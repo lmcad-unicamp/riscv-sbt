@@ -1,75 +1,166 @@
 DIR_ROOT := $(PWD)
 DIR_TOOLCHAIN := $(DIR_ROOT)/toolchain
 
-all: riscv-gnu-toolchain riscv-isa-sim riscv-pk
+all: llvm riscv-isa-sim riscv-pk
 
+###
 ### riscv-gnu-toolchain ###
+###
 
-riscv-gnu-toolchain/Makefile:
-	cd riscv-gnu-toolchain && \
-	./configure --prefix=$(DIR_TOOLCHAIN) --enable-multilib
+GCC_BUILD := riscv-gnu-toolchain/build
+GCC_MAKEFILE := $(GCC_BUILD)/Makefile
+GCC_OUT := $(GCC_BUILD)/build-gcc-newlib/gcc/xgcc
+GCC_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/riscv64-unknown-elf-gcc
+
+$(GCC_MAKEFILE):
+	mkdir -p $(GCC_BUILD)
+	cd $(GCC_BUILD) && \
+	../configure --prefix=$(DIR_TOOLCHAIN) --enable-multilib
+
+$(GCC_OUT) $(GCC_TOOLCHAIN): $(GCC_MAKEFILE)
+	# this builds AND installs the riscv-gnu-toolchain
+	$(MAKE) -C $(GCC_BUILD) -j9
+	touch $@
 
 .PHONY: riscv-gnu-toolchain
-riscv-gnu-toolchain: riscv-gnu-toolchain/Makefile
-	$(MAKE) -C riscv-gnu-toolchain -j9
+riscv-gnu-toolchain: $(GCC_TOOLCHAIN)
 
 riscv-gnu-toolchain-clean:
-	$(MAKE) -C riscv-gnu-toolchain distclean
-	rm -f riscv-gnu-toolchain/Makefile
+	rm -rf $(GCC_BUILD)
 
+###
 ### riscv-fesvr ####
+###
 
-riscv-fesvr/Makefile:
-	cd riscv-fesvr && \
-	./configure --prefix=$(DIR_TOOLCHAIN)
+FESVR_BUILD := riscv-fesvr/build
+FESVR_MAKEFILE := $(FESVR_BUILD)/Makefile
+FESVR_OUT := $(FESVR_BUILD)/libfesvr.so
+FESVR_TOOLCHAIN := $(DIR_TOOLCHAIN)/lib/libfesvr.so
+
+$(FESVR_MAKEFILE):
+	mkdir -p $(FESVR_BUILD)
+	cd $(FESVR_BUILD) && \
+	../configure --prefix=$(DIR_TOOLCHAIN)
+
+$(FESVR_OUT): $(FESVR_MAKEFILE)
+	$(MAKE) -C $(FESVR_BUILD) -j9
+
+$(FESVR_TOOLCHAIN): $(FESVR_OUT)
+	$(MAKE) -C $(FESVR_BUILD) install
 
 .PHONY: riscv-fesvr
-riscv-fesvr $(DIR_TOOLCHAIN)/lib/libfesvr.so: riscv-fesvr/Makefile
-	$(MAKE) -C riscv-fesvr -j9
-	$(MAKE) -C riscv-fesvr install
+riscv-fesvr: $(FESVR_TOOLCHAIN)
 
 riscv-fesvr-clean:
-	$(MAKE) -C riscv-fesvr distclean
-	rm -f riscv-fesvr/Makefile
+	rm -rf $(FESVR_BUILD)
 
+###
 ### riscv-isa-sim ###
+###
 
-riscv-isa-sim/Makefile: $(DIR_TOOLCHAIN)/lib/libfesvr.so
-	cd riscv-isa-sim && \
-	./configure --prefix=$(DIR_TOOLCHAIN) --with-fesvr=$(DIR_TOOLCHAIN)
+SIM_BUILD := riscv-isa-sim/build
+SIM_MAKEFILE := $(SIM_BUILD)/Makefile
+SIM_OUT := $(SIM_BUILD)/spike
+SIM_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/spike
+
+$(SIM_MAKEFILE): $(FESVR_TOOLCHAIN)
+	mkdir -p $(SIM_BUILD)
+	cd $(SIM_BUILD) && \
+	../configure --prefix=$(DIR_TOOLCHAIN) --with-fesvr=$(DIR_TOOLCHAIN)
+
+$(SIM_OUT): $(SIM_MAKEFILE)
+	$(MAKE) -C $(SIM_BUILD) -j9
+	touch $@
+
+$(SIM_TOOLCHAIN): $(SIM_OUT)
+	$(MAKE) -C $(SIM_BUILD) install
 
 .PHONY: riscv-isa-sim
-riscv-isa-sim: riscv-isa-sim/Makefile
-	$(MAKE) -C riscv-isa-sim -j9
-	$(MAKE) -C riscv-isa-sim install
+riscv-isa-sim: $(SIM_TOOLCHAIN)
 
 riscv-isa-sim-clean:
-	$(MAKE) -C riscv-isa-sim distclean
-	rm -f riscv-isa-sim/Makefile
+	rm -rf $(SIM_BUILD)
 
+###
 ### riscv-pk ###
+###
 
-riscv-pk/build/Makefile riscv-pk/build64/Makefile:
-	# 32 bit
-	mkdir -p riscv-pk/build
-	cd riscv-pk/build && \
-	../configure --prefix=$(DIR_TOOLCHAIN) --host=riscv64-unknown-elf --enable-32bit
-	# 64 bit
-	mkdir -p riscv-pk/build64
-	cd riscv-pk/build64 && \
-	../configure --prefix=$(DIR_TOOLCHAIN) --host=riscv64-unknown-elf
+PK_HOST := riscv64-unknown-elf
+PK_BUILD := riscv-pk/build
+
+PK32_BUILD := $(PK_BUILD)/32
+PK32_MAKEFILE := $(PK32_BUILD)/Makefile
+PK32_OUT := $(PK32_BUILD)/pk
+PK32_TOOLCHAIN := $(DIR_TOOLCHAIN)/riscv32-unknown-elf/bin/pk
+
+$(PK32_MAKEFILE):
+	mkdir -p $(PK32_BUILD)
+	cd $(PK32_BUILD) && \
+	../../configure --prefix=$(DIR_TOOLCHAIN) --host=$(PK_HOST) --enable-32bit
+
+$(PK32_OUT): $(PK32_MAKEFILE)
+	$(MAKE) -C $(PK32_BUILD)
+	touch $@
+
+$(PK32_TOOLCHAIN): $(PK32_OUT)
+	$(MAKE) -C $(PK32_BUILD) install
+
+PK64_BUILD := $(PK_BUILD)/64
+PK64_MAKEFILE := $(PK64_BUILD)/Makefile
+PK64_OUT := $(PK64_BUILD)/pk
+PK64_TOOLCHAIN := $(DIR_TOOLCHAIN)/riscv64-unknown-elf/bin/pk
+
+$(PK64_MAKEFILE):
+	mkdir -p $(PK64_BUILD)
+	cd $(PK64_BUILD) && \
+	../../configure --prefix=$(DIR_TOOLCHAIN) --host=$(PK_HOST)
+
+$(PK64_OUT): $(PK64_MAKEFILE)
+	$(MAKE) -C $(PK64_BUILD)
+	touch $@
+
+$(PK64_TOOLCHAIN): $(PK64_OUT)
+	$(MAKE) -C $(PK64_BUILD) install
 
 .PHONY: riscv-pk
-riscv-pk: riscv-pk/build/Makefile riscv-pk/build64/Makefile
-	$(MAKE) -C riscv-pk/build
-	$(MAKE) -C riscv-pk/build install
-	$(MAKE) -C riscv-pk/build64
-	$(MAKE) -C riscv-pk/build64 install
+riscv-pk: $(PK32_TOOLCHAIN) $(PK64_TOOLCHAIN)
 
 riscv-pk-clean:
-	rm -rf riscv-pk/build riscv-pk/build64
+	rm -rf $(PK32_BUILD) $(PK64_BUILD)
+
+###
+### llvm ###
+###
+
+LLVM_BUILD := llvm/build
+LLVM_MAKEFILE := $(LLVM_BUILD)/Makefile
+#LLVM_OUT := $(LLVM_BUILD)/clang
+#LLVM_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/clang
+
+$(LLVM_MAKEFILE): $(GCC_TOOLCHAIN)
+	mkdir -p $(LLVM_BUILD)
+	cd $(LLVM_BUILD) && \
+	cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD="ARM RISCV X86" -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) ../
+
+$(LLVM_OUT): $(LLVM_MAKEFILE)
+	$(MAKE) -C $(LLVM_BUILD) -j9
+	touch $@
+
+$(LLVM_TOOLCHAIN): $(LLVM_OUT)
+	$(MAKE) -C $(LLVM_BUILD) install
+
+.PHONY: llvm
+llvm: $(LLVM_TOOLCHAIN)
+
+llvm-clean:
+	rm -rf $(LLVM_BUILD)
 
 ###
 
-clean: riscv-gnu-toolchain-clean riscv-fesvr-clean riscv-isa-sim-clean riscv-pk-clean
+clean: \
+	riscv-gnu-toolchain-clean \
+	riscv-fesvr-clean \
+	riscv-isa-sim-clean \
+	riscv-pk-clean \
+	llvm-clean
 	rm -rf $(DIR_TOOLCHAIN)
