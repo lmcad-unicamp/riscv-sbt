@@ -129,25 +129,47 @@ riscv-pk-clean:
 	rm -rf $(PK32_BUILD) $(PK64_BUILD)
 
 ###
+### cmake
+###
+
+CMAKE_URL := http://www.cmake.org/files/v3.5/cmake-3.5.2-Linux-x86_64.tar.gz
+CMAKE_ROOT := cmake
+CMAKE_PKG := $(CMAKE_ROOT)/cmake-3.5.2-Linux-x86_64.tar.gz
+CMAKE := $(PWD)/$(CMAKE_ROOT)/bin/cmake
+
+$(CMAKE_PKG):
+	mkdir -p $(CMAKE_ROOT)
+	cd $(CMAKE_ROOT) && \
+	wget $(CMAKE_URL)
+
+$(CMAKE): $(CMAKE_PKG)
+	tar --strip-components=1 -xvf $(CMAKE_PKG) -C $(CMAKE_ROOT)
+	touch $(CMAKE)
+
+.PHONY:
+cmake: $(CMAKE)
+
+###
 ### llvm ###
 ###
 
 LLVM_BUILD := llvm/build
 LLVM_MAKEFILE := $(LLVM_BUILD)/Makefile
-#LLVM_OUT := $(LLVM_BUILD)/clang
-#LLVM_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/clang
+LLVM_OUT := $(LLVM_BUILD)/clang
+LLVM_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/clang
 
-$(LLVM_MAKEFILE): $(GCC_TOOLCHAIN)
+$(LLVM_MAKEFILE): $(GCC_TOOLCHAIN) $(CMAKE)
 	mkdir -p $(LLVM_BUILD)
 	cd $(LLVM_BUILD) && \
-	cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD="ARM RISCV X86" -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) ../
+	$(CMAKE) -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86" -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) ../
 
 $(LLVM_OUT): $(LLVM_MAKEFILE)
-	$(MAKE) -C $(LLVM_BUILD) -j9
-	touch $@
+	$(MAKE) -C $(LLVM_BUILD) #-j9 #| tee $(LLVM_BUILD)/log.txt
+	false
 
 $(LLVM_TOOLCHAIN): $(LLVM_OUT)
-	$(MAKE) -C $(LLVM_BUILD) install
+	echo INSTALL
+	#$(MAKE) -C $(LLVM_BUILD) install
 
 .PHONY: llvm
 llvm: $(LLVM_TOOLCHAIN)
