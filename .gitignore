@@ -1,3 +1,4 @@
+build-llvm
 cmake
 merge_tools
 toolchain

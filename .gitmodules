@@ -13,3 +13,6 @@
 [submodule "riscv-pk"]
 	path = riscv-pk
 	url = https://github.com/riscv/riscv-pk
+[submodule "clang"]
+	path = clang
+	url = https://github.com/OpenISA/clang

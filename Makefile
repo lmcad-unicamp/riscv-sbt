@@ -1,3 +1,5 @@
+MAKE_OPTS := -j9
+
 DIR_ROOT := $(PWD)
 DIR_TOOLCHAIN := $(DIR_ROOT)/toolchain
 
@@ -19,7 +21,7 @@ $(GCC_MAKEFILE):
 
 $(GCC_OUT) $(GCC_TOOLCHAIN): $(GCC_MAKEFILE)
 	# this builds AND installs the riscv-gnu-toolchain
-	$(MAKE) -C $(GCC_BUILD) -j9
+	$(MAKE) -C $(GCC_BUILD) $(MAKE_OPTS)
 	touch $@
 
 .PHONY: riscv-gnu-toolchain
@@ -43,7 +45,7 @@ $(FESVR_MAKEFILE):
 	../configure --prefix=$(DIR_TOOLCHAIN)
 
 $(FESVR_OUT): $(FESVR_MAKEFILE)
-	$(MAKE) -C $(FESVR_BUILD) -j9
+	$(MAKE) -C $(FESVR_BUILD) $(MAKE_OPTS)
 
 $(FESVR_TOOLCHAIN): $(FESVR_OUT)
 	$(MAKE) -C $(FESVR_BUILD) install
@@ -69,7 +71,7 @@ $(SIM_MAKEFILE): $(FESVR_TOOLCHAIN)
 	../configure --prefix=$(DIR_TOOLCHAIN) --with-fesvr=$(DIR_TOOLCHAIN)
 
 $(SIM_OUT): $(SIM_MAKEFILE)
-	$(MAKE) -C $(SIM_BUILD) -j9
+	$(MAKE) -C $(SIM_BUILD) $(MAKE_OPTS)
 	touch $@
 
 $(SIM_TOOLCHAIN): $(SIM_OUT)
@@ -153,19 +155,19 @@ cmake: $(CMAKE)
 ### llvm ###
 ###
 
-LLVM_BUILD := llvm/build
+LLVM_BUILD := build-llvm
 LLVM_MAKEFILE := $(LLVM_BUILD)/Makefile
-LLVM_OUT := $(LLVM_BUILD)/bin/llc
-LLVM_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/llc
+LLVM_OUT := $(LLVM_BUILD)/bin/clang
+LLVM_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/clang
 
 $(LLVM_MAKEFILE): $(GCC_TOOLCHAIN) $(CMAKE)
 	mkdir -p $(LLVM_BUILD)
 	cd $(LLVM_BUILD) && \
-	$(CMAKE) -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86" -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) ../
+	$(CMAKE) -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86" -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) ../llvm
 	touch $@
 
 $(LLVM_OUT): $(LLVM_MAKEFILE)
-	$(MAKE) -C $(LLVM_BUILD) #-j9 #| tee $(LLVM_BUILD)/log.txt
+	$(MAKE) -C $(LLVM_BUILD) $(MAKE_OPTS)
 	touch $@
 
 $(LLVM_TOOLCHAIN): $(LLVM_OUT)
