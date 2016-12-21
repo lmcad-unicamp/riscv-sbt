@@ -155,21 +155,22 @@ cmake: $(CMAKE)
 
 LLVM_BUILD := llvm/build
 LLVM_MAKEFILE := $(LLVM_BUILD)/Makefile
-LLVM_OUT := $(LLVM_BUILD)/clang
-LLVM_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/clang
+LLVM_OUT := $(LLVM_BUILD)/bin/llc
+LLVM_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/llc
 
 $(LLVM_MAKEFILE): $(GCC_TOOLCHAIN) $(CMAKE)
 	mkdir -p $(LLVM_BUILD)
 	cd $(LLVM_BUILD) && \
 	$(CMAKE) -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86" -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) ../
+	touch $@
 
 $(LLVM_OUT): $(LLVM_MAKEFILE)
 	$(MAKE) -C $(LLVM_BUILD) #-j9 #| tee $(LLVM_BUILD)/log.txt
-	false
+	touch $@
 
 $(LLVM_TOOLCHAIN): $(LLVM_OUT)
-	echo INSTALL
-	#$(MAKE) -C $(LLVM_BUILD) install
+	$(MAKE) -C $(LLVM_BUILD) install
+	touch $@
 
 .PHONY: llvm
 llvm: $(LLVM_TOOLCHAIN)
