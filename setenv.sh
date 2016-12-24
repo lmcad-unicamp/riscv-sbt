@@ -1,1 +1,2 @@
-export PATH=$PWD/toolchain/bin:$PATH
+export TOPDIR=$PWD
+export PATH=$TOPDIR/toolchain/bin:$PATH

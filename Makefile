@@ -3,7 +3,7 @@ MAKE_OPTS := -j9
 DIR_ROOT := $(PWD)
 DIR_TOOLCHAIN := $(DIR_ROOT)/toolchain
 
-all: llvm riscv-isa-sim riscv-pk
+all: sbt riscv-isa-sim riscv-pk
 
 ###
 ### riscv-gnu-toolchain ###
@@ -161,6 +161,7 @@ LLVM_OUT := $(LLVM_BUILD)/bin/clang
 LLVM_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/clang
 
 $(LLVM_MAKEFILE): $(GCC_TOOLCHAIN) $(CMAKE)
+	cd llvm/tools && ln -sf ../../clang clang
 	mkdir -p $(LLVM_BUILD)
 	cd $(LLVM_BUILD) && \
 	$(CMAKE) -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86" -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) ../llvm
@@ -181,11 +182,41 @@ llvm-clean:
 	rm -rf $(LLVM_BUILD)
 
 ###
+### sbt ###
+###
+
+SBT_BUILD := sbt/build
+SBT_MAKEFILE := $(SBT_BUILD)/Makefile
+SBT_OUT := $(SBT_BUILD)/riscv-sbt
+SBT_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/riscv-sbt
+
+$(SBT_MAKEFILE): $(LLVM_TOOLCHAIN)
+	mkdir -p $(SBT_BUILD)
+	cd $(SBT_BUILD) && \
+	$(CMAKE) -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) ..
+	touch $@
+
+$(SBT_OUT): $(SBT_MAKEFILE)
+	$(MAKE) VERBOSE=1 -C $(SBT_BUILD)
+	touch $@
+
+$(SBT_TOOLCHAIN): $(SBT_OUT)
+	$(MAKE) -C $(SBT_BUILD) install
+	touch $@
+
+.PHONY: sbt
+sbt: $(SBT_TOOLCHAIN)
+
+sbt-clean:
+	rm -rf $(SBT_BUILD)
+
+###
 
 clean: \
 	riscv-gnu-toolchain-clean \
 	riscv-fesvr-clean \
 	riscv-isa-sim-clean \
 	riscv-pk-clean \
-	llvm-clean
+	llvm-clean \
+	sbt-clean
 	rm -rf $(DIR_TOOLCHAIN)

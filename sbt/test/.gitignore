@@ -1,0 +1,4 @@
+*.o
+hello
+x86hello
+test_x86_syscall
