@@ -196,16 +196,16 @@ $(SBT_MAKEFILE): $(LLVM_TOOLCHAIN)
 	$(CMAKE) -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) ..
 	touch $@
 
-$(SBT_OUT): $(SBT_MAKEFILE)
+.PHONY: sbt-build
+sbt-build: $(SBT_MAKEFILE)
 	$(MAKE) VERBOSE=1 -C $(SBT_BUILD)
-	touch $@
 
 $(SBT_TOOLCHAIN): $(SBT_OUT)
 	$(MAKE) -C $(SBT_BUILD) install
 	touch $@
 
 .PHONY: sbt
-sbt: $(SBT_TOOLCHAIN)
+sbt: sbt-build $(SBT_TOOLCHAIN)
 
 sbt-clean:
 	rm -rf $(SBT_BUILD)

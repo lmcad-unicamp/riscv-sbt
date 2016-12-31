@@ -1,4 +1,7 @@
 *.o
 hello
-x86hello
+rv-x86-hello
+rv-x86-hello.bc
+rv-x86-hello.s
 test_x86_syscall
+x86hello
