@@ -13,12 +13,13 @@ link_directories ("${PROJECT_SOURCE_DIR}/../toolchain/lib")
 add_executable (riscv-sbt sbt.cpp)
 
 # llvm-config --cxxflags
+# TODO make -g flag conditional
 target_compile_options (riscv-sbt PRIVATE
   -fPIC -fvisibility-inlines-hidden -Wall -W -Wno-unused-parameter
   -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic
   -Wno-long-long -Wno-maybe-uninitialized -Wdelete-non-virtual-dtor
   -Wno-comment -Werror=date-time -std=c++11 -ffunction-sections
-  -fdata-sections -O3 -fno-exceptions -fno-rtti)
+  -fdata-sections -O3 -fno-exceptions -fno-rtti -g)
 target_compile_definitions(riscv-sbt PRIVATE
   NDEBUG _GNU_SOURCE __STDC_CONSTANT_MACROS __STDC_FORMAT_MACROS
   __STDC_LIMIT_MACROS)
