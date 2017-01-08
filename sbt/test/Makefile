@@ -55,4 +55,5 @@ test_x86_syscall.o: test_x86_syscall.s
 
 clean:
 	rm -f hello.o hello x86hello.o x86hello \
-		test_x86_syscall.o test_x86_syscall
+		test_x86_syscall.o test_x86_syscall \
+		rv-x86-hello*

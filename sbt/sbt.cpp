@@ -1,6 +1,12 @@
 #include "sbt.h"
 
 #include <llvm/Bitcode/BitcodeWriter.h>
+#include <llvm/MC/MCAsmInfo.h>
+#include <llvm/MC/MCContext.h>
+#include <llvm/MC/MCDisassembler/MCDisassembler.h>
+#include <llvm/MC/MCInstrInfo.h>
+#include <llvm/MC/MCObjectFileInfo.h>
+#include <llvm/MC/MCRegisterInfo.h>
 #include <llvm/Object/Binary.h>
 #include <llvm/Object/ObjectFile.h>
 #include <llvm/Support/FileSystem.h>
@@ -64,46 +70,6 @@ SBT::SBT(
     }
     InputFiles.push_back(File);
   }
-}
-
-
-Error SBT::translate(const std::string &File)
-{
-  Error E = make_error<SBTError>(File);
-  SBTError &SE = cast<SBTError>(E);
-
-  // attempt to open the binary.
-  Expected<object::OwningBinary<object::Binary>> Exp =
-    object::createBinary(File);
-  if (!Exp)
-    return Exp.takeError();
-  object::OwningBinary<object::Binary> &OB = Exp.get();
-  object::Binary *Bin = OB.getBinary();
-
-  if (!object::ObjectFile::classof(Bin)) {
-    SE << "Unrecognized file type.\n";
-    return E;
-  }
-
-  object::ObjectFile *obj = dyn_cast<object::ObjectFile>(Bin);
-
-  outs() << obj->getFileName() << ": file format: " << obj->getFileFormatName()
-         << "\n";
-
-  // get target
-  Triple triple("riscv32-unknown-elf");
-  triple.setArch(Triple::ArchType(obj->getArch()));
-  std::string tripleName = triple.getTriple();
-  outs() << "triple: " << tripleName << "\n";
-
-  std::string StrError;
-  const Target *Target = TargetRegistry::lookupTarget(tripleName, StrError);
-  if (!Target) {
-    SE << "target not found: " << tripleName << ": " << StrError << "\n";
-    return E;
-  }
-
-  return Error::success();
 }
 
 Error SBT::genHello()
@@ -180,6 +146,87 @@ void SBT::write()
 }
 
 
+Error SBT::translate(const std::string &File)
+{
+  SBTError SE(File);
+  auto E = [&SE](){
+    return make_error<SBTError>(std::move(SE));
+  };
+
+  // attempt to open the binary.
+  Expected<object::OwningBinary<object::Binary>> Exp =
+    object::createBinary(File);
+  if (!Exp)
+    return Exp.takeError();
+  object::OwningBinary<object::Binary> &OB = Exp.get();
+  object::Binary *Bin = OB.getBinary();
+
+  if (!object::ObjectFile::classof(Bin)) {
+    SE << "Unrecognized file type.\n";
+    return E();
+  }
+
+  object::ObjectFile *OBJ = dyn_cast<object::ObjectFile>(Bin);
+
+  outs() << OBJ->getFileName() << ": file format: " << OBJ->getFileFormatName()
+         << "\n";
+
+  // get target
+  Triple Triple("riscv32-unknown-elf");
+  Triple.setArch(Triple::ArchType(OBJ->getArch()));
+  std::string TripleName = Triple.getTriple();
+  outs() << "Triple: " << TripleName << "\n";
+
+  std::string StrError;
+  const Target *Target = TargetRegistry::lookupTarget(TripleName, StrError);
+  if (!Target) {
+    SE << "Target not found: " << TripleName << ": " << StrError << "\n";
+    return E();
+  }
+
+  std::unique_ptr<const MCRegisterInfo> MRI(
+      Target->createMCRegInfo(TripleName));
+  if (!MRI) {
+    SE << "No register info for target " << TripleName << "\n";
+    return E();
+  }
+
+  // Set up disassembler.
+  std::unique_ptr<const MCAsmInfo> AsmInfo(
+      Target->createMCAsmInfo(*MRI, TripleName));
+  if (!AsmInfo) {
+    SE << "No assembly info for target " << TripleName << "\n";
+    return E();
+  }
+
+  SubtargetFeatures Features;
+  std::unique_ptr<const MCSubtargetInfo> STI(
+      Target->createMCSubtargetInfo(TripleName, "", Features.getString()));
+  if (!STI) {
+    SE << "No subtarget info for target " << TripleName << "\n";
+    return E();
+  }
+
+  std::unique_ptr<const MCObjectFileInfo> MOFI(new MCObjectFileInfo);
+  MCContext Ctx(AsmInfo.get(), MRI.get(), MOFI.get());
+
+  std::unique_ptr<const MCDisassembler> DisAsm(
+      Target->createMCDisassembler(*STI, Ctx));
+  if (!DisAsm) {
+    SE << "No disassembler for target " << TripleName << "\n";
+    return E();
+  }
+
+  std::unique_ptr<const MCInstrInfo> MII(Target->createMCInstrInfo());
+  if (!MII) {
+    SE << "No instruction info for target " << TripleName << "\n";
+    return E();
+  }
+
+  return Error::success();
+}
+
+
 /// SBTError ///
 
 char SBTError::ID = 'S';
@@ -190,13 +237,16 @@ void handleError(Error &&E)
 {
   Error E2 = llvm::handleErrors(std::move(E),
     [](const SBTError &SE) {
+      errs() << "SBTError:\n";
       SE.log(errs());
+      errs().flush();
+      std::exit(EXIT_FAILURE);
     });
 
-  if (E2)
+  if (E2) {
     logAllUnhandledErrors(std::move(E2), errs(), *SBT::BIN_NAME + ": ");
-
-  std::exit(EXIT_FAILURE);
+    std::exit(EXIT_FAILURE);
+  }
 }
 
 } // sbt
@@ -246,6 +296,9 @@ int main(int argc, char *argv[])
 
   sbt::handleError(SBT.run());
   SBT.dump();
+
+  errs() << "Error: Incomplete translation\n";
+  std::exit(EXIT_FAILURE);
   SBT.write();
 
   return EXIT_SUCCESS;
