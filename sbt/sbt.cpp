@@ -290,9 +290,9 @@ int main(int argc, char *argv[])
   } Finish;
 
   Expected<sbt::SBT> Exp = sbt::SBT::create(InputFiles, OutputFile);
-  sbt::SBT &SBT = Exp.get();
   if (!Exp)
     sbt::handleError(Exp.takeError());
+  sbt::SBT &SBT = Exp.get();
 
   sbt::handleError(SBT.run());
   SBT.dump();

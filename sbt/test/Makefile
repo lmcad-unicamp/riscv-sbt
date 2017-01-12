@@ -42,6 +42,7 @@ rv-x86-hello.s: rv-x86-hello.bc
 
 rv-x86-hello.bc: hello.o
 	riscv-sbt -o $@ $<
+#	gdb --args riscv-sbt -o $@ $<
 
 
 ##

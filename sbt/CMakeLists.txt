@@ -117,7 +117,7 @@ link_directories (${SBT_LINK_DIRS})
 add_executable (riscv-sbt sbt.cpp)
 target_compile_options (riscv-sbt PRIVATE ${SBT_COMPILE_OPTIONS})
 target_compile_definitions(riscv-sbt PRIVATE ${SBT_COMPILE_DEFINITIONS})
-target_link_libraries (riscv-sbt ${SBT_SYS_LIBS} ${SBT_LIBS})
+target_link_libraries (riscv-sbt ${SBT_SYS_LIBS} ${SBT_LIBS} LLVMRISCVDisassembler)
 
 # install
 install (TARGETS riscv-sbt DESTINATION bin)

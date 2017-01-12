@@ -169,16 +169,16 @@ $(LLVM_MAKEFILE): $(GCC_TOOLCHAIN) $(CMAKE)
 	$(CMAKE) -DCMAKE_BUILD_TYPE=$(LLVM_BUILD_TYPE) -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86" -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) ../llvm
 	touch $@
 
-$(LLVM_OUT): $(LLVM_MAKEFILE)
+.PHONY: llvm-build
+llvm-build: $(LLVM_MAKEFILE)
 	$(MAKE) -C $(LLVM_BUILD) $(MAKE_OPTS)
-	touch $@
 
 $(LLVM_TOOLCHAIN): $(LLVM_OUT)
 	$(MAKE) -C $(LLVM_BUILD) install
 	touch $@
 
 .PHONY: llvm
-llvm: $(LLVM_TOOLCHAIN)
+llvm: llvm-build $(LLVM_TOOLCHAIN)
 
 llvm-clean:
 	rm -rf $(LLVM_BUILD)
