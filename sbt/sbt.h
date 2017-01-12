@@ -77,7 +77,7 @@ public:
   SBTError(const std::string &FileName) :
     SS(new llvm::raw_string_ostream(S))
   {
-    *SS << *SBT::BIN_NAME << ": '" << FileName << "': ";
+    *SS << *SBT::BIN_NAME << ": error: '" << FileName << "': ";
   }
 
   SBTError(const SBTError &) = delete;

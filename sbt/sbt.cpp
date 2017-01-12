@@ -237,14 +237,14 @@ void handleError(Error &&E)
 {
   Error E2 = llvm::handleErrors(std::move(E),
     [](const SBTError &SE) {
-      errs() << "SBTError:\n";
+      // errs() << "SBTError:\n";
       SE.log(errs());
       errs().flush();
       std::exit(EXIT_FAILURE);
     });
 
   if (E2) {
-    logAllUnhandledErrors(std::move(E2), errs(), *SBT::BIN_NAME + ": ");
+    logAllUnhandledErrors(std::move(E2), errs(), *SBT::BIN_NAME + ": error: ");
     std::exit(EXIT_FAILURE);
   }
 }
