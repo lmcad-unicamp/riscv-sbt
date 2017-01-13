@@ -177,6 +177,9 @@ $(LLVM_TOOLCHAIN): $(LLVM_OUT)
 	$(MAKE) -C $(LLVM_BUILD) install
 	touch $@
 
+llvm-install:
+	$(MAKE) -C $(LLVM_BUILD) install
+
 .PHONY: llvm
 llvm: llvm-build $(LLVM_TOOLCHAIN)
 

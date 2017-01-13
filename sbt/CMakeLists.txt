@@ -89,6 +89,15 @@ if (RC1 OR RC2 OR RC3 OR RC4 OR RC5 OR RC6)
   message(FATAL_ERROR "Failed to execute llvm-config")
 endif()
 
+set (SBT_RISCV_MASTER_LIBS
+  LLVMRISCVMasterDisassembler
+  LLVMRISCVMasterCodeGen
+  LLVMRISCVMasterAsmParser
+  LLVMRISCVMasterDesc
+  LLVMRISCVMasterInfo
+  LLVMRISCVMasterAsmPrinter
+  )
+
 # set debug options
 set (DEBUG TRUE)
 if (DEBUG)
@@ -117,7 +126,11 @@ link_directories (${SBT_LINK_DIRS})
 add_executable (riscv-sbt sbt.cpp)
 target_compile_options (riscv-sbt PRIVATE ${SBT_COMPILE_OPTIONS})
 target_compile_definitions(riscv-sbt PRIVATE ${SBT_COMPILE_DEFINITIONS})
-target_link_libraries (riscv-sbt ${SBT_SYS_LIBS} ${SBT_LIBS} LLVMRISCVDisassembler)
+target_link_libraries (riscv-sbt
+  ${SBT_RISCV_MASTER_LIBS}
+  ${SBT_LIBS}
+  ${SBT_SYS_LIBS}
+)
 
 # install
 install (TARGETS riscv-sbt DESTINATION bin)

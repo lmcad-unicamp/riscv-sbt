@@ -19,6 +19,16 @@
 
 using namespace llvm;
 
+extern "C" void LLVMInitializeRISCVMasterAsmParser();
+extern "C" void LLVMInitializeRISCVMasterDisassembler();
+extern "C" void LLVMInitializeRISCVMasterTargetMC();
+extern "C" void LLVMInitializeRISCVMasterTarget();
+extern "C" void LLVMInitializeRISCVMasterTargetInfo();
+
+namespace llvm {
+Target &getTheRISCVMaster32Target();
+}
+
 namespace sbt {
 
 void SBT::init()
@@ -32,6 +42,12 @@ void SBT::init()
   InitializeAllTargetMCs();
   InitializeAllAsmParsers();
   InitializeAllDisassemblers();
+
+  LLVMInitializeRISCVMasterAsmParser();
+  LLVMInitializeRISCVMasterDisassembler();
+  LLVMInitializeRISCVMasterTargetMC();
+  LLVMInitializeRISCVMasterTarget();
+  LLVMInitializeRISCVMasterTargetInfo();
 }
 
 void SBT::finish()
@@ -218,7 +234,8 @@ Error SBT::translate(const std::string &File)
   outs() << "Triple: " << TripleName << "\n";
 
   std::string StrError;
-  const Target *Target = TargetRegistry::lookupTarget(TripleName, StrError);
+  const Target *Target = &getTheRISCVMaster32Target();
+  // const Target *Target = TargetRegistry::lookupTarget(TripleName, StrError);
   if (!Target) {
     SE << "Target not found: " << TripleName << ": " << StrError << "\n";
     return E();
@@ -330,7 +347,7 @@ Error SBT::translate(const std::string &File)
 #endif
 
 #ifndef NDEBUG
-      raw_ostream &DebugOut = DebugFlag ? dbgs() : nulls();
+      raw_ostream &DebugOut = dbgs();
 #else
       raw_ostream &DebugOut = nulls();
 #endif
@@ -354,10 +371,10 @@ Error SBT::translate(const std::string &File)
 
       // instructions
       uint64_t Size;
-      outs() << "SectionAddr = " << SectionAddr << "\n";
-      outs() << "Bytes = " << Bytes.size() << "\n";
+      // outs() << "SectionAddr = " << SectionAddr << "\n";
+      // outs() << "Bytes = " << Bytes.size() << "\n";
       for (uint64_t Index = Start; Index < End; Index += Size) {
-        outs() << "Index = " << Index << "\n";
+        // outs() << "Index = " << Index << "\n";
 
         MCInst Inst;
 
@@ -366,8 +383,8 @@ Error SBT::translate(const std::string &File)
           DisAsm->getInstruction(Inst, Size, Bytes.slice(Index),
             SectionAddr + Index, DebugOut, nulls());
         if (st == MCDisassembler::DecodeStatus::Success) {
-          outs() << "*\n";
           Inst.print(outs());
+          outs() << "\n";
           /*
 #ifndef NDEBUG
           outs() << format("%8" PRIx64 ":", eoffset + Index);
