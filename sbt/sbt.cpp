@@ -8,6 +8,8 @@
 #include <llvm/MC/MCObjectFileInfo.h>
 #include <llvm/MC/MCRegisterInfo.h>
 #include <llvm/Object/Binary.h>
+#include <llvm/Object/ELF.h>
+#include <llvm/Object/MachO.h>
 #include <llvm/Object/ObjectFile.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/Signals.h>
@@ -145,6 +147,44 @@ void SBT::write()
   OS.flush();
 }
 
+static Expected<std::vector<std::pair<uint64_t, StringRef>>>
+getSymbolsList(const object::ObjectFile *Obj, const object::SectionRef &Section)
+{
+  uint64_t SectionAddr = Section.getAddress();
+
+  std::error_code EC;
+  // Make a list of all the symbols in this section.
+  std::vector<std::pair<uint64_t, StringRef>> Symbols;
+  for (auto Symbol : Obj->symbols()) {
+    if (!Section.containsSymbol(Symbol))
+      continue;
+
+    auto Exp = Symbol.getAddress();
+    if (!Exp)
+      return Exp.takeError();
+    auto &Address = Exp.get();
+    Address -= SectionAddr;
+
+    auto Exp2 = Symbol.getName();
+    if (!Exp2)
+      return Exp2.takeError();
+    auto &Name = Exp2.get();
+    Symbols.push_back(std::make_pair(Address, Name));
+  }
+
+  // Sort the symbols by address, just in case they didn't come in that way.
+  array_pod_sort(Symbols.begin(), Symbols.end());
+  return Symbols;
+}
+
+static uint64_t getELFOffset(const object::SectionRef &Section)
+{
+  object::DataRefImpl Sec = Section.getRawDataRefImpl();
+  auto sec = reinterpret_cast<
+    const object::Elf_Shdr_Impl<
+      object::ELFType<support::little, false>> *>(Sec.p);
+  return sec->sh_offset;
+}
 
 Error SBT::translate(const std::string &File)
 {
@@ -166,14 +206,14 @@ Error SBT::translate(const std::string &File)
     return E();
   }
 
-  object::ObjectFile *OBJ = dyn_cast<object::ObjectFile>(Bin);
+  object::ObjectFile *Obj = dyn_cast<object::ObjectFile>(Bin);
 
-  outs() << OBJ->getFileName() << ": file format: " << OBJ->getFileFormatName()
+  outs() << Obj->getFileName() << ": file format: " << Obj->getFileFormatName()
          << "\n";
 
   // get target
   Triple Triple("riscv32-unknown-elf");
-  Triple.setArch(Triple::ArchType(OBJ->getArch()));
+  Triple.setArch(Triple::ArchType(Obj->getArch()));
   std::string TripleName = Triple.getTriple();
   outs() << "Triple: " << TripleName << "\n";
 
@@ -223,6 +263,138 @@ Error SBT::translate(const std::string &File)
     return E();
   }
 
+  // sections
+  for (const object::SectionRef &Section : Obj->sections()) {
+    if (!Section.isText())
+      continue;
+
+    uint64_t SectionAddr = Section.getAddress();
+
+    StringRef SegmentName = "";
+    if (const object::MachOObjectFile *MachO =
+        dyn_cast<const object::MachOObjectFile>(Obj)) {
+      object::DataRefImpl DR = Section.getRawDataRefImpl();
+      SegmentName = MachO->getSectionFinalSegmentName(DR);
+    }
+    StringRef Name;
+    std::error_code EC = Section.getName(Name);
+    if (EC) {
+      SE << "Failed to get Section Name";
+      return E();
+    }
+#ifndef NDEBUG
+    outs() << "Disassembly of section ";
+    if (!SegmentName.empty())
+      outs() << SegmentName << ",";
+    outs() << Name << ':';
+#endif
+
+    StringRef BytesStr;
+    EC = Section.getContents(BytesStr);
+    if (EC) {
+      SE << "Failed to get Section Contents";
+      return E();
+    }
+    ArrayRef<uint8_t> Bytes(reinterpret_cast<const uint8_t *>(BytesStr.data()),
+                            BytesStr.size());
+
+    // Make a list of all the symbols in this section.
+    auto Exp = getSymbolsList(Obj, Section);
+    if (!Exp)
+      return Exp.takeError();
+    auto &Symbols = Exp.get();
+    // If the section has no symbols just insert a dummy one and disassemble
+    // the whole section.
+    if (Symbols.empty())
+      Symbols.push_back(std::make_pair(0, Name));
+
+    uint64_t SectSize = Section.getSize();
+    // Disassemble symbol by symbol.
+    for (unsigned si = 0, se = Symbols.size(); si != se; ++si) {
+      uint64_t Start = Symbols[si].first;
+      uint64_t End;
+
+      // The end is either the size of the section or the beginning of the next
+      // symbol.
+      if (si == se - 1)
+        End = SectSize;
+      // Make sure this symbol takes up space.
+      else if (Symbols[si + 1].first != Start)
+        End = Symbols[si + 1].first - 1;
+      else
+        // This symbol has the same address as the next symbol. Skip it.
+        continue;
+
+#ifndef NDEBUG
+      outs() << '\n' << Symbols[si].second << ":\n";
+#endif
+
+#ifndef NDEBUG
+      raw_ostream &DebugOut = DebugFlag ? dbgs() : nulls();
+#else
+      raw_ostream &DebugOut = nulls();
+#endif
+
+      /*
+      uint64_t eoffset = SectionAddr;
+      // Relocatable object
+      if (SectionAddr == 0)
+        // TODO handle errors
+        eoffset = getELFOffset(Section);
+      */
+
+      /*
+      if (Symbols[si].second == "main")
+        IP->StartMainFunction(Start + eoffset);
+      else
+        IP->StartFunction(
+            Twine("a").concat(Twine::utohexstr(Start + eoffset)).str(),
+            Start + eoffset);
+       */
+
+      // instructions
+      uint64_t Size;
+      outs() << "SectionAddr = " << SectionAddr << "\n";
+      outs() << "Bytes = " << Bytes.size() << "\n";
+      for (uint64_t Index = Start; Index < End; Index += Size) {
+        outs() << "Index = " << Index << "\n";
+
+        MCInst Inst;
+
+        // IP->UpdateCurAddr(Index + eoffset);
+        MCDisassembler::DecodeStatus st =
+          DisAsm->getInstruction(Inst, Size, Bytes.slice(Index),
+            SectionAddr + Index, DebugOut, nulls());
+        if (st == MCDisassembler::DecodeStatus::Success) {
+          outs() << "*\n";
+          Inst.print(outs());
+          /*
+#ifndef NDEBUG
+          outs() << format("%8" PRIx64 ":", eoffset + Index);
+          outs() << "\t";
+          DumpBytes(StringRef(BytesStr.data() + Index, Size));
+#endif
+          IP->printInst(&Inst, outs(), "");
+#ifdef NDEBUG
+          if (++NumProcessed % 10000 == 0) {
+            outs() << ".";
+          }
+#endif
+#ifndef NDEBUG
+          outs() << "\n";
+#endif
+        */
+        } else {
+          SE << "Invalid instruction encoding\n";
+          return E();
+        }
+      } // instructions
+      // IP->FinishFunction();
+    } // symbols
+  } // sections
+  // IP->FinishModule();
+  // OptimizeAndWriteBitcode(&*IP);
+
   return Error::success();
 }
 
@@ -239,6 +411,7 @@ void handleError(Error &&E)
     [](const SBTError &SE) {
       // errs() << "SBTError:\n";
       SE.log(errs());
+      errs() << "\n";
       errs().flush();
       std::exit(EXIT_FAILURE);
     });
