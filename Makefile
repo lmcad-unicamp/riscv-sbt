@@ -1,92 +1,118 @@
 MAKE_OPTS := -j9
-LLVM_BUILD_TYPE := Debug
-# LLVM_BUILD_TYPE := Release
 
-DIR_ROOT := $(PWD)
-DIR_TOOLCHAIN := $(DIR_ROOT)/toolchain
+# build type for LLVM and SBT
+BUILD_TYPE := Debug
+# BUILD_TYPE := Release
 
+ifeq ($(TOPDIR),)
+$(error "TOPDIR not set. Please run 'source setenv.sh' first.")
+endif
+
+DIR_TOOLCHAIN := $(TOPDIR)/toolchain
+
+ALL := GCC FESVR SIM PK32 PK64 LLVM SBT
 all: sbt riscv-isa-sim riscv-pk
 
+
 ###
-### riscv-gnu-toolchain ###
+### rules
 ###
 
+# gen MAKEFILE
+define RULE_MAKEFILE =
+$$($(1)_MAKEFILE): $$($(1)_DEPS)
+	mkdir -p $$($(1)_BUILD)
+	cd $$($(1)_BUILD) && \
+	$$($(1)_CONFIGURE)
+	touch $$@
+endef
+
+# build
+define RULE_BUILD =
+# unconditional build
+.PHONY: $$($(1)_ALIAS)-build
+$$($(1)_ALIAS)-build:
+	$(MAKE) -C $$($(1)_BUILD) $(MAKE_OPTS)
+
+# build only when MAKEFILE changes
+$$($(1)_OUT): $$($(1)_MAKEFILE)
+	$(MAKE) $$($(1)_ALIAS)-build
+	touch $$@
+endef
+
+# install
+define RULE_INSTALL =
+# unconditional install
+.PHONY: $$($(1)_ALIAS)-install
+$$($(1)_ALIAS)-install:
+	$(MAKE) -C $$($(1)_BUILD) install
+
+# install only when build OUTPUT changes
+$$($(1)_TOOLCHAIN): $$($(1)_OUT)
+	$(MAKE) $$($(1)_ALIAS)-install
+	touch $$@
+endef
+
+# build and install
+define RULE_BUILD_AND_INSTALL =
+$$($(1)_OUT) $$($(1)_TOOLCHAIN): $$($(1)_MAKEFILE)
+	$(MAKE) -C $$($(1)_BUILD) $(MAKE_OPTS)
+endef
+
+# alias to invoke to build and install target
+define RULE_ALIAS =
+.PHONY: $$($(1)_ALIAS)
+$$($(1)_ALIAS): $$($(1)_TOOLCHAIN)
+endef
+
+# clean
+define RULE_CLEAN =
+$$($(1)_ALIAS)-clean:
+	rm -rf $$($(1)_BUILD)
+endef
+
+# all rules above
+define RULE_ALL =
+$(call RULE_MAKEFILE,$(1))
+ifneq ($$($(1)_BUILD_AND_INSTALL),)
+$(call RULE_BUILD_AND_INSTALL,$(1))
+else
+$(call RULE_BUILD,$(1))
+$(call RULE_INSTALL,$(1))
+endif
+$(call RULE_ALIAS,$(1))
+$(call RULE_CLEAN,$(1))
+endef
+
+
+# riscv-gnu-toolchain
 GCC_BUILD := riscv-gnu-toolchain/build
 GCC_MAKEFILE := $(GCC_BUILD)/Makefile
 GCC_OUT := $(GCC_BUILD)/build-gcc-newlib/gcc/xgcc
 GCC_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/riscv64-unknown-elf-gcc
+GCC_CONFIGURE := ../configure --prefix=$(DIR_TOOLCHAIN) --enable-multilib
+GCC_ALIAS := riscv-gnu-toolchain
+GCC_BUILD_AND_INSTALL := 1
 
-$(GCC_MAKEFILE):
-	mkdir -p $(GCC_BUILD)
-	cd $(GCC_BUILD) && \
-	../configure --prefix=$(DIR_TOOLCHAIN) --enable-multilib
-
-$(GCC_OUT) $(GCC_TOOLCHAIN): $(GCC_MAKEFILE)
-	# this builds AND installs the riscv-gnu-toolchain
-	$(MAKE) -C $(GCC_BUILD) $(MAKE_OPTS)
-	touch $@
-
-.PHONY: riscv-gnu-toolchain
-riscv-gnu-toolchain: $(GCC_TOOLCHAIN)
-
-riscv-gnu-toolchain-clean:
-	rm -rf $(GCC_BUILD)
-
-###
-### riscv-fesvr ####
-###
-
+# riscv-fesvr
 FESVR_BUILD := riscv-fesvr/build
 FESVR_MAKEFILE := $(FESVR_BUILD)/Makefile
 FESVR_OUT := $(FESVR_BUILD)/libfesvr.so
 FESVR_TOOLCHAIN := $(DIR_TOOLCHAIN)/lib/libfesvr.so
+FESVR_CONFIGURE := ../configure --prefix=$(DIR_TOOLCHAIN)
+FESVR_ALIAS := riscv-fesvr
 
-$(FESVR_MAKEFILE):
-	mkdir -p $(FESVR_BUILD)
-	cd $(FESVR_BUILD) && \
-	../configure --prefix=$(DIR_TOOLCHAIN)
-
-$(FESVR_OUT): $(FESVR_MAKEFILE)
-	$(MAKE) -C $(FESVR_BUILD) $(MAKE_OPTS)
-
-$(FESVR_TOOLCHAIN): $(FESVR_OUT)
-	$(MAKE) -C $(FESVR_BUILD) install
-
-.PHONY: riscv-fesvr
-riscv-fesvr: $(FESVR_TOOLCHAIN)
-
-riscv-fesvr-clean:
-	rm -rf $(FESVR_BUILD)
-
-###
-### riscv-isa-sim ###
-###
-
+# riscv-isa-sim
 SIM_BUILD := riscv-isa-sim/build
 SIM_MAKEFILE := $(SIM_BUILD)/Makefile
 SIM_OUT := $(SIM_BUILD)/spike
 SIM_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/spike
-
-$(SIM_MAKEFILE): $(FESVR_TOOLCHAIN)
-	mkdir -p $(SIM_BUILD)
-	cd $(SIM_BUILD) && \
-	../configure --prefix=$(DIR_TOOLCHAIN) --with-fesvr=$(DIR_TOOLCHAIN)
-
-$(SIM_OUT): $(SIM_MAKEFILE)
-	$(MAKE) -C $(SIM_BUILD) $(MAKE_OPTS)
-	touch $@
-
-$(SIM_TOOLCHAIN): $(SIM_OUT)
-	$(MAKE) -C $(SIM_BUILD) install
-
-.PHONY: riscv-isa-sim
-riscv-isa-sim: $(SIM_TOOLCHAIN)
-
-riscv-isa-sim-clean:
-	rm -rf $(SIM_BUILD)
+SIM_CONFIGURE := ../configure --prefix=$(DIR_TOOLCHAIN) --with-fesvr=$(DIR_TOOLCHAIN)
+SIM_ALIAS := riscv-isa-sim
+SIM_DEPS := $(FESVR_TOOLCHAIN)
 
 ###
-### riscv-pk ###
+### riscv-pk
 ###
 
 PK_HOST := riscv64-unknown-elf
@@ -96,39 +122,21 @@ PK32_BUILD := $(PK_BUILD)/32
 PK32_MAKEFILE := $(PK32_BUILD)/Makefile
 PK32_OUT := $(PK32_BUILD)/pk
 PK32_TOOLCHAIN := $(DIR_TOOLCHAIN)/riscv32-unknown-elf/bin/pk
-
-$(PK32_MAKEFILE):
-	mkdir -p $(PK32_BUILD)
-	cd $(PK32_BUILD) && \
-	../../configure --prefix=$(DIR_TOOLCHAIN) --host=$(PK_HOST) --enable-32bit
-
-$(PK32_OUT): $(PK32_MAKEFILE)
-	$(MAKE) -C $(PK32_BUILD)
-	touch $@
-
-$(PK32_TOOLCHAIN): $(PK32_OUT)
-	$(MAKE) -C $(PK32_BUILD) install
+PK32_CONFIGURE := ../../configure --prefix=$(DIR_TOOLCHAIN) --host=$(PK_HOST) --enable-32bit
+PK32_ALIAS := riscv-pk32
 
 PK64_BUILD := $(PK_BUILD)/64
 PK64_MAKEFILE := $(PK64_BUILD)/Makefile
 PK64_OUT := $(PK64_BUILD)/pk
 PK64_TOOLCHAIN := $(DIR_TOOLCHAIN)/riscv64-unknown-elf/bin/pk
+PK64_CONFIGURE := ../../configure --prefix=$(DIR_TOOLCHAIN) --host=$(PK_HOST)
+PK64_ALIAS := riscv-pk64
 
-$(PK64_MAKEFILE):
-	mkdir -p $(PK64_BUILD)
-	cd $(PK64_BUILD) && \
-	../../configure --prefix=$(DIR_TOOLCHAIN) --host=$(PK_HOST)
-
-$(PK64_OUT): $(PK64_MAKEFILE)
-	$(MAKE) -C $(PK64_BUILD)
-	touch $@
-
-$(PK64_TOOLCHAIN): $(PK64_OUT)
-	$(MAKE) -C $(PK64_BUILD) install
-
+# alias for both pk32 && pk64
 .PHONY: riscv-pk
 riscv-pk: $(PK32_TOOLCHAIN) $(PK64_TOOLCHAIN)
 
+# clean for both pk32 && pk64
 riscv-pk-clean:
 	rm -rf $(PK32_BUILD) $(PK64_BUILD)
 
@@ -150,78 +158,44 @@ $(CMAKE): $(CMAKE_PKG)
 	tar --strip-components=1 -xvf $(CMAKE_PKG) -C $(CMAKE_ROOT)
 	touch $(CMAKE)
 
-.PHONY:
+.PHONY: cmake
 cmake: $(CMAKE)
 
 ###
-### llvm ###
+### llvm
 ###
 
 LLVM_BUILD := build-llvm
 LLVM_MAKEFILE := $(LLVM_BUILD)/Makefile
 LLVM_OUT := $(LLVM_BUILD)/bin/clang
 LLVM_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/clang
+LLVM_CONFIGURE := \
+    $(CMAKE) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86" \
+             -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) ../llvm
+LLVM_ALIAS := llvm
+CLANG_LINK := llvm/tools/clang
+LLVM_DEPS := $(GCC_TOOLCHAIN) $(CMAKE) $(CLANG_LINK)
 
-$(LLVM_MAKEFILE): $(GCC_TOOLCHAIN) $(CMAKE)
-	cd llvm/tools && ln -sf ../../clang clang
-	mkdir -p $(LLVM_BUILD)
-	cd $(LLVM_BUILD) && \
-	$(CMAKE) -DCMAKE_BUILD_TYPE=$(LLVM_BUILD_TYPE) -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86" -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) ../llvm
-	touch $@
-
-.PHONY: llvm-build
-llvm-build: $(LLVM_MAKEFILE)
-	$(MAKE) -C $(LLVM_BUILD) $(MAKE_OPTS)
-
-$(LLVM_TOOLCHAIN): $(LLVM_OUT)
-	$(MAKE) -C $(LLVM_BUILD) install
-	touch $@
-
-llvm-install:
-	$(MAKE) -C $(LLVM_BUILD) install
-
-.PHONY: llvm
-llvm: llvm-build $(LLVM_TOOLCHAIN)
-
-llvm-clean:
-	rm -rf $(LLVM_BUILD)
+$(CLANG_LINK):
+	ln -sf $(TOPDIR)/clang $@
 
 ###
-### sbt ###
+### sbt
 ###
 
 SBT_BUILD := sbt/build
 SBT_MAKEFILE := $(SBT_BUILD)/Makefile
 SBT_OUT := $(SBT_BUILD)/riscv-sbt
 SBT_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/riscv-sbt
+SBT_CONFIGURE := \
+    $(CMAKE) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+             -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) ..
+SBT_ALIAS := sbt
+SBT_DEPS := $(LLVM_TOOLCHAIN)
 
-$(SBT_MAKEFILE): $(LLVM_TOOLCHAIN)
-	mkdir -p $(SBT_BUILD)
-	cd $(SBT_BUILD) && \
-	$(CMAKE) -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) ..
-	touch $@
+# generate all rules
+$(foreach prog,$(ALL),$(eval $(call RULE_ALL,$(prog))))
 
-.PHONY: sbt-build
-sbt-build: $(SBT_MAKEFILE)
-	$(MAKE) VERBOSE=1 -C $(SBT_BUILD)
-
-$(SBT_TOOLCHAIN): $(SBT_OUT)
-	$(MAKE) -C $(SBT_BUILD) install
-	touch $@
-
-.PHONY: sbt
-sbt: sbt-build $(SBT_TOOLCHAIN)
-
-sbt-clean:
-	rm -rf $(SBT_BUILD)
-
-###
-
-clean: \
-	riscv-gnu-toolchain-clean \
-	riscv-fesvr-clean \
-	riscv-isa-sim-clean \
-	riscv-pk-clean \
-	llvm-clean \
-	sbt-clean
+# clean all
+clean: $(foreach prog,$(ALL),$(prog)-clean)
 	rm -rf $(DIR_TOOLCHAIN)

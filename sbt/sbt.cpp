@@ -43,11 +43,11 @@ void SBT::init()
   InitializeAllAsmParsers();
   InitializeAllDisassemblers();
 
+  LLVMInitializeRISCVMasterTargetInfo();
+  LLVMInitializeRISCVMasterTargetMC();
   LLVMInitializeRISCVMasterAsmParser();
   LLVMInitializeRISCVMasterDisassembler();
-  LLVMInitializeRISCVMasterTargetMC();
   LLVMInitializeRISCVMasterTarget();
-  LLVMInitializeRISCVMasterTargetInfo();
 }
 
 void SBT::finish()
