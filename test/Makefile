@@ -2,6 +2,8 @@
 
 COMPILER := clang
 #COMPILER := gcc
+SYSROOT := $(TOPDIR)/toolchain/riscv64-unknown-elf
+SYSROOT_FLAG := -isysroot $(SYSROOT) -isystem $(SYSROOT)/include
 
 ### config ###
 
@@ -12,8 +14,8 @@ CFLAGS := -Wall -Werror -O2
 GCC_FLAGS := $(CFLAGS)
 ifeq ($(COMPILER),clang)
 CC := clang
-CC_RISCV32 := --target=riscv32 -mriscv=RV32IAMFD
-CC_RISCV64 := --target=riscv64 -mriscv=RV64IAMFD
+CC_RISCV32 := --target=riscv32 -mriscv=RV32IAMFD $(SYSROOT_FLAG)
+CC_RISCV64 := --target=riscv64 -mriscv=RV64IAMFD $(SYSROOT_FLAG)
 else
 CC := $(GCC)
 CC_RISCV32 := -m32

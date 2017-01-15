@@ -197,5 +197,5 @@ SBT_DEPS := $(LLVM_TOOLCHAIN)
 $(foreach prog,$(ALL),$(eval $(call RULE_ALL,$(prog))))
 
 # clean all
-clean: $(foreach prog,$(ALL),$(prog)-clean)
+clean: $(foreach prog,$(ALL),$($(prog)_ALIAS)-clean)
 	rm -rf $(DIR_TOOLCHAIN)
