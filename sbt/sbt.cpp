@@ -4,12 +4,13 @@
 #include <llvm/MC/MCAsmInfo.h>
 #include <llvm/MC/MCContext.h>
 #include <llvm/MC/MCDisassembler/MCDisassembler.h>
+#include <llvm/MC/MCInstPrinter.h>
 #include <llvm/MC/MCInstrInfo.h>
 #include <llvm/MC/MCObjectFileInfo.h>
 #include <llvm/MC/MCRegisterInfo.h>
+#include <llvm/MC/MCStreamer.h>
 #include <llvm/Object/Binary.h>
 #include <llvm/Object/ELF.h>
-#include <llvm/Object/MachO.h>
 #include <llvm/Object/ObjectFile.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/Signals.h>
@@ -19,6 +20,7 @@
 
 using namespace llvm;
 
+// RISCVMaster initializers
 extern "C" void LLVMInitializeRISCVMasterAsmParser();
 extern "C" void LLVMInitializeRISCVMasterDisassembler();
 extern "C" void LLVMInitializeRISCVMasterTargetMC();
@@ -29,31 +31,39 @@ namespace llvm {
 Target &getTheRISCVMaster32Target();
 }
 
+// SBT
+
 namespace sbt {
+
+const std::string *SBT::BIN_NAME = nullptr;
 
 void SBT::init()
 {
   BIN_NAME = new std::string("riscv-sbt");
 
-  // print a stack trace if we signal out.
+  // Print stack trace if we signal out.
   sys::PrintStackTraceOnErrorSignal(*BIN_NAME);
 
+  // Init LLVM targets
   InitializeAllTargetInfos();
   InitializeAllTargetMCs();
   InitializeAllAsmParsers();
   InitializeAllDisassemblers();
 
+  // Init RISCVMaster 'target'
   LLVMInitializeRISCVMasterTargetInfo();
   LLVMInitializeRISCVMasterTargetMC();
   LLVMInitializeRISCVMasterAsmParser();
   LLVMInitializeRISCVMasterDisassembler();
-  LLVMInitializeRISCVMasterTarget();
+  // skip registration of RISCVMaster target to avoid
+  // conflicts with RISCV target
+  // LLVMInitializeRISCVMasterTarget();
 }
 
 void SBT::finish()
 {
-  delete BIN_NAME;
   llvm_shutdown();
+  delete BIN_NAME;
 }
 
 Expected<SBT> SBT::create(
@@ -66,8 +76,6 @@ Expected<SBT> SBT::create(
     return std::move(Err);
   return std::move(S);
 }
-
-const std::string *SBT::BIN_NAME = nullptr;
 
 SBT::SBT(
   const cl::list<std::string> &InputFilesList,
@@ -163,28 +171,36 @@ void SBT::write()
   OS.flush();
 }
 
-static Expected<std::vector<std::pair<uint64_t, StringRef>>>
+// private helper functions
+
+typedef std::vector<std::pair<uint64_t, StringRef>> SymbolVec;
+
+// get all symbols present in Obj that belong to this Section
+static Expected<SymbolVec>
 getSymbolsList(const object::ObjectFile *Obj, const object::SectionRef &Section)
 {
   uint64_t SectionAddr = Section.getAddress();
 
   std::error_code EC;
   // Make a list of all the symbols in this section.
-  std::vector<std::pair<uint64_t, StringRef>> Symbols;
+  SymbolVec Symbols;
   for (auto Symbol : Obj->symbols()) {
+    // skip symbols not present in this Section
     if (!Section.containsSymbol(Symbol))
       continue;
 
+    // address
     auto Exp = Symbol.getAddress();
     if (!Exp)
       return Exp.takeError();
-    auto &Address = Exp.get();
+    uint64_t &Address = Exp.get();
     Address -= SectionAddr;
 
+    // name
     auto Exp2 = Symbol.getName();
     if (!Exp2)
       return Exp2.takeError();
-    auto &Name = Exp2.get();
+    StringRef &Name = Exp2.get();
     Symbols.push_back(std::make_pair(Address, Name));
   }
 
@@ -204,34 +220,34 @@ static uint64_t getELFOffset(const object::SectionRef &Section)
 
 Error SBT::translate(const std::string &File)
 {
+  // prepare error handling
   SBTError SE(File);
-  auto E = [&SE](){
+  auto E = [&SE]() {
     return make_error<SBTError>(std::move(SE));
   };
 
   // attempt to open the binary.
-  Expected<object::OwningBinary<object::Binary>> Exp =
-    object::createBinary(File);
+  auto Exp = object::createBinary(File);
   if (!Exp)
     return Exp.takeError();
   object::OwningBinary<object::Binary> &OB = Exp.get();
   object::Binary *Bin = OB.getBinary();
 
+  // for now, only object files are supported
   if (!object::ObjectFile::classof(Bin)) {
     SE << "Unrecognized file type.\n";
     return E();
   }
 
-  object::ObjectFile *Obj = dyn_cast<object::ObjectFile>(Bin);
-
-  outs() << Obj->getFileName() << ": file format: " << Obj->getFileFormatName()
+  auto Obj = dyn_cast<object::ObjectFile>(Bin);
+  log() << Obj->getFileName() << ": file format: " << Obj->getFileFormatName()
          << "\n";
 
   // get target
   Triple Triple("riscv32-unknown-elf");
   Triple.setArch(Triple::ArchType(Obj->getArch()));
   std::string TripleName = Triple.getTriple();
-  outs() << "Triple: " << TripleName << "\n";
+  log() << Obj->getFileName() << ": Triple: " << TripleName << "\n";
 
   std::string StrError;
   const Target *Target = &getTheRISCVMaster32Target();
@@ -280,32 +296,31 @@ Error SBT::translate(const std::string &File)
     return E();
   }
 
-  // sections
+  std::unique_ptr<MCInstPrinter> InstPrinter(
+    Target->createMCInstPrinter(Triple, 0, *AsmInfo, *MII, *MRI));
+  if (!InstPrinter) {
+    SE << "No instruction printer for target " << TripleName << "\n";
+    return E();
+  }
+
+  // for each section
   for (const object::SectionRef &Section : Obj->sections()) {
+    // skip non code sections
     if (!Section.isText())
       continue;
 
-    uint64_t SectionAddr = Section.getAddress();
-
-    StringRef SegmentName = "";
-    if (const object::MachOObjectFile *MachO =
-        dyn_cast<const object::MachOObjectFile>(Obj)) {
-      object::DataRefImpl DR = Section.getRawDataRefImpl();
-      SegmentName = MachO->getSectionFinalSegmentName(DR);
-    }
-    StringRef Name;
-    std::error_code EC = Section.getName(Name);
+    // get section name
+    StringRef SectionName;
+    std::error_code EC = Section.getName(SectionName);
     if (EC) {
       SE << "Failed to get Section Name";
       return E();
     }
 #ifndef NDEBUG
-    outs() << "Disassembly of section ";
-    if (!SegmentName.empty())
-      outs() << SegmentName << ",";
-    outs() << Name << ':';
+    log() << "Disassembly of section " << SectionName << ":\n";
 #endif
 
+    // get section bytes
     StringRef BytesStr;
     EC = Section.getContents(BytesStr);
     if (EC) {
@@ -319,17 +334,20 @@ Error SBT::translate(const std::string &File)
     auto Exp = getSymbolsList(Obj, Section);
     if (!Exp)
       return Exp.takeError();
-    auto &Symbols = Exp.get();
+    SymbolVec &Symbols = Exp.get();
     // If the section has no symbols just insert a dummy one and disassemble
     // the whole section.
     if (Symbols.empty())
-      Symbols.push_back(std::make_pair(0, Name));
+      Symbols.push_back(std::make_pair(0, SectionName));
 
+    uint64_t SectionAddr = Section.getAddress();
     uint64_t SectSize = Section.getSize();
     // Disassemble symbol by symbol.
     for (unsigned si = 0, se = Symbols.size(); si != se; ++si) {
-      uint64_t Start = Symbols[si].first;
+      const SymbolVec::value_type &Symbol = Symbols[si];
+      uint64_t Start = Symbol.first;
       uint64_t End;
+      const StringRef &SymbolName = Symbol.second;
 
       // The end is either the size of the section or the beginning of the next
       // symbol.
@@ -343,78 +361,99 @@ Error SBT::translate(const std::string &File)
         continue;
 
 #ifndef NDEBUG
-      outs() << '\n' << Symbols[si].second << ":\n";
-#endif
-
-#ifndef NDEBUG
+      outs() << SymbolName << ":\n";
       raw_ostream &DebugOut = dbgs();
 #else
       raw_ostream &DebugOut = nulls();
 #endif
 
-      /*
-      uint64_t eoffset = SectionAddr;
       // Relocatable object
+      uint64_t ELFOffset = SectionAddr;
       if (SectionAddr == 0)
-        // TODO handle errors
-        eoffset = getELFOffset(Section);
-      */
+        ELFOffset = getELFOffset(Section);
 
-      /*
-      if (Symbols[si].second == "main")
-        IP->StartMainFunction(Start + eoffset);
-      else
-        IP->StartFunction(
-            Twine("a").concat(Twine::utohexstr(Start + eoffset)).str(),
-            Start + eoffset);
-       */
+      if (SymbolName == "main")
+        ; // TODO start main
+      else {
+        Error E = startFunction(SymbolName, Start + ELFOffset);
+        if (E)
+          return E;
+      }
 
-      // instructions
+      // for each instruction
       uint64_t Size;
-      // outs() << "SectionAddr = " << SectionAddr << "\n";
-      // outs() << "Bytes = " << Bytes.size() << "\n";
       for (uint64_t Index = Start; Index < End; Index += Size) {
-        // outs() << "Index = " << Index << "\n";
+        uint64_t Addr = Index + ELFOffset;
 
         MCInst Inst;
-
-        // IP->UpdateCurAddr(Index + eoffset);
         MCDisassembler::DecodeStatus st =
           DisAsm->getInstruction(Inst, Size, Bytes.slice(Index),
             SectionAddr + Index, DebugOut, nulls());
         if (st == MCDisassembler::DecodeStatus::Success) {
-          Inst.print(outs());
-          outs() << "\n";
-          /*
 #ifndef NDEBUG
-          outs() << format("%8" PRIx64 ":", eoffset + Index);
-          outs() << "\t";
-          DumpBytes(StringRef(BytesStr.data() + Index, Size));
-#endif
-          IP->printInst(&Inst, outs(), "");
-#ifdef NDEBUG
-          if (++NumProcessed % 10000 == 0) {
-            outs() << ".";
-          }
-#endif
-#ifndef NDEBUG
+          InstPrinter->printInst(&Inst, outs(), "", *STI);
           outs() << "\n";
 #endif
-        */
+          Error E = translate(Inst, Addr);
+          if (E)
+            return E;
         } else {
           SE << "Invalid instruction encoding\n";
           return E();
         }
-      } // instructions
-      // IP->FinishFunction();
-    } // symbols
-  } // sections
-  // IP->FinishModule();
-  // OptimizeAndWriteBitcode(&*IP);
+      } // for each instruction
+      // TODO finish function
+    } // for each symbol
+  } // for each section
+  // TODO finish module
 
   return Error::success();
 }
 
+Error SBT::translate(const MCInst &Instr, uint64_t Addr)
+{
+  return Error::success();
+}
+
+Error SBT::startFunction(StringRef Name, uint64_t Addr)
+{
+  // FunctionAddrs.push_back(Addr);
+
+  // Create a function with no parameters
+  FunctionType *FT =
+    FunctionType::get(Type::getVoidTy(*Context), !VAR_ARG);
+  Function *F =
+    Function::Create(FT,
+      Function::ExternalLinkage, Name, &*Module);
+
+  // BB
+  Twine BBName = Twine("bb").concat(Twine::utohexstr(Addr));
+  BasicBlock *BB =
+    BasicBlock::Create(*Context, BBName, F);
+  Builder.SetInsertPoint(BB);
+
+  if (FirstFunction) {
+    FirstFunction = false;
+    buildRegisterFile();
+    // CurFunAddr = Addr;
+  }
+
+  return Error::success();
+}
+
+void SBT::buildRegisterFile()
+{
+  Type *Ty = Type::getInt32Ty(*Context);
+  Constant *X0 = ConstantInt::get(Ty, 0u);
+  X[0] = new GlobalVariable(*Module, Ty, CONSTANT,
+    GlobalValue::ExternalLinkage, X0, "X0");
+
+  for (int I = 1; I < 32; ++I) {
+    std::string RegName = Twine("X").concat(Twine(I)).str();
+    X[I] = new GlobalVariable(*Module, Ty, !CONSTANT,
+        GlobalValue::ExternalLinkage, X0, RegName);
+  }
+}
 
 /// SBTError ///
 

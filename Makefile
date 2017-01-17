@@ -86,7 +86,7 @@ endef
 
 
 # riscv-gnu-toolchain
-GCC_BUILD := riscv-gnu-toolchain/build
+GCC_BUILD := $(TOPDIR)/riscv-gnu-toolchain/build
 GCC_MAKEFILE := $(GCC_BUILD)/Makefile
 GCC_OUT := $(GCC_BUILD)/build-gcc-newlib/gcc/xgcc
 GCC_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/riscv64-unknown-elf-gcc
@@ -95,7 +95,7 @@ GCC_ALIAS := riscv-gnu-toolchain
 GCC_BUILD_AND_INSTALL := 1
 
 # riscv-fesvr
-FESVR_BUILD := riscv-fesvr/build
+FESVR_BUILD := $(TOPDIR)/riscv-fesvr/build
 FESVR_MAKEFILE := $(FESVR_BUILD)/Makefile
 FESVR_OUT := $(FESVR_BUILD)/libfesvr.so
 FESVR_TOOLCHAIN := $(DIR_TOOLCHAIN)/lib/libfesvr.so
@@ -103,7 +103,7 @@ FESVR_CONFIGURE := ../configure --prefix=$(DIR_TOOLCHAIN)
 FESVR_ALIAS := riscv-fesvr
 
 # riscv-isa-sim
-SIM_BUILD := riscv-isa-sim/build
+SIM_BUILD := $(TOPDIR)/riscv-isa-sim/build
 SIM_MAKEFILE := $(SIM_BUILD)/Makefile
 SIM_OUT := $(SIM_BUILD)/spike
 SIM_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/spike
@@ -116,7 +116,7 @@ SIM_DEPS := $(FESVR_TOOLCHAIN)
 ###
 
 PK_HOST := riscv64-unknown-elf
-PK_BUILD := riscv-pk/build
+PK_BUILD := $(TOPDIR)/riscv-pk/build
 
 PK32_BUILD := $(PK_BUILD)/32
 PK32_MAKEFILE := $(PK32_BUILD)/Makefile
@@ -145,9 +145,9 @@ riscv-pk-clean:
 ###
 
 CMAKE_URL := http://www.cmake.org/files/v3.5/cmake-3.5.2-Linux-x86_64.tar.gz
-CMAKE_ROOT := cmake
+CMAKE_ROOT := $(TOPDIR)/cmake
 CMAKE_PKG := $(CMAKE_ROOT)/cmake-3.5.2-Linux-x86_64.tar.gz
-CMAKE := $(PWD)/$(CMAKE_ROOT)/bin/cmake
+CMAKE := $(CMAKE_ROOT)/bin/cmake
 
 $(CMAKE_PKG):
 	mkdir -p $(CMAKE_ROOT)
@@ -165,7 +165,7 @@ cmake: $(CMAKE)
 ### llvm
 ###
 
-LLVM_BUILD := build-llvm
+LLVM_BUILD := $(TOPDIR)/build-llvm
 LLVM_MAKEFILE := $(LLVM_BUILD)/Makefile
 LLVM_OUT := $(LLVM_BUILD)/bin/clang
 LLVM_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/clang
@@ -173,7 +173,7 @@ LLVM_CONFIGURE := \
     $(CMAKE) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86" \
              -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) ../llvm
 LLVM_ALIAS := llvm
-CLANG_LINK := llvm/tools/clang
+CLANG_LINK := $(TOPDIR)/llvm/tools/clang
 LLVM_DEPS := $(GCC_TOOLCHAIN) $(CMAKE) $(CLANG_LINK)
 
 $(CLANG_LINK):
@@ -183,7 +183,7 @@ $(CLANG_LINK):
 ### sbt
 ###
 
-SBT_BUILD := sbt/build
+SBT_BUILD := $(TOPDIR)/sbt/build
 SBT_MAKEFILE := $(SBT_BUILD)/Makefile
 SBT_OUT := $(SBT_BUILD)/riscv-sbt
 SBT_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/riscv-sbt
