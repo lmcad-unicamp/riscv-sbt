@@ -1,18 +1,26 @@
 #include "sbt.h"
+#include "Constants.h"
+#include "SBTError.h"
+#include "Translator.h"
+#include "Utils.h"
 
 #include <llvm/Bitcode/BitcodeWriter.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
 #include <llvm/MC/MCAsmInfo.h>
 #include <llvm/MC/MCContext.h>
 #include <llvm/MC/MCDisassembler/MCDisassembler.h>
+#include <llvm/MC/MCInst.h>
 #include <llvm/MC/MCInstPrinter.h>
 #include <llvm/MC/MCInstrInfo.h>
 #include <llvm/MC/MCObjectFileInfo.h>
 #include <llvm/MC/MCRegisterInfo.h>
 #include <llvm/MC/MCStreamer.h>
 #include <llvm/Object/Binary.h>
-#include <llvm/Object/ELF.h>
 #include <llvm/Object/ObjectFile.h>
 #include <llvm/Support/FileSystem.h>
+#include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/Signals.h>
 #include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
@@ -35,11 +43,9 @@ Target &getTheRISCVMaster32Target();
 
 namespace sbt {
 
-const std::string *SBT::BIN_NAME = nullptr;
-
 void SBT::init()
 {
-  BIN_NAME = new std::string("riscv-sbt");
+  initConstants();
 
   // Print stack trace if we signal out.
   sys::PrintStackTraceOnErrorSignal(*BIN_NAME);
@@ -63,7 +69,7 @@ void SBT::init()
 void SBT::finish()
 {
   llvm_shutdown();
-  delete BIN_NAME;
+  destroyConstants();
 }
 
 Expected<SBT> SBT::create(
@@ -85,7 +91,8 @@ SBT::SBT(
   OutputFile(OutputFile),
   Context(new LLVMContext),
   Builder(*Context),
-  Module(new llvm::Module("main", *Context))
+  Module(new llvm::Module("main", *Context)),
+  SBTTranslator(new Translator(&*Context, &Builder, &*Module))
 {
   for (auto File : InputFilesList) {
     if (!sys::fs::exists(File)) {
@@ -173,51 +180,6 @@ void SBT::write()
 
 // private helper functions
 
-typedef std::vector<std::pair<uint64_t, StringRef>> SymbolVec;
-
-// get all symbols present in Obj that belong to this Section
-static Expected<SymbolVec>
-getSymbolsList(const object::ObjectFile *Obj, const object::SectionRef &Section)
-{
-  uint64_t SectionAddr = Section.getAddress();
-
-  std::error_code EC;
-  // Make a list of all the symbols in this section.
-  SymbolVec Symbols;
-  for (auto Symbol : Obj->symbols()) {
-    // skip symbols not present in this Section
-    if (!Section.containsSymbol(Symbol))
-      continue;
-
-    // address
-    auto Exp = Symbol.getAddress();
-    if (!Exp)
-      return Exp.takeError();
-    uint64_t &Address = Exp.get();
-    Address -= SectionAddr;
-
-    // name
-    auto Exp2 = Symbol.getName();
-    if (!Exp2)
-      return Exp2.takeError();
-    StringRef &Name = Exp2.get();
-    Symbols.push_back(std::make_pair(Address, Name));
-  }
-
-  // Sort the symbols by address, just in case they didn't come in that way.
-  array_pod_sort(Symbols.begin(), Symbols.end());
-  return Symbols;
-}
-
-static uint64_t getELFOffset(const object::SectionRef &Section)
-{
-  object::DataRefImpl Sec = Section.getRawDataRefImpl();
-  auto sec = reinterpret_cast<
-    const object::Elf_Shdr_Impl<
-      object::ELFType<support::little, false>> *>(Sec.p);
-  return sec->sh_offset;
-}
-
 Error SBT::translate(const std::string &File)
 {
   // prepare error handling
@@ -240,14 +202,15 @@ Error SBT::translate(const std::string &File)
   }
 
   auto Obj = dyn_cast<object::ObjectFile>(Bin);
-  log() << Obj->getFileName() << ": file format: " << Obj->getFileFormatName()
+  logs() << Obj->getFileName() << ": file format: " << Obj->getFileFormatName()
          << "\n";
+  SBTTranslator->setCurObj(Obj);
 
   // get target
   Triple Triple("riscv32-unknown-elf");
   Triple.setArch(Triple::ArchType(Obj->getArch()));
   std::string TripleName = Triple.getTriple();
-  log() << Obj->getFileName() << ": Triple: " << TripleName << "\n";
+  logs() << Obj->getFileName() << ": Triple: " << TripleName << "\n";
 
   std::string StrError;
   const Target *Target = &getTheRISCVMaster32Target();
@@ -309,6 +272,8 @@ Error SBT::translate(const std::string &File)
     if (!Section.isText())
       continue;
 
+    SBTTranslator->setCurSection(&Section);
+
     // get section name
     StringRef SectionName;
     std::error_code EC = Section.getName(SectionName);
@@ -317,7 +282,7 @@ Error SBT::translate(const std::string &File)
       return E();
     }
 #ifndef NDEBUG
-    log() << "Disassembly of section " << SectionName << ":\n";
+    logs() << "Disassembly of section " << SectionName << ":\n";
 #endif
 
     // get section bytes
@@ -375,7 +340,7 @@ Error SBT::translate(const std::string &File)
       if (SymbolName == "main")
         ; // TODO start main
       else {
-        Error E = startFunction(SymbolName, Start + ELFOffset);
+        Error E = SBTTranslator->startFunction(SymbolName, Start + ELFOffset);
         if (E)
           return E;
       }
@@ -383,7 +348,7 @@ Error SBT::translate(const std::string &File)
       // for each instruction
       uint64_t Size;
       for (uint64_t Index = Start; Index < End; Index += Size) {
-        uint64_t Addr = Index + ELFOffset;
+        SBTTranslator->setCurAddr(Index + ELFOffset);
 
         MCInst Inst;
         MCDisassembler::DecodeStatus st =
@@ -394,7 +359,7 @@ Error SBT::translate(const std::string &File)
           InstPrinter->printInst(&Inst, outs(), "", *STI);
           outs() << "\n";
 #endif
-          Error E = translate(Inst, Addr);
+          Error E = SBTTranslator->translate(Inst);
           if (E)
             return E;
         } else {
@@ -410,54 +375,11 @@ Error SBT::translate(const std::string &File)
   return Error::success();
 }
 
-Error SBT::translate(const MCInst &Instr, uint64_t Addr)
+
+void SBT::dump() const
 {
-  return Error::success();
+  Module->dump();
 }
-
-Error SBT::startFunction(StringRef Name, uint64_t Addr)
-{
-  // FunctionAddrs.push_back(Addr);
-
-  // Create a function with no parameters
-  FunctionType *FT =
-    FunctionType::get(Type::getVoidTy(*Context), !VAR_ARG);
-  Function *F =
-    Function::Create(FT,
-      Function::ExternalLinkage, Name, &*Module);
-
-  // BB
-  Twine BBName = Twine("bb").concat(Twine::utohexstr(Addr));
-  BasicBlock *BB =
-    BasicBlock::Create(*Context, BBName, F);
-  Builder.SetInsertPoint(BB);
-
-  if (FirstFunction) {
-    FirstFunction = false;
-    buildRegisterFile();
-    // CurFunAddr = Addr;
-  }
-
-  return Error::success();
-}
-
-void SBT::buildRegisterFile()
-{
-  Type *Ty = Type::getInt32Ty(*Context);
-  Constant *X0 = ConstantInt::get(Ty, 0u);
-  X[0] = new GlobalVariable(*Module, Ty, CONSTANT,
-    GlobalValue::ExternalLinkage, X0, "X0");
-
-  for (int I = 1; I < 32; ++I) {
-    std::string RegName = Twine("X").concat(Twine(I)).str();
-    X[I] = new GlobalVariable(*Module, Ty, !CONSTANT,
-        GlobalValue::ExternalLinkage, X0, RegName);
-  }
-}
-
-/// SBTError ///
-
-char SBTError::ID = 'S';
 
 ///
 
@@ -473,7 +395,7 @@ void handleError(Error &&E)
     });
 
   if (E2) {
-    logAllUnhandledErrors(std::move(E2), errs(), *SBT::BIN_NAME + ": error: ");
+    logAllUnhandledErrors(std::move(E2), errs(), *BIN_NAME + ": error: ");
     std::exit(EXIT_FAILURE);
   }
 }

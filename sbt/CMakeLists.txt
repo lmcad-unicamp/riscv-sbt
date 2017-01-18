@@ -124,7 +124,13 @@ target_compile_options (x86_syscall PRIVATE --32)
 # SBT
 include_directories (${SBT_INCLUDE_DIRS})
 link_directories (${SBT_LINK_DIRS})
-add_executable (riscv-sbt sbt.cpp)
+add_executable (riscv-sbt
+  Constants.cpp
+  SBTError.cpp
+  Translator.cpp
+  Utils.cpp
+  sbt.cpp
+  )
 target_compile_options (riscv-sbt PRIVATE ${SBT_COMPILE_OPTIONS})
 target_compile_definitions(riscv-sbt PRIVATE ${SBT_COMPILE_DEFINITIONS})
 target_link_libraries (riscv-sbt
