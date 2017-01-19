@@ -25,6 +25,11 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
 
+#define TEST 1
+#if TEST
+#include "Object.h"
+#endif
+
 using namespace llvm;
 
 // RISCVMaster initializers
@@ -381,6 +386,14 @@ Error SBT::genHello()
 
 ///
 
+struct SBTFinish
+{
+  ~SBTFinish()
+  {
+    sbt::SBT::finish();
+  }
+};
+
 static void handleError(Error &&E)
 {
   Error E2 = llvm::handleErrors(std::move(E),
@@ -401,8 +414,17 @@ static void handleError(Error &&E)
 
 static void test()
 {
-  ExitOnError ExitOnErr;
+#if TEST
+  // ExitOnError ExitOnErr;
+  sbt::SBT::init();
+  sbt::SBTFinish Finish;
+  auto ExpObj = sbt::Object::create("sbt/test/hello.o");
+  if (ExpObj)
+    sbt::handleError(ExpObj.get().dump());
+  else
+    sbt::handleError(ExpObj.takeError());
   std::exit(EXIT_SUCCESS);
+#endif
 }
 
 int main(int argc, char *argv[])
@@ -432,15 +454,7 @@ int main(int argc, char *argv[])
 
   // start SBT
   sbt::SBT::init();
-
-  // finalizer object
-  struct SBTFinish
-  {
-    ~SBTFinish()
-    {
-      sbt::SBT::finish();
-    }
-  } Finish;
+  sbt::SBTFinish Finish;
 
   // create SBT
   auto Exp = sbt::SBT::create(InputFiles, OutputFile);

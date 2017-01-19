@@ -126,6 +126,7 @@ include_directories (${SBT_INCLUDE_DIRS})
 link_directories (${SBT_LINK_DIRS})
 add_executable (riscv-sbt
   Constants.cpp
+  Object.cpp
   SBTError.cpp
   Translator.cpp
   Utils.cpp

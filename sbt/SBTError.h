@@ -19,9 +19,10 @@ public:
 
   // disallow copy
   SBTError(const SBTError &) = delete;
-
   // move
   SBTError(SBTError &&X);
+  // dtor
+  ~SBTError() override;
 
   // log error
   void log(llvm::raw_ostream &OS) const override;

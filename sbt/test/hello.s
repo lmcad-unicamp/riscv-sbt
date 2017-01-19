@@ -6,15 +6,15 @@ msg_len = . - msg
 .global _start
 _start:
 
-.equ exit, 93
-.equ write, 64
+SYS_EXIT  = 93
+SYS_WRITE = 64
 
     # write
     li a0,1
     la a1,msg
     li a2,msg_len
     li a3,0
-    li a7,write
+    li a7,SYS_WRITE
     ecall
 
     # exit
@@ -22,5 +22,5 @@ _start:
     li a1,0
     li a2,0
     li a3,0
-    li a7,exit
+    li a7,SYS_EXIT
     ecall

@@ -24,6 +24,11 @@ SBTError::SBTError(SBTError &&X) :
 {
 }
 
+SBTError::~SBTError()
+{
+  consumeError(std::move(Cause));
+}
+
 void SBTError::log(llvm::raw_ostream &OS) const
 {
   OS << SS->str();

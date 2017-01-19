@@ -2,8 +2,7 @@
 
 #include "Constants.h"
 
-#include <llvm/Object/ELF.h>
-#include <llvm/Object/ObjectFile.h>
+#include <llvm/Object/ELFObjectFile.h>
 #include <llvm/Support/raw_ostream.h>
 
 using namespace llvm;
@@ -17,11 +16,15 @@ raw_ostream &logs(bool error)
 
 uint64_t getELFOffset(const object::SectionRef &Section)
 {
-  object::DataRefImpl Sec = Section.getRawDataRefImpl();
-  auto sec = reinterpret_cast<
-    const object::Elf_Shdr_Impl<
-      object::ELFType<support::little, false>> *>(Sec.p);
-  return sec->sh_offset;
+  // check if ObjectFile is supported
+  const object::ObjectFile *Obj = Section.getObject();
+  typedef object::ELFObjectFile<
+    object::ELFType<support::little, false>> ELFObj;
+  assert(ELFObj::classof(Obj) && "Only ELF32LE object files are supported");
+
+  object::DataRefImpl Impl = Section.getRawDataRefImpl();
+  auto EI = reinterpret_cast<ELFObj::Elf_Shdr *>(Impl.p);
+  return EI->sh_offset;
 }
 
 Expected<SymbolVec> getSymbolsList(
