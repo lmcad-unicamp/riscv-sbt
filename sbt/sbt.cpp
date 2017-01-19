@@ -1,11 +1,11 @@
 #include "sbt.h"
+
 #include "Constants.h"
 #include "SBTError.h"
 #include "Translator.h"
 #include "Utils.h"
 
 #include <llvm/Bitcode/BitcodeWriter.h>
-#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/MC/MCAsmInfo.h>
@@ -16,14 +16,13 @@
 #include <llvm/MC/MCInstrInfo.h>
 #include <llvm/MC/MCObjectFileInfo.h>
 #include <llvm/MC/MCRegisterInfo.h>
-#include <llvm/MC/MCStreamer.h>
 #include <llvm/Object/Binary.h>
 #include <llvm/Object/ObjectFile.h>
 #include <llvm/Support/FileSystem.h>
-#include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/Signals.h>
 #include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
+#include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
 
 using namespace llvm;
@@ -98,11 +97,233 @@ SBT::SBT(
     if (!sys::fs::exists(File)) {
       SBTError SE(File);
       SE << "No such file.\n";
-      E = make_error<SBTError>(std::move(SE));
+      E = error(SE);
       return;
     }
     InputFiles.push_back(File);
   }
+
+  SBTError SE;
+  auto error = [&E](SBTError &EE) {
+    E = sbt::error(std::move(EE));
+  };
+
+  // get target
+  Triple Triple("riscv32-unknown-elf");
+  std::string TripleName = Triple.getTriple();
+  logs() << "Triple: " << TripleName << "\n";
+
+  std::string StrError;
+  Target = &getTheRISCVMaster32Target();
+  // Target = TargetRegistry::lookupTarget(TripleName, StrError);
+  if (!Target) {
+    SE << "Target not found: " << TripleName << ": " << StrError << "\n";
+    error(SE);
+    return;
+  }
+
+  MRI.reset(Target->createMCRegInfo(TripleName));
+  if (!MRI) {
+    SE << "No register info for target " << TripleName << "\n";
+    error(SE);
+    return;
+  }
+
+  // Set up disassembler.
+  AsmInfo.reset(Target->createMCAsmInfo(*MRI, TripleName));
+  if (!AsmInfo) {
+    SE << "No assembly info for target " << TripleName << "\n";
+    error(SE);
+    return;
+  }
+
+  SubtargetFeatures Features;
+  STI.reset(
+      Target->createMCSubtargetInfo(TripleName, "", Features.getString()));
+  if (!STI) {
+    SE << "No subtarget info for target " << TripleName << "\n";
+    error(SE);
+    return;
+  }
+
+  MOFI.reset(new MCObjectFileInfo);
+  MC.reset(new MCContext(AsmInfo.get(), MRI.get(), MOFI.get()));
+  DisAsm.reset(Target->createMCDisassembler(*STI, *MC));
+  if (!DisAsm) {
+    SE << "No disassembler for target " << TripleName << "\n";
+    error(SE);
+  }
+
+  MII.reset(Target->createMCInstrInfo());
+  if (!MII) {
+    SE << "No instruction info for target " << TripleName << "\n";
+    error(SE);
+    return;
+  }
+
+  InstPrinter.reset(
+    Target->createMCInstPrinter(Triple, 0, *AsmInfo, *MII, *MRI));
+  if (!InstPrinter) {
+    SE << "No instruction printer for target " << TripleName << "\n";
+    error(SE);
+    return;
+  }
+}
+
+Error SBT::run()
+{
+  // genHello();
+
+  for (auto &F : InputFiles) {
+    Error E = translate(F);
+    if (E)
+      return E;
+  }
+  return Error::success();
+}
+
+void SBT::dump() const
+{
+  Module->dump();
+}
+
+void SBT::write()
+{
+  std::error_code EC;
+  raw_fd_ostream OS(OutputFile, EC, sys::fs::F_None);
+  WriteBitcodeToFile(&*Module, OS);
+  OS.flush();
+}
+
+Error SBT::translate(const std::string &File)
+{
+  SBTError SE(File);
+
+  // attempt to open the binary.
+  auto Exp = object::createBinary(File);
+  if (!Exp) {
+    SE << Exp.takeError() << "Failed to open binary file\n";
+    return error(SE);
+  }
+  object::OwningBinary<object::Binary> &OB = Exp.get();
+  object::Binary *Bin = OB.getBinary();
+
+  // for now, only object files are supported
+  if (!object::ObjectFile::classof(Bin)) {
+    SE << "Unrecognized file type.\n";
+    return error(SE);
+  }
+
+  auto Obj = dyn_cast<object::ObjectFile>(Bin);
+  auto log = [&]() -> raw_ostream & {
+    return logs() << Obj->getFileName() << ": ";
+  };
+
+  log() << "File Format: " << Obj->getFileFormatName() << "\n";
+  SBTTranslator->setCurObj(Obj);
+
+  // for each section
+  for (const object::SectionRef &Section : Obj->sections()) {
+    // skip non code sections
+    if (!Section.isText())
+      continue;
+
+    SBTTranslator->setCurSection(&Section);
+
+    // get section name
+    StringRef SectionName;
+    std::error_code EC = Section.getName(SectionName);
+    if (EC) {
+      SE << "Failed to get Section Name";
+      return error(SE);
+    }
+    DBGS << "Disassembly of section " << SectionName << ":\n";
+
+    // get section bytes
+    StringRef BytesStr;
+    EC = Section.getContents(BytesStr);
+    if (EC) {
+      SE << "Failed to get Section Contents";
+      return error(SE);
+    }
+    ArrayRef<uint8_t> Bytes(reinterpret_cast<const uint8_t *>(BytesStr.data()),
+                            BytesStr.size());
+
+    // Make a list of all the symbols in this section.
+    auto Exp = getSymbolsList(Obj, Section);
+    if (!Exp) {
+      SE << Exp.takeError() << "Failed to get SymbolsList";
+      return error(SE);
+    }
+    SymbolVec &Symbols = Exp.get();
+    // If the section has no symbols just insert a dummy one and disassemble
+    // the whole section.
+    if (Symbols.empty())
+      Symbols.push_back({0, SectionName});
+
+    uint64_t SectionAddr = Section.getAddress();
+    uint64_t SectionSize = Section.getSize();
+
+    // for each symbol
+    for (unsigned SI = 0, SN = Symbols.size(); SI != SN; ++SI) {
+      const auto &Symbol = Symbols[SI];
+      uint64_t Start = Symbol.first;
+      uint64_t End;
+      const StringRef &SymbolName = Symbol.second;
+
+      // The end is either the size of the section or the beginning of the next
+      // symbol.
+      if (SI == SN - 1)
+        End = SectionSize;
+      // Make sure this symbol takes up space.
+      else if (Symbols[SI + 1].first != Start)
+        End = Symbols[SI + 1].first - 1;
+      else
+        // This symbol has the same address as the next symbol. Skip it.
+        continue;
+      DBGS << SymbolName << ":\n";
+
+      // Relocatable object
+      uint64_t ELFOffset = SectionAddr;
+      if (SectionAddr == 0)
+        ELFOffset = getELFOffset(Section);
+
+      if (SymbolName == "main")
+        ; // TODO start main
+      else {
+        Error E = SBTTranslator->startFunction(SymbolName, Start + ELFOffset);
+        if (E)
+          return E;
+      }
+
+      // for each instruction
+      uint64_t Size;
+      for (uint64_t Index = Start; Index < End; Index += Size) {
+        SBTTranslator->setCurAddr(Index + ELFOffset);
+
+        MCInst Inst;
+        MCDisassembler::DecodeStatus st =
+          DisAsm->getInstruction(Inst, Size, Bytes.slice(Index),
+            SectionAddr + Index, DBGS, nulls());
+        if (st == MCDisassembler::DecodeStatus::Success) {
+#ifndef NDEBUG
+          InstPrinter->printInst(&Inst, DBGS, "", *STI);
+          DBGS << "\n";
+#endif
+          Error E = SBTTranslator->translate(Inst);
+          if (E)
+            return E;
+        } else {
+          SE << "Invalid instruction encoding\n";
+          return error(SE);
+        }
+      } // for each instruction
+      // TODO finish function
+    } // for each symbol
+  } // for each section
+  // TODO finish module
+
+  return Error::success();
 }
 
 Error SBT::genHello()
@@ -158,236 +379,12 @@ Error SBT::genHello()
   return Error::success();
 }
 
-Error SBT::run()
-{
-  // genHello();
-
-  for (auto &F : InputFiles) {
-    Error E = translate(F);
-    if (E)
-      return E;
-  }
-  return Error::success();
-}
-
-void SBT::write()
-{
-  std::error_code EC;
-  raw_fd_ostream OS(OutputFile, EC, sys::fs::F_None);
-  WriteBitcodeToFile(&*Module, OS);
-  OS.flush();
-}
-
-// private helper functions
-
-Error SBT::translate(const std::string &File)
-{
-  // prepare error handling
-  SBTError SE(File);
-  auto E = [&SE]() {
-    return make_error<SBTError>(std::move(SE));
-  };
-
-  // attempt to open the binary.
-  auto Exp = object::createBinary(File);
-  if (!Exp)
-    return Exp.takeError();
-  object::OwningBinary<object::Binary> &OB = Exp.get();
-  object::Binary *Bin = OB.getBinary();
-
-  // for now, only object files are supported
-  if (!object::ObjectFile::classof(Bin)) {
-    SE << "Unrecognized file type.\n";
-    return E();
-  }
-
-  auto Obj = dyn_cast<object::ObjectFile>(Bin);
-  logs() << Obj->getFileName() << ": file format: " << Obj->getFileFormatName()
-         << "\n";
-  SBTTranslator->setCurObj(Obj);
-
-  // get target
-  Triple Triple("riscv32-unknown-elf");
-  Triple.setArch(Triple::ArchType(Obj->getArch()));
-  std::string TripleName = Triple.getTriple();
-  logs() << Obj->getFileName() << ": Triple: " << TripleName << "\n";
-
-  std::string StrError;
-  const Target *Target = &getTheRISCVMaster32Target();
-  // const Target *Target = TargetRegistry::lookupTarget(TripleName, StrError);
-  if (!Target) {
-    SE << "Target not found: " << TripleName << ": " << StrError << "\n";
-    return E();
-  }
-
-  std::unique_ptr<const MCRegisterInfo> MRI(
-      Target->createMCRegInfo(TripleName));
-  if (!MRI) {
-    SE << "No register info for target " << TripleName << "\n";
-    return E();
-  }
-
-  // Set up disassembler.
-  std::unique_ptr<const MCAsmInfo> AsmInfo(
-      Target->createMCAsmInfo(*MRI, TripleName));
-  if (!AsmInfo) {
-    SE << "No assembly info for target " << TripleName << "\n";
-    return E();
-  }
-
-  SubtargetFeatures Features;
-  std::unique_ptr<const MCSubtargetInfo> STI(
-      Target->createMCSubtargetInfo(TripleName, "", Features.getString()));
-  if (!STI) {
-    SE << "No subtarget info for target " << TripleName << "\n";
-    return E();
-  }
-
-  std::unique_ptr<const MCObjectFileInfo> MOFI(new MCObjectFileInfo);
-  MCContext Ctx(AsmInfo.get(), MRI.get(), MOFI.get());
-
-  std::unique_ptr<const MCDisassembler> DisAsm(
-      Target->createMCDisassembler(*STI, Ctx));
-  if (!DisAsm) {
-    SE << "No disassembler for target " << TripleName << "\n";
-    return E();
-  }
-
-  std::unique_ptr<const MCInstrInfo> MII(Target->createMCInstrInfo());
-  if (!MII) {
-    SE << "No instruction info for target " << TripleName << "\n";
-    return E();
-  }
-
-  std::unique_ptr<MCInstPrinter> InstPrinter(
-    Target->createMCInstPrinter(Triple, 0, *AsmInfo, *MII, *MRI));
-  if (!InstPrinter) {
-    SE << "No instruction printer for target " << TripleName << "\n";
-    return E();
-  }
-
-  // for each section
-  for (const object::SectionRef &Section : Obj->sections()) {
-    // skip non code sections
-    if (!Section.isText())
-      continue;
-
-    SBTTranslator->setCurSection(&Section);
-
-    // get section name
-    StringRef SectionName;
-    std::error_code EC = Section.getName(SectionName);
-    if (EC) {
-      SE << "Failed to get Section Name";
-      return E();
-    }
-#ifndef NDEBUG
-    logs() << "Disassembly of section " << SectionName << ":\n";
-#endif
-
-    // get section bytes
-    StringRef BytesStr;
-    EC = Section.getContents(BytesStr);
-    if (EC) {
-      SE << "Failed to get Section Contents";
-      return E();
-    }
-    ArrayRef<uint8_t> Bytes(reinterpret_cast<const uint8_t *>(BytesStr.data()),
-                            BytesStr.size());
-
-    // Make a list of all the symbols in this section.
-    auto Exp = getSymbolsList(Obj, Section);
-    if (!Exp)
-      return Exp.takeError();
-    SymbolVec &Symbols = Exp.get();
-    // If the section has no symbols just insert a dummy one and disassemble
-    // the whole section.
-    if (Symbols.empty())
-      Symbols.push_back(std::make_pair(0, SectionName));
-
-    uint64_t SectionAddr = Section.getAddress();
-    uint64_t SectSize = Section.getSize();
-    // Disassemble symbol by symbol.
-    for (unsigned si = 0, se = Symbols.size(); si != se; ++si) {
-      const SymbolVec::value_type &Symbol = Symbols[si];
-      uint64_t Start = Symbol.first;
-      uint64_t End;
-      const StringRef &SymbolName = Symbol.second;
-
-      // The end is either the size of the section or the beginning of the next
-      // symbol.
-      if (si == se - 1)
-        End = SectSize;
-      // Make sure this symbol takes up space.
-      else if (Symbols[si + 1].first != Start)
-        End = Symbols[si + 1].first - 1;
-      else
-        // This symbol has the same address as the next symbol. Skip it.
-        continue;
-
-#ifndef NDEBUG
-      outs() << SymbolName << ":\n";
-      raw_ostream &DebugOut = dbgs();
-#else
-      raw_ostream &DebugOut = nulls();
-#endif
-
-      // Relocatable object
-      uint64_t ELFOffset = SectionAddr;
-      if (SectionAddr == 0)
-        ELFOffset = getELFOffset(Section);
-
-      if (SymbolName == "main")
-        ; // TODO start main
-      else {
-        Error E = SBTTranslator->startFunction(SymbolName, Start + ELFOffset);
-        if (E)
-          return E;
-      }
-
-      // for each instruction
-      uint64_t Size;
-      for (uint64_t Index = Start; Index < End; Index += Size) {
-        SBTTranslator->setCurAddr(Index + ELFOffset);
-
-        MCInst Inst;
-        MCDisassembler::DecodeStatus st =
-          DisAsm->getInstruction(Inst, Size, Bytes.slice(Index),
-            SectionAddr + Index, DebugOut, nulls());
-        if (st == MCDisassembler::DecodeStatus::Success) {
-#ifndef NDEBUG
-          InstPrinter->printInst(&Inst, outs(), "", *STI);
-          outs() << "\n";
-#endif
-          Error E = SBTTranslator->translate(Inst);
-          if (E)
-            return E;
-        } else {
-          SE << "Invalid instruction encoding\n";
-          return E();
-        }
-      } // for each instruction
-      // TODO finish function
-    } // for each symbol
-  } // for each section
-  // TODO finish module
-
-  return Error::success();
-}
-
-
-void SBT::dump() const
-{
-  Module->dump();
-}
-
 ///
 
-void handleError(Error &&E)
+static void handleError(Error &&E)
 {
   Error E2 = llvm::handleErrors(std::move(E),
     [](const SBTError &SE) {
-      // errs() << "SBTError:\n";
       SE.log(errs());
       errs() << "\n";
       errs().flush();
@@ -402,11 +399,15 @@ void handleError(Error &&E)
 
 } // sbt
 
+static void test()
+{
+  ExitOnError ExitOnErr;
+  std::exit(EXIT_SUCCESS);
+}
 
 int main(int argc, char *argv[])
 {
-  // test();
-  // ExitOnError ExitOnErr;
+  test();
 
   // options
   cl::list<std::string> InputFiles(
@@ -432,6 +433,7 @@ int main(int argc, char *argv[])
   // start SBT
   sbt::SBT::init();
 
+  // finalizer object
   struct SBTFinish
   {
     ~SBTFinish()
@@ -440,16 +442,23 @@ int main(int argc, char *argv[])
     }
   } Finish;
 
-  Expected<sbt::SBT> Exp = sbt::SBT::create(InputFiles, OutputFile);
+  // create SBT
+  auto Exp = sbt::SBT::create(InputFiles, OutputFile);
   if (!Exp)
     sbt::handleError(Exp.takeError());
   sbt::SBT &SBT = Exp.get();
 
+  // translate files
   sbt::handleError(SBT.run());
+
+  // dump resulting IR
   SBT.dump();
 
+  // abort while SBT translation is not finished
   errs() << "Error: Incomplete translation\n";
   std::exit(EXIT_FAILURE);
+
+  // write IR to output file
   SBT.write();
 
   return EXIT_SUCCESS;

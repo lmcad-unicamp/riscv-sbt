@@ -47,13 +47,30 @@ public:
     return *SS;
   }
 
+  SBTError &operator<<(llvm::Error &&E)
+  {
+    Cause = std::move(E);
+    return *this;
+  }
+
   // Used by ErrorInfo::classID.
   static char ID;
 
 private:
   std::string S;                                  // error message
   std::unique_ptr<llvm::raw_string_ostream> SS;   // string stream
+  mutable llvm::Error Cause;
 };
+
+static inline llvm::Error error(SBTError &&SE)
+{
+  return llvm::make_error<SBTError>(std::move(SE));
+}
+
+static inline llvm::Error error(SBTError &SE)
+{
+  return error(std::move(SE));
+}
 
 } // sbt
 

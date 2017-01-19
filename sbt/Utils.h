@@ -1,8 +1,7 @@
 #ifndef SBT_UTILS_H
 #define SBT_UTILS_H
 
-#include "SBTError.h"
-
+#include <llvm/Support/Error.h>
 #include <llvm/Support/raw_ostream.h>
 
 #include <vector>
@@ -23,11 +22,6 @@ static llvm::raw_ostream &DBGS = llvm::outs();
 #else
 static llvm::raw_ostream &DBGS = llvm::nulls();
 #endif
-
-static inline llvm::Error error(SBTError &SE)
-{
-  return llvm::make_error<SBTError>(std::move(SE));
-}
 
 uint64_t getELFOffset(const llvm::object::SectionRef &Section);
 

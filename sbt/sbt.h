@@ -10,12 +10,17 @@
 #include <vector>
 
 namespace llvm {
-class MCInst;
 class LLVMContext;
+class MCAsmInfo;
+class MCContext;
+class MCDisassembler;
+class MCInstPrinter;
+class MCInstrInfo;
+class MCObjectFileInfo;
+class MCRegisterInfo;
+class MCSubtargetInfo;
 class Module;
-class raw_ostream;
-class Type;
-class Value;
+class Target;
 }
 
 namespace sbt {
@@ -43,7 +48,7 @@ public:
   // dtor
   ~SBT() = default;
 
-  // run - translate binaries
+  // translate binaries
   llvm::Error run();
 
   // dump generated IR
@@ -61,6 +66,17 @@ private:
   std::unique_ptr<llvm::Module> Module;
   std::unique_ptr<Translator> SBTTranslator;
 
+  // Target info
+  const llvm::Target *Target;
+  std::unique_ptr<const llvm::MCRegisterInfo> MRI;
+  std::unique_ptr<const llvm::MCAsmInfo> AsmInfo;
+  std::unique_ptr<const llvm::MCSubtargetInfo> STI;
+  std::unique_ptr<const llvm::MCObjectFileInfo> MOFI;
+  std::unique_ptr<llvm::MCContext> MC;
+  std::unique_ptr<const llvm::MCDisassembler> DisAsm;
+  std::unique_ptr<const llvm::MCInstrInfo> MII;
+  std::unique_ptr<llvm::MCInstPrinter> InstPrinter;
+
   /// private member functions
 
   // ctor
@@ -72,7 +88,7 @@ private:
   // translate one file
   llvm::Error translate(const std::string &File);
 
-  // for test only - generate hello world IR
+  // generate hello world IR (for test only)
   llvm::Error genHello();
 };
 
