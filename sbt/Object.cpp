@@ -6,57 +6,30 @@
 #include <llvm/Object/ELFObjectFile.h>
 #include <llvm/Support/Error.h>
 
-#include <map>
-
 using namespace llvm;
 
 namespace sbt {
 
-class Symbol
+class Flags
 {
 public:
-  Symbol(
-    const std::string &Name)
-    :
-    Name(Name)
+  std::string str(uint32_t Flags) const
   {
-  }
-
-  std::string Name;
-};
-
-typedef std::map<std::string, Symbol> SymbolMap;
-
-class ObjDumpImpl
-{
-public:
-  ObjDumpImpl(raw_ostream &OS) :
-    OS(OS),
-    E(Error::success())
-  {}
-
-  ~ObjDumpImpl()
-  {
-    if (E)
-      errs() << "Uncaught error on ObjDumpImpl\n";
-  }
-
-  Error dump(const object::SectionRef &Section);
-  Error dump(const object::SymbolRef &Symbol);
-  Error dumpRelocations(const object::SectionRef &Section);
-
-  Error takeError()
-  {
-    return std::move(E);
+    std::string FlagsStr;
+    for (const auto &F : AllFlags) {
+      if (Flags & F.first) {
+        if (!FlagsStr.empty())
+          FlagsStr += ",";
+        FlagsStr += F.second;
+      }
+    }
+    return FlagsStr;
   }
 
 private:
-  raw_ostream &OS;
-  mutable Error E;
-
   // Flags
   typedef object::BasicSymbolRef BSR;
-  std::vector<std::pair<uint32_t, std::string>> AllFlags = {
+  std::vector<std::pair<uint32_t, StringRef>> AllFlags = {
     { BSR::SF_Undefined,  "Undefined" },      // Symbol is defined in another object file
     { BSR::SF_Global,     "Global" },         // Global symbol
     { BSR::SF_Weak,       "Weak" },           // Weak symbol
@@ -72,173 +45,190 @@ private:
     { BSR::SF_Executable, "Executable" },     // Symbol points to an executable section
                                               // (IR only)
   };
-
-  bool getSectionName(
-    const object::SectionRef &Section,
-    StringRef &SectionName) const
-  {
-    if (Section.getName(SectionName)) {
-      SBTError SE;
-      SE << "Failed to get SectionName";
-      E = error(SE);
-      return false;
-    }
-    return true;
-  }
-
-  bool getSymbolName(
-    const object::SymbolRef &Symbol,
-    StringRef &SymbolName) const
-  {
-    auto Exp = Symbol.getName();
-    if (!Exp) {
-      SBTError SE;
-      SE << "Failed to get SymbolName";
-      E = error(SE);
-      return false;
-    }
-    SymbolName = Exp.get();
-    return true;
-  }
-
-  typedef llvm::object::SymbolRef SR;
-  std::string getTypeStr(SR::Type Type) const
-  {
-    std::string TypeStr;
-    switch (Type) {
-      default:
-      case SR::ST_Unknown:   TypeStr = "Unk";  break;
-      case SR::ST_Data:      TypeStr = "Data"; break;
-      case SR::ST_Debug:     TypeStr = "Dbg";  break;
-      case SR::ST_File:      TypeStr = "File"; break;
-      case SR::ST_Function:  TypeStr = "Func"; break;
-      case SR::ST_Other:     TypeStr = "Oth";  break;
-    }
-    return TypeStr;
-  }
-
-  std::string getFlagsStr(uint32_t Flags) const
-  {
-    std::string FlagsStr;
-    for (const auto &F : AllFlags) {
-      if (Flags & F.first)
-        FlagsStr += std::string(!FlagsStr.empty()? ",":"") + F.second;
-    }
-    return FlagsStr;
-  }
 };
 
-Error ObjDumpImpl::dump(const object::SectionRef &Section)
+static Flags *TheFlags = nullptr;
+
+static StringRef getTypeStr(object::SymbolRef::Type Type)
 {
-  SBTError SE;
-
-  StringRef SectionName;
-  if (!getSectionName(Section, SectionName))
-    return takeError();
-
-  OS << "[" << SectionName << "]\n";
-
-  return dumpRelocations(Section);
+  typedef llvm::object::SymbolRef SR;
+  std::string TypeStr;
+  switch (Type) {
+    default:
+    case SR::ST_Unknown:   TypeStr = "Unk";  break;
+    case SR::ST_Data:      TypeStr = "Data"; break;
+    case SR::ST_Debug:     TypeStr = "Dbg";  break;
+    case SR::ST_File:      TypeStr = "File"; break;
+    case SR::ST_Function:  TypeStr = "Func"; break;
+    case SR::ST_Other:     TypeStr = "Oth";  break;
+  }
+  return TypeStr;
 }
 
-Error ObjDumpImpl::dumpRelocations(const object::SectionRef &Section)
+
+///
+/// Section
+///
+
+Section::Section(
+  const Object &Obj,
+  object::SectionRef Sec,
+  Error &E)
+  :
+  Sec(Sec)
 {
-  auto RB = Section.relocations().begin();
-  auto RE = Section.relocations().end();
-  if (RB != RE) {
-    OS << "Relocations:\n";
-    OS << "Offs\tType\tSymbol\n";
-    auto SymbolEnd = Section.getObject()->symbol_end();
-
-    for (auto R = RB; R != RE; ++R) {
-      // Symbol
-      StringRef SymbolName;
-      auto I = R->getSymbol();
-      if (I != SymbolEnd)
-        if (!getSymbolName(*I, SymbolName))
-          return takeError();
-
-      uint64_t Offset = R->getOffset();
-      SmallVector<char, 128> TypeName;
-      R->getTypeName(TypeName);
-
-      OS << Offset << "\t";
-      OS << "[" << TypeName << "]\t";
-      OS << "[" << SymbolName << "]\n";
-    }
+  // Get SectionName
+  if (Sec.getName(Name)) {
+    SBTError SE;
+    SE << "Failed to get SectionName";
+    E = error(SE);
+    return;
   }
-
-  return Error::success();
 }
 
-Error ObjDumpImpl::dump(const object::SymbolRef &Symbol)
+void Section::header(llvm::raw_ostream &OS)
 {
-  SBTError SE;
-  const object::ObjectFile *Obj = Symbol.getObject();
-  auto SectionEnd = Obj->section_end();
+  OS << "Sections:\n";
+}
 
-  // Name
-  StringRef SymbolName;
-  if (!getSymbolName(Symbol, SymbolName))
-    return takeError();
+std::string Section::str() const
+{
+  std::string S;
+  llvm::raw_string_ostream SS(S);
+  SS  << "Section{"
+      << " Name=[" << name()
+      << "] }";
+  return S;
+}
 
-  // Section
-  auto ExpSection = Symbol.getSection();
-  if (!ExpSection) {
-    SE << "Failed to get Section";
-    return error(SE);
+///
+/// Symbol
+///
+
+Symbol::Symbol(
+  const Object &Obj,
+  object::SymbolRef Sym,
+  Error &E)
+  :
+  Sym(Sym)
+{
+  // Get Name
+  auto ExpSymName = Sym.getName();
+  if (!ExpSymName) {
+    SBTError SE;
+    SE << "Failed to get SymbolName";
+    E = error(SE);
+    return;
   }
-  auto I = ExpSection.get();
-  StringRef SectionName;
-  if (I != SectionEnd) {
-    const object::SectionRef &Section = *I;
-    if (!getSectionName(Section, SectionName))
-      return takeError();
+  Name = std::move(ExpSymName.get());
+
+  // SE
+  Twine Tw("Symbol(", Name);
+  Tw.concat(")");
+  SBTError SE(Tw.str());
+
+  // Get Section
+  auto ExpSecI = Sym.getSection();
+  if (!ExpSecI) {
+    SE << "Could not get Section";
+    E = error(SE);
+    return;
   }
+  object::section_iterator SI = ExpSecI.get();
+  if (SI != Obj.sectionEnd())
+    Sec = Obj.getSection(&*SI);
 
   // Address
-  uint64_t Address = 999;
-  auto ExpAddr = Symbol.getAddress();
-  if (ExpAddr) {
-    Address = ExpAddr.get();
+  auto ExpAddr = Sym.getAddress();
+  if (!ExpAddr) {
+    SE << "Could not get Address";
+    E = error(SE);
+    return;
   }
+  Address = ExpAddr.get();
 
   // Type
-  std::string TypeStr;
-  auto ExpType = Symbol.getType();
-  if (ExpType)
-    TypeStr = getTypeStr(ExpType.get());
-  else
-    TypeStr = "Non";
-
-  // Flags
-  uint32_t Flags = Symbol.getFlags();
-  std::string FlagsStr = getFlagsStr(Flags);
-
-  // Print
-  OS << Address << "\t";
-  OS << TypeStr << "\t";
-  if (!SectionName.empty())
-    OS << SectionName;
-  OS << "\t[" << SymbolName << "]\t";
-  OS << "[" << FlagsStr << "]\n";
-
-  return Error::success();
+  auto ExpType = Sym.getType();
+  if (!ExpType) {
+    SE << "Could not get Type";
+    E = error(SE);
+    return;
+  }
+  Type = ExpType.get();
 }
 
-/// Object ///
-
-Expected<Object> Object::create(const std::string &File)
+void Symbol::header(llvm::raw_ostream &OS)
 {
-  Error E = Error::success();
-  Object O(File, E);
-  if (E)
-    return std::move(E);
-  else
-    return std::move(O);
+  OS << "Symbols:\n";
+  // OS << "Addr\tType\tSect\tSymbol\tFlags\n";
 }
 
-Object::Object(const std::string &File, Error &E)
+std::string Symbol::str() const
+{
+  std::string S;
+  llvm::raw_string_ostream SS(S);
+  SS  << "Symbol{"
+      << " Addr=[" << Address
+      << "], Type=[" << getTypeStr(Type)
+      << "], " << (section()? section()->str() + ", " : "")
+      << "Name=[" << name()
+      << "], Flags=[" << TheFlags->str(flags())
+      << "] }";
+  return S;
+}
+
+///
+/// Relocation
+///
+
+Relocation::Relocation(
+  const Object &Obj,
+  object::RelocationRef Reloc,
+  Error &E)
+  :
+  Reloc(Reloc)
+{
+  // Symbol
+  auto I = Reloc.getSymbol();
+  if (I != Obj.symbolEnd())
+    Sym = Obj.getSymbol(&*I);
+  else
+    DBGS << "Relocation: symbol info not available\n";
+}
+
+void Relocation::header(raw_ostream &OS)
+{
+  OS << "Relocations:\n";
+  // OS << "Offs\tType\tSymbol\n";
+}
+
+std::string Relocation::str() const
+{
+  std::string S;
+  raw_string_ostream SS(S);
+  SS  << "Reloc{"
+      << " Offs=[" << offset()
+      << "], Type=[" << typeName()
+      << "], Symbol=[" << (symbol()? symbol()->name() : "")
+      << "] }";
+  return S;
+}
+
+///
+/// Object
+///
+
+void Object::init()
+{
+  TheFlags = new Flags;
+}
+
+void Object::finish()
+{
+  delete TheFlags;
+}
+
+Object::Object(const StringRef &File, Error &E)
 {
   SBTError SE(File);
 
@@ -252,49 +242,86 @@ Object::Object(const std::string &File, Error &E)
   OB = std::move(Exp.get());
   object::Binary *Bin = OB.getBinary();
 
-  // for now, only object files are supported
+  // For now, only ELF object files are supported.
   typedef object::ELFObjectFile<
     object::ELFType<support::little, false>> ELFObj;
 
   if (!ELFObj::classof(Bin)) {
-    SE << "Unrecognized file type";
+    SE << "Unsupported file type";
     E = error(SE);
     return;
   }
 
   Obj = dyn_cast<object::ObjectFile>(Bin);
+  FileName = Obj->getFileName();
+
+  E = readSymbols();
 }
 
-Error Object::dump() const
+Error Object::readSymbols()
 {
-  StringRef FileName = Obj->getFileName();
   SBTError SE(FileName);
+
+  // Read Sections
+  for (const object::SectionRef &S : Obj->sections()) {
+    auto ExpSec = create<Section>(*this, S);
+    if (!ExpSec)
+      return ExpSec.takeError();
+    Section &Sec = ExpSec.get();
+    Sections(Sec.name(), std::move(Sec));
+    SectionPtrs(S.getRawDataRefImpl().p, Sec.name());
+  }
+
+  // Read Symbols
+  for (const object::SymbolRef &S : Obj->symbols()) {
+    auto ExpSym = create<Symbol>(*this, S);
+    if (!ExpSym)
+      return ExpSym.takeError();
+    Symbol &Sym = ExpSym.get();
+    Symbols(Sym.name(), std::move(Sym));
+    SymbolPtrs(&S, Sym.name());
+  }
+
+  // Relocs
+  for (const object::SectionRef &S : Obj->sections()) {
+    for (auto RB = S.relocations().begin(),
+         RE = S.relocations().end();
+         RB != RE; ++RB)
+    {
+      const object::RelocationRef &R = *RB;
+      auto ExpRel = create<Relocation>(*this, R);
+      if (!ExpRel)
+        return ExpRel.takeError();
+      Relocation &Rel = ExpRel.get();
+      Relocs.emplace_back(std::move(Rel));
+    }
+  }
+
+  return Error::success();
+}
+
+void Object::dump() const
+{
   raw_ostream &OS = outs();
-  ObjDumpImpl OD(OS);
 
   // basic info
   OS << "FileName: " << FileName << "\n";
   OS << "FileFormat: " << Obj->getFileFormatName() << "\n";
 
   // Sections
-  OS << "Sections:\n";
-  Error E = Error::success();
-  consumeError(std::move(E));
-  for (auto Section : Obj->sections()) {
-    E = OD.dump(Section);
-    if (E)
-      return E;
-  }
+  Section::header(OS);
+  for (const Section &Sec : Sections)
+    OS << Sec.str() << "\n";
 
-  OS << "Symbols:\n";
-  OS << "Addr\tType\tSect\tSymbol\tFlags\n";
-  for (auto Symbol : Obj->symbols()) {
-    E = OD.dump(Symbol);
-    if (E)
-      return E;
-  }
+  // Symbols
+  Symbol::header(OS);
+  for (const Symbol &Sym : Symbols)
+    OS << Sym.str() << "\n";
 
-  return Error::success();
+  // Relocations
+  Relocation::header(OS);
+  for (const Relocation &Rel : Relocs)
+    OS << Rel.str() << "\n";
 }
 
 } // sbt

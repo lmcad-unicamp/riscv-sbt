@@ -157,6 +157,7 @@ Error Translator::translate(const llvm::MCInst &Inst)
       unsigned NRD = RVReg(ORD.getReg());
       DBGS << "X" << NRD << ", ";
 
+      /*
       const MCOperand &OImm = Inst.getOperand(1);
       int64_t Imm = OImm.getImm();
       DBGS << Imm << "\n";
@@ -167,6 +168,7 @@ Error Translator::translate(const llvm::MCInst &Inst)
         return ExpR.takeError();
       Value *V = Builder->CreateAdd(ExpR.get(), VImm);
       store(V, NRD);
+      */
       break;
     }
 
@@ -231,24 +233,21 @@ void Translator::buildRegisterFile()
   }
 }
 
+/*
 Expected<Value *> Translator::resolveRelocation()
 {
   SBTError SE;
 
   // debug
-  StringRef SectionName;
-  if (!CurSection->getName(SectionName))
-    DBGS << "Section: " << SectionName << "\n";
-  DBGS << "CurObj: " << CurObj->getFileName() << "\n";
+  DBGS << "Section: " << CurSection->name() << "\n";
+  DBGS << "CurObj: " << CurObj->fileName() << "\n";
 
   Value *V = nullptr;
 
   // find relocation section
   bool Found = false;
   object::SectionRef RelocSec;
-  object::section_iterator End = CurObj->section_end();
-  object::section_iterator Iter = End;
-  for (auto Section : CurObj->sections()) {
+  for (const Section &Sec : CurObj->sections()) {
     StringRef Name;
     std::error_code EC = Section.getName(Name);
     if (EC) {
@@ -375,6 +374,6 @@ Expected<Value *> Translator::resolveRelocation()
   V = ConstantInt::get(I32, Reloc);
   return V;
 }
-
+*/
 
 } // sbt

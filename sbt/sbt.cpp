@@ -1,6 +1,7 @@
 #include "sbt.h"
 
 #include "Constants.h"
+#include "Object.h"
 #include "SBTError.h"
 #include "Translator.h"
 #include "Utils.h"
@@ -25,10 +26,7 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
 
-#define TEST 1
-#if TEST
-#include "Object.h"
-#endif
+#define TEST 0
 
 using namespace llvm;
 
@@ -50,9 +48,10 @@ namespace sbt {
 void SBT::init()
 {
   initConstants();
+  Object::init();
 
   // Print stack trace if we signal out.
-  sys::PrintStackTraceOnErrorSignal(*BIN_NAME);
+  sys::PrintStackTraceOnErrorSignal("");
 
   // Init LLVM targets
   InitializeAllTargetInfos();
@@ -73,6 +72,7 @@ void SBT::init()
 void SBT::finish()
 {
   llvm_shutdown();
+  Object::finish();
   destroyConstants();
 }
 
@@ -204,49 +204,30 @@ Error SBT::translate(const std::string &File)
 {
   SBTError SE(File);
 
-  // attempt to open the binary.
-  auto Exp = object::createBinary(File);
-  if (!Exp) {
-    SE << Exp.takeError() << "Failed to open binary file\n";
-    return error(SE);
-  }
-  object::OwningBinary<object::Binary> &OB = Exp.get();
-  object::Binary *Bin = OB.getBinary();
+  auto ExpObj = sbt::create<Object>(File);
+  if (!ExpObj)
+    return ExpObj.takeError();
+  Object &Obj = ExpObj.get();
 
-  // for now, only object files are supported
-  if (!object::ObjectFile::classof(Bin)) {
-    SE << "Unrecognized file type.\n";
-    return error(SE);
-  }
-
-  auto Obj = dyn_cast<object::ObjectFile>(Bin);
   auto log = [&]() -> raw_ostream & {
-    return logs() << Obj->getFileName() << ": ";
+    return logs() << Obj.fileName()  << ": ";
   };
 
-  log() << "File Format: " << Obj->getFileFormatName() << "\n";
-  SBTTranslator->setCurObj(Obj);
+  log() << "File Format: " << Obj.fileFormat() << "\n";
+  SBTTranslator->setCurObj(&Obj);
 
   // for each section
-  for (const object::SectionRef &Section : Obj->sections()) {
+  for (const Section &Sec : Obj.sections()) {
     // skip non code sections
-    if (!Section.isText())
+    if (!Sec->isText())
       continue;
 
-    SBTTranslator->setCurSection(&Section);
-
-    // get section name
-    StringRef SectionName;
-    std::error_code EC = Section.getName(SectionName);
-    if (EC) {
-      SE << "Failed to get Section Name";
-      return error(SE);
-    }
-    DBGS << "Disassembly of section " << SectionName << ":\n";
+    SBTTranslator->setCurSection(&Sec);
+    DBGS << "Disassembly of section " << Sec.name() << ":\n";
 
     // get section bytes
     StringRef BytesStr;
-    EC = Section.getContents(BytesStr);
+    std::error_code EC = Sec->getContents(BytesStr);
     if (EC) {
       SE << "Failed to get Section Contents";
       return error(SE);
@@ -254,44 +235,29 @@ Error SBT::translate(const std::string &File)
     ArrayRef<uint8_t> Bytes(reinterpret_cast<const uint8_t *>(BytesStr.data()),
                             BytesStr.size());
 
-    // Make a list of all the symbols in this section.
-    auto Exp = getSymbolsList(Obj, Section);
-    if (!Exp) {
-      SE << Exp.takeError() << "Failed to get SymbolsList";
-      return error(SE);
-    }
-    SymbolVec &Symbols = Exp.get();
-    // If the section has no symbols just insert a dummy one and disassemble
-    // the whole section.
-    if (Symbols.empty())
-      Symbols.push_back({0, SectionName});
-
-    uint64_t SectionAddr = Section.getAddress();
-    uint64_t SectionSize = Section.getSize();
+    uint64_t SectionAddr = Sec->getAddress();
+    uint64_t SectionSize = Sec->getSize();
+    auto Symbols = Sec.symbols();
 
     // for each symbol
-    for (unsigned SI = 0, SN = Symbols.size(); SI != SN; ++SI) {
-      const auto &Symbol = Symbols[SI];
-      uint64_t Start = Symbol.first;
-      uint64_t End;
-      const StringRef &SymbolName = Symbol.second;
+    for (size_t SI = 0, SN = Symbols.size(); SI != SN; ++SI) {
+      // TODO REVIEW
+      const Symbol &Sym = *Symbols.at(SI);
 
-      // The end is either the size of the section or the beginning of the next
-      // symbol.
+      uint64_t Start = Sym.address();
+      uint64_t End;
       if (SI == SN - 1)
         End = SectionSize;
-      // Make sure this symbol takes up space.
-      else if (Symbols[SI + 1].first != Start)
-        End = Symbols[SI + 1].first - 1;
       else
-        // This symbol has the same address as the next symbol. Skip it.
-        continue;
+        End = Symbols.at(SI + 1)->address();
+
+      const StringRef &SymbolName = Sym.name();
       DBGS << SymbolName << ":\n";
 
       // Relocatable object
       uint64_t ELFOffset = SectionAddr;
       if (SectionAddr == 0)
-        ELFOffset = getELFOffset(Section);
+        ELFOffset = getELFOffset(Sec.section());
 
       if (SymbolName == "main")
         ; // TODO start main
@@ -414,15 +380,16 @@ static void handleError(Error &&E)
 
 static void test()
 {
+  using namespace sbt;
 #if TEST
   // ExitOnError ExitOnErr;
-  sbt::SBT::init();
-  sbt::SBTFinish Finish;
-  auto ExpObj = sbt::Object::create("sbt/test/hello.o");
-  if (ExpObj)
-    sbt::handleError(ExpObj.get().dump());
+  SBT::init();
+  SBTFinish Finish;
+  auto ExpObj = create<Object>("sbt/test/hello.o");
+  if (!ExpObj)
+    handleError(ExpObj.takeError());
   else
-    sbt::handleError(ExpObj.takeError());
+    ExpObj.get().dump();
   std::exit(EXIT_SUCCESS);
 #endif
 }

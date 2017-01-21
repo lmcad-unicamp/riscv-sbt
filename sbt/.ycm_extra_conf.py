@@ -24,6 +24,7 @@ import ycm_core
 
 TOPDIR = os.environ['TOPDIR']
 flags = [
+'-x', 'c++',
 '-Wall',
 '-Werror',
 '-std=c++11',

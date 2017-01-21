@@ -7,14 +7,14 @@ namespace sbt {
 
 char SBTError::ID = 'S';
 
-SBTError::SBTError(const std::string &FileName) :
+SBTError::SBTError(const std::string &Prefix) :
   SS(new raw_string_ostream(S)),
   Cause(Error::success())
 {
-  // error format: <sbt>: error: '<file>': <msg>
+  // error format: <sbt>: error: prefix: <msg>
   *SS << *BIN_NAME << ": error: ";
-  if (!FileName.empty())
-    *SS << "'" << FileName << "': ";
+  if (!Prefix.empty())
+    *SS << Prefix << ": ";
 }
 
 SBTError::SBTError(SBTError &&X) :

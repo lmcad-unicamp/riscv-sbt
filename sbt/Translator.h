@@ -1,6 +1,8 @@
 #ifndef SBT_TRANSLATOR_H
 #define SBT_TRANSLATOR_H
 
+#include "Object.h"
+
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/Support/Error.h>
 
@@ -43,12 +45,12 @@ public:
     CurAddr = Addr;
   }
 
-  void setCurObj(const llvm::object::ObjectFile *Obj)
+  void setCurObj(const Object *Obj)
   {
     CurObj = Obj;
   }
 
-  void setCurSection(const llvm::object::SectionRef *Section)
+  void setCurSection(const Section *Section)
   {
     CurSection = Section;
   }
@@ -67,8 +69,8 @@ private:
   llvm::Function *FSyscall4;
 
   uint64_t CurAddr;
-  const llvm::object::ObjectFile *CurObj;
-  const llvm::object::SectionRef *CurSection;
+  const Object *CurObj;
+  const Section *CurSection;
 
   // methods
   llvm::Value *load(unsigned Reg);

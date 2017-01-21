@@ -32,6 +32,18 @@ llvm::Expected<SymbolVec> getSymbolsList(
   const llvm::object::ObjectFile *Obj,
   const llvm::object::SectionRef &Section);
 
+
+template <typename T, typename... Args>
+llvm::Expected<T> create(Args &... args)
+{
+    llvm::Error E = llvm::Error::success();
+    llvm::consumeError(std::move(E));
+    T TT(args..., E);
+    if (E)
+      return std::move(E);
+    return std::move(TT);
+}
+
 } // sbt
 
 #endif

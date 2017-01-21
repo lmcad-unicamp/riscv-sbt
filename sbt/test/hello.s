@@ -1,6 +1,8 @@
 .data
+long0: .long 1234
 msg:    .ascii "Hello, world!\n"
 msg_len = . - msg
+long1: .long 5678
 
 .text
 .global _start
@@ -11,6 +13,8 @@ SYS_WRITE = 64
 
     # write
     li a0,1
+    la a1,long0
+    la a1,long1
     la a1,msg
     li a2,msg_len
     li a3,0
