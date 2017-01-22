@@ -31,7 +31,7 @@ SBTError::~SBTError()
 
 void SBTError::log(llvm::raw_ostream &OS) const
 {
-  OS << SS->str();
+  OS << SS->str() << "\n";
   if (Cause) {
     logAllUnhandledErrors(std::move(Cause), OS, "Cause: ");
     Cause = Error::success();

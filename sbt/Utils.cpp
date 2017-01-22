@@ -14,19 +14,7 @@ raw_ostream &logs(bool error)
   return (error? errs() : outs()) << *BIN_NAME << ": ";
 }
 
-uint64_t getELFOffset(const object::SectionRef &Section)
-{
-  // check if ObjectFile is supported
-  const object::ObjectFile *Obj = Section.getObject();
-  typedef object::ELFObjectFile<
-    object::ELFType<support::little, false>> ELFObj;
-  assert(ELFObj::classof(Obj) && "Only ELF32LE object files are supported");
-
-  object::DataRefImpl Impl = Section.getRawDataRefImpl();
-  auto EI = reinterpret_cast<ELFObj::Elf_Shdr *>(Impl.p);
-  return EI->sh_offset;
-}
-
+/*
 Expected<SymbolVec> getSymbolsList(
   const object::ObjectFile *Obj,
   const object::SectionRef &Section)
@@ -64,5 +52,6 @@ Expected<SymbolVec> getSymbolsList(
   array_pod_sort(Symbols.begin(), Symbols.end());
   return Symbols;
 }
+*/
 
 }

@@ -1,18 +1,22 @@
 #include "Object.h"
 
 #include "SBTError.h"
-#include "Utils.h"
 
 #include <llvm/Object/ELFObjectFile.h>
-#include <llvm/Support/Error.h>
 
 using namespace llvm;
 
 namespace sbt {
 
+// For now, only ELF 32 LE object files are supported.
+typedef object::ELFObjectFile<
+  object::ELFType<support::little, false>> ELFObj;
+
+// symbol flags
 class Flags
 {
 public:
+  // symbol flags to string
   std::string str(uint32_t Flags) const
   {
     std::string FlagsStr;
@@ -27,7 +31,7 @@ public:
   }
 
 private:
-  // Flags
+  // all flags vector
   typedef object::BasicSymbolRef BSR;
   std::vector<std::pair<uint32_t, StringRef>> AllFlags = {
     { BSR::SF_Undefined,  "Undefined" },      // Symbol is defined in another object file
@@ -49,7 +53,8 @@ private:
 
 static Flags *TheFlags = nullptr;
 
-static StringRef getTypeStr(object::SymbolRef::Type Type)
+// symbol type to string
+static std::string getTypeStr(Symbol::Type Type)
 {
   typedef llvm::object::SymbolRef SR;
   std::string TypeStr;
@@ -71,10 +76,11 @@ static StringRef getTypeStr(object::SymbolRef::Type Type)
 ///
 
 Section::Section(
-  const Object &Obj,
+  ConstObjectPtr Obj,
   object::SectionRef Sec,
   Error &E)
   :
+  Obj(Obj),
   Sec(Sec)
 {
   // Get SectionName
@@ -84,6 +90,13 @@ Section::Section(
     E = error(SE);
     return;
   }
+}
+
+uint64_t Section::getELFOffset() const
+{
+  object::DataRefImpl Impl = Sec.getRawDataRefImpl();
+  auto EI = reinterpret_cast<ELFObj::Elf_Shdr *>(Impl.p);
+  return EI->sh_offset;
 }
 
 void Section::header(llvm::raw_ostream &OS)
@@ -96,8 +109,11 @@ std::string Section::str() const
   std::string S;
   llvm::raw_string_ostream SS(S);
   SS  << "Section{"
-      << " Name=[" << name()
-      << "] }";
+      << " Name=[" << name() << "]";
+  // dump symbols
+  for (ConstSymbolPtr Sym : symbols())
+    SS << "\n    " << Sym->str();
+  SS << " }";
   return S;
 }
 
@@ -106,10 +122,11 @@ std::string Section::str() const
 ///
 
 Symbol::Symbol(
-  const Object &Obj,
+  ConstObjectPtr Obj,
   object::SymbolRef Sym,
   Error &E)
   :
+  Obj(Obj),
   Sym(Sym)
 {
   // Get Name
@@ -123,9 +140,10 @@ Symbol::Symbol(
   Name = std::move(ExpSymName.get());
 
   // SE
-  Twine Tw("Symbol(", Name);
-  Tw.concat(")");
-  SBTError SE(Tw.str());
+  std::string Prefix("Symbol(");
+  Prefix += Name;
+  Prefix += ")";
+  SBTError SE(Prefix);
 
   // Get Section
   auto ExpSecI = Sym.getSection();
@@ -135,8 +153,8 @@ Symbol::Symbol(
     return;
   }
   object::section_iterator SI = ExpSecI.get();
-  if (SI != Obj.sectionEnd())
-    Sec = Obj.getSection(&*SI);
+  if (SI != Obj->sectionEnd())
+    Sec = Obj->section(*SI);
 
   // Address
   auto ExpAddr = Sym.getAddress();
@@ -154,7 +172,7 @@ Symbol::Symbol(
     E = error(SE);
     return;
   }
-  Type = ExpType.get();
+  TheType = ExpType.get();
 }
 
 void Symbol::header(llvm::raw_ostream &OS)
@@ -169,9 +187,8 @@ std::string Symbol::str() const
   llvm::raw_string_ostream SS(S);
   SS  << "Symbol{"
       << " Addr=[" << Address
-      << "], Type=[" << getTypeStr(Type)
-      << "], " << (section()? section()->str() + ", " : "")
-      << "Name=[" << name()
+      << "], Type=[" << getTypeStr(type())
+      << "], Name=[" << name()
       << "], Flags=[" << TheFlags->str(flags())
       << "] }";
   return S;
@@ -182,18 +199,19 @@ std::string Symbol::str() const
 ///
 
 Relocation::Relocation(
-  const Object &Obj,
+  ConstObjectPtr Obj,
   object::RelocationRef Reloc,
   Error &E)
   :
+  Obj(Obj),
   Reloc(Reloc)
 {
   // Symbol
-  auto I = Reloc.getSymbol();
-  if (I != Obj.symbolEnd())
-    Sym = Obj.getSymbol(&*I);
+  object::symbol_iterator I = Reloc.getSymbol();
+  if (I != Obj->symbolEnd())
+    Sym = Obj->symbol(*I);
   else
-    DBGS << "Relocation: symbol info not available\n";
+    DBGS << "Relocation: symbol info not found\n";
 }
 
 void Relocation::header(raw_ostream &OS)
@@ -209,7 +227,8 @@ std::string Relocation::str() const
   SS  << "Reloc{"
       << " Offs=[" << offset()
       << "], Type=[" << typeName()
-      << "], Symbol=[" << (symbol()? symbol()->name() : "")
+      << "], Section=[" << section()->name()
+      << "], Symbol=[" << symbol()->name()
       << "] }";
   return S;
 }
@@ -228,23 +247,21 @@ void Object::finish()
   delete TheFlags;
 }
 
-Object::Object(const StringRef &File, Error &E)
+Object::Object(
+  const StringRef &FilePath,
+  Error &E)
 {
-  SBTError SE(File);
+  SBTError SE(FilePath);
 
   // Atempt to open the binary.
-  auto Exp = object::createBinary(File);
-  if (!Exp) {
-    SE << Exp.takeError() << "Failed to open binary file";
+  auto ExpObj = object::createBinary(FilePath);
+  if (!ExpObj) {
+    SE << ExpObj.takeError() << "Failed to open binary file";
     E = error(SE);
     return;
   }
-  OB = std::move(Exp.get());
+  OB = std::move(ExpObj.get());
   object::Binary *Bin = OB.getBinary();
-
-  // For now, only ELF object files are supported.
-  typedef object::ELFObjectFile<
-    object::ELFType<support::little, false>> ELFObj;
 
   if (!ELFObj::classof(Bin)) {
     SE << "Unsupported file type";
@@ -255,31 +272,69 @@ Object::Object(const StringRef &File, Error &E)
   Obj = dyn_cast<object::ObjectFile>(Bin);
   FileName = Obj->getFileName();
 
+  // object::ObjectFile created, now process its symbols
   E = readSymbols();
 }
 
 Error Object::readSymbols()
 {
   SBTError SE(FileName);
+  const Object *ConstThis = this;
+  SectionPtrVec Sections;
+  // TODO Speed up this by using Section address
+  //      instead of Name.
+  Map<StringRef, ConstSymbolPtrVec> SectionToSymbols;
 
   // Read Sections
   for (const object::SectionRef &S : Obj->sections()) {
-    auto ExpSec = create<Section>(*this, S);
+    auto ExpSec = create<Section*>(ConstThis, S);
     if (!ExpSec)
       return ExpSec.takeError();
-    Section &Sec = ExpSec.get();
-    Sections(Sec.name(), std::move(Sec));
-    SectionPtrs(S.getRawDataRefImpl().p, Sec.name());
+    Section *Sec = ExpSec.get();
+    SectionPtr NCPtr(Sec);
+    ConstSectionPtr Ptr(NCPtr);
+    // add to maps
+    NameToSection(Sec->name(), ConstSectionPtr(Ptr));
+    PtrToSection(S.getRawDataRefImpl().p, ConstSectionPtr(Ptr));
+    // add to sections vector
+    Sections.push_back(NCPtr);
   }
 
   // Read Symbols
   for (const object::SymbolRef &S : Obj->symbols()) {
-    auto ExpSym = create<Symbol>(*this, S);
+    auto ExpSym = create<Symbol*>(ConstThis, S);
     if (!ExpSym)
       return ExpSym.takeError();
-    Symbol &Sym = ExpSym.get();
-    Symbols(Sym.name(), std::move(Sym));
-    SymbolPtrs(&S, Sym.name());
+    Symbol *Sym = ExpSym.get();
+    ConstSymbolPtr Ptr(Sym);
+    NameToSymbol(Sym->name(), ConstSymbolPtr(Ptr));
+    PtrToSymbol(S.getRawDataRefImpl().p, ConstSymbolPtr(Ptr));
+
+    // Add Symbol to corresponding Section vector
+    if (Sym->section()) {
+      StringRef SectionName = Sym->section()->name();
+      ConstSymbolPtrVec *P = SectionToSymbols[SectionName];
+      // New section
+      if (!P)
+        SectionToSymbols(SectionName, { Ptr });
+      // Existing section
+      else
+        P->push_back(Ptr);
+    }
+  }
+
+  // Set Symbols in Sections
+  for (SectionPtr Sec : Sections) {
+    StringRef SectionName = Sec->name();
+    ConstSymbolPtrVec *Vec = SectionToSymbols[SectionName];
+    if (Vec) {
+      // Sort symbols by address
+      std::sort(Vec->begin(), Vec->end(),
+        [](const ConstSymbolPtr &S1, const ConstSymbolPtr &S2) {
+          return S1->address() < S2->address();
+        });
+      Sec->symbols(std::move(*Vec));
+    }
   }
 
   // Relocs
@@ -289,11 +344,12 @@ Error Object::readSymbols()
          RB != RE; ++RB)
     {
       const object::RelocationRef &R = *RB;
-      auto ExpRel = create<Relocation>(*this, R);
+      auto ExpRel = create<Relocation*>(ConstThis, R);
       if (!ExpRel)
         return ExpRel.takeError();
-      Relocation &Rel = ExpRel.get();
-      Relocs.emplace_back(std::move(Rel));
+      Relocation *Rel = ExpRel.get();
+      ConstRelocationPtr Ptr(Rel);
+      Relocs.push_back(Ptr);
     }
   }
 
@@ -305,23 +361,25 @@ void Object::dump() const
   raw_ostream &OS = outs();
 
   // basic info
-  OS << "FileName: " << FileName << "\n";
-  OS << "FileFormat: " << Obj->getFileFormatName() << "\n";
+  OS << "FileName: " << fileName() << "\n";
+  OS << "FileFormat: " << fileFormatName() << "\n";
 
   // Sections
   Section::header(OS);
-  for (const Section &Sec : Sections)
-    OS << Sec.str() << "\n";
+  for (ConstSectionPtr Sec : sections())
+    OS << Sec->str() << "\n";
 
+  /*
   // Symbols
   Symbol::header(OS);
-  for (const Symbol &Sym : Symbols)
-    OS << Sym.str() << "\n";
+  for (ConstSymbolPtr Sym : symbols())
+    OS << Sym->str() << "\n";
+   */
 
   // Relocations
   Relocation::header(OS);
-  for (const Relocation &Rel : Relocs)
-    OS << Rel.str() << "\n";
+  for (ConstRelocationPtr Rel : Relocs)
+    OS << Rel->str() << "\n";
 }
 
 } // sbt

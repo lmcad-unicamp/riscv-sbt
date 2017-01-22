@@ -45,6 +45,7 @@ Translator::~Translator()
     delete X[i];
 }
 
+// MCInst register number to RISCV register number
 static unsigned RVReg(unsigned Reg)
 {
   namespace RISCV = RISCVMaster;

@@ -7,7 +7,6 @@
 #include <llvm/Support/Error.h>
 
 namespace llvm {
-class Error;
 class LLVMContext;
 class Function;
 class FunctionType;
@@ -16,11 +15,6 @@ class GlobalVariable;
 class MCInst;
 class Module;
 class Value;
-
-namespace object {
-class ObjectFile;
-class SectionRef;
-}
 }
 
 namespace sbt {
@@ -45,12 +39,12 @@ public:
     CurAddr = Addr;
   }
 
-  void setCurObj(const Object *Obj)
+  void setCurObj(ConstObjectPtr Obj)
   {
     CurObj = Obj;
   }
 
-  void setCurSection(const Section *Section)
+  void setCurSection(ConstSectionPtr Section)
   {
     CurSection = Section;
   }
@@ -69,8 +63,8 @@ private:
   llvm::Function *FSyscall4;
 
   uint64_t CurAddr;
-  const Object *CurObj;
-  const Section *CurSection;
+  ConstObjectPtr CurObj = nullptr;
+  ConstSectionPtr CurSection;
 
   // methods
   llvm::Value *load(unsigned Reg);
@@ -78,7 +72,7 @@ private:
 
   void buildRegisterFile();
 
-  llvm::Expected<llvm::Value *> resolveRelocation();
+  // llvm::Expected<llvm::Value *> resolveRelocation();
 };
 
 } // sbt

@@ -3,6 +3,8 @@ MAKE_OPTS := -j9
 # build type for LLVM and SBT
 BUILD_TYPE := Debug
 # BUILD_TYPE := Release
+# LLVM_BUILD_TYPE := $(BUILD_TYPE)
+LLVM_BUILD_TYPE := Release
 
 ifeq ($(TOPDIR),)
 $(error "TOPDIR not set. Please run 'source setenv.sh' first.")
@@ -33,6 +35,11 @@ define RULE_BUILD =
 .PHONY: $$($(1)_ALIAS)-build
 $$($(1)_ALIAS)-build:
 	$(MAKE) -C $$($(1)_BUILD) $(MAKE_OPTS)
+
+# serial build
+.PHONY: $$($(1)_ALIAS)-build1
+$$($(1)_ALIAS)-build1:
+	$(MAKE) -C $$($(1)_BUILD)
 
 # build only when MAKEFILE changes
 $$($(1)_OUT): $$($(1)_MAKEFILE)
@@ -170,7 +177,8 @@ LLVM_MAKEFILE := $(LLVM_BUILD)/Makefile
 LLVM_OUT := $(LLVM_BUILD)/bin/clang
 LLVM_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/clang
 LLVM_CONFIGURE := \
-    $(CMAKE) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86" \
+    $(CMAKE) -DCMAKE_BUILD_TYPE=$(LLVM_BUILD_TYPE) \
+             -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86" \
              -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) ../llvm
 LLVM_ALIAS := llvm
 CLANG_LINK := $(TOPDIR)/llvm/tools/clang
@@ -199,3 +207,7 @@ $(foreach prog,$(ALL),$(eval $(call RULE_ALL,$(prog))))
 # clean all
 clean: $(foreach prog,$(ALL),$($(prog)_ALIAS)-clean)
 	rm -rf $(DIR_TOOLCHAIN)
+
+.PHONY: test
+test:
+	$(MAKE) -C $(TOPDIR)/sbt/test

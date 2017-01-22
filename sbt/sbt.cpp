@@ -26,7 +26,7 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
 
-#define TEST 0
+#define TEST 1
 
 using namespace llvm;
 
@@ -207,27 +207,30 @@ Error SBT::translate(const std::string &File)
   auto ExpObj = sbt::create<Object>(File);
   if (!ExpObj)
     return ExpObj.takeError();
-  Object &Obj = ExpObj.get();
+  Object *Obj = &ExpObj.get();
 
   auto log = [&]() -> raw_ostream & {
-    return logs() << Obj.fileName()  << ": ";
+    return logs() << Obj->fileName()  << ": ";
   };
 
-  log() << "File Format: " << Obj.fileFormat() << "\n";
-  SBTTranslator->setCurObj(&Obj);
+  log() << "File Format: " << Obj->fileFormatName() << "\n";
+  SBTTranslator->setCurObj(Obj);
 
   // for each section
-  for (const Section &Sec : Obj.sections()) {
+  for (ConstSectionPtr Sec : Obj->sections()) {
+    // LLVM Object Section
+    const object::SectionRef *LOSec = &Sec->section();
+
     // skip non code sections
-    if (!Sec->isText())
+    if (!LOSec->isText())
       continue;
 
-    SBTTranslator->setCurSection(&Sec);
-    DBGS << "Disassembly of section " << Sec.name() << ":\n";
+    SBTTranslator->setCurSection(Sec);
+    DBGS << "Disassembly of section " << Sec->name() << ":\n";
 
     // get section bytes
     StringRef BytesStr;
-    std::error_code EC = Sec->getContents(BytesStr);
+    std::error_code EC = LOSec->getContents(BytesStr);
     if (EC) {
       SE << "Failed to get Section Contents";
       return error(SE);
@@ -235,29 +238,28 @@ Error SBT::translate(const std::string &File)
     ArrayRef<uint8_t> Bytes(reinterpret_cast<const uint8_t *>(BytesStr.data()),
                             BytesStr.size());
 
-    uint64_t SectionAddr = Sec->getAddress();
-    uint64_t SectionSize = Sec->getSize();
-    auto Symbols = Sec.symbols();
+    uint64_t SectionAddr = LOSec->getAddress();
+    uint64_t SectionSize = LOSec->getSize();
+    const ConstSymbolPtrVec &Symbols = Sec->symbols();
 
     // for each symbol
     for (size_t SI = 0, SN = Symbols.size(); SI != SN; ++SI) {
-      // TODO REVIEW
-      const Symbol &Sym = *Symbols.at(SI);
+      ConstSymbolPtr Sym = Symbols[SI];
 
-      uint64_t Start = Sym.address();
+      uint64_t Start = Sym->address();
       uint64_t End;
       if (SI == SN - 1)
         End = SectionSize;
       else
-        End = Symbols.at(SI + 1)->address();
+        End = Symbols[SI + 1]->address();
 
-      const StringRef &SymbolName = Sym.name();
+      const StringRef &SymbolName = Sym->name();
       DBGS << SymbolName << ":\n";
 
       // Relocatable object
       uint64_t ELFOffset = SectionAddr;
       if (SectionAddr == 0)
-        ELFOffset = getELFOffset(Sec.section());
+        ELFOffset = Sec->getELFOffset();
 
       if (SymbolName == "main")
         ; // TODO start main
@@ -385,12 +387,13 @@ static void test()
   // ExitOnError ExitOnErr;
   SBT::init();
   SBTFinish Finish;
-  auto ExpObj = create<Object>("sbt/test/hello.o");
+  StringRef FilePath = "hello.o";
+  auto ExpObj = create<Object>(FilePath);
   if (!ExpObj)
     handleError(ExpObj.takeError());
   else
     ExpObj.get().dump();
-  std::exit(EXIT_SUCCESS);
+  std::exit(EXIT_FAILURE);
 #endif
 }
 
