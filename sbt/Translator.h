@@ -119,10 +119,12 @@ private:
       if (O.isReg())
         return getReg(Inst, Op);
       else if (O.isImm()) {
-        uint64_t rel = handleRelocation();
-        if (rel)
-          return llvm::ConstantInt::get(I32, rel);
-        else {
+        std::string RelocStr;
+        uint64_t Rel;
+        if (handleRelocation(Rel, &RelocStr)) {
+          DBGS << RelocStr;
+          return llvm::ConstantInt::get(I32, Rel);
+        } else {
           int64_t Imm = O.getImm();
           V = llvm::ConstantInt::get(I32, Imm);
           DBGS << Imm;
@@ -137,38 +139,50 @@ private:
   {
     const llvm::MCOperand &O = Inst.getOperand(Op);
     if (O.isImm()) {
-      uint64_t rel = 0;
-      if (handleReloc)
-        rel = handleRelocation();
-
-      if (rel)
-        return rel;
+      uint64_t Rel = 0;
+      if (handleReloc && handleRelocation(Rel))
+        return Rel;
       else
         return O.getImm();
     } else
       llvm_unreachable("Operand is not an Imm");
   }
 
-  uint64_t handleRelocation()
+  bool handleRelocation(uint64_t &Rel, std::string *Out = nullptr)
   {
     if (RI == RE)
-      return 0;
+      return false;
 
-    uint64_t val = 0;
     auto CurReloc = *RI;
     if (CurReloc->offset() == CurAddr) {
-      if (CurReloc->symbol()->name() == ".L0 ") {
+      llvm::StringRef SymbolName = CurReloc->symbol()->name();
+      llvm::StringRef RealSymbolName = SymbolName;
+      bool IsLO = false;
+      if (SymbolName == ".L0 ") {
         auto LastReloc = *(RI - 1);
         // 12 lower bits
-        val = LastReloc->symbol()->address() & 0xFFF;
+        Rel = LastReloc->symbol()->address() & 0xFFF;
+        IsLO = true;
+        RealSymbolName = LastReloc->symbol()->name();
       } else {
         // 20 upper bits
-        val = CurReloc->symbol()->address() & 0xFFFFF000;
+        Rel = CurReloc->symbol()->address() & 0xFFFFF000;
       }
+
+      if (Out) {
+        llvm::raw_string_ostream SS(*Out);
+        if (IsLO)
+          SS << "%lo(";
+        else
+          SS << "%hi(";
+        SS << RealSymbolName << ") = " << Rel;
+      }
+
       ++RI;
+      return true;
     }
 
-    return val;
+    return false;
   }
 };
 

@@ -209,7 +209,7 @@ Error SBT::translate(const std::string &File)
   if (!ExpObj)
     return ExpObj.takeError();
   Object *Obj = &ExpObj.get();
-  // Obj->dump();
+  Obj->dump();
 
   auto log = [&]() -> raw_ostream & {
     return logs() << Obj->fileName()  << ": ";
@@ -292,11 +292,11 @@ Error SBT::translate(const std::string &File)
           DisAsm->getInstruction(Inst, Size, Bytes.slice(Index),
             SectionAddr + Index, DBGS, nulls());
         if (st == MCDisassembler::DecodeStatus::Success) {
-#ifndef NDEBUG
+//#ifndef NDEBUG
           DBGS << llvm::formatv("{0:X-4}: ", Index);
           InstPrinter->printInst(&Inst, DBGS, "", *STI);
           DBGS << "\n";
-#endif
+//#endif
           Error E = SBTTranslator->translate(Inst);
           if (E)
             return E;

@@ -9,6 +9,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/Object/ObjectFile.h>
+#include <llvm/Support/FormatVariadic.h>
 
 #define GET_INSTRINFO_ENUM
 #include "../build-llvm/lib/Target/RISCVMaster/RISCVMasterGenInstrInfo.inc"
@@ -103,6 +104,8 @@ Error Translator::translate(const llvm::MCInst &Inst)
 
   SBTError SE;
 
+  DBGS << formatv("{0:X-4}:   ", CurAddr);
+
   switch (Inst.getOpcode())
   {
     case RISCV::ADDI: {
@@ -124,18 +127,25 @@ Error Translator::translate(const llvm::MCInst &Inst)
 
       unsigned O = getRD(Inst);
       int64_t I = getImm(Inst, 1);
-      uint64_t R = handleRelocation();
+      std::string RelocStr;
+      uint64_t R;
+      bool IsReloc = handleRelocation(R, &RelocStr);
       int64_t PC = CurAddr;
       int64_t S;
-      if (R)  // relocation
+      if (IsReloc)  // relocation
         S = R;
       else
         S = PC + I;
+      S = S & 0xFFFFF000;
 
-      Value *V = ConstantInt::get(I32, S & 0xFFFFF000);
+      Value *V = ConstantInt::get(I32, S);
       store(V, O);
 
-      DBGS << S << "\n";
+      if (IsReloc)
+        DBGS << RelocStr;
+      else
+        DBGS << S;
+      DBGS << "\n";
       break;
     }
 

@@ -14,11 +14,13 @@ class SectionRef;
 }
 }
 
+#define DBGS_ON
+
 namespace sbt {
 
 llvm::raw_ostream &logs(bool error = false);
 
-#ifndef NDEBUG
+#ifdef DBGS_ON
 static llvm::raw_ostream &DBGS = llvm::outs();
 #else
 static llvm::raw_ostream &DBGS = llvm::nulls();

@@ -1,10 +1,9 @@
 MAKE_OPTS := -j9
 
-# build type for LLVM and SBT
-BUILD_TYPE := Debug
-# BUILD_TYPE := Release
-# LLVM_BUILD_TYPE := $(BUILD_TYPE)
-LLVM_BUILD_TYPE := Release
+# build type for LLVM and SBT (Release or Debug)
+# WARNING: using Release LLVM builds with Debug SBT CAN cause problems!
+BUILD_TYPE := Release
+LLVM_BUILD_TYPE := $(BUILD_TYPE)
 
 ifeq ($(TOPDIR),)
 $(error "TOPDIR not set. Please run 'source setenv.sh' first.")
