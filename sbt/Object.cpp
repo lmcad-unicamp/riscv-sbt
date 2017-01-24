@@ -307,6 +307,10 @@ Error Object::readSymbols()
       return ExpSym.takeError();
     Symbol *Sym = ExpSym.get();
     ConstSymbolPtr Ptr(Sym);
+    // skip debug symbols
+    if (Sym->type() == object::SymbolRef::ST_Debug)
+      continue;
+
     NameToSymbol(Sym->name(), ConstSymbolPtr(Ptr));
     PtrToSymbol(S.getRawDataRefImpl().p, ConstSymbolPtr(Ptr));
 

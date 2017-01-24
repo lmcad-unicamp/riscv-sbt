@@ -71,6 +71,28 @@ public:
     return Sec;
   }
 
+  // address
+  uint64_t address() const
+  {
+    return Sec.getAddress();
+  }
+
+  // size
+  uint64_t size() const
+  {
+    return Sec.getSize();
+  }
+
+  bool isText() const
+  {
+    return Sec.isText();
+  }
+
+  std::error_code contents(llvm::StringRef &S) const
+  {
+    return Sec.getContents(S);
+  }
+
   // symbols, ordered by address
   const ConstSymbolPtrVec &symbols() const
   {
@@ -294,6 +316,12 @@ public:
   llvm::StringRef fileFormatName() const
   {
     return Obj->getFileFormatName();
+  }
+
+  // relocs
+  const ConstRelocationPtrVec relocs() const
+  {
+    return Relocs;
   }
 
   // dump object contents to stdout

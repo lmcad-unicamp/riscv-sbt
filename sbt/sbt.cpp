@@ -20,13 +20,14 @@
 #include <llvm/Object/Binary.h>
 #include <llvm/Object/ObjectFile.h>
 #include <llvm/Support/FileSystem.h>
+#include <llvm/Support/FormatVariadic.h>
 #include <llvm/Support/Signals.h>
 #include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
 
-#define TEST 1
+#define TEST 0
 
 using namespace llvm;
 
@@ -208,6 +209,7 @@ Error SBT::translate(const std::string &File)
   if (!ExpObj)
     return ExpObj.takeError();
   Object *Obj = &ExpObj.get();
+  // Obj->dump();
 
   auto log = [&]() -> raw_ostream & {
     return logs() << Obj->fileName()  << ": ";
@@ -216,21 +218,35 @@ Error SBT::translate(const std::string &File)
   log() << "File Format: " << Obj->fileFormatName() << "\n";
   SBTTranslator->setCurObj(Obj);
 
+  const ConstRelocationPtrVec Relocs = Obj->relocs();
+  auto RI = Relocs.cbegin();
+  auto RE = Relocs.cend();
+
   // for each section
   for (ConstSectionPtr Sec : Obj->sections()) {
-    // LLVM Object Section
-    const object::SectionRef *LOSec = &Sec->section();
+    uint64_t SectionAddr = Sec->address();
+    uint64_t SectionSize = Sec->size();
+
+    // Relocatable object?
+    uint64_t ELFOffset = SectionAddr;
+    if (SectionAddr == 0)
+      ELFOffset = Sec->getELFOffset();
+
+    DBGS << "Section " << Sec->name()
+      << ": Addr=" << SectionAddr
+      << ", ELFOffs=" << ELFOffset
+      << ", Size=" << SectionSize << "\n";
 
     // skip non code sections
-    if (!LOSec->isText())
+    if (!Sec->isText())
       continue;
 
     SBTTranslator->setCurSection(Sec);
-    DBGS << "Disassembly of section " << Sec->name() << ":\n";
+    SBTTranslator->setRelocIters(RI, RE);
 
     // get section bytes
     StringRef BytesStr;
-    std::error_code EC = LOSec->getContents(BytesStr);
+    std::error_code EC = Sec->contents(BytesStr);
     if (EC) {
       SE << "Failed to get Section Contents";
       return error(SE);
@@ -238,41 +254,38 @@ Error SBT::translate(const std::string &File)
     ArrayRef<uint8_t> Bytes(reinterpret_cast<const uint8_t *>(BytesStr.data()),
                             BytesStr.size());
 
-    uint64_t SectionAddr = LOSec->getAddress();
-    uint64_t SectionSize = LOSec->getSize();
     const ConstSymbolPtrVec &Symbols = Sec->symbols();
+    size_t SN = Symbols.size();
+    DBGS << "Symbols=" << SN << "\n";
 
     // for each symbol
-    for (size_t SI = 0, SN = Symbols.size(); SI != SN; ++SI) {
+    for (size_t SI = 0; SI != SN; ++SI) {
       ConstSymbolPtr Sym = Symbols[SI];
 
       uint64_t Start = Sym->address();
-      uint64_t End;
+      volatile uint64_t End;  // gcc bug: need to make it volatile
       if (SI == SN - 1)
         End = SectionSize;
       else
         End = Symbols[SI + 1]->address();
 
-      const StringRef &SymbolName = Sym->name();
-      DBGS << SymbolName << ":\n";
-
-      // Relocatable object
-      uint64_t ELFOffset = SectionAddr;
-      if (SectionAddr == 0)
-        ELFOffset = Sec->getELFOffset();
-
-      if (SymbolName == "main")
-        ; // TODO start main
-      else {
-        Error E = SBTTranslator->startFunction(SymbolName, Start + ELFOffset);
-        if (E)
-          return E;
+      if (Sym->flags() & object::SymbolRef::SF_Global) {
+        const StringRef &SymbolName = Sym->name();
+        DBGS << SymbolName << ": (start=" << Start << ",end=" << End << ")\n";
+        if (SymbolName == "main")
+          ; // TODO start main
+        else {
+          Error E = SBTTranslator->startFunction(SymbolName, Start);
+          if (E)
+            return E;
+        }
       }
 
       // for each instruction
       uint64_t Size;
       for (uint64_t Index = Start; Index < End; Index += Size) {
-        SBTTranslator->setCurAddr(Index + ELFOffset);
+        // SBTTranslator->setCurAddr(Index + ELFOffset);
+        SBTTranslator->setCurAddr(Index);
 
         MCInst Inst;
         MCDisassembler::DecodeStatus st =
@@ -280,6 +293,7 @@ Error SBT::translate(const std::string &File)
             SectionAddr + Index, DBGS, nulls());
         if (st == MCDisassembler::DecodeStatus::Success) {
 #ifndef NDEBUG
+          DBGS << llvm::formatv("{0:X-4}: ", Index);
           InstPrinter->printInst(&Inst, DBGS, "", *STI);
           DBGS << "\n";
 #endif
@@ -290,6 +304,8 @@ Error SBT::translate(const std::string &File)
           SE << "Invalid instruction encoding\n";
           return error(SE);
         }
+
+
       } // for each instruction
       // TODO finish function
     } // for each symbol
@@ -349,6 +365,11 @@ Error SBT::genHello()
   Args = { SC, RC };
   Builder.CreateCall(FSyscall, Args);
   Builder.CreateRet(RC);
+
+  // XXX Used for testing only, remove
+  Module->dump();
+  std::exit(EXIT_FAILURE);
+
   return Error::success();
 }
 
