@@ -235,12 +235,18 @@ private:
     if (handleRelocation(Rel, SS)) {
       llvm::Value *V =
         Builder->CreateGEP(ShadowImage, llvm::ConstantInt::get(I32, Rel));
+      // V->dump();
       updateFirst(V, First);
-      V = Builder->CreateCast(llvm::Instruction::CastOps::BitCast, V,
-          llvm::Type::getInt32PtrTy(*Context));
+      V = Builder->CreateCast(llvm::Instruction::CastOps::BitCast,
+        V, llvm::Type::getInt32PtrTy(*Context));
       updateFirst(V, First);
+      V = Builder->CreateCast(llvm::Instruction::CastOps::PtrToInt,
+        V, I32);
+      updateFirst(V, First);
+      /*
       V = Builder->CreateLoad(V, "ShadowLoad");
       updateFirst(V, First);
+       */
       return V;
     } else {
       int64_t Imm = Inst.getOperand(Op).getImm();
@@ -263,23 +269,28 @@ private:
     if (CurReloc->offset() == CurAddr) {
       llvm::StringRef SymbolName = CurReloc->symbol()->name();
       llvm::StringRef RealSymbolName = SymbolName;
-      bool IsLO = false;
+      // bool IsLO = false;
       if (SymbolName == ".L0 ") {
         auto LastReloc = *(RI - 1);
         // 12 lower bits
-        Rel = LastReloc->symbol()->address() & 0xFFF;
-        IsLO = true;
+        // Rel = LastReloc->symbol()->address() & 0xFFF;
+        Rel = LastReloc->symbol()->address();
+        // IsLO = true;
         RealSymbolName = LastReloc->symbol()->name();
       } else {
         // 20 upper bits
-        Rel = CurReloc->symbol()->address() & 0xFFFFF000;
+        //Rel = CurReloc->symbol()->address() & 0xFFFFF000;
+        Rel = CurReloc->symbol()->address();
       }
 
+      /*
       if (IsLO)
         SS << "%lo(";
       else
         SS << "%hi(";
       SS << RealSymbolName << ") = " << Rel;
+       */
+      SS << RealSymbolName << " = " << Rel;
 
       ++RI;
       return true;

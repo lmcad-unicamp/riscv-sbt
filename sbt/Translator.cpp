@@ -135,6 +135,14 @@ Error Translator::translate(const llvm::MCInst &Inst)
       unsigned O = getRD(Inst, SS);
       Value *O1 = getReg(Inst, 1, First, SS);
       Value *O2 = getRegOrImm(Inst, 2, First, SS);
+
+      // If this is a relocation, get lower 12 bits only
+      // TODO Review this
+      if (!isa<ConstantInt>(O2)) {
+        O2 = Builder->CreateAnd(O2, ConstantInt::get(I32, 0xFFF));
+        updateFirst(O2, First);
+      }
+
       Value *V = add(O1, O2, First);
       store(V, O, First);
 
@@ -149,13 +157,13 @@ Error Translator::translate(const llvm::MCInst &Inst)
       Value *V = getImm(Inst, 1, First, SS);
 
       // Add PC (CurAddr) if V is not a relocation
+      // TODO Review this
       if (isa<ConstantInt>(V))
         V = add(V, ConstantInt::get(I32, CurAddr), First);
 
       // Get upper 20 bits only
       V = Builder->CreateAnd(V, ConstantInt::get(I32, 0xFFFFF000));
-      if (!First && isa<Instruction>(V))
-        First = dyn_cast<Instruction>(V);
+      updateFirst(V, First);
 
       store(V, O, First);
 
@@ -352,7 +360,7 @@ Error Translator::genSyscallHandler()
 
   // Default case: call exit(99)
   BasicBlock *BBSW1Dfl = BasicBlock::Create(*Context,
-    BBPrefix + "sw1_default", FRVSC, BBExit);
+    BBPrefix + "sw1_default", FRVSC, BBSW2);
   Builder->SetInsertPoint(BBSW1Dfl);
   store(ConstantInt::get(I32, 1), RV_T0, First);
   store(ConstantInt::get(I32, X86_SYS_EXIT), RV_A7, First);
@@ -397,8 +405,8 @@ Error Translator::genSyscallHandler()
       Args.push_back(load(RV_A0 + I, First));
 
     // Make the syscall
-    CallInst *C = Builder->CreateCall(FX86SC[Val], Args);
-    store(C->getReturnedArgOperand(), RV_A0, First);
+    Value *V = Builder->CreateCall(FX86SC[Val], Args);
+    store(V, RV_A0, First);
     Builder->CreateBr(BBExit);
     return BB;
   };
@@ -418,9 +426,8 @@ Error Translator::handleSyscall(llvm::Instruction *&First)
 {
   Value *SC = load(RV_A7, First);
   std::vector<Value *> Args = { SC };
-  CallInst *C = Builder->CreateCall(FRVSC, Args);
-  updateFirst(C, First);
-  Value *V = C->getReturnedArgOperand();
+  Value *V = Builder->CreateCall(FRVSC, Args);
+  updateFirst(V, First);
   store(V, RV_A0, First);
 
   return Error::success();
