@@ -1,6 +1,8 @@
 #ifndef SBT_CONSTANTS_H
 #define SBT_CONSTANTS_H
 
+#define SBT_DEBUG 1
+
 #include <string>
 
 namespace sbt {

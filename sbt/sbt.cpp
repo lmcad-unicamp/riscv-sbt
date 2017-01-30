@@ -95,9 +95,9 @@ SBT::SBT(
   :
   OutputFile(OutputFile),
   Context(new LLVMContext),
-  Builder(*Context),
+  Builder(new IRBuilder<>(*Context)),
   Module(new llvm::Module("main", *Context)),
-  SBTTranslator(new Translator(&*Context, &Builder, &*Module))
+  SBTTranslator(new Translator(&*Context, &*Builder, &*Module))
 {
   for (auto File : InputFilesList) {
     if (!sys::fs::exists(File)) {
@@ -117,7 +117,7 @@ SBT::SBT(
   // get target
   Triple Triple("riscv32-unknown-elf");
   std::string TripleName = Triple.getTriple();
-  logs() << "Triple: " << TripleName << "\n";
+  // logs() << "Triple: " << TripleName << "\n";
 
   std::string StrError;
   Target = &getTheRISCVMaster32Target();
@@ -209,14 +209,19 @@ Error SBT::translate(const std::string &File)
   if (!ExpObj)
     return ExpObj.takeError();
   Object *Obj = &ExpObj.get();
-  Obj->dump();
+  // Obj->dump();
+  SBTTranslator->setCurObj(Obj);
 
+  /*
   auto log = [&]() -> raw_ostream & {
     return logs() << Obj->fileName()  << ": ";
   };
+   */
 
-  log() << "File Format: " << Obj->fileFormatName() << "\n";
-  SBTTranslator->setCurObj(Obj);
+  // log() << "File Format: " << Obj->fileFormatName() << "\n";
+
+  if (Error E = SBTTranslator->startModule())
+    return E;
 
   const ConstRelocationPtrVec Relocs = Obj->relocs();
   auto RI = Relocs.cbegin();
@@ -232,7 +237,7 @@ Error SBT::translate(const std::string &File)
     if (SectionAddr == 0)
       ELFOffset = Sec->getELFOffset();
 
-    DBGS << "Section " << Sec->name()
+    nulls() << "Section " << Sec->name()
       << ": Addr=" << SectionAddr
       << ", ELFOffs=" << ELFOffset
       << ", Size=" << SectionSize << "\n";
@@ -256,7 +261,7 @@ Error SBT::translate(const std::string &File)
 
     const ConstSymbolPtrVec &Symbols = Sec->symbols();
     size_t SN = Symbols.size();
-    DBGS << "Symbols=" << SN << "\n";
+    // DBGS << "Symbols=" << SN << "\n";
 
     // for each symbol
     for (size_t SI = 0; SI != SN; ++SI) {
@@ -271,13 +276,12 @@ Error SBT::translate(const std::string &File)
 
       if (Sym->flags() & object::SymbolRef::SF_Global) {
         const StringRef &SymbolName = Sym->name();
-        DBGS << SymbolName << ": (start=" << Start << ",end=" << End << ")\n";
-        if (SymbolName == "main")
-          ; // TODO start main
-        else {
-          Error E = SBTTranslator->startFunction(SymbolName, Start);
-          if (E)
+        DBGS << SymbolName << ":\n";
+        if (SymbolName == "_start") {
+          if (Error E = SBTTranslator->startFunction(SymbolName, Start))
             return E;
+        } else if (SymbolName == "main") {
+          // TODO start main
         }
       }
 
@@ -292,11 +296,11 @@ Error SBT::translate(const std::string &File)
           DisAsm->getInstruction(Inst, Size, Bytes.slice(Index),
             SectionAddr + Index, DBGS, nulls());
         if (st == MCDisassembler::DecodeStatus::Success) {
-//#ifndef NDEBUG
+#if 0 // SBT_DEBUG
           DBGS << llvm::formatv("{0:X-4}: ", Index);
           InstPrinter->printInst(&Inst, DBGS, "", *STI);
           DBGS << "\n";
-//#endif
+#endif
           Error E = SBTTranslator->translate(Inst);
           if (E)
             return E;
@@ -307,10 +311,12 @@ Error SBT::translate(const std::string &File)
 
 
       } // for each instruction
-      // TODO finish function
     } // for each symbol
   } // for each section
-  // TODO finish module
+  if (Error E = SBTTranslator->finishFunction())
+    return E;
+  if (Error E = SBTTranslator->finishModule())
+    return E;
 
   return Error::success();
 }
@@ -349,7 +355,7 @@ Error SBT::genHello()
 
   // entry basic block
   BasicBlock *BB = BasicBlock::Create(*Context, "entry", FStart);
-  Builder.SetInsertPoint(BB);
+  Builder->SetInsertPoint(BB);
 
   // call write
   Value *SC = ConstantInt::get(Int32, APInt(32, SYS_WRITE, SIGNED));
@@ -357,14 +363,14 @@ Error SBT::genHello()
   Value *Ptr = Msg;
   Value *Len = ConstantInt::get(Int32, APInt(32, Hello.size(), SIGNED));
   std::vector<Value *> Args = { SC, FD, Ptr, Len };
-  Builder.CreateCall(FSyscall, Args);
+  Builder->CreateCall(FSyscall, Args);
 
   // call exit
   SC = ConstantInt::get(Int32, APInt(32, SYS_EXIT, SIGNED));
   Value *RC = ConstantInt::get(Int32, APInt(32, 0, SIGNED));
   Args = { SC, RC };
-  Builder.CreateCall(FSyscall, Args);
-  Builder.CreateRet(RC);
+  Builder->CreateCall(FSyscall, Args);
+  Builder->CreateRet(RC);
 
   // XXX Used for testing only, remove
   Module->dump();
@@ -458,10 +464,6 @@ int main(int argc, char *argv[])
 
   // dump resulting IR
   SBT.dump();
-
-  // abort while SBT translation is not finished
-  errs() << "Error: Incomplete translation\n";
-  std::exit(EXIT_FAILURE);
 
   // write IR to output file
   SBT.write();

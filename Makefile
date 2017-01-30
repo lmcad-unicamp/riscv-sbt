@@ -2,7 +2,7 @@ MAKE_OPTS := -j9
 
 # build type for LLVM and SBT (Release or Debug)
 # WARNING: using Release LLVM builds with Debug SBT CAN cause problems!
-BUILD_TYPE := Release
+BUILD_TYPE := Debug
 LLVM_BUILD_TYPE := $(BUILD_TYPE)
 
 ifeq ($(TOPDIR),)

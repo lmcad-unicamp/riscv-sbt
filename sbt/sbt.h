@@ -62,7 +62,7 @@ private:
   std::string OutputFile;
 
   std::unique_ptr<llvm::LLVMContext> Context;
-  llvm::IRBuilder<> Builder;
+  std::unique_ptr<llvm::IRBuilder<>> Builder;
   std::unique_ptr<llvm::Module> Module;
   std::unique_ptr<Translator> SBTTranslator;
 

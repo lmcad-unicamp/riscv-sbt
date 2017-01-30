@@ -1,6 +1,5 @@
 #include "Translator.h"
 
-#include "Constants.h"
 #include "SBTError.h"
 #include "Utils.h"
 
@@ -29,20 +28,8 @@ Translator::Translator(
   ZERO(ConstantInt::get(I32, 0)),
   Context(Ctx),
   Builder(Bldr),
-  Module(Mod),
-  FTSyscall4(FunctionType::get(I32,
-    { I32, I32, I32, I32, I32 }, !VAR_ARG)),
-  FSyscall4(Function::Create(FTSyscall4,
-    Function::ExternalLinkage, "syscall", Module))
+  Module(Mod)
 {
-  buildRegisterFile();
-}
-
-Translator::~Translator()
-{
-  // Destroy register file
-  for (int i = 0; i < 32; i++)
-    delete X[i];
 }
 
 // MCInst register number to RISCV register number
@@ -87,79 +74,102 @@ unsigned Translator::RVReg(unsigned Reg)
   }
 }
 
-Value *Translator::load(unsigned Reg)
-{
-  Value *V = Builder->CreateLoad(X[Reg], X[Reg]->getName());
-  return V;
-}
-
-void Translator::store(Value *V, unsigned Reg)
-{
-  Builder->CreateStore(V, X[Reg], !VOLATILE);
-}
-
 Error Translator::translate(const llvm::MCInst &Inst)
 {
   namespace RISCV = RISCVMaster;
 
   SBTError SE;
+  Instruction *First = nullptr;
 
-  DBGS << formatv("{0:X-4}:   ", CurAddr);
+  // Add RV Inst metadata and print it in debug mode
+#if SBT_DEBUG
+  auto MDName = [](const llvm::StringRef &S) {
+    std::string SSS;
+    raw_string_ostream SS(SSS);
+    SS << '_';
+    for (char C : S) {
+      switch (C) {
+        case ' ':
+        case ':':
+        case ',':
+        case '%':
+        case '(':
+        case ')':
+        case '\t':
+          SS << '_';
+          break;
+
+        case '=':
+          SS << "eq";
+          break;
+
+        default:
+          SS << C;
+      }
+    }
+    SS.flush();
+    return SSS;
+  };
+
+# define DBGPRINT(s) \
+  do { \
+    SS.flush(); \
+    DBGS << SSS << "\n"; \
+    MDNode *N = MDNode::get(*Context, MDString::get(*Context, "RISC-V Instruction")); \
+    First->setMetadata(MDName(SSS), N); \
+  } while (0)
+
+  std::string SSS;
+  raw_string_ostream SS(SSS);
+#else
+# define DBGPRINT(s)  do { ; } while(0)
+  raw_ostream &SS = nulls();
+#endif
+  SS << formatv("{0:X-4}:   ", CurAddr);
 
   switch (Inst.getOpcode())
   {
     case RISCV::ADDI: {
-      DBGS << "ADDI ";
+      SS << "addi\t";
 
-      unsigned O = getRD(Inst);
-      Value *O1 = getReg(Inst, 1);
-      Value *O2 = getRegOrImm(Inst, 2);
+      unsigned O = getRD(Inst, SS);
+      Value *O1 = getReg(Inst, 1, First, SS);
+      Value *O2 = getRegOrImm(Inst, 2, First, SS);
+      Value *V = add(O1, O2, First);
+      store(V, O, First);
 
-      Value *V = Builder->CreateAdd(O1, O2);
-      store(V, O);
-
-      DBGS << "\n";
+      DBGPRINT(SS);
       break;
     }
 
     case RISCV::AUIPC: {
-      DBGS << "AUIPC ";
+      SS << "auipc\t";
 
-      unsigned O = getRD(Inst);
-      int64_t I = getImm(Inst, 1);
-      std::string RelocStr;
-      uint64_t R;
-      bool IsReloc = handleRelocation(R, &RelocStr);
-      int64_t PC = CurAddr;
-      int64_t S;
-      if (IsReloc)  // relocation
-        S = R;
-      else
-        S = PC + I;
-      S = S & 0xFFFFF000;
+      unsigned O = getRD(Inst, SS);
+      Value *V = getImm(Inst, 1, First, SS);
 
-      Value *V = ConstantInt::get(I32, S);
-      store(V, O);
+      // Add PC (CurAddr) if V is not a relocation
+      if (isa<ConstantInt>(V))
+        V = add(V, ConstantInt::get(I32, CurAddr), First);
 
-      if (IsReloc)
-        DBGS << RelocStr;
-      else
-        DBGS << S;
-      DBGS << "\n";
+      // Get upper 20 bits only
+      V = Builder->CreateAnd(V, ConstantInt::get(I32, 0xFFFFF000));
+      if (!First && isa<Instruction>(V))
+        First = dyn_cast<Instruction>(V);
+
+      store(V, O, First);
+
+      DBGPRINT(SS);
       break;
     }
 
     case RISCV::ECALL: {
-      DBGS << "ECALL\n";
+      SS << "ecall";
 
-      // call
-      Value *SC = load(17);
-      Value *A0 = load(10);
-      Value *A1 = load(11);
-      Value *A2 = load(12);
-      Value *A3 = load(13);
-      std::vector<Value *> Args = { SC, A0, A1, A2, A3 };
-      Builder->CreateCall(FSyscall4, Args);
+      if (Error E = handleSyscall(First))
+        return E;
+
+      DBGPRINT(SS);
       break;
     }
 
@@ -173,6 +183,26 @@ Error Translator::translate(const llvm::MCInst &Inst)
   return Error::success();
 }
 
+Error Translator::startModule()
+{
+  // BasicBlock *BB = Builder->GetInsertBlock();
+
+  buildRegisterFile();
+
+  if (Error E = buildShadowImage())
+    return E;
+
+  if (Error E = genSyscallHandler())
+    return E;
+
+  return Error::success();
+}
+
+Error Translator::finishModule()
+{
+  return Error::success();
+}
+
 Error Translator::startFunction(StringRef Name, uint64_t Addr)
 {
   // Create a function with no parameters
@@ -183,15 +213,15 @@ Error Translator::startFunction(StringRef Name, uint64_t Addr)
 
   // BB
   Twine BBName = Twine("bb").concat(Twine::utohexstr(Addr));
-  BasicBlock *BB =
-    BasicBlock::Create(*Context, BBName, F);
+  BasicBlock *BB = BasicBlock::Create(*Context, BBName, F);
   Builder->SetInsertPoint(BB);
 
-  if (FirstFunction) {
-    FirstFunction = false;
-    // CurFunAddr = Addr;
-  }
+  return Error::success();
+}
 
+Error Translator::finishFunction()
+{
+  Builder->CreateRetVoid();
   return Error::success();
 }
 
@@ -199,16 +229,201 @@ void Translator::buildRegisterFile()
 {
   Constant *X0 = ConstantInt::get(I32, 0u);
   X[0] = new GlobalVariable(*Module, I32, CONSTANT,
-    GlobalValue::ExternalLinkage, X0, "X0");
+    GlobalValue::ExternalLinkage, X0, IREGNAME + "0");
 
   for (int I = 1; I < 32; ++I) {
     std::string S;
     raw_string_ostream SS(S);
-    SS << "X" << I;
-    std::string RegName = SS.str();
+    SS << IREGNAME << I;
     X[I] = new GlobalVariable(*Module, I32, !CONSTANT,
-        GlobalValue::ExternalLinkage, X0, RegName);
+        GlobalValue::ExternalLinkage, X0, SS.str());
   }
+}
+
+Error Translator::buildShadowImage()
+{
+  SBTError SE;
+
+  // Assuming only one data section for now
+  // Get Data Section
+  ConstSectionPtr DS = nullptr;
+  for (ConstSectionPtr Sec : CurObj->sections()) {
+    if (Sec->section().isData() && !Sec->isText()) {
+      // DBGS << __FUNCTION__ << ": " << Sec->name() << "\n";
+      DS = Sec;
+      break;
+    }
+  }
+
+  if (!DS) {
+    SE << __FUNCTION__ << ": No Data Section found";
+    return error(SE);
+  }
+
+  StringRef Bytes;
+  std::error_code EC = DS->contents(Bytes);
+  if (EC) {
+    SE << __FUNCTION__ << ": failed to get section contents";
+    return error(SE);
+  }
+
+  ArrayRef<uint8_t> ByteArray(
+    reinterpret_cast<const uint8_t *>(Bytes.data()),
+    Bytes.size());
+
+  Constant *CDA = ConstantDataArray::get(*Context, ByteArray);
+
+  ShadowImage =
+    new GlobalVariable(*Module, CDA->getType(), !CONSTANT,
+      GlobalValue::ExternalLinkage, CDA, "ShadowMemory");
+
+  return Error::success();
+}
+
+Error Translator::genSyscallHandler()
+{
+  // Declare X86 syscall functions
+  const size_t N = 5;
+  FunctionType *FTX86SC[N];
+  Function *FX86SC[N];
+  std::vector<Type *> FArgs = { I32 };
+
+  const std::string SCName = "syscall";
+  for (size_t I = 0; I < N; I++) {
+    std::string S = SCName;
+    raw_string_ostream SS(S);
+    SS << I;
+
+    FTX86SC[I] = FunctionType::get(I32, FArgs, !VAR_ARG);
+    FArgs.push_back(I32);
+
+    FX86SC[I] = Function::Create(FTX86SC[I],
+      Function::ExternalLinkage, SS.str(), Module);
+  }
+
+  // Build syscalls' info
+  struct Syscall {
+    int Args;
+    int RV;
+    int X86;
+
+    Syscall(int A, int R, int X) :
+      Args(A),
+      RV(R),
+      X86(X)
+    {}
+  };
+
+  // Arg #, RISC-V Syscall #, X86 Syscall #
+  const int X86_SYS_EXIT = 1;
+  const std::vector<Syscall> SCV = {
+    { 1, 93, 1 },  // EXIT
+    { 4, 64, 4 }   // WRITE
+  };
+
+  const std::string BBPrefix = "bb_rvsc_";
+  llvm::Instruction *First = nullptr;
+
+  // Define rv_syscall function
+  FTRVSC = FunctionType::get(I32, { I32 }, !VAR_ARG);
+  FRVSC =
+    Function::Create(FTRVSC, Function::ExternalLinkage, "rv_syscall", Module);
+
+  // Entry
+  BasicBlock *BBEntry = BasicBlock::Create(*Context, BBPrefix + "entry", FRVSC);
+  llvm::Argument &SC = *FRVSC->arg_begin();
+
+  // Exit
+  //
+  // Return A0
+  BasicBlock *BBExit = BasicBlock::Create(*Context,
+    BBPrefix + "exit", FRVSC);
+  Builder->SetInsertPoint(BBExit);
+  Builder->CreateRet(load(RV_A0, First));
+
+  // 2nd switch
+  BasicBlock *BBSW2 = BasicBlock::Create(*Context,
+    BBPrefix + "sw2", FRVSC, BBExit);
+
+  // First Switch:
+  // - switch based on RISC-V syscall number and:
+  //   - set number of args
+  //   - set X86 syscall number
+
+  // Default case: call exit(99)
+  BasicBlock *BBSW1Dfl = BasicBlock::Create(*Context,
+    BBPrefix + "sw1_default", FRVSC, BBExit);
+  Builder->SetInsertPoint(BBSW1Dfl);
+  store(ConstantInt::get(I32, 1), RV_T0, First);
+  store(ConstantInt::get(I32, X86_SYS_EXIT), RV_A7, First);
+  store(ConstantInt::get(I32, 99), RV_A0, First);
+  Builder->CreateBr(BBSW2);
+
+  Builder->SetInsertPoint(BBEntry);
+  SwitchInst *SW1 = Builder->CreateSwitch(&SC, BBSW1Dfl);
+
+  // Other cases
+  auto addSW1Case = [&](const Syscall &S) {
+    std::string SSS = BBPrefix;
+    raw_string_ostream SS(SSS);
+    SS << "sw1_case_" << S.RV;
+
+    BasicBlock *BB = BasicBlock::Create(*Context, SS.str(), FRVSC, BBSW2);
+    Builder->SetInsertPoint(BB);
+    store(ConstantInt::get(I32, S.Args), RV_T0, First);
+    store(ConstantInt::get(I32, S.X86), RV_A7, First);
+    Builder->CreateBr(BBSW2);
+    SW1->addCase(ConstantInt::get(I32, S.RV), BB);
+  };
+
+  for (const Syscall &S : SCV)
+    addSW1Case(S);
+
+  // Second Switch:
+  // - switch based on syscall's number of args
+  //   and make the call
+
+  auto getSW2CaseBB = [&](size_t Val) {
+    std::string SSS = BBPrefix;
+    raw_string_ostream SS(SSS);
+    SS << "sw2_case_" << Val;
+
+    BasicBlock *BB = BasicBlock::Create(*Context, SS.str(), FRVSC, BBExit);
+    Builder->SetInsertPoint(BB);
+
+    // Set args
+    std::vector<Value *> Args = { &SC };
+    for (size_t I = 0; I < Val; I++)
+      Args.push_back(load(RV_A0 + I, First));
+
+    // Make the syscall
+    CallInst *C = Builder->CreateCall(FX86SC[Val], Args);
+    store(C->getReturnedArgOperand(), RV_A0, First);
+    Builder->CreateBr(BBExit);
+    return BB;
+  };
+
+  BasicBlock *SW2Case0 = getSW2CaseBB(0);
+
+  Builder->SetInsertPoint(BBSW2);
+  SwitchInst *SW2 = Builder->CreateSwitch(load(RV_T0, First), SW2Case0);
+  SW2->addCase(ConstantInt::get(I32, 0), SW2Case0);
+  for (size_t I = 1; I < N; I++)
+    SW2->addCase(ConstantInt::get(I32, I), getSW2CaseBB(I));
+
+  return Error::success();
+}
+
+Error Translator::handleSyscall(llvm::Instruction *&First)
+{
+  Value *SC = load(RV_A7, First);
+  std::vector<Value *> Args = { SC };
+  CallInst *C = Builder->CreateCall(FRVSC, Args);
+  updateFirst(C, First);
+  Value *V = C->getReturnedArgOperand();
+  store(V, RV_A0, First);
+
+  return Error::success();
 }
 
 } // sbt
