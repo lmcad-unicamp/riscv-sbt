@@ -14,7 +14,7 @@ _start:
   pushl $msg
   pushl $1
   pushl $SYS_WRITE
-  call syscall4
+  call syscall3
 
   pushl $0
   pushl $SYS_EXIT
