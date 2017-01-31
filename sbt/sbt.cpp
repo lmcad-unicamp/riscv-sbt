@@ -296,7 +296,7 @@ Error SBT::translate(const std::string &File)
           DisAsm->getInstruction(Inst, Size, Bytes.slice(Index),
             SectionAddr + Index, DBGS, nulls());
         if (st == MCDisassembler::DecodeStatus::Success) {
-#if 0 // SBT_DEBUG
+#if SBT_DEBUG
           DBGS << llvm::formatv("{0:X-4}: ", Index);
           InstPrinter->printInst(&Inst, DBGS, "", *STI);
           DBGS << "\n";

@@ -210,5 +210,5 @@ clean: $(foreach prog,$(ALL),$($(prog)_ALIAS)-clean)
 .PHONY: test
 test:
 	$(MAKE) sbt-build sbt-install
-	rm -f $(TOPDIR)/sbt/test/rv-x86-hello.bc
+	rm -f $(TOPDIR)/sbt/test/rv-x86-main.bc
 	$(MAKE) -C $(TOPDIR)/sbt/test
