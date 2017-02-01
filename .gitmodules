@@ -1,9 +1,6 @@
 [submodule "llvm"]
 	path = llvm
 	url = https://github.com/OpenISA/llvm
-[submodule "riscv-gnu-toolchain"]
-	path = riscv-gnu-toolchain
-	url = https://github.com/riscv/riscv-gnu-toolchain
 [submodule "riscv-isa-sim"]
 	path = riscv-isa-sim
 	url = https://github.com/riscv/riscv-isa-sim
@@ -16,3 +13,15 @@
 [submodule "clang"]
 	path = clang
 	url = https://github.com/OpenISA/clang
+[submodule "riscv-binutils-gdb"]
+	path = riscv-binutils-gdb
+	url = https://github.com/riscv/riscv-binutils-gdb
+[submodule "riscv-dejagnu"]
+	path = riscv-dejagnu
+	url = https://github.com/riscv/riscv-dejagnu
+[submodule "riscv-newlib"]
+	path = riscv-newlib
+	url = https://github.com/riscv/riscv-newlib
+[submodule "riscv-gcc"]
+	path = riscv-gcc
+	url = https://github.com/riscv/riscv-gcc

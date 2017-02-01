@@ -10,14 +10,26 @@ $(error "TOPDIR not set. Please run 'source setenv.sh' first.")
 endif
 
 DIR_TOOLCHAIN := $(TOPDIR)/toolchain
+DIR_TOOLCHAIN_X86 := $(DIR_TOOLCHAIN)/x86
 
-ALL := GCC FESVR SIM PK32 PK64 LLVM SBT
-all: sbt riscv-isa-sim riscv-pk
+ALL := BINUTILS BINUTILS_X86 #GCC FESVR SIM PK32 PK64 LLVM SBT
+all: riscv-binutils-gdb x86-binutils-gdb #sbt riscv-isa-sim riscv-pk
 
 
 ###
 ### rules
 ###
+
+ALL_FILES := find \! -type d | sed "s@^\./@@; /^pkg\//d;" | sort
+DIFF_FILTER := grep "^< " | sed "s/^< //"
+NEW_FILES := bash -c \
+             'diff <($(ALL_FILES)) <(cat pkg/all.files) | $(DIFF_FILTER)'
+
+define UPDATE_FILES
+	cd $(DIR_TOOLCHAIN) && \
+	cat pkg/$$($(1)_ALIAS).files >> pkg/all.files && \
+	sort pkg/all.files -o pkg/all.files
+endef
 
 # gen MAKEFILE
 define RULE_MAKEFILE =
@@ -52,6 +64,13 @@ define RULE_INSTALL =
 .PHONY: $$($(1)_ALIAS)-install
 $$($(1)_ALIAS)-install:
 	$(MAKE) -C $$($(1)_BUILD) install
+	echo "Updating file list..."
+	if [ ! -f $$(DIR_TOOLCHAIN)/pkg/all.files) ]; then \
+		touch $$(DIR_TOOLCHAIN)/pkg/all.files; \
+	fi
+	cd $$(DIR_TOOLCHAIN) && \
+	$$(NEW_FILES) > pkg/$$($(1)_ALIAS).files && \
+	$(call UPDATE_FILES),$(1))
 
 # install only when build OUTPUT changes
 $$($(1)_TOOLCHAIN): $$($(1)_OUT)
@@ -90,15 +109,46 @@ $(call RULE_ALIAS,$(1))
 $(call RULE_CLEAN,$(1))
 endef
 
+# riscv-binutils-gdb
+BINUTILS_BUILD := $(TOPDIR)/build/riscv-binutils-gdb
+BINUTILS_MAKEFILE := $(BINUTILS_BUILD)/Makefile
+BINUTILS_OUT := $(BINUTILS_BUILD)/ld
+BINUTILS_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/ld
+BINUTILS_CONFIGURE := $(TOPDIR)/riscv-binutils-gdb/configure \
+                      --target=riscv64-unknown-linux-gnu \
+                      --prefix=$(DIR_TOOLCHAIN) \
+                      --with-sysroot=$(DIR_TOOLCHAIN)/sysroot \
+                      --enable-multilib \
+                      --disable-werror \
+                      --disable-nls
+BINUTILS_ALIAS := riscv-binutils-gdb
 
-# riscv-gnu-toolchain
-GCC_BUILD := $(TOPDIR)/riscv-gnu-toolchain/build
-GCC_MAKEFILE := $(GCC_BUILD)/Makefile
-GCC_OUT := $(GCC_BUILD)/build-gcc-newlib/gcc/xgcc
-GCC_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/riscv64-unknown-elf-gcc
-GCC_CONFIGURE := ../configure --prefix=$(DIR_TOOLCHAIN) --enable-multilib
-GCC_ALIAS := riscv-gnu-toolchain
-GCC_BUILD_AND_INSTALL := 1
+# x86-binutils-gdb
+BINUTILS_X86_BUILD := $(TOPDIR)/build/x86-binutils-gdb
+BINUTILS_X86_MAKEFILE := $(BINUTILS_X86_BUILD)/Makefile
+BINUTILS_X86_OUT := $(BINUTILS_X86_BUILD)/ld
+BINUTILS_X86_TOOLCHAIN := $(DIR_TOOLCHAIN_X86)/bin/ld
+BINUTILS_X86_CONFIGURE := $(TOPDIR)/riscv-binutils-gdb/configure \
+                          --prefix=$(DIR_TOOLCHAIN_X86) \
+                          --enable-multilib
+BINUTILS_X86_ALIAS := x86-binutils-gdb
+
+
+# riscv-dejagnu
+DEJAGNU_BUILD := $(TOPDIR)/build/riscv-dejagnu
+DEJAGNU_MAKEFILE := $(DEJAGNU_BUILD)/Makefile
+DEJAGNU_OUT := $(DEJAGNU_BUILD)/ld
+DEJAGNU_TOOLCHAIN := $(DIR_TOOLCHAIN)/lib/libdejagnu.so
+DEJAGNU_CONFIGURE := $(TOPDIR)/riscv-dejagnu/configure \
+                      --target=riscv64-unknown-linux-gnu \
+                      --prefix=$(DIR_TOOLCHAIN) \
+                      --with-sysroot=$(DIR_TOOLCHAIN)/sysroot \
+                      --enable-multilib \
+                      --disable-werror \
+                      --disable-nls
+DEJAGNU_ALIAS := riscv-dejagnu
+
+
 
 # riscv-fesvr
 FESVR_BUILD := $(TOPDIR)/riscv-fesvr/build
@@ -206,6 +256,27 @@ $(foreach prog,$(ALL),$(eval $(call RULE_ALL,$(prog))))
 # clean all
 clean: $(foreach prog,$(ALL),$($(prog)_ALIAS)-clean)
 	rm -rf $(DIR_TOOLCHAIN)
+
+###
+### TEST targets
+###
+
+all_files:
+	cd $(DIR_TOOLCHAIN) && \
+	$(ALL_FILES)
+
+new_files:
+	cd $(DIR_TOOLCHAIN) && \
+	$(NEW_FILES)
+
+$(eval UPDATE_FILE := $(call UPDATE_FILES,$(PKG)))
+update_files:
+	f="$(DIR_TOOLCHAIN)/pkg/$($(PKG)_ALIAS).files" && \
+	if [ ! -f "$$f" ]; then \
+		echo "Invalid PKG: \"$(PKG)\""; \
+		exit 1; \
+	fi
+	$(UPDATE_FILE)
 
 .PHONY: test
 test:
