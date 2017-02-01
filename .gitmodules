@@ -25,3 +25,6 @@
 [submodule "riscv-gcc"]
 	path = riscv-gcc
 	url = https://github.com/riscv/riscv-gcc
+[submodule "riscv-gnu-toolchain"]
+	path = riscv-gnu-toolchain
+	url = https://github.com/riscv/riscv-gnu-toolchain

@@ -12,8 +12,8 @@ endif
 DIR_TOOLCHAIN := $(TOPDIR)/toolchain
 DIR_TOOLCHAIN_X86 := $(DIR_TOOLCHAIN)/x86
 
-ALL := BINUTILS BINUTILS_X86 #GCC FESVR SIM PK32 PK64 LLVM SBT
-all: riscv-binutils-gdb x86-binutils-gdb #sbt riscv-isa-sim riscv-pk
+ALL := BINUTILS NEWLIB_GCC FESVR SIM PK32 PK64 #LLVM SBT
+all: riscv-newlib-gcc #riscv-isa-sim riscv-pk
 
 
 ###
@@ -45,7 +45,7 @@ define RULE_BUILD =
 # unconditional build
 .PHONY: $$($(1)_ALIAS)-build
 $$($(1)_ALIAS)-build:
-	$(MAKE) -C $$($(1)_BUILD) $(MAKE_OPTS)
+	$(MAKE) -C $$($(1)_BUILD) $$($(1)_MAKE_FLAGS) $(MAKE_OPTS)
 
 # serial build
 .PHONY: $$($(1)_ALIAS)-build1
@@ -65,12 +65,13 @@ define RULE_INSTALL =
 $$($(1)_ALIAS)-install:
 	$(MAKE) -C $$($(1)_BUILD) install
 	echo "Updating file list..."
-	if [ ! -f $$(DIR_TOOLCHAIN)/pkg/all.files) ]; then \
+	if [ ! -f $$(DIR_TOOLCHAIN)/pkg/all.files ]; then \
+		mkdir -p $$(DIR_TOOLCHAIN)/pkg; \
 		touch $$(DIR_TOOLCHAIN)/pkg/all.files; \
 	fi
 	cd $$(DIR_TOOLCHAIN) && \
 	$$(NEW_FILES) > pkg/$$($(1)_ALIAS).files && \
-	$(call UPDATE_FILES),$(1))
+	$(call UPDATE_FILES,$(1))
 
 # install only when build OUTPUT changes
 $$($(1)_TOOLCHAIN): $$($(1)_OUT)
@@ -93,6 +94,10 @@ endef
 # clean
 define RULE_CLEAN =
 $$($(1)_ALIAS)-clean:
+	cd $(DIR_TOOLCHAIN) && \
+		rm -f `cat pkg/$$($(1)_ALIAS).files` && \
+		rm -f pkg/$$($(1)_ALIAS).files && \
+		$(ALL_FILES) > pkg/all.files
 	rm -rf $$($(1)_BUILD)
 endef
 
@@ -109,61 +114,87 @@ $(call RULE_ALIAS,$(1))
 $(call RULE_CLEAN,$(1))
 endef
 
-# riscv-binutils-gdb
+###
+### riscv-binutils-gdb
+###
+
+# riscv
 BINUTILS_BUILD := $(TOPDIR)/build/riscv-binutils-gdb
 BINUTILS_MAKEFILE := $(BINUTILS_BUILD)/Makefile
-BINUTILS_OUT := $(BINUTILS_BUILD)/ld
-BINUTILS_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/ld
+BINUTILS_OUT := $(BINUTILS_BUILD)/ld/ld-new
+BINUTILS_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/riscv64-unknown-elf-ld
 BINUTILS_CONFIGURE := $(TOPDIR)/riscv-binutils-gdb/configure \
-                      --target=riscv64-unknown-linux-gnu \
+                      --target=riscv64-unknown-elf \
                       --prefix=$(DIR_TOOLCHAIN) \
-                      --with-sysroot=$(DIR_TOOLCHAIN)/sysroot \
-                      --enable-multilib \
-                      --disable-werror \
-                      --disable-nls
+                      --disable-werror
 BINUTILS_ALIAS := riscv-binutils-gdb
 
-# x86-binutils-gdb
+# x86
 BINUTILS_X86_BUILD := $(TOPDIR)/build/x86-binutils-gdb
 BINUTILS_X86_MAKEFILE := $(BINUTILS_X86_BUILD)/Makefile
-BINUTILS_X86_OUT := $(BINUTILS_X86_BUILD)/ld
+BINUTILS_X86_OUT := $(BINUTILS_X86_BUILD)/ld/ld-new
 BINUTILS_X86_TOOLCHAIN := $(DIR_TOOLCHAIN_X86)/bin/ld
 BINUTILS_X86_CONFIGURE := $(TOPDIR)/riscv-binutils-gdb/configure \
                           --prefix=$(DIR_TOOLCHAIN_X86) \
                           --enable-multilib
 BINUTILS_X86_ALIAS := x86-binutils-gdb
 
+###
+### riscv-newlib-gcc
+###
 
-# riscv-dejagnu
-DEJAGNU_BUILD := $(TOPDIR)/build/riscv-dejagnu
-DEJAGNU_MAKEFILE := $(DEJAGNU_BUILD)/Makefile
-DEJAGNU_OUT := $(DEJAGNU_BUILD)/ld
-DEJAGNU_TOOLCHAIN := $(DIR_TOOLCHAIN)/lib/libdejagnu.so
-DEJAGNU_CONFIGURE := $(TOPDIR)/riscv-dejagnu/configure \
-                      --target=riscv64-unknown-linux-gnu \
-                      --prefix=$(DIR_TOOLCHAIN) \
-                      --with-sysroot=$(DIR_TOOLCHAIN)/sysroot \
-                      --enable-multilib \
-                      --disable-werror \
-                      --disable-nls
-DEJAGNU_ALIAS := riscv-dejagnu
+SRC_NEWLIB_GCC := $(TOPDIR)/riscv-newlib-gcc
+$(SRC_NEWLIB_GCC):
+	cp -a $(TOPDIR)/riscv-gcc $@.tmp
+	cp -a $(TOPDIR)/riscv-newlib/. $@.tmp
+	cp -a $(TOPDIR)/riscv-gcc/include/. $@.tmp/include
+	mv $@.tmp $@
 
+NEWLIB_GCC_BUILD := $(TOPDIR)/build/riscv-newlib-gcc
+NEWLIB_GCC_MAKEFILE := $(NEWLIB_GCC_BUILD)/Makefile
+NEWLIB_GCC_OUT := $(NEWLIB_GCC_BUILD)/gcc/xgcc
+NEWLIB_GCC_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/riscv64-unknown-elf-gcc
+NEWLIB_GCC_CONFIGURE := $(TOPDIR)/riscv-newlib-gcc/configure \
+                 --target=riscv64-unknown-elf \
+                 --prefix=$(DIR_TOOLCHAIN) \
+                 --without-headers \
+                 --disable-shared \
+                 --disable-threads \
+                 --enable-languages=c,c++ \
+                 --with-system-zlib \
+                 --enable-tls \
+                 --with-newlib \
+                 --disable-libmudflap \
+                 --disable-libssp \
+                 --disable-libquadmath \
+                 --disable-libgomp \
+                 --disable-nls \
+                 --enable-multilib \
+                 --enable-checking=yes \
+                 --with-abi=lp64d \
+                 --with-arch=rv64g
+NEWLIB_GCC_MAKE_FLAGS := inhibit-libc=true
+NEWLIB_GCC_ALIAS := riscv-newlib-gcc
+NEWLIB_GCC_DEPS := $(BINUTILS_TOOLCHAIN) $(SRC_NEWLIB_GCC)
 
 
 # riscv-fesvr
-FESVR_BUILD := $(TOPDIR)/riscv-fesvr/build
+FESVR_BUILD := $(TOPDIR)/build/riscv-fesvr
 FESVR_MAKEFILE := $(FESVR_BUILD)/Makefile
 FESVR_OUT := $(FESVR_BUILD)/libfesvr.so
 FESVR_TOOLCHAIN := $(DIR_TOOLCHAIN)/lib/libfesvr.so
-FESVR_CONFIGURE := ../configure --prefix=$(DIR_TOOLCHAIN)
+FESVR_CONFIGURE := $(TOPDIR)/riscv-fesvr/configure \
+                   --prefix=$(DIR_TOOLCHAIN)
 FESVR_ALIAS := riscv-fesvr
 
 # riscv-isa-sim
-SIM_BUILD := $(TOPDIR)/riscv-isa-sim/build
+SIM_BUILD := $(TOPDIR)/build/riscv-isa-sim
 SIM_MAKEFILE := $(SIM_BUILD)/Makefile
 SIM_OUT := $(SIM_BUILD)/spike
 SIM_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/spike
-SIM_CONFIGURE := ../configure --prefix=$(DIR_TOOLCHAIN) --with-fesvr=$(DIR_TOOLCHAIN)
+SIM_CONFIGURE := $(TOPDIR)/riscv-isa-sim/configure \
+                 --prefix=$(DIR_TOOLCHAIN) \
+                 --with-fesvr=$(DIR_TOOLCHAIN)
 SIM_ALIAS := riscv-isa-sim
 SIM_DEPS := $(FESVR_TOOLCHAIN)
 
@@ -172,20 +203,25 @@ SIM_DEPS := $(FESVR_TOOLCHAIN)
 ###
 
 PK_HOST := riscv64-unknown-elf
-PK_BUILD := $(TOPDIR)/riscv-pk/build
+PK_BUILD := $(TOPDIR)/build/riscv-pk
 
 PK32_BUILD := $(PK_BUILD)/32
 PK32_MAKEFILE := $(PK32_BUILD)/Makefile
 PK32_OUT := $(PK32_BUILD)/pk
 PK32_TOOLCHAIN := $(DIR_TOOLCHAIN)/riscv32-unknown-elf/bin/pk
-PK32_CONFIGURE := ../../configure --prefix=$(DIR_TOOLCHAIN) --host=$(PK_HOST) --enable-32bit
+PK32_CONFIGURE := $(TOPDIR)/riscv-pk/configure \
+                  --prefix=$(DIR_TOOLCHAIN) \
+                  --host=$(PK_HOST) \
+                  --enable-32bit
 PK32_ALIAS := riscv-pk32
 
 PK64_BUILD := $(PK_BUILD)/64
 PK64_MAKEFILE := $(PK64_BUILD)/Makefile
 PK64_OUT := $(PK64_BUILD)/pk
 PK64_TOOLCHAIN := $(DIR_TOOLCHAIN)/riscv64-unknown-elf/bin/pk
-PK64_CONFIGURE := ../../configure --prefix=$(DIR_TOOLCHAIN) --host=$(PK_HOST)
+PK64_CONFIGURE := $(TOPDIR)/riscv-pk/configure \
+                  --prefix=$(DIR_TOOLCHAIN) \
+                  --host=$(PK_HOST)
 PK64_ALIAS := riscv-pk64
 
 # alias for both pk32 && pk64
@@ -194,7 +230,7 @@ riscv-pk: $(PK32_TOOLCHAIN) $(PK64_TOOLCHAIN)
 
 # clean for both pk32 && pk64
 riscv-pk-clean:
-	rm -rf $(PK32_BUILD) $(PK64_BUILD)
+	rm -rf $(PK_BUILD)
 
 ###
 ### cmake
@@ -231,7 +267,7 @@ LLVM_CONFIGURE := \
              -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) ../llvm
 LLVM_ALIAS := llvm
 CLANG_LINK := $(TOPDIR)/llvm/tools/clang
-LLVM_DEPS := $(GCC_TOOLCHAIN) $(CMAKE) $(CLANG_LINK)
+LLVM_DEPS := $(NEWLIB_GCC_TOOLCHAIN) $(CMAKE) $(CLANG_LINK)
 
 $(CLANG_LINK):
 	ln -sf $(TOPDIR)/clang $@

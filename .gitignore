@@ -1,4 +1,5 @@
 build
 cmake
 merge_tools
+riscv-newlib-gcc
 toolchain
