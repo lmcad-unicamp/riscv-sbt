@@ -12,8 +12,26 @@ endif
 DIR_TOOLCHAIN := $(TOPDIR)/toolchain
 DIR_TOOLCHAIN_X86 := $(DIR_TOOLCHAIN)/x86
 
-ALL := BINUTILS NEWLIB_GCC FESVR SIM PK32 PK64 #LLVM SBT
-all: riscv-newlib-gcc #riscv-isa-sim riscv-pk
+ALL := \
+	BINUTILS32 \
+	NEWLIB_GCC32 \
+	FESVR \
+	SIM \
+	PK32 \
+	BINUTILS64 \
+	NEWLIB_GCC64 \
+	PK64 \
+	#LLVM \
+	#SBT
+
+all: \
+	riscv-binutils-gdb-32 \
+	riscv-newlib-gcc-32 \
+	riscv-isa-sim \
+	riscv-pk-32 \
+	riscv-binutils-gdb-64 \
+	riscv-newlib-gcc-64 \
+	riscv-pk-64
 
 
 ###
@@ -118,18 +136,32 @@ endef
 ### riscv-binutils-gdb
 ###
 
-# riscv
-BINUTILS_BUILD := $(TOPDIR)/build/riscv-binutils-gdb
-BINUTILS_MAKEFILE := $(BINUTILS_BUILD)/Makefile
-BINUTILS_OUT := $(BINUTILS_BUILD)/ld/ld-new
-BINUTILS_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/riscv64-unknown-elf-ld
-BINUTILS_CONFIGURE := $(TOPDIR)/riscv-binutils-gdb/configure \
+# 32 bit
+
+BINUTILS32_BUILD := $(TOPDIR)/build/riscv-binutils-gdb/32
+BINUTILS32_MAKEFILE := $(BINUTILS32_BUILD)/Makefile
+BINUTILS32_OUT := $(BINUTILS32_BUILD)/ld/ld-new
+BINUTILS32_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/riscv32-unknown-elf-ld
+BINUTILS32_CONFIGURE := $(TOPDIR)/riscv-binutils-gdb/configure \
+                      --target=riscv32-unknown-elf \
+                      --prefix=$(DIR_TOOLCHAIN) \
+                      --disable-werror
+BINUTILS32_ALIAS := riscv-binutils-gdb-32
+
+# 64 bit
+
+BINUTILS64_BUILD := $(TOPDIR)/build/riscv-binutils-gdb/64
+BINUTILS64_MAKEFILE := $(BINUTILS64_BUILD)/Makefile
+BINUTILS64_OUT := $(BINUTILS64_BUILD)/ld/ld-new
+BINUTILS64_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/riscv64-unknown-elf-ld
+BINUTILS64_CONFIGURE := $(TOPDIR)/riscv-binutils-gdb/configure \
                       --target=riscv64-unknown-elf \
                       --prefix=$(DIR_TOOLCHAIN) \
                       --disable-werror
-BINUTILS_ALIAS := riscv-binutils-gdb
+BINUTILS64_ALIAS := riscv-binutils-gdb-64
 
 # x86
+
 BINUTILS_X86_BUILD := $(TOPDIR)/build/x86-binutils-gdb
 BINUTILS_X86_MAKEFILE := $(BINUTILS_X86_BUILD)/Makefile
 BINUTILS_X86_OUT := $(BINUTILS_X86_BUILD)/ld/ld-new
@@ -150,11 +182,42 @@ $(SRC_NEWLIB_GCC):
 	cp -a $(TOPDIR)/riscv-gcc/include/. $@.tmp/include
 	mv $@.tmp $@
 
-NEWLIB_GCC_BUILD := $(TOPDIR)/build/riscv-newlib-gcc
-NEWLIB_GCC_MAKEFILE := $(NEWLIB_GCC_BUILD)/Makefile
-NEWLIB_GCC_OUT := $(NEWLIB_GCC_BUILD)/gcc/xgcc
-NEWLIB_GCC_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/riscv64-unknown-elf-gcc
-NEWLIB_GCC_CONFIGURE := $(TOPDIR)/riscv-newlib-gcc/configure \
+# 32 bit
+
+NEWLIB_GCC32_BUILD := $(TOPDIR)/build/riscv-newlib-gcc/32
+NEWLIB_GCC32_MAKEFILE := $(NEWLIB_GCC32_BUILD)/Makefile
+NEWLIB_GCC32_OUT := $(NEWLIB_GCC32_BUILD)/gcc/xgcc
+NEWLIB_GCC32_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/riscv32-unknown-elf-gcc
+NEWLIB_GCC32_CONFIGURE := $(TOPDIR)/riscv-newlib-gcc/configure \
+                 --target=riscv32-unknown-elf \
+                 --prefix=$(DIR_TOOLCHAIN) \
+                 --without-headers \
+                 --disable-shared \
+                 --disable-threads \
+                 --enable-languages=c,c++ \
+                 --with-system-zlib \
+                 --enable-tls \
+                 --with-newlib \
+                 --disable-libmudflap \
+                 --disable-libssp \
+                 --disable-libquadmath \
+                 --disable-libgomp \
+                 --disable-nls \
+                 --enable-multilib=no \
+                 --enable-checking=yes \
+                 --with-abi=ilp32d \
+                 --with-arch=rv32g
+NEWLIB_GCC32_MAKE_FLAGS := inhibit-libc=true
+NEWLIB_GCC32_ALIAS := riscv-newlib-gcc-32
+NEWLIB_GCC32_DEPS := $(BINUTILS32_TOOLCHAIN) $(SRC_NEWLIB_GCC)
+
+# 64 bit
+
+NEWLIB_GCC64_BUILD := $(TOPDIR)/build/riscv-newlib-gcc/64
+NEWLIB_GCC64_MAKEFILE := $(NEWLIB_GCC64_BUILD)/Makefile
+NEWLIB_GCC64_OUT := $(NEWLIB_GCC64_BUILD)/gcc/xgcc
+NEWLIB_GCC64_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/riscv64-unknown-elf-gcc
+NEWLIB_GCC64_CONFIGURE := $(TOPDIR)/riscv-newlib-gcc/configure \
                  --target=riscv64-unknown-elf \
                  --prefix=$(DIR_TOOLCHAIN) \
                  --without-headers \
@@ -169,16 +232,18 @@ NEWLIB_GCC_CONFIGURE := $(TOPDIR)/riscv-newlib-gcc/configure \
                  --disable-libquadmath \
                  --disable-libgomp \
                  --disable-nls \
-                 --enable-multilib \
+                 --enable-multilib=no \
                  --enable-checking=yes \
                  --with-abi=lp64d \
                  --with-arch=rv64g
-NEWLIB_GCC_MAKE_FLAGS := inhibit-libc=true
-NEWLIB_GCC_ALIAS := riscv-newlib-gcc
-NEWLIB_GCC_DEPS := $(BINUTILS_TOOLCHAIN) $(SRC_NEWLIB_GCC)
+NEWLIB_GCC64_MAKE_FLAGS := inhibit-libc=true
+NEWLIB_GCC64_ALIAS := riscv-newlib-gcc-64
+NEWLIB_GCC64_DEPS := $(BINUTILS64_TOOLCHAIN) $(SRC_NEWLIB_GCC)
 
+###
+### riscv-fesvr
+###
 
-# riscv-fesvr
 FESVR_BUILD := $(TOPDIR)/build/riscv-fesvr
 FESVR_MAKEFILE := $(FESVR_BUILD)/Makefile
 FESVR_OUT := $(FESVR_BUILD)/libfesvr.so
@@ -194,7 +259,8 @@ SIM_OUT := $(SIM_BUILD)/spike
 SIM_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/spike
 SIM_CONFIGURE := $(TOPDIR)/riscv-isa-sim/configure \
                  --prefix=$(DIR_TOOLCHAIN) \
-                 --with-fesvr=$(DIR_TOOLCHAIN)
+                 --with-fesvr=$(DIR_TOOLCHAIN) \
+                 --with-isa=RV32IMAFDC
 SIM_ALIAS := riscv-isa-sim
 SIM_DEPS := $(FESVR_TOOLCHAIN)
 
@@ -202,35 +268,28 @@ SIM_DEPS := $(FESVR_TOOLCHAIN)
 ### riscv-pk
 ###
 
-PK_HOST := riscv64-unknown-elf
-PK_BUILD := $(TOPDIR)/build/riscv-pk
+# 32 bit
 
-PK32_BUILD := $(PK_BUILD)/32
+PK32_BUILD := $(TOPDIR)/build/riscv-pk/32
 PK32_MAKEFILE := $(PK32_BUILD)/Makefile
 PK32_OUT := $(PK32_BUILD)/pk
 PK32_TOOLCHAIN := $(DIR_TOOLCHAIN)/riscv32-unknown-elf/bin/pk
 PK32_CONFIGURE := $(TOPDIR)/riscv-pk/configure \
                   --prefix=$(DIR_TOOLCHAIN) \
-                  --host=$(PK_HOST) \
+                  --host=riscv32-unknown-elf \
                   --enable-32bit
-PK32_ALIAS := riscv-pk32
+PK32_ALIAS := riscv-pk-32
 
-PK64_BUILD := $(PK_BUILD)/64
+# 64 bit
+
+PK64_BUILD := $(TOPDIR)/build/riscv-pk/64
 PK64_MAKEFILE := $(PK64_BUILD)/Makefile
 PK64_OUT := $(PK64_BUILD)/pk
 PK64_TOOLCHAIN := $(DIR_TOOLCHAIN)/riscv64-unknown-elf/bin/pk
 PK64_CONFIGURE := $(TOPDIR)/riscv-pk/configure \
                   --prefix=$(DIR_TOOLCHAIN) \
-                  --host=$(PK_HOST)
-PK64_ALIAS := riscv-pk64
-
-# alias for both pk32 && pk64
-.PHONY: riscv-pk
-riscv-pk: $(PK32_TOOLCHAIN) $(PK64_TOOLCHAIN)
-
-# clean for both pk32 && pk64
-riscv-pk-clean:
-	rm -rf $(PK_BUILD)
+                  --host=riscv64-unknown-elf
+PK64_ALIAS := riscv-pk-64
 
 ###
 ### cmake
@@ -257,17 +316,19 @@ cmake: $(CMAKE)
 ### llvm
 ###
 
-LLVM_BUILD := $(TOPDIR)/build-llvm
-LLVM_MAKEFILE := $(LLVM_BUILD)/Makefile
-LLVM_OUT := $(LLVM_BUILD)/bin/clang
-LLVM_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/clang
-LLVM_CONFIGURE := \
-    $(CMAKE) -DCMAKE_BUILD_TYPE=$(LLVM_BUILD_TYPE) \
+# debug
+
+LLVM_DEBUG_BUILD := $(TOPDIR)/build/llvm/debug
+LLVM_DEBUG_MAKEFILE := $(LLVM_DEBUG_BUILD)/Makefile
+LLVM_DEBUG_OUT := $(LLVM_DEBUG_BUILD)/bin/clang
+LLVM_DEBUG_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/clang
+LLVM_DEBUG_CONFIGURE := \
+    $(CMAKE) -DCMAKE_BUILD_TYPE=Debug \
              -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86" \
-             -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) ../llvm
-LLVM_ALIAS := llvm
+             -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) $(TOPDIR)/llvm
+LLVM_DEBUG_ALIAS := llvm-debug
 CLANG_LINK := $(TOPDIR)/llvm/tools/clang
-LLVM_DEPS := $(NEWLIB_GCC_TOOLCHAIN) $(CMAKE) $(CLANG_LINK)
+LLVM_DEBUG_DEPS := $(NEWLIB_GCC_TOOLCHAIN) $(CMAKE) $(CLANG_LINK)
 
 $(CLANG_LINK):
 	ln -sf $(TOPDIR)/clang $@

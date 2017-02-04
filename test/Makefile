@@ -1,71 +1,85 @@
 ### user config ###
 
-COMPILER := clang
+#COMPILER := clang
 #COMPILER := gcc
-SYSROOT := $(TOPDIR)/toolchain/riscv64-unknown-elf
-SYSROOT_FLAG := -isysroot $(SYSROOT) -isystem $(SYSROOT)/include
+#SYSROOT := $(TOPDIR)/toolchain/riscv64-unknown-elf
+#SYSROOT_FLAG := -isysroot $(SYSROOT) -isystem $(SYSROOT)/include
 
 ### config ###
 
-AS := riscv64-unknown-elf-as
-LD := riscv64-unknown-elf-ld
-GCC := riscv64-unknown-elf-gcc
+#AS := riscv64-unknown-elf-as
+#LD := riscv64-unknown-elf-ld
+#GCC := riscv64-unknown-elf-gcc
+#CFLAGS := -Wall -Werror -O2
+#GCC_FLAGS := $(CFLAGS)
+#ifeq ($(COMPILER),clang)
+#CC := clang
+#CC_RISCV32 := --target=riscv32 -mriscv=RV32IAMFD $(SYSROOT_FLAG)
+#CC_RISCV64 := --target=riscv64 -mriscv=RV64IAMFD $(SYSROOT_FLAG)
+#else
+#CC := $(GCC)
+#CC_RISCV32 := -m32
+#CC_RISCV64 := -m64
+#endif
+
+### config ###
+
 CFLAGS := -Wall -Werror -O2
-GCC_FLAGS := $(CFLAGS)
-ifeq ($(COMPILER),clang)
-CC := clang
-CC_RISCV32 := --target=riscv32 -mriscv=RV32IAMFD $(SYSROOT_FLAG)
-CC_RISCV64 := --target=riscv64 -mriscv=RV64IAMFD $(SYSROOT_FLAG)
-else
-CC := $(GCC)
-CC_RISCV32 := -m32
-CC_RISCV64 := -m64
-endif
 
 ### rules ###
 
 all: hello hello64 hellos
 
+###
+### test gcc
+###
+
 ### 32-bit ###
 
+AS32 := riscv32-unknown-elf-as
+LD32 := riscv32-unknown-elf-ld
+GCC32 := riscv32-unknown-elf-gcc
+
 hello.s: hello.c
-	$(CC) $(CC_RISCV32) $(CFLAGS) -S $< -o $@
+	$(GCC32) $(CFLAGS) -S $< -o $@
 
 hello.o: hello.s
-	$(GCC) -m32 $(GCC_FLAGS) -c -o $@ $<
+	$(GCC32) $(CFLAGS) -c -o $@ $<
 
 hello: hello.o
-	$(GCC) -m32 $(GCC_FLAGS) -o $@ $<
+	$(GCC32) $(CFLAGS) -o $@ $<
+
+run: hello
+	spike $(TOPDIR)/toolchain/riscv32-unknown-elf/bin/pk hello
 
 ### 64-bit ###
 
+AS64 := riscv64-unknown-elf-as
+LD64 := riscv64-unknown-elf-ld
+GCC64 := riscv64-unknown-elf-gcc
+
 hello64.s: hello.c
-	$(CC) $(CC_RISCV64) $(CFLAGS) -S $< -o $@
+	$(GCC64) $(CFLAGS) -S $< -o $@
 
 hello64.o: hello64.s
-	$(GCC) -m64 $(GCC_FLAGS) -c -o $@ $<
+	$(GCC64) $(CFLAGS) -c -o $@ $<
 
 hello64: hello64.o
-	$(GCC) -m64 $(GCC_FLAGS) -o $@ $<
+	$(GCC64) $(CFLAGS) -o $@ $<
+
+run64: hello64
+	spike --isa=RV64IMAFDC pk hello64
 
 ### assembly 32-bit ###
 
 hellos.o: myhello.s
-	$(AS) -m32 -o$@ $<
+	$(AS32) -o$@ $<
 
 hellos: hellos.o
-	$(LD) -m elf32lriscv -o$@ $<
-
-### run ###
-
-run: hello
-	spike --isa=RV32G ../toolchain/riscv32-unknown-elf/bin/pk hello
-
-run64: hello64
-	spike pk hello64
+	$(LD32) -o$@ $<
 
 runs: hellos
-	spike --isa=RV32G ../toolchain/riscv32-unknown-elf/bin/pk hellos
+	spike $(TOPDIR)/toolchain/riscv32-unknown-elf/bin/pk hellos
 
 ### clean ###
 
