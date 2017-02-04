@@ -282,6 +282,11 @@ SIM_DEPS := $(FESVR_TOOLCHAIN)
 
 # 32 bit
 
+PK_PATCHED := $(TOPDIR)/riscv-pk/.patched
+$(PK_PATCHED): $(TOPDIR)/riscv-pk-32-bit-build-fix.patch
+	cd $(TOPDIR)/riscv-pk && patch < $<
+	@touch $@
+
 PK32_BUILD := $(TOPDIR)/build/riscv-pk/32
 PK32_MAKEFILE := $(PK32_BUILD)/Makefile
 PK32_OUT := $(PK32_BUILD)/pk
@@ -291,6 +296,7 @@ PK32_CONFIGURE := $(TOPDIR)/riscv-pk/configure \
                   --host=riscv32-unknown-elf \
                   --enable-32bit
 PK32_ALIAS := riscv-pk-32
+PK32_DEPS := $(PK_PATCHED)
 
 # 64 bit
 
@@ -302,6 +308,7 @@ PK64_CONFIGURE := $(TOPDIR)/riscv-pk/configure \
                   --prefix=$(DIR_TOOLCHAIN) \
                   --host=riscv64-unknown-elf
 PK64_ALIAS := riscv-pk-64
+PK64_DEPS := $(PK_PATCHED)
 
 ###
 ### cmake
