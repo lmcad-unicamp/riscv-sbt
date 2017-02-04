@@ -1,34 +1,10 @@
-### user config ###
-
-#COMPILER := clang
-#COMPILER := gcc
-#SYSROOT := $(TOPDIR)/toolchain/riscv64-unknown-elf
-#SYSROOT_FLAG := -isysroot $(SYSROOT) -isystem $(SYSROOT)/include
-
-### config ###
-
-#AS := riscv64-unknown-elf-as
-#LD := riscv64-unknown-elf-ld
-#GCC := riscv64-unknown-elf-gcc
-#CFLAGS := -Wall -Werror -O2
-#GCC_FLAGS := $(CFLAGS)
-#ifeq ($(COMPILER),clang)
-#CC := clang
-#CC_RISCV32 := --target=riscv32 -mriscv=RV32IAMFD $(SYSROOT_FLAG)
-#CC_RISCV64 := --target=riscv64 -mriscv=RV64IAMFD $(SYSROOT_FLAG)
-#else
-#CC := $(GCC)
-#CC_RISCV32 := -m32
-#CC_RISCV64 := -m64
-#endif
-
 ### config ###
 
 CFLAGS := -Wall -Werror -O2
 
 ### rules ###
 
-all: hello hello64 hellos
+all: gcc-hello-32 gcc-hello-64 asm-hello-32 clang-hello-32
 
 ###
 ### test gcc
@@ -40,17 +16,17 @@ AS32 := riscv32-unknown-elf-as
 LD32 := riscv32-unknown-elf-ld
 GCC32 := riscv32-unknown-elf-gcc
 
-hello.s: hello.c
-	$(GCC32) $(CFLAGS) -S $< -o $@
+gcc-hello-32.s: hello.c
+	$(GCC32) $(CFLAGS) -o $@ -S $<
 
-hello.o: hello.s
-	$(GCC32) $(CFLAGS) -c -o $@ $<
+gcc-hello-32.o: gcc-hello-32.s
+	$(GCC32) $(CFLAGS) -o $@ -c $<
 
-hello: hello.o
+gcc-hello-32: gcc-hello-32.o
 	$(GCC32) $(CFLAGS) -o $@ $<
 
-run: hello
-	spike $(TOPDIR)/toolchain/riscv32-unknown-elf/bin/pk hello
+run-gcc-hello-32: gcc-hello-32
+	spike $(TOPDIR)/toolchain/riscv32-unknown-elf/bin/pk gcc-hello-32
 
 ### 64-bit ###
 
@@ -58,33 +34,60 @@ AS64 := riscv64-unknown-elf-as
 LD64 := riscv64-unknown-elf-ld
 GCC64 := riscv64-unknown-elf-gcc
 
-hello64.s: hello.c
-	$(GCC64) $(CFLAGS) -S $< -o $@
+gcc-hello-64.s: hello.c
+	$(GCC64) $(CFLAGS) -o $@ -S $<
 
-hello64.o: hello64.s
-	$(GCC64) $(CFLAGS) -c -o $@ $<
+gcc-hello-64.o: gcc-hello-64.s
+	$(GCC64) $(CFLAGS) -o $@ -c $<
 
-hello64: hello64.o
+gcc-hello-64: gcc-hello-64.o
 	$(GCC64) $(CFLAGS) -o $@ $<
 
-run64: hello64
-	spike --isa=RV64IMAFDC pk hello64
+run-gcc-hello-64: gcc-hello-64
+	spike --isa=RV64IMAFDC pk gcc-hello-64
 
 ### assembly 32-bit ###
 
-hellos.o: myhello.s
-	$(AS32) -o$@ $<
+asm-hello-32.o: hello.s
+	$(AS32) -o $@ $<
 
-hellos: hellos.o
-	$(LD32) -o$@ $<
+asm-hello-32: asm-hello-32.o
+	$(LD32) -o $@ $<
 
-runs: hellos
-	spike $(TOPDIR)/toolchain/riscv32-unknown-elf/bin/pk hellos
+run-asm-hello-32: asm-hello-32
+	spike $(TOPDIR)/toolchain/riscv32-unknown-elf/bin/pk asm-hello-32
+
+###
+### test clang
+###
 
 ### clean ###
 
+CLANG := clang
+SYSROOT := $(TOPDIR)/toolchain/riscv32-unknown-elf
+SYSROOT_FLAG := -isysroot $(SYSROOT) -isystem $(SYSROOT)/include
+CLANG_FLAGS := --target=riscv32 -mriscv=RV32IAMFD $(SYSROOT_FLAG)
+TOOLCHAIN := $(TOPDIR)/toolchain
+LIB := $(TOOLCHAIN)/riscv32-unknown-elf/lib
+CRT0 := $(LIB)/crt0.o
+
+### 32-bit ###
+
+clang-hello-32.s: hello.c
+	$(CLANG) $(CLANG_FLAGS) $(CFLAGS) -o $@ -S $<
+
+clang-hello-32.o: clang-hello-32.s
+	$(AS32) -o $@ $<
+
+clang-hello-32: clang-hello-32.o
+	$(LD32) -o $@ -dT ldscripts/elf32lriscv.x $(CRT0) $< -lc -lgloss -lc
+
+run-clang-hello-32: clang-hello-32
+	spike $(TOPDIR)/toolchain/riscv32-unknown-elf/bin/pk clang-hello-32
+
+run: run-gcc-hello-32 run-gcc-hello-64 run-asm-hello-32 run-clang-hello-32
+	@echo Success!
+
 clean:
 	rm -f \
-		hello.s hello.o hello \
-		hello64.s hello64.o hello64 \
-		hellos hellos.o
+		gcc-hello-32* gcc-hello-64* asm-hello-32* clang-hello-32*

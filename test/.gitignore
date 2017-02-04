@@ -1,6 +1,3 @@
-*.o
-hello.s
-hello
-hello64.s
-hello64
-hellos
+gcc-hello-*
+asm-hello-*
+clang-hello-*

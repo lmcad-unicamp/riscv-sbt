@@ -10,10 +10,11 @@
 #include <llvm/Object/ObjectFile.h>
 #include <llvm/Support/FormatVariadic.h>
 
+// LLVM internal instruction info
 #define GET_INSTRINFO_ENUM
-#include "../build-llvm/lib/Target/RISCVMaster/RISCVMasterGenInstrInfo.inc"
+#include <lib/Target/RISCVMaster/RISCVMasterGenInstrInfo.inc>
 #define GET_REGINFO_ENUM
-#include "../build-llvm/lib/Target/RISCVMaster/RISCVMasterGenRegisterInfo.inc"
+#include <lib/Target/RISCVMaster/RISCVMasterGenRegisterInfo.inc>
 
 using namespace llvm;
 

@@ -29,6 +29,7 @@ flags = [
 '-Werror',
 '-std=c++11',
 '-I', TOPDIR + '/toolchain/include',
+'-I', TOPDIR + '/build/llvm/debug',
 ]
 
 

@@ -1,3 +1,11 @@
+#!/bin/bash
+
 export TOPDIR="$PWD"
-TC="$TOPDIR/toolchain/bin"
-echo "$PATH" | grep "$TC" >/dev/null || export PATH="$TC:$PATH"
+TC="$TOPDIR/toolchain"
+echo "$PATH" | grep "$TC/bin" >/dev/null || export PATH="$TC/bin:$PATH"
+
+# put LLVM release dir first in path, if requested
+if [ $# -eq 1 -a "$1" == "release" ]; then
+  echo "$PATH" | grep "$TC/release/bin" >/dev/null || \
+  export PATH="$TC/release/bin:$PATH"
+fi

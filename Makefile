@@ -3,7 +3,6 @@ MAKE_OPTS := -j9
 # build type for LLVM and SBT (Release or Debug)
 # WARNING: using Release LLVM builds with Debug SBT CAN cause problems!
 BUILD_TYPE := Debug
-LLVM_BUILD_TYPE := $(BUILD_TYPE)
 
 ifeq ($(TOPDIR),)
 $(error "TOPDIR not set. Please run 'source setenv.sh' first.")
@@ -21,17 +20,30 @@ ALL := \
 	BINUTILS64 \
 	NEWLIB_GCC64 \
 	PK64 \
-	#LLVM \
-	#SBT
+	LLVM_DEBUG \
+	LLVM_RELEASE \
+	SBT
 
 all: \
-	riscv-binutils-gdb-32 \
-	riscv-newlib-gcc-32 \
+	sbt \
 	riscv-isa-sim \
-	riscv-pk-32 \
-	riscv-binutils-gdb-64 \
-	riscv-newlib-gcc-64 \
-	riscv-pk-64
+	riscv-pk-32
+
+#
+# all targets
+#
+#all: \
+#	riscv-binutils-gdb-32 \
+#	riscv-newlib-gcc-32 \
+#	riscv-fesvr \
+#	riscv-isa-sim \
+#	riscv-pk-32 \
+#	riscv-binutils-gdb-64 \
+#	riscv-newlib-gcc-64 \
+#	riscv-pk-64 \
+#	llvm-debug \
+#	llvm-release \
+#	sbt
 
 
 ###
@@ -328,24 +340,41 @@ LLVM_DEBUG_CONFIGURE := \
              -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) $(TOPDIR)/llvm
 LLVM_DEBUG_ALIAS := llvm-debug
 CLANG_LINK := $(TOPDIR)/llvm/tools/clang
-LLVM_DEBUG_DEPS := $(NEWLIB_GCC_TOOLCHAIN) $(CMAKE) $(CLANG_LINK)
+LLVM_DEBUG_DEPS := $(NEWLIB_GCC32_TOOLCHAIN) $(CMAKE) $(CLANG_LINK)
 
 $(CLANG_LINK):
 	ln -sf $(TOPDIR)/clang $@
+
+# release
+
+LLVM_RELEASE_BUILD := $(TOPDIR)/build/llvm/release
+LLVM_RELEASE_MAKEFILE := $(LLVM_RELEASE_BUILD)/Makefile
+LLVM_RELEASE_OUT := $(LLVM_RELEASE_BUILD)/bin/clang
+LLVM_RELEASE_TOOLCHAIN := $(DIR_TOOLCHAIN)/release/bin/clang
+LLVM_RELEASE_CONFIGURE := \
+    $(CMAKE) -DCMAKE_BUILD_TYPE=Release \
+             -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86" \
+             -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN)/release $(TOPDIR)/llvm
+LLVM_RELEASE_ALIAS := llvm-release
+LLVM_RELEASE_DEPS := $(NEWLIB_GCC32_TOOLCHAIN) $(CMAKE) $(CLANG_LINK)
 
 ###
 ### sbt
 ###
 
-SBT_BUILD := $(TOPDIR)/sbt/build
+SBT_BUILD := $(TOPDIR)/build/sbt
 SBT_MAKEFILE := $(SBT_BUILD)/Makefile
 SBT_OUT := $(SBT_BUILD)/riscv-sbt
 SBT_TOOLCHAIN := $(DIR_TOOLCHAIN)/bin/riscv-sbt
 SBT_CONFIGURE := \
     $(CMAKE) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
-             -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) ..
+             -DCMAKE_INSTALL_PREFIX=$(DIR_TOOLCHAIN) $(TOPDIR)/sbt
 SBT_ALIAS := sbt
-SBT_DEPS := $(LLVM_TOOLCHAIN)
+ifeq ($(BUILD_TYPE),Debug)
+SBT_DEPS := $(LLVM_DEBUG_TOOLCHAIN)
+else
+SBT_DEPS := $(LLVM_RELEASE_TOOLCHAIN)
+endif
 
 # generate all rules
 $(foreach prog,$(ALL),$(eval $(call RULE_ALL,$(prog))))
