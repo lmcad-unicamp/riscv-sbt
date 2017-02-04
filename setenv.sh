@@ -2,6 +2,8 @@
 
 export TOPDIR="$PWD"
 TC="$TOPDIR/toolchain"
+export PK32=$TC/riscv32-unknown-elf/bin/pk
+
 echo "$PATH" | grep "$TC/bin" >/dev/null || export PATH="$TC/bin:$PATH"
 
 # put LLVM release dir first in path, if requested

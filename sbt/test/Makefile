@@ -1,19 +1,24 @@
-RV_AS := riscv64-unknown-elf-as
-RV_LD := riscv64-unknown-elf-ld
+RV_AS := riscv32-unknown-elf-as
+RV_LD := riscv32-unknown-elf-ld
 
 X86_AS := as
 X86_LD := ld
-X86_SYSCALL_O := ../build/CMakeFiles/x86_syscall.dir/x86_syscall.s.o
+X86_SYSCALL_O := $(TOPDIR)/build/sbt/CMakeFiles/x86_syscall.dir/x86_syscall.s.o
 
-all: rv-hello x86-hello rv-x86-hello \
+all: \
+	rv-hello \
+	x86-hello \
+	rv-x86-hello \
 	test_x86_syscall \
-	x86-main rv-main rv-x86-main.bc
+	#x86-main \
+	rv-main \
+	rv-x86-main.bc
 
 ### RISC-V
 # native rv hello world, in asm, using syscalls
 
 rv-hello.o: rv-hello.s
-	$(RV_AS) -m32 -o $@ $<
+	$(RV_AS) -o $@ $<
 
 rv-hello: rv-hello.o
 	$(RV_LD) -m elf32lriscv -o $@ $<
