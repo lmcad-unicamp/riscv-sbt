@@ -16,9 +16,6 @@
 [submodule "riscv-binutils-gdb"]
 	path = riscv-binutils-gdb
 	url = https://github.com/riscv/riscv-binutils-gdb
-[submodule "riscv-dejagnu"]
-	path = riscv-dejagnu
-	url = https://github.com/riscv/riscv-dejagnu
 [submodule "riscv-newlib"]
 	path = riscv-newlib
 	url = https://github.com/riscv/riscv-newlib
