@@ -125,9 +125,11 @@ endef
 define RULE_CLEAN =
 $$($(1)_ALIAS)-clean:
 	cd $(DIR_TOOLCHAIN) && \
-		rm -f `cat pkg/$$($(1)_ALIAS).files` && \
-		rm -f pkg/$$($(1)_ALIAS).files && \
-		$(ALL_FILES) > pkg/all.files
+		if [ -f pkg/$$($(1)_ALIAS).files ]; then \
+			rm -f `cat pkg/$$($(1)_ALIAS).files` && \
+			rm -f pkg/$$($(1)_ALIAS).files && \
+			$(ALL_FILES) > pkg/all.files; \
+		fi
 	rm -rf $$($(1)_BUILD)
 endef
 

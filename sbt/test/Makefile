@@ -126,8 +126,18 @@ run-rv-main: rv-main
 rv-x86-main.bc: rv-main.o
 	riscv-sbt -o $@ $<
 
+
+CXXFLAGS := -Wall -Wextra -Werror -O0 -g -std=c++11 -pedantic
+
+elf.o: elf.cpp
+	$(CXX) -m32 $(CXXFLAGS) -o $@ -c $<
+
+elf: elf.o
+	$(CXX) -m32 $(CXXFLAGS) -o $@ $<
+
 clean:
 	rm -f \
+		elf \
 		rv-hello.o rv-hello \
 		x86-hello.o x86-hello \
 		test_x86_syscall.o test_x86_syscall \
