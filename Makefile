@@ -1,8 +1,8 @@
-MAKE_OPTS := -j9
+MAKE_OPTS ?= -j9
 
 # build type for LLVM and SBT (Release or Debug)
 # WARNING: using Release LLVM builds with Debug SBT CAN cause problems!
-BUILD_TYPE := Debug
+BUILD_TYPE ?= Debug
 
 ifeq ($(TOPDIR),)
 $(error "TOPDIR not set. Please run 'source setenv.sh' first.")
@@ -22,7 +22,8 @@ ALL := \
 	PK64 \
 	LLVM_DEBUG \
 	LLVM_RELEASE \
-	SBT
+	SBT \
+	BINUTILS_X86
 
 all: \
 	sbt \
@@ -43,7 +44,8 @@ all: \
 #	riscv-pk-64 \
 #	llvm-debug \
 #	llvm-release \
-#	sbt
+#	sbt \
+#	x86-binutils-gdb
 
 
 ###

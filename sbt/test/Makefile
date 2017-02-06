@@ -6,6 +6,7 @@ X86_LD := ld
 X86_SYSCALL_O := $(TOPDIR)/build/sbt/CMakeFiles/x86_syscall.dir/x86_syscall.s.o
 
 all: \
+	elf \
 	rv-hello \
 	x86-hello \
 	rv-x86-hello \

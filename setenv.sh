@@ -10,4 +10,5 @@ echo "$PATH" | grep "$TC/bin" >/dev/null || export PATH="$TC/bin:$PATH"
 if [ $# -eq 1 -a "$1" == "release" ]; then
   echo "$PATH" | grep "$TC/release/bin" >/dev/null || \
   export PATH="$TC/release/bin:$PATH"
+  export BUILD_TYPE=Release
 fi
