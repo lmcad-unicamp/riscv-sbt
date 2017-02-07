@@ -1,4 +1,5 @@
-rv32-as-*
+*.o
+rv32-hello
 rv32-clang-*
 rv32-gcc-*
 x86-clang-*

@@ -1,26 +1,10 @@
-RV_AS := riscv32-unknown-elf-as
-RV_LD := riscv32-unknown-elf-ld
+include $(TOPDIR)/config.mk
 
-X86_AS := i386-unknown-elf-as
-X86_LD := i386-unknown-elf-ld
-ifeq ($(BUILD_TYPE),Debug)
-  BUILD_TYPE_DIR := debug
-else
-  BUILD_TYPE_DIR := release
-endif
+BINS :=	elf rv-hello x86-hello rv-x86-hello test_x86_syscall #x86-main
 
-SBT_BUILD_DIR := $(TOPDIR)/build/sbt/$(BUILD_TYPE_DIR)
-X86_SYSCALL_O := $(SBT_BUILD_DIR)/CMakeFiles/x86_syscall.dir/x86_syscall.s.o
+all: $(BINS)
 
-all: \
-	elf \
-	rv-hello \
-	x86-hello \
-	rv-x86-hello \
-	test_x86_syscall \
-	#x86-main \
-	rv-main \
-	rv-x86-main.bc
+include $(TOPDIR)/rules.mk
 
 ### RISC-V
 # native rv hello world, in asm, using syscalls
