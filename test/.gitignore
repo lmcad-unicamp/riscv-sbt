@@ -1,3 +1,4 @@
-gcc-hello-*
-asm-hello-*
-clang-hello-*
+rv32-as-*
+rv32-clang-*
+rv32-gcc-*
+x86-clang-*

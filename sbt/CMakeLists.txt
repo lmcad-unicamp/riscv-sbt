@@ -103,7 +103,7 @@ message(STATUS "This is a ${CMAKE_BUILD_TYPE} build")
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
   #  set (SBT_COMPILE_OPTIONS ${SBT_COMPILE_OPTIONS} -g -O0 -rdynamic)
   set (SBT_INCLUDE_DIRS ${SBT_INCLUDE_DIRS}
-    ${CMAKE_BINARY_DIR}/../llvm/debug)
+    ${CMAKE_BINARY_DIR}/../../llvm/debug)
   set (CMAKE_VERBOSE_MAKEFILE ON)
   message(STATUS "SBT_INCLUDE_DIRS = [${SBT_INCLUDE_DIRS}]")
   message(STATUS "SBT_COMPILE_OPTIONS = [${SBT_COMPILE_OPTIONS}]")
@@ -114,7 +114,7 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 else()
   set (SBT_COMPILE_DEFINITIONS ${SBT_COMPILE_DEFINITIONS} NDEBUG)
   set (SBT_INCLUDE_DIRS ${SBT_INCLUDE_DIRS}
-    ${CMAKE_BINARY_DIR}/../llvm/release)
+    ${CMAKE_BINARY_DIR}/../../llvm/release)
 endif()
 
 # enable AT&T assembler
