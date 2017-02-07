@@ -22,6 +22,8 @@ TOOLCHAIN_RELEASE := $(TOOLCHAIN)/release
 LIB := $(TOOLCHAIN_RELEASE)/riscv32-unknown-elf/lib
 CRT0 := $(LIB)/crt0.o
 
+SPIKE32 := LD_LIBRARY_PATH=$(TOOLCHAIN_RELEASE)/lib spike $(PK32)
+
 X86_CLANG_FLAGS := --target=i386
 X86_LIB := $(TOOLCHAIN)/x86/i386-unknown-elf/lib
 
@@ -46,6 +48,18 @@ all: $(BINS)
 # RV32
 #
 
+# RUN
+define RV32_RUN
+run-$(1): $(1)
+	$(SPIKE32) $(1)
+endef
+
+# CLEAN
+define CLEAN
+clean-$(1):
+	rm -f $(1) $(1).o $(1).s
+endef
+
 # GCC
 define RV32_GCC
 $(1).s: $(2).c
@@ -57,11 +71,8 @@ $(1).o: $(1).s
 $(1): $(1).o
 	$(GCC32) $(CFLAGS) -o $$@ $$<
 
-run-$(1): $(1)
-	spike $(PK32) $(1)
-
-clean-$(1):
-	rm -f $(1) $(1).o $(1).s
+$(call RV32_RUN,$(1))
+$(call CLEAN,$(1))
 endef
 
 # AS
@@ -72,11 +83,8 @@ $(1).o: $(2).s
 $(1): $(1).o
 	$(LD32) -o $$@ $$<
 
-run-$(1): $(1)
-	spike $(PK32) $(1)
-
-clean-$(1):
-	rm -f $(1) $(1).o
+$(call RV32_RUN,$(1))
+$(call CLEAN,$(1))
 endef
 
 # CLANG
@@ -88,13 +96,11 @@ $(1).o: $(1).s
 	$(AS32) -o $$@ $$<
 
 $(1): $(1).o
-	$(LD32) -o $$@ -dT ldscripts/elf32lriscv.x $(CRT0) $$< -lc -lgloss -lc
+	$(LD32) -o $$@ -L$(LIB) \
+		-dT ldscripts/elf32lriscv.x $(CRT0) $$< -lc -lgloss -lc
 
-run-$(1): $(1)
-	spike $(PK32) $(1)
-
-clean-$(1):
-	rm -f $(1) $(1).o $(1).s
+$(call RV32_RUN,$(1))
+$(call CLEAN,$(1))
 endef
 
 #
@@ -115,13 +121,18 @@ $(1): $(1).o
 run-$(1): $(1)
 	spike --isa=RV64IMAFDC pk $(1)
 
-clean-$(1):
-	rm -f $(1) $(1).o $(1).s
+$(call CLEAN,$(1))
 endef
 
 #
 # X86
 #
+
+# RUN
+define X86_RUN
+run-$(1): $(1)
+	./$(1)
+endef
 
 # CLANG
 define X86_CLANG
@@ -138,11 +149,8 @@ $(1): $(1).o
 		$(X86_LC) $(X86_LGCC) $(X86_LC) \
 		$(X86_CRTN)
 
-run-$(1): $(1)
-	./$(1)
-
-clean-$(1):
-	rm -f $(1) $(1).o $(1).s
+$(call X86_RUN,$(1))
+$(call CLEAN,$(1))
 endef
 
 
