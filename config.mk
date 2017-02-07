@@ -1,8 +1,8 @@
 ### config ###
 
 # flags
-CFLAGS    := -Wall -Werror -O2
-CXXFLAGS  := $(CFLAGS)
+CFLAGS    = -Wall -Werror -O2
+CXXFLAGS  = $(CFLAGS) -std=c++11
 
 # build type dir
 ifeq ($(BUILD_TYPE),Debug)

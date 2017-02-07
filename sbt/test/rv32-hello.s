@@ -1,0 +1,1 @@
+../../test/rv32-hello.s

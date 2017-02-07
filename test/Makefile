@@ -13,5 +13,4 @@ $(eval $(call BUILD,RV32,rv32-clang-hello,CLANG,hello))
 $(eval $(call BUILD,X86,x86-clang-hello,CLANG,hello))
 
 run: $(foreach prog,$(BINS),run-$(prog))
-
 clean: $(foreach prog,$(BINS),clean-$(prog))

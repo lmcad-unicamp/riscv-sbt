@@ -39,12 +39,28 @@ $(2).o: $(2).s
 # .o -> elf
 ifneq ($(4),)
 $(2): $(2).o
-	$$($(1)_LD) -o $$@ $$($(1)_LD_FLAGS0) $$< $$($(1)_LD_FLAGS1)
+	$$($(1)_LD) -o $$@ \
+		$$($(1)_LD_FLAGS0) $$< \
+		$($(1)_LIBS) \
+		$$($(1)_LD_FLAGS1)
 else
 $(2): $(2).o
-	$$($(1)_LD) -o $$@ $$<
+	$$($(1)_LD) -o $$@ $$< $($(1)_LIBS)
 endif
 
 $(call RUN,$(1),$(2))
 $(call CLEAN,$(2),$(4))
+endef
+
+# NBUILD: native build
+# 1: output module
+define NBUILD
+$(1).o: $(1).cpp
+	$(CXX) $(CXXFLAGS) -o $$@ -c $$<
+
+$(1): $(1).o
+	$(CXX) $(LDFLAGS) -o $$@ $$<
+
+$(call RUN,X86,$(1))
+$(call CLEAN,$(1),$(1))
 endef

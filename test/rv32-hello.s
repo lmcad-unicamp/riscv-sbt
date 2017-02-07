@@ -1,14 +1,13 @@
 .data
-msg:    .ascii "Hello, world!\n"
+msg:    .ascii "Hello, World!\n"
 msg_len = . - msg
-
-.text
-.global _start
-_start:
 
 SYS_WRITE = 64
 SYS_EXIT = 93
 
+.text
+.global _start
+_start:
     # print
     li a0,1
     la a1,msg
