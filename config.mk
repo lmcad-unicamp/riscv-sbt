@@ -3,8 +3,10 @@
 # flags
 CFLAGS    = -Wall -Werror -O2
 CXXFLAGS  = $(CFLAGS) -std=c++11
+MAKE_OPTS ?= -j9
 
-# build type dir
+# build type
+BUILD_TYPE ?= Debug
 ifeq ($(BUILD_TYPE),Debug)
   BUILD_TYPE_DIR := debug
 else
@@ -21,6 +23,7 @@ X86_SYSCALL_O := $(SBT_BUILD_DIR)/CMakeFiles/x86_syscall.dir/x86_syscall.s.o
 
 TOOLCHAIN         := $(TOPDIR)/toolchain
 TOOLCHAIN_RELEASE := $(TOOLCHAIN)/release
+TOOLCHAIN_DEBUG   := $(TOOLCHAIN)/debug
 TOOLCHAIN_X86     := $(TOOLCHAIN)/x86
 
 RV32_TRIPLE   := riscv32-unknown-elf

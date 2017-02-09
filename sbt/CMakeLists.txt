@@ -27,9 +27,21 @@ set (Sep "s/ /;/g")
 # FormatLibs
 set (FormatLibs "s/${CStOrSp}-l${CNSp1}/\\1\\2/g; ${Trim}; ${Sep}")
 
+# get BUILD_TYPE_DIR
+execute_process(
+  COMMAND echo ${CMAKE_BUILD_TYPE}
+  COMMAND sed "s/.*/\\l&/"
+  COMMAND ${FilterNL}
+  RESULT_VARIABLE RC1
+  OUTPUT_VARIABLE BUILD_TYPE_DIR
+)
+
+# set LLVM_CONFIG
+set (LLVM_CONFIG $ENV{TOPDIR}/toolchain/${BUILD_TYPE_DIR}/bin/llvm-config)
+
 # include dirs
 execute_process(
-  COMMAND llvm-config --cxxflags
+  COMMAND ${LLVM_CONFIG} --cxxflags
   COMMAND sed "s/${CStOrSp}-I${CNSp1}/\\1\\2/g; ${FilterNonI}; ${Trim}; ${Sep}"
   COMMAND ${FilterNL}
   RESULT_VARIABLE RC1
@@ -38,7 +50,7 @@ execute_process(
 
 # compile options
 execute_process(
-  COMMAND llvm-config --cxxflags
+  COMMAND ${LLVM_CONFIG} --cxxflags
   COMMAND sed "${FilterD}; ${FilterI}; ${Trim}; ${Sep}"
   COMMAND ${FilterNL}
   RESULT_VARIABLE RC2
@@ -50,7 +62,7 @@ set (DefsSed "s/${CStOrSp}-D${CNSp1}/\\1\\2/g; ${FilterNonD}; ${Trim}; ${Sep}; "
 
 # compile defs
 execute_process(
-  COMMAND llvm-config --cxxflags
+  COMMAND ${LLVM_CONFIG} --cxxflags
   COMMAND sed "${DefsSed}"
   COMMAND ${FilterNL}
   RESULT_VARIABLE RC3
@@ -59,7 +71,7 @@ execute_process(
 
 # link dirs
 execute_process(
-  COMMAND llvm-config --ldflags
+  COMMAND ${LLVM_CONFIG} --ldflags
   COMMAND sed "s/-L//g; ${Trim}; ${Sep}"
   COMMAND ${FilterNL}
   RESULT_VARIABLE RC4
@@ -68,7 +80,7 @@ execute_process(
 
 # sys libs
 execute_process(
-  COMMAND llvm-config --system-libs
+  COMMAND ${LLVM_CONFIG} --system-libs
   COMMAND sed "${FormatLibs}"
   COMMAND ${FilterNL}
   RESULT_VARIABLE RC5
@@ -77,7 +89,7 @@ execute_process(
 
 # libs
 execute_process(
-  COMMAND llvm-config --libs arm bitwriter core object riscv support target x86
+  COMMAND ${LLVM_CONFIG} --libs arm bitwriter core object riscv support target x86
   COMMAND sed "${FormatLibs}"
   COMMAND ${FilterNL}
   RESULT_VARIABLE RC6

@@ -14,7 +14,7 @@ all: $(BINS)
 
 include $(TOPDIR)/rules.mk
 
-CXXFLAGS = -m32 -Wall -Wextra -Werror -O0 -g -std=c++11 -pedantic
+CXXFLAGS = -m32 -Wall -Werror -O0 -g -std=c++11 -pedantic
 LDFLAGS  = -m32
 $(eval $(call NBUILD,elf))
 
