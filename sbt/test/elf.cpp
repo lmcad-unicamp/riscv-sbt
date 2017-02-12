@@ -100,15 +100,17 @@ elf::elf(const std::string &filename) :
     throw EXCEPTION("failed to read elf header");
 
   // program headers
-  ifs.seekg(hdr.e_phoff, std::ios_base::beg);
-  if (ifs.fail())
-    throw EXCEPTION("seek to e_phoff failed");
-  assert(sizeof(program_header) == hdr.e_phentsize);
-  ph.reset(new program_header[hdr.e_phnum]);
-  for (uint16_t i = 0; i < hdr.e_phnum; i++) {
-    ifs.read(reinterpret_cast<char *>(&ph[i]), sizeof(program_header));
+  if (hdr.e_phnum > 0) {
+    ifs.seekg(hdr.e_phoff, std::ios_base::beg);
     if (ifs.fail())
-      throw EXCEPTION("failed to read program headers");
+      throw EXCEPTION("seek to e_phoff failed");
+    assert(sizeof(program_header) == hdr.e_phentsize);
+    ph.reset(new program_header[hdr.e_phnum]);
+    for (uint16_t i = 0; i < hdr.e_phnum; i++) {
+      ifs.read(reinterpret_cast<char *>(&ph[i]), sizeof(program_header));
+      if (ifs.fail())
+        throw EXCEPTION("failed to read program headers");
+    }
   }
 
   // section headers
@@ -495,7 +497,16 @@ void elf::dump_text(uint32_t offs, uint32_t size) const
   std::string objdump = hdr.e_machine == EM_RISCV?
     "riscv32-unknown-elf-objdump" : "objdump";
   system((objdump + " -d " + filename + " | "
-    "awk 'BEGIN { p=0; } { if (/<_start>:/) p=1; if (p) print; }'").c_str());
+    "awk 'BEGIN { st=0; } { "
+    "if (st == 0) { "
+    "  if (/Disassembly of section .text/) st=1;"
+    "} else if (st == 1) { "
+    "  st=2; "
+    "} else { "
+    "  print; "
+    "} "
+    "}'"
+  ).c_str());
 }
 
 void elf::dump_data(uint32_t offs, uint32_t size, uint32_t doffs) const

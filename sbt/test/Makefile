@@ -4,11 +4,11 @@ BINS := elf \
 	rv32-hello x86-hello \
 	x86-test-syscall \
 	rv32-x86-hello \
-	x86-main
+	x86-main rv32-main
 
 RUN_BINS := rv32-hello x86-hello x86-test-syscall \
 	rv32-x86-hello \
-	x86-main
+	x86-main rv32-main
 
 all: $(BINS)
 
@@ -34,6 +34,8 @@ $(eval $(call BUILD,X86,rv32-x86-hello))
 
 X86_LIBS =
 $(eval $(call BUILD,X86,x86-main,CLANG,main))
+
+$(eval $(call BUILD,RV32,rv32-main,CLANG,main))
 
 run: $(foreach prog,$(RUN_BINS),run-$(prog))
 clean: $(foreach prog,$(BINS),clean-$(prog))
