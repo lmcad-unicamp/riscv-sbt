@@ -58,7 +58,7 @@ define NBUILD
 $(1).o: $(1).cpp
 	$(CXX) $(CXXFLAGS) -o $$@ -c $$<
 
-$(1): $(1).o
+$(1): $(1).o $(1).hpp
 	$(CXX) $(LDFLAGS) -o $$@ $$<
 
 $(call RUN,X86,$(1))

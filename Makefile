@@ -134,7 +134,7 @@ $$($(1)_ALIAS)-clean:
 			rm -f `cat pkg/$$($(1)_ALIAS).files` && \
 			rm -f pkg/$$($(1)_ALIAS).files && \
 			$(ALL_FILES) > pkg/all.files; \
-		fi
+		fi || true
 	rm -rf $$($(1)_BUILD)
 endef
 

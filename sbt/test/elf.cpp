@@ -1,9 +1,10 @@
+#include <algorithm>
 #include <cassert>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 
-#include "elf.h"
+#include "elf.hpp"
 
 using std::cout;
 
@@ -220,13 +221,13 @@ std::string elf::e_flags_str(uint32_t f) const
   return out;
 }
 
-void elf::dump() const
-{
-  uint16_t c;
 
+void elf::dump_header() const
+{
   // e_ident
 
   // magic
+  uint16_t c;
   cout << poffs << "e_ident[EI_MAG0-3] =";
   for (size_t i = 0; i < 4; i++) {
     c = hdr.e_ident[i];
@@ -285,16 +286,26 @@ void elf::dump() const
   PD(e_shentsize, s)
   PD(e_shnum, s)
   PD(e_shstrndx, s)
+}
 
-  for (uint16_t i = 0; i < hdr.e_phnum; i++) {
-    cout << "program_header[" << i << "]" << nl;
-    dump_ph(&ph[i]);
-  }
 
-  for (uint16_t i = 0; i < hdr.e_shnum; i++) {
-    cout << "section_header[" << i << "]" << nl;
-    dump_sh(&sh[i]);
-  }
+void elf::dump(
+  dump_flags flags,
+  std::vector<std::string> &&sections) const
+{
+  this->flags = flags;
+  dump_sections = std::move(sections);
+
+  if (flags & DF_EH)
+    dump_header();
+
+  if (flags & DF_PH)
+    for (uint16_t i = 0; i < hdr.e_phnum; i++)
+      dump_ph(i, &ph[i]);
+
+  if (flags & DF_SH)
+    for (uint16_t i = 0; i < hdr.e_shnum; i++)
+      dump_sh(i, &sh[i]);
 }
 
 // program header
@@ -336,8 +347,10 @@ static std::string p_flags_str(uint32_t s)
 #undef ST
 #define ST ph->
 
-void elf::dump_ph(const program_header *ph) const
+void elf::dump_ph(uint16_t index, const program_header *ph) const
 {
+  cout << "program_header[" << index << "]" << nl;
+
   offs = 0;
   uint32_t u;
 
@@ -430,8 +443,22 @@ std::unique_ptr<char[]> elf::read(uint32_t offs, uint32_t size) const
 #undef ST
 #define ST sh->
 
-void elf::dump_sh(const section_header *sh) const
+void elf::dump_sh(uint16_t index, const section_header *sh) const
 {
+  std::string name = sh_name_str(sh->sh_name);
+
+  if (flags & DF_LIST) {
+    cout << hex(2) << index << " "<< '[' << name << ']' << nl;
+    return;
+  }
+
+  if (!dump_sections.empty() &&
+      std::find(dump_sections.begin(), dump_sections.end(), name) ==
+        dump_sections.end())
+    return;
+
+  cout << "section_header[" << index << "]" << nl;
+
   offs = 0;
   uint32_t u;
 
@@ -450,7 +477,6 @@ void elf::dump_sh(const section_header *sh) const
   // dump contents
   uint32_t offs = sh->sh_offset;
   uint32_t size = sh->sh_size;
-  std::string name = sh_name_str(sh->sh_name);
 
   if (name == ".text")
     dump_text(offs, size);
@@ -553,6 +579,61 @@ static std::string st_shndx_str(uint16_t u)
   }
 }
 
+void elf::dump_symbol(const struct sym *sym) const
+{
+  uint8_t  c;
+  uint16_t s;
+  uint32_t u;
+
+  offs = 0;
+  PXS(st_name, u)
+  PX(st_value, u)
+  PD(st_size, u)
+
+  // st_info
+  c = sym->st_info;
+  uint8_t bind = c >> 4;
+  uint8_t type = c & 0xF;
+
+  cout << poffs << "st_info = "
+       << "bind=" << hex(2) << uint16_t(bind) << desc(bind_str(bind))
+       << ", type=" << hex(2) << uint16_t(type) << desc(type_str(type))
+       << nl;
+  offs++;
+
+  // st_other
+  c = sym->st_other;
+  uint8_t vis = c & 0x7;
+  cout << poffs << "st_other = "
+       << "vis=" << hex(2) << uint16_t(vis) << desc(vis_str(vis)) << nl;
+  offs++;
+
+  PXS(st_shndx, s)
+}
+
+void elf::dump_symbol_compact(const struct sym *sym) const
+{
+  const char *name = st_name_str(sym->st_name);
+
+  // st_info
+  uint8_t c = sym->st_info;
+  uint8_t bind = c >> 4;
+  uint8_t type = c & 0xF;
+
+  // st_other
+  c = sym->st_other;
+  uint8_t vis = c & 0x7;
+
+  cout  << '[' << name << ']'
+        << " " << hex(8) << sym->st_value
+        << " " << std::setw(2) << std::dec << sym->st_size
+        << " " << bind_str(bind)
+        << " "  << type_str(type)
+        << " " << vis_str(vis)
+        << " " << st_shndx_str(sym->st_shndx)
+        << nl;
+}
+
 void elf::dump_symtab(uint32_t soffs, uint32_t ssize) const
 {
   if (strtabndx == -1) {
@@ -575,36 +656,10 @@ void elf::dump_symtab(uint32_t soffs, uint32_t ssize) const
   size_t n = ssize / sizeof(struct sym);
 
   cout << "Symbols:" << nl;
-  uint8_t  c;
-  uint16_t s;
-  uint32_t u;
   for (size_t i = 0; i < n; i++) {
     const struct sym *sym = &syms[i];
-    offs = 0;
-
-    PXS(st_name, u)
-    PX(st_value, u)
-    PD(st_size, u)
-
-    // st_info
-    c = sym->st_info;
-    uint8_t bind = c >> 4;
-    uint8_t type = c & 0xF;
-
-    cout << poffs << "st_info = "
-         << "bind=" << hex(2) << uint16_t(bind) << desc(bind_str(bind))
-         << ", type=" << hex(2) << uint16_t(type) << desc(type_str(type))
-         << nl;
-    offs++;
-
-    // st_other
-    c = sym->st_other;
-    uint8_t vis = c & 0x7;
-    cout << poffs << "st_other = "
-         << "vis=" << hex(2) << uint16_t(vis) << desc(vis_str(vis)) << nl;
-    offs++;
-
-    PXS(st_shndx, s)
+    // dump_symbol(sym);
+    dump_symbol_compact(sym);
   }
 }
 
@@ -620,18 +675,74 @@ void elf::dump_symtab(uint32_t soffs, uint32_t ssize) const
 
 void usage()
 {
-  std::cout << "usage: elf <filename>" << std::endl;
+  std::cout << "usage: elf [options] <filename> [section]*\n"
+    "Options:\n"
+    "-e: elf header\n"
+    "-p: program headers\n"
+    "-s: sections headers\n"
+    "-l: list sections headers\n"
+    ;
 }
 
 int main(int argc, char *argv[])
 {
-  if (argc != 2) {
+  if (argc < 2) {
     usage();
     return 1;
   }
 
-  elf elf(argv[1]);
-  elf.dump();
+  // parse options
+  uint32_t flags = elf::dump_flags::DF_NONE;
+  std::string filepath;
+  std::vector<std::string> sections;
+  for (int i = 1; i < argc; i++) {
+    std::string arg = argv[i];
+
+    // option
+    if (arg.size() > 1 && arg[0] == '-') {
+      for (auto c = arg.begin() + 1, end = arg.end(); c != end; ++c) {
+        switch (*c) {
+          case 'e':
+            flags |= elf::dump_flags::DF_EH;
+            break;
+          case 'p':
+            flags |= elf::dump_flags::DF_PH;
+            break;
+          case 's':
+            flags |= elf::dump_flags::DF_SH;
+            break;
+          case 'l':
+            flags |= elf::dump_flags::DF_SH;
+            flags |= elf::dump_flags::DF_LIST;
+            break;
+          default:
+            usage();
+            return 1;
+        }
+      }
+
+    // positional parameter
+    } else {
+      if (filepath.empty())
+        filepath = arg;
+      else
+        sections.push_back(arg);
+    }
+  }
+
+  if (filepath.empty()) {
+    usage();
+    return 1;
+  }
+
+  if (!sections.empty())
+    flags |= elf::dump_flags::DF_SH;
+
+  elf elf(filepath);
+  elf.dump(flags == elf::dump_flags::DF_NONE?
+      elf::dump_flags::DF_DEFAULT :
+      static_cast<elf::dump_flags>(flags),
+    std::move(sections));
   return 0;
 }
 

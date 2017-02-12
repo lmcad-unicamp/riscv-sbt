@@ -2,8 +2,8 @@
 msg: .ascii "Hello, World!\n"
 msglen = . - msg
 
-.equ SYS_EXIT,   1
-.equ SYS_WRITE,  4
+SYS_EXIT  = 1
+SYS_WRITE = 4
 
 .text
 .global _start

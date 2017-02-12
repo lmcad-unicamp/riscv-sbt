@@ -4,6 +4,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <vector>
 
 /// str
 
@@ -256,7 +257,19 @@ class elf
 public:
   elf(const std::string &filename);
 
-  void dump() const;
+
+  enum dump_flags : uint32_t {
+    DF_NONE = 0,
+    DF_EH = 1,
+    DF_PH = 2,
+    DF_SH = 4,
+    DF_LIST = 8,
+    DF_DEFAULT = DF_EH | DF_PH | DF_SH
+  };
+
+  void dump(
+    dump_flags flags = DF_DEFAULT,
+    std::vector<std::string> &&sections = {}) const;
 
 private:
   // data
@@ -269,16 +282,21 @@ private:
   mutable int strtabndx = -1;
   mutable std::unique_ptr<char[]> strtab;
   mutable uint32_t strtabsz = 0;
+  mutable uint32_t flags;
+  mutable std::vector<std::string> dump_sections;
 
   // functions
   std::unique_ptr<char[]> read(uint32_t offs, uint32_t size) const;
 
-  void dump_ph(const program_header *ph) const;
-  void dump_sh(const section_header *sh) const;
+  void dump_header() const;
+  void dump_ph(uint16_t index, const program_header *ph) const;
+  void dump_sh(uint16_t index, const section_header *sh) const;
 
   void dump_text(uint32_t offs, uint32_t size) const;
   void dump_data(uint32_t offs, uint32_t size, uint32_t doffs = -1) const;
   void dump_symtab(uint32_t offs, uint32_t size) const;
+  void dump_symbol(const struct sym *sym) const;
+  void dump_symbol_compact(const struct sym *sym) const;
 
   std::string e_flags_str(uint32_t u) const;
 

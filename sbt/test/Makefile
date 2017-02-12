@@ -37,3 +37,4 @@ $(eval $(call BUILD,X86,x86-main,CLANG,main))
 
 run: $(foreach prog,$(RUN_BINS),run-$(prog))
 clean: $(foreach prog,$(BINS),clean-$(prog))
+	rm -f rv32-x86-hello.bc
