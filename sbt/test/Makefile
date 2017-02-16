@@ -4,11 +4,11 @@ BINS := elf \
 	rv32-hello x86-hello \
 	x86-test-syscall \
 	rv32-x86-hello \
-	x86-main rv32-main
+	x86-main rv32-main rv32-x86-main
 
 RUN_BINS := rv32-hello x86-hello x86-test-syscall \
 	rv32-x86-hello \
-	x86-main rv32-main
+	x86-main rv32-main rv32-x86-main
 
 all: $(BINS)
 
@@ -36,6 +36,22 @@ X86_LIBS =
 $(eval $(call BUILD,X86,x86-main,CLANG,main))
 
 $(eval $(call BUILD,RV32,rv32-main,CLANG,main))
+
+
+### rv32-x86-main ###
+
+rv32-x86-main.bc: rv32-main.o
+	riscv-sbt -o $@ $<
+
+rv32-x86-main.s: rv32-x86-main.bc
+	llc -O3 -o $@ -march x86 $<
+
+X86_LIBS = $(X86_SYSCALL_O)
+$(eval $(call AS,X86,rv32-x86-main))
+$(eval $(call CLINK,X86,rv32-x86-main))
+
+clean-rv32-x86-main:
+	rm -f rv32-x86-main*
 
 run: $(foreach prog,$(RUN_BINS),run-$(prog))
 clean: $(foreach prog,$(BINS),clean-$(prog))

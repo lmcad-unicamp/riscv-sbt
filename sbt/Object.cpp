@@ -279,7 +279,7 @@ Object::Object(
 Error Object::readSymbols()
 {
   SBTError SE(FileName);
-  const Object *ConstThis = this;
+  // const Object *ConstThis = this;
   SectionPtrVec Sections;
   // TODO Speed up this by using Section address
   //      instead of Name.
@@ -287,7 +287,7 @@ Error Object::readSymbols()
 
   // Read Sections
   for (const object::SectionRef &S : Obj->sections()) {
-    auto ExpSec = create<Section*>(ConstThis, S);
+    auto ExpSec = create<Section*>(this, S);
     if (!ExpSec)
       return ExpSec.takeError();
     Section *Sec = ExpSec.get();
@@ -302,7 +302,7 @@ Error Object::readSymbols()
 
   // Read Symbols
   for (const object::SymbolRef &S : Obj->symbols()) {
-    auto ExpSym = create<Symbol*>(ConstThis, S);
+    auto ExpSym = create<Symbol*>(this, S);
     if (!ExpSym)
       return ExpSym.takeError();
     Symbol *Sym = ExpSym.get();
@@ -348,7 +348,7 @@ Error Object::readSymbols()
          RB != RE; ++RB)
     {
       const object::RelocationRef &R = *RB;
-      auto ExpRel = create<Relocation*>(ConstThis, R);
+      auto ExpRel = create<Relocation*>(this, R);
       if (!ExpRel)
         return ExpRel.takeError();
       Relocation *Rel = ExpRel.get();

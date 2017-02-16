@@ -20,6 +20,34 @@ else
 endif
 endef
 
+# Assemble
+# 1: prefix
+# 2: output module
+define AS
+# .s -> .o
+$(2).o: $(2).s
+	$$($(1)_AS) -o $$@ -c $$<
+endef
+
+# C program link
+# 1: prefix
+# 2: output module
+define CLINK
+$(2): $(2).o
+	$$($(1)_LD) -o $$@ \
+		$$($(1)_LD_FLAGS0) $$< \
+		$($(1)_LIBS) \
+		$$($(1)_LD_FLAGS1)
+endef
+
+# assembly program link
+# 1: prefix
+# 2: output module
+define LINK
+$(2): $(2).o
+	$$($(1)_LD) -o $$@ $$< $($(1)_LIBS)
+endef
+
 # BUILD
 # 1: prefix
 # 2: output module
@@ -32,20 +60,13 @@ $(2).s: $(4).c
 	$$($(1)_$(3)) $$($(1)_$(3)_FLAGS) $(CFLAGS) -o $$@ -S $$<
 endif
 
-# .s -> .o
-$(2).o: $(2).s
-	$$($(1)_AS) -o $$@ -c $$<
+$(call AS,$(1),$(2))
 
 # .o -> elf
 ifneq ($(4),)
-$(2): $(2).o
-	$$($(1)_LD) -o $$@ \
-		$$($(1)_LD_FLAGS0) $$< \
-		$($(1)_LIBS) \
-		$$($(1)_LD_FLAGS1)
+$(call CLINK,$(1),$(2))
 else
-$(2): $(2).o
-	$$($(1)_LD) -o $$@ $$< $($(1)_LIBS)
+$(call LINK,$(1),$(2))
 endif
 
 $(call RUN,$(1),$(2))

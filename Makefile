@@ -7,9 +7,9 @@ include $(TOPDIR)/config.mk
 # build type for LLVM and SBT (Release or Debug)
 # WARNING: using Release LLVM builds with Debug SBT CAN cause problems!
 ifeq ($(BUILD_TYPE),Debug)
-  TARGETS := sbt-debug
+  SBT := sbt-debug
 else
-  TARGETS := sbt-release
+  SBT := sbt-release
 endif
 
 ALL := \
@@ -29,7 +29,7 @@ ALL := \
 	NEWLIB_GCC_X86
 
 all: \
-	$(TARGETS) \
+	$(SBT) \
 	riscv-isa-sim \
 	riscv-pk-32 \
 	x86-newlib-gcc
@@ -454,6 +454,6 @@ update_files:
 
 .PHONY: test
 test:
-	$(MAKE) sbt-build sbt-install
-	rm -f $(TOPDIR)/sbt/test/rv-x86-main.bc
-	$(MAKE) -C $(TOPDIR)/sbt/test
+	$(MAKE) $(SBT)-build1 $(SBT)-install
+	rm -f $(TOPDIR)/sbt/test/rv32-x86-main.bc
+	$(MAKE) -C $(TOPDIR)/sbt/test rv32-x86-main

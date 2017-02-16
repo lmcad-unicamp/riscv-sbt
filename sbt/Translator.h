@@ -123,6 +123,7 @@ public:
   llvm::Error startModule();
   llvm::Error finishModule();
 
+  llvm::Error startMain(llvm::StringRef Name, uint64_t Addr);
   llvm::Error startFunction(llvm::StringRef Name, uint64_t Addr);
   llvm::Error finishFunction();
 
@@ -151,6 +152,7 @@ public:
 private:
   // Constants
   llvm::IntegerType *I32;
+  llvm::Type *I32Ptr;
   llvm::Value *ZERO;
   const std::string IR_XREGNAME = "x";
 
@@ -158,7 +160,7 @@ private:
   llvm::LLVMContext *Context;
   llvm::IRBuilder<> *Builder;
   llvm::Module *Module;
-  llvm::GlobalVariable *X[32];
+  llvm::Value *X[32];
   llvm::FunctionType *FTRVSC;
   llvm::Function *FRVSC;
 
@@ -170,11 +172,15 @@ private:
   llvm::Instruction *First = nullptr;
 
   llvm::GlobalVariable *ShadowImage = nullptr;
+  llvm::GlobalVariable *Stack = nullptr;
+  llvm::Value *StackEnd = nullptr;
+  size_t StackSize = 4096;
 
   // Methods
   void buildRegisterFile();
   llvm::Error buildShadowImage();
   llvm::Error genSyscallHandler();
+  llvm::Error buildStack();
 
   llvm::Error handleSyscall();
 
@@ -216,8 +222,17 @@ private:
   // Get RD
   unsigned getRD(const llvm::MCInst &Inst, llvm::raw_ostream &SS)
   {
-    const llvm::MCOperand &OR = Inst.getOperand(0);
-    unsigned NR = RVReg(OR.getReg());
+    return getRegNum(0, Inst, SS);
+  }
+
+  // GetRegNum
+  unsigned getRegNum(
+    unsigned Num,
+    const llvm::MCInst &Inst,
+    llvm::raw_ostream &SS)
+  {
+    const llvm::MCOperand &R = Inst.getOperand(Num);
+    unsigned NR = RVReg(R.getReg());
     SS << regName(NR) << ", ";
     return NR;
   }
@@ -237,7 +252,7 @@ private:
       V = load(NR);
 
     SS << regName(NR);
-    if (Op == 1)
+    if (Op < 2)
        SS << ", ";
     return V;
   }
@@ -275,6 +290,20 @@ private:
   bool isRelocation(const llvm::Value *V) const
   {
     return !llvm::isa<llvm::ConstantInt>(V);
+  }
+
+  llvm::Value *i8PtrToI32(llvm::Value *V8)
+  {
+    // Cast to int32_t *
+    llvm::Value *V =
+      Builder->CreateCast(llvm::Instruction::CastOps::BitCast,
+        V8, llvm::Type::getInt32PtrTy(*Context));
+    updateFirst(V);
+    // Cast to int32_t
+    V = Builder->CreateCast(llvm::Instruction::CastOps::PtrToInt,
+      V, I32);
+    updateFirst(V);
+    return V;
   }
 
   // Handle relocation.
@@ -324,14 +353,8 @@ private:
     llvm::Value *V =
       Builder->CreateGEP(ShadowImage, llvm::ConstantInt::get(I32, Rel));
     updateFirst(V);
-    // Cast to int32_t *
-    V = Builder->CreateCast(llvm::Instruction::CastOps::BitCast,
-      V, llvm::Type::getInt32PtrTy(*Context));
-    updateFirst(V);
-    // Cast to int32_t
-    V = Builder->CreateCast(llvm::Instruction::CastOps::PtrToInt,
-      V, I32);
-    updateFirst(V);
+
+    V = i8PtrToI32(V);
 
     // Finally, get only the upper or lower part of the result
     V = Builder->CreateAnd(V, llvm::ConstantInt::get(I32, Mask));

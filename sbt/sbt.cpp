@@ -281,7 +281,8 @@ Error SBT::translate(const std::string &File)
           if (Error E = SBTTranslator->startFunction(SymbolName, Start))
             return E;
         } else if (SymbolName == "main") {
-          // TODO start main
+          if (Error E = SBTTranslator->startMain(SymbolName, Start))
+            return E;
         }
       }
 

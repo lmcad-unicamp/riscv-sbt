@@ -26,6 +26,7 @@ Translator::Translator(
   llvm::Module *Mod)
   :
   I32(Type::getInt32Ty(*Ctx)),
+  I32Ptr(Type::getInt32PtrTy(*Ctx)),
   ZERO(ConstantInt::get(I32, 0)),
   Context(Ctx),
   Builder(Bldr),
@@ -92,6 +93,20 @@ Error Translator::translate(const llvm::MCInst &Inst)
 
   switch (Inst.getOpcode())
   {
+    case RISCV::ADD: {
+      SS << "add\t";
+
+      unsigned O = getRD(Inst, SS);
+      Value *O1 = getReg(Inst, 1, SS);
+      Value *O2 = getReg(Inst, 2, SS);
+
+      Value *V = add(O1, O2);
+      store(V, O);
+
+      dbgprint(SS);
+      break;
+    }
+
     case RISCV::ADDI: {
       SS << "addi\t";
 
@@ -137,6 +152,70 @@ Error Translator::translate(const llvm::MCInst &Inst)
       break;
     }
 
+    case RISCV::JALR: {
+      SS << "jalr\t";
+
+      unsigned RD = getRD(Inst, SS);
+      unsigned RS1 = getRegNum(1, Inst, SS);
+      Value *Imm = getImm(Inst, 2, SS);
+
+      // Check for 'return'
+      if (RD == RV_ZERO &&
+          RS1 == RV_RA &&
+          isa<ConstantInt>(Imm) &&
+          cast<ConstantInt>(Imm)->getValue() == 0)
+      {
+        Builder->CreateRet(load(RV_A0));
+        break;
+      }
+
+      // Value *Target = add(RS1, Imm);
+      // Target = Builder->CreateAnd(Target, ~1U);
+      // updateFirst(Target);
+
+      dbgprint(SS);
+      break;
+    }
+
+    case RISCV::LW: {
+      SS << "lw\t";
+
+      unsigned O = getRD(Inst, SS);
+      Value *RS1 = getReg(Inst, 1, SS);
+      Value *Imm = getImm(Inst, 2, SS);
+
+      Value *V = add(RS1, Imm);
+      Value *Ptr = Builder->CreateCast(
+        llvm::Instruction::CastOps::IntToPtr, V, I32Ptr);
+      updateFirst(Ptr);
+      V = Builder->CreateLoad(Ptr);
+      updateFirst(V);
+
+      store(V, O);
+
+      dbgprint(SS);
+      break;
+    }
+
+    case RISCV::SW: {
+      SS << "sw\t";
+
+      Value *RS1 = getReg(Inst, 0, SS);
+      Value *RS2 = getReg(Inst, 1, SS);
+      Value *Imm = getImm(Inst, 2, SS);
+
+      Value *V = add(RS1, Imm);
+
+      Value *Ptr = Builder->CreateCast(
+        llvm::Instruction::CastOps::IntToPtr, V, I32Ptr);
+      updateFirst(Ptr);
+      V = Builder->CreateStore(RS2, Ptr);
+      updateFirst(V);
+
+      dbgprint(SS);
+      break;
+    }
+
     default: {
       SE << "Unknown instruction opcode: "
          << Inst.getOpcode() << "\n";
@@ -154,6 +233,9 @@ Error Translator::startModule()
   if (Error E = buildShadowImage())
     return E;
 
+  if (Error E = buildStack())
+    return E;
+
   if (Error E = genSyscallHandler())
     return E;
 
@@ -162,6 +244,31 @@ Error Translator::startModule()
 
 Error Translator::finishModule()
 {
+  return Error::success();
+}
+
+Error Translator::startMain(StringRef Name, uint64_t Addr)
+{
+  // Create a function with no parameters
+  FunctionType *FT =
+    FunctionType::get(I32, !VAR_ARG);
+  Function *F =
+    Function::Create(FT, Function::ExternalLinkage, Name, Module);
+
+  // BB
+  Twine BBName = Twine("bb").concat(Twine::utohexstr(Addr));
+  BasicBlock *BB = BasicBlock::Create(*Context, BBName, F);
+  Builder->SetInsertPoint(BB);
+
+  // Set stack pointer.
+
+  std::vector<Value *> Idx = { ZERO, ConstantInt::get(I32, StackSize) };
+  Value *V =
+    Builder->CreateGEP(Stack, Idx);
+  StackEnd = i8PtrToI32(V);
+
+  store(StackEnd, RV_SP);
+
   return Error::success();
 }
 
@@ -183,7 +290,8 @@ Error Translator::startFunction(StringRef Name, uint64_t Addr)
 
 Error Translator::finishFunction()
 {
-  Builder->CreateRetVoid();
+  if (Builder->GetInsertBlock()->getTerminator() == nullptr)
+    Builder->CreateRetVoid();
   return Error::success();
 }
 
@@ -382,6 +490,23 @@ Error Translator::handleSyscall()
   Value *V = Builder->CreateCall(FRVSC, Args);
   updateFirst(V);
   store(V, RV_A0);
+
+  return Error::success();
+}
+
+Error Translator::buildStack()
+{
+  std::string Bytes(StackSize, 'S');
+
+  ArrayRef<uint8_t> ByteArray(
+    reinterpret_cast<const uint8_t *>(Bytes.data()),
+    StackSize);
+
+  Constant *CDA = ConstantDataArray::get(*Context, ByteArray);
+
+  Stack =
+    new GlobalVariable(*Module, CDA->getType(), !CONSTANT,
+      GlobalValue::ExternalLinkage, CDA, "Stack");
 
   return Error::success();
 }
