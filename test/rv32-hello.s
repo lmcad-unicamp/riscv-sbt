@@ -1,4 +1,5 @@
 .data
+dummy: .long 1234
 msg:    .ascii "Hello, World!\n"
 msg_len = . - msg
 

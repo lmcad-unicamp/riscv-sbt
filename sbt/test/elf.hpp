@@ -250,6 +250,21 @@ static const uint16_t SHN_UNDEF   = 0x0000;
 static const uint16_t SHN_ABS     = 0xFFF1;
 static const uint16_t SHN_COMMON  = 0xFFF2;
 
+// rel
+
+struct rela
+{
+  uint32_t r_offset;
+  uint32_t r_info;
+  int32_t  r_addend;
+};
+
+static const uint8_t R_RISCV_PCREL_HI20   = 0x17;
+static const uint8_t R_RISCV_PCREL_LO12_I = 0x18;
+static const uint8_t R_RISCV_HI20         = 0x1A;
+static const uint8_t R_RISCV_LO12_I       = 0x1B;
+static const uint8_t R_RISCV_RELAX        = 0x33;
+
 /// elf ///
 
 class elf
@@ -282,11 +297,14 @@ private:
   mutable int strtabndx = -1;
   mutable std::unique_ptr<char[]> strtab;
   mutable uint32_t strtabsz = 0;
+  mutable std::unique_ptr<char[]> symtab;
+  mutable uint32_t symtabsz = 0;
   mutable uint32_t flags;
   mutable std::vector<std::string> dump_sections;
 
   // functions
   std::unique_ptr<char[]> read(uint32_t offs, uint32_t size) const;
+  const struct sym *get_symtab(uint32_t offs = 0, uint32_t size = 0) const;
 
   void dump_header() const;
   void dump_ph(uint16_t index, const program_header *ph) const;
@@ -296,11 +314,13 @@ private:
   void dump_data(uint32_t offs, uint32_t size, uint32_t doffs = -1) const;
   void dump_symtab(uint32_t offs, uint32_t size) const;
   void dump_symbol(const struct sym *sym) const;
-  void dump_symbol_compact(const struct sym *sym) const;
+  void dump_symbol_compact(const struct sym *sym, std::ostream &os) const;
+  void dump_rela(uint32_t soffs, uint32_t ssize) const;
 
   std::string e_flags_str(uint32_t u) const;
 
   const char *sh_name_str(uint32_t sh_name) const;
   const char *st_name_str(uint32_t u) const;
+  std::string r_type_str(uint8_t c) const;
 };
 

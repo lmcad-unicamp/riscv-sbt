@@ -486,6 +486,8 @@ void elf::dump_sh(uint16_t index, const section_header *sh) const
     dump_data(offs, size, sh->sh_addr);
   else if (sh->sh_type == SHT_SYMTAB)
     dump_symtab(offs, size);
+  else if (sh->sh_type == SHT_RELA)
+    dump_rela(offs, size);
   else
     dump_data(offs, size);
 }
@@ -622,7 +624,7 @@ void elf::dump_symbol(const struct sym *sym) const
   PXS(st_shndx, s)
 }
 
-void elf::dump_symbol_compact(const struct sym *sym) const
+void elf::dump_symbol_compact(const struct sym *sym, std::ostream &os) const
 {
   const char *name = st_name_str(sym->st_name);
 
@@ -635,18 +637,28 @@ void elf::dump_symbol_compact(const struct sym *sym) const
   c = sym->st_other;
   uint8_t vis = c & 0x7;
 
-  cout  << '[' << name << ']'
-        << " " << hex(8) << sym->st_value
-        << " " << std::setw(2) << std::dec << sym->st_size
-        << " " << bind_str(bind)
-        << " "  << type_str(type)
-        << " " << vis_str(vis)
-        << " " << st_shndx_str(sym->st_shndx)
-        << nl;
+  uint16_t st_shndx = sym->st_shndx;
+  std::ostringstream shndx;
+  shndx << st_shndx_str(st_shndx);
+  if (shndx.str().empty()) {
+    if (st_shndx < hdr.e_shnum)
+      shndx << sh_name_str(sh[st_shndx].sh_name);
+    else
+      shndx << hex(4) << sym->st_shndx;
+  }
+
+  os  << '[' << name << ']'
+      << " " << hex(8) << sym->st_value
+      << " " << std::setw(2) << std::dec << sym->st_size
+      << " " << bind_str(bind)
+      << " "  << type_str(type)
+      << " " << vis_str(vis)
+      << " " << shndx.str();
 }
 
-void elf::dump_symtab(uint32_t soffs, uint32_t ssize) const
+const struct sym *elf::get_symtab(uint32_t offs, uint32_t size) const
 {
+  // load .strtab if needed
   if (strtabndx == -1) {
     // find .strtab
     for (int i = 0; strtabndx == -1 && i < hdr.e_shnum; i++)
@@ -661,16 +673,91 @@ void elf::dump_symtab(uint32_t soffs, uint32_t ssize) const
     strtab = read(strtab_sh->sh_offset, strtabsz);
   }
 
-  auto data = read(soffs, ssize);
-  const struct sym *syms = reinterpret_cast<const struct sym *>(&data[0]);
-  assert(ssize % sizeof(struct sym) == 0);
+  // look for .symtab
+  if (offs == 0 && size == 0 && !symtab) {
+    for (size_t i = 0; i < hdr.e_shnum; i++) {
+      const section_header *s = &sh[i];
+      if (s->sh_type == SHT_SYMTAB) {
+        offs = s->sh_offset;
+        size = s->sh_size;
+        break;
+      }
+    }
+  }
+
+  // load it
+  if (!symtab) {
+    if (size == 0)
+      return nullptr;
+
+    symtab = read(offs, size);
+    symtabsz = size;
+    assert(size % sizeof(struct sym) == 0);
+  }
+
+  return reinterpret_cast<const struct sym *>(&symtab[0]);
+}
+
+void elf::dump_symtab(uint32_t soffs, uint32_t ssize) const
+{
+  auto syms = get_symtab(soffs, ssize);
   size_t n = ssize / sizeof(struct sym);
 
   cout << "Symbols:" << nl;
   for (size_t i = 0; i < n; i++) {
     const struct sym *sym = &syms[i];
     // dump_symbol(sym);
-    dump_symbol_compact(sym);
+    dump_symbol_compact(sym, cout);
+    cout << nl;
+  }
+}
+
+std::string elf::r_type_str(uint8_t c) const
+{
+  if (hdr.e_machine == EM_RISCV) {
+    switch (c) {
+      CASE(R_RISCV_PCREL_HI20)
+      CASE(R_RISCV_PCREL_LO12_I)
+      CASE(R_RISCV_HI20)
+      CASE(R_RISCV_LO12_I)
+      CASE(R_RISCV_RELAX)
+      default: {
+        std::ostringstream ss;
+        ss << hex(2) << uint16_t(c);
+        return ss.str();
+      }
+    }
+  } else
+    return "TODO_X86_R_TYPES";
+}
+
+void elf::dump_rela(uint32_t soffs, uint32_t ssize) const
+{
+  // load .rela
+  auto data = read(soffs, ssize);
+  const struct rela *rela = reinterpret_cast<const struct rela *>(&data[0]);
+  assert(ssize % sizeof(struct rela) == 0);
+  size_t n = ssize / sizeof(struct rela);
+
+  auto syms = get_symtab();
+
+  cout << "Relocations:" << nl;
+  for (size_t i = 0; i < n; i++) {
+    uint32_t sym = rela->r_info >> 8;
+    uint8_t type = rela->r_info & 0xFF;
+
+    std::ostringstream ss;
+    if (sym < symtabsz)
+      dump_symbol_compact(syms + sym, ss);
+    else
+      ss << hex(6) << sym;
+
+    cout  << hex(8) << rela->r_offset
+          << " " << hex(8) << rela->r_addend
+          << " " << r_type_str(type)
+          << "\t" << ss.str()
+          << nl;
+    rela++;
   }
 }
 

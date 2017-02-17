@@ -7,6 +7,7 @@
 
 #include <llvm/MC/MCInst.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/Support/ELF.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/ErrorHandling.h>
 
@@ -147,6 +148,7 @@ public:
   {
     this->RI = RI;
     this->RE = RE;
+    this->RLast = RI;
   }
 
 private:
@@ -169,12 +171,21 @@ private:
   ConstSectionPtr CurSection;
   ConstRelocIter RI;
   ConstRelocIter RE;
+  ConstRelocIter RLast;
   llvm::Instruction *First = nullptr;
 
   llvm::GlobalVariable *ShadowImage = nullptr;
   llvm::GlobalVariable *Stack = nullptr;
   llvm::Value *StackEnd = nullptr;
   size_t StackSize = 4096;
+
+  // Relocation Info
+  bool IsRel = false;
+  std::string RelSym;
+  std::string XSyms[32];
+
+  bool InMain = false;
+
 
   // Methods
   void buildRegisterFile();
@@ -215,6 +226,8 @@ private:
     updateFirst(V);
     return V;
   }
+
+  llvm::Value *call(llvm::StringRef Func);
 
   // Get RISC-V register number
   static unsigned RVReg(unsigned Reg);
@@ -308,59 +321,20 @@ private:
 
   // Handle relocation.
   // Returns true if Rel was relocated.
-  llvm::Value *handleRelocation(llvm::raw_ostream &SS)
+  llvm::Value *handleRelocation(llvm::raw_ostream &SS);
+
+  void setRelInfo(unsigned Reg)
   {
-    // No more relocations exist
-    if (RI == RE)
-      return nullptr;
-
-    // Check if there is a relocation for current address
-    auto CurReloc = *RI;
-    if (CurReloc->offset() != CurAddr)
-      return nullptr;
-
-    llvm::StringRef SymbolName = CurReloc->symbol()->name();
-    llvm::StringRef RealSymbolName = SymbolName;
-    bool IsLO = false;
-    uint64_t Rel;
-    uint64_t Mask;
-    // %lo relocation
-    if (SymbolName == ".L0 ") {
-      IsLO = true;
-      Mask = 0xFFF;
-      // Real symbol info is at previous relocation
-      auto LastReloc = *(RI - 1);
-      Rel = LastReloc->symbol()->address();
-      RealSymbolName = LastReloc->symbol()->name();
-    // %hi relocation
-    } else {
-      Mask = 0xFFFFF000;
-      Rel = CurReloc->symbol()->address();
-    }
-    // Increment relocation iterator
-    ++RI;
-
-    // Write relocation string
-    if (IsLO)
-      SS << "%lo(";
+    if (IsRel)
+      XSyms[Reg] = RelSym;
     else
-      SS << "%hi(";
-    SS << RealSymbolName << ") = " << Rel;
+      XSyms[Reg] = "";
+  }
 
-    // Now add the relocation offset to ShadowImage to get the final address
-
-    // Get char * to memory
-    llvm::Value *V =
-      Builder->CreateGEP(ShadowImage, llvm::ConstantInt::get(I32, Rel));
-    updateFirst(V);
-
-    V = i8PtrToI32(V);
-
-    // Finally, get only the upper or lower part of the result
-    V = Builder->CreateAnd(V, llvm::ConstantInt::get(I32, Mask));
-    updateFirst(V);
-
-    return V;
+  void resetRelInfo(unsigned Reg)
+  {
+    IsRel = false;
+    XSyms[Reg] = "";
   }
 
 #if SBT_DEBUG

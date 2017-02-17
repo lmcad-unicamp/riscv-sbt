@@ -210,8 +210,8 @@ Relocation::Relocation(
   object::symbol_iterator I = Reloc.getSymbol();
   if (I != Obj->symbolEnd())
     Sym = Obj->symbol(*I);
-  else
-    DBGS << "Relocation: symbol info not found\n";
+  // else
+  //  DBGS << "Relocation: symbol info not found\n";
 }
 
 void Relocation::header(raw_ostream &OS)

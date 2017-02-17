@@ -5,7 +5,7 @@
 # 2: clean .s?
 define CLEAN
 clean-$(1):
-	rm -f $(1) $(1).o $$(if $(2),$(1).s,)
+	rm -f $(1) $(1).o $$(if $(2),$(1).s,) $(1).bc $(CLEAN_EXTRA)
 endef
 
 # RUN
@@ -76,10 +76,10 @@ endef
 # NBUILD: native build
 # 1: output module
 define NBUILD
-$(1).o: $(1).cpp
+$(1).o: $(1).cpp $(1).hpp
 	$(CXX) $(CXXFLAGS) -o $$@ -c $$<
 
-$(1): $(1).o $(1).hpp
+$(1): $(1).o
 	$(CXX) $(LDFLAGS) -o $$@ $$<
 
 $(call RUN,X86,$(1))

@@ -88,6 +88,11 @@ public:
     return Sec.isText();
   }
 
+  bool isData() const
+  {
+    return Sec.isData();
+  }
+
   std::error_code contents(llvm::StringRef &S) const
   {
     return Sec.getContents(S);
@@ -113,11 +118,23 @@ public:
   // get string representation
   std::string str() const;
 
+  uint64_t shadowOffs() const
+  {
+    return ShadowOffs;
+  }
+
+  // This needs to be set later...
+  void shadowOffs(uint64_t Offs) const
+  {
+    ShadowOffs = Offs;
+  }
+
 private:
   ConstObjectPtr Obj;
   llvm::object::SectionRef Sec;
   llvm::StringRef Name;
   ConstSymbolPtrVec Symbols;
+  mutable uint64_t ShadowOffs = 0;
 };
 
 /// Symbol
@@ -202,6 +219,11 @@ public:
   uint64_t offset() const
   {
     return Reloc.getOffset();
+  }
+
+  uint64_t type() const
+  {
+    return Reloc.getType();
   }
 
   // type name

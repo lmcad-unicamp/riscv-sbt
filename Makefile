@@ -452,6 +452,9 @@ update_files:
 	fi
 	$(UPDATE_FILE)
 
+lc:
+	cat $(TOPDIR)/sbt/*.h $(TOPDIR)/sbt/*.cpp | wc -l
+
 .PHONY: test
 test:
 	$(MAKE) $(SBT)-build1 $(SBT)-install

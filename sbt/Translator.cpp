@@ -16,6 +16,9 @@
 #define GET_REGINFO_ENUM
 #include <lib/Target/RISCVMaster/RISCVMasterGenRegisterInfo.inc>
 
+#include <algorithm>
+#include <vector>
+
 using namespace llvm;
 
 namespace sbt {
@@ -103,6 +106,7 @@ Error Translator::translate(const llvm::MCInst &Inst)
       Value *V = add(O1, O2);
       store(V, O);
 
+      resetRelInfo(O);
       dbgprint(SS);
       break;
     }
@@ -117,6 +121,7 @@ Error Translator::translate(const llvm::MCInst &Inst)
       Value *V = add(O1, O2);
       store(V, O);
 
+      setRelInfo(O);
       dbgprint(SS);
       break;
     }
@@ -138,6 +143,7 @@ Error Translator::translate(const llvm::MCInst &Inst)
 
       store(V, O);
 
+      setRelInfo(O);
       dbgprint(SS);
       break;
     }
@@ -158,6 +164,7 @@ Error Translator::translate(const llvm::MCInst &Inst)
       unsigned RD = getRD(Inst, SS);
       unsigned RS1 = getRegNum(1, Inst, SS);
       Value *Imm = getImm(Inst, 2, SS);
+      Value *V;
 
       // Check for 'return'
       if (RD == RV_ZERO &&
@@ -165,13 +172,29 @@ Error Translator::translate(const llvm::MCInst &Inst)
           isa<ConstantInt>(Imm) &&
           cast<ConstantInt>(Imm)->getValue() == 0)
       {
-        Builder->CreateRet(load(RV_A0));
-        break;
-      }
+        if (InMain)
+          V = Builder->CreateRet(load(RV_A0));
+        else
+          V = Builder->CreateRetVoid();
+        updateFirst(V);
 
-      // Value *Target = add(RS1, Imm);
-      // Target = Builder->CreateAnd(Target, ~1U);
-      // updateFirst(Target);
+      // External call
+      } else if (RD == RV_RA &&
+          isa<ConstantInt>(Imm) &&
+          cast<ConstantInt>(Imm)->getValue() == 0)
+      {
+        StringRef Sym = XSyms[RS1];
+        if (!Sym.empty()) {
+          V = call(Sym);
+          store(V, RD);
+        }
+      // Internal call
+      } else {
+        assert(false && "TODO implement Internal call");
+        // Value *Target = add(V, Imm);
+        // Target = Builder->CreateAnd(Target, ~1U);
+        // updateFirst(Target);
+      }
 
       dbgprint(SS);
       break;
@@ -193,6 +216,19 @@ Error Translator::translate(const llvm::MCInst &Inst)
 
       store(V, O);
 
+      setRelInfo(O);
+      dbgprint(SS);
+      break;
+    }
+
+    case RISCV::LUI: {
+      SS << "lui\t";
+
+      unsigned O = getRD(Inst, SS);
+      Value *Imm = getImm(Inst, 1, SS);
+      store(Imm, O);
+
+      setRelInfo(O);
       dbgprint(SS);
       break;
     }
@@ -268,6 +304,7 @@ Error Translator::startMain(StringRef Name, uint64_t Addr)
   StackEnd = i8PtrToI32(V);
 
   store(StackEnd, RV_SP);
+  InMain = true;
 
   return Error::success();
 }
@@ -292,6 +329,7 @@ Error Translator::finishFunction()
 {
   if (Builder->GetInsertBlock()->getTerminator() == nullptr)
     Builder->CreateRetVoid();
+  InMain = false;
   return Error::success();
 }
 
@@ -314,34 +352,35 @@ Error Translator::buildShadowImage()
 {
   SBTError SE;
 
-  // Assuming only one data section for now
-  // Get Data Section
-  ConstSectionPtr DS = nullptr;
+  std::vector<uint8_t> Vec;
   for (ConstSectionPtr Sec : CurObj->sections()) {
-    if (Sec->section().isData() && !Sec->isText()) {
-      DS = Sec;
-      break;
+    // Skip non text/data sections
+    if (!Sec->isText() && !Sec->isData())
+      continue;
+
+    // Read contents
+    StringRef Bytes;
+    std::error_code EC = Sec->contents(Bytes);
+    if (EC) {
+      SE  << __FUNCTION__ << ": failed to get section ["
+          << Sec->name() << "] contents";
+      return error(SE);
     }
+
+    // Set Shadow Offset of Section
+    Sec->shadowOffs(Vec.size());
+
+    ArrayRef<uint8_t> ByteArray(
+      reinterpret_cast<const uint8_t *>(Bytes.data()),
+      Bytes.size());
+
+    // Append to vector
+    for (size_t I = 0; I < Bytes.size(); I++)
+      Vec.push_back(Bytes[I]);
   }
 
-  if (!DS) {
-    SE << __FUNCTION__ << ": No Data Section found";
-    return error(SE);
-  }
-
-  StringRef Bytes;
-  std::error_code EC = DS->contents(Bytes);
-  if (EC) {
-    SE << __FUNCTION__ << ": failed to get section contents";
-    return error(SE);
-  }
-
-  ArrayRef<uint8_t> ByteArray(
-    reinterpret_cast<const uint8_t *>(Bytes.data()),
-    Bytes.size());
-
-  Constant *CDA = ConstantDataArray::get(*Context, ByteArray);
-
+  // Create the ShadowImage
+  Constant *CDA = ConstantDataArray::get(*Context, Vec);
   ShadowImage =
     new GlobalVariable(*Module, CDA->getType(), !CONSTANT,
       GlobalValue::ExternalLinkage, CDA, "ShadowMemory");
@@ -510,6 +549,103 @@ Error Translator::buildStack()
 
   return Error::success();
 }
+
+
+Value *Translator::call(StringRef Func)
+{
+  FunctionType *FT =
+    FunctionType::get(I32, { I32 }, !VAR_ARG);
+  Function *F =
+    Function::Create(FT, Function::ExternalLinkage, "puts", Module);
+
+  std::vector<Value *> Args = { load(RV_A0) };
+  Value *V = Builder->CreateCall(F, Args, F->getName());
+  updateFirst(V);
+  return V;
+}
+
+
+llvm::Value *Translator::handleRelocation(llvm::raw_ostream &SS)
+{
+  IsRel = false;
+
+  // No more relocations exist
+  if (RI == RE)
+    return nullptr;
+
+  // Check if there is a relocation for current address
+  auto CurReloc = *RI;
+  if (CurReloc->offset() != CurAddr)
+    return nullptr;
+
+  ConstSymbolPtr Sym = CurReloc->symbol();
+  llvm::StringRef SymbolName = Sym->name();
+  uint64_t Type = CurReloc->type();
+  ConstSectionPtr Sec = Sym->section();
+  bool IsLO = false;
+  uint64_t Rel = Sym->address();
+  uint64_t Mask;
+
+  // Add Section Offset (if any)
+  if (Sec)
+    Rel += Sec->shadowOffs();
+
+  switch (Type) {
+    case llvm::ELF::R_RISCV_PCREL_HI20:
+    case llvm::ELF::R_RISCV_HI20:
+      break;
+
+    // This rellocation has PC info only
+    // Symbol info is present on the PCREL_HI20 Reloc
+    case llvm::ELF::R_RISCV_PCREL_LO12_I:
+      IsLO = true;
+      Rel = (**RLast).symbol()->address();
+      Rel += (**RLast).section()->shadowOffs();
+      break;
+
+    case llvm::ELF::R_RISCV_LO12_I:
+      IsLO = true;
+      break;
+
+    default:
+      DBGS << "Relocation Type: " << Type << '\n';
+      llvm_unreachable("unknown relocation");
+  }
+
+  // Increment relocation iterator
+  do {
+    ++RI;
+  } while (RI != RE && (**RI).offset() == CurAddr);
+
+  // Write relocation string
+  if (IsLO) {
+    Mask = 0xFFF;
+    SS << "%lo(";
+  } else {
+    Mask = 0xFFFFF000;
+    SS << "%hi(";
+  }
+  SS << SymbolName << ") = " << Rel;
+
+  // Now add the relocation offset to ShadowImage to get the final address
+
+  // Get char * to memory
+  std::vector<llvm::Value *> Idx = { ZERO, llvm::ConstantInt::get(I32, Rel) };
+  llvm::Value *V =
+    Builder->CreateGEP(ShadowImage, Idx);
+  updateFirst(V);
+
+  V = i8PtrToI32(V);
+
+  // Finally, get only the upper or lower part of the result
+  V = Builder->CreateAnd(V, llvm::ConstantInt::get(I32, Mask));
+  updateFirst(V);
+
+  IsRel = true;
+  RelSym = SymbolName;
+  return V;
+}
+
 
 #if SBT_DEBUG
 static std::string getMDName(const llvm::StringRef &S)
