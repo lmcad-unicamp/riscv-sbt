@@ -191,9 +191,11 @@ Error Translator::translate(const llvm::MCInst &Inst)
           if (!ExpV)
             return ExpV.takeError();
           V = *ExpV;
-          store(V, RD);
+          if (!V->getType()->isVoidTy())
+            store(V, RV_A0);
         }
-      // Internal call
+
+      // TODO Internal call
       } else {
         assert(false && "TODO implement Internal call");
         // Value *Target = add(V, Imm);
@@ -629,7 +631,11 @@ Expected<Value *> Translator::call(StringRef Func)
       Args.push_back(load(Reg));
   }
 
-  Value *V = Builder->CreateCall(F, Args, F->getName());
+  Value *V;
+  if (F->getReturnType()->isVoidTy())
+    V = Builder->CreateCall(F, Args);
+  else
+    V = Builder->CreateCall(F, Args, F->getName());
   updateFirst(V);
   return V;
 }
