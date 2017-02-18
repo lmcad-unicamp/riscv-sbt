@@ -167,6 +167,7 @@ private:
   llvm::Value *X[32];
   llvm::FunctionType *FTRVSC;
   llvm::Function *FRVSC;
+  std::unique_ptr<llvm::Module> LCModule;
 
   uint64_t CurAddr;
   ConstObjectPtr CurObj = nullptr;
@@ -241,7 +242,7 @@ private:
     return V;
   }
 
-  llvm::Value *call(llvm::StringRef Func);
+  llvm::Expected<llvm::Value *> call(llvm::StringRef Func);
 
   // Get RISC-V register number
   static unsigned RVReg(unsigned Reg);

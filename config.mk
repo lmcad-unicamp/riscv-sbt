@@ -57,10 +57,12 @@ RV32_SYSROOT_FLAG := -isysroot $(RV32_SYSROOT) \
                      -isystem $(RV32_SYSROOT)/include
 RV32_CLANG_FLAGS  := --target=riscv32 -mriscv=RV32IAMFD \
                      $(RV32_SYSROOT_FLAG)
-RV32_LIB  := $(TOOLCHAIN_RELEASE)/$(RV32_TRIPLE)/lib
-RV32_CRT0 := $(RV32_LIB)/crt0.o
-RV32_LD_FLAGS0 := -L$(RV32_LIB) -dT ldscripts/elf32lriscv.x $(RV32_CRT0)
-RV32_LD_FLAGS1 := -lc -lgloss -lc
+RV32_LIB      := $(TOOLCHAIN_RELEASE)/$(RV32_TRIPLE)/lib
+RV32_LIB_GCC  := $(TOOLCHAIN_RELEASE)/lib/gcc/$(RV32_TRIPLE)/7.0.0
+RV32_CRT0     := $(RV32_LIB)/crt0.o
+RV32_LD_FLAGS0 := -L$(RV32_LIB) -L$(RV32_LIB_GCC) \
+                  -dT ldscripts/elf32lriscv.x $(RV32_CRT0)
+RV32_LD_FLAGS1 := -lc -lgloss -lc -lgcc
 
 # x86
 X86_CLANG       := $(CLANG)

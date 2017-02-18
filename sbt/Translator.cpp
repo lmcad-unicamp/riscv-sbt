@@ -3,12 +3,14 @@
 #include "SBTError.h"
 #include "Utils.h"
 
+#include <llvm/Bitcode/BitcodeReader.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/Object/ObjectFile.h>
 #include <llvm/Support/FormatVariadic.h>
+#include <llvm/Support/MemoryBuffer.h>
 
 // LLVM internal instruction info
 #define GET_INSTRINFO_ENUM
@@ -185,7 +187,10 @@ Error Translator::translate(const llvm::MCInst &Inst)
       {
         StringRef Sym = XSyms[RS1];
         if (!Sym.empty()) {
-          V = call(Sym);
+          auto ExpV = call(Sym);
+          if (!ExpV)
+            return ExpV.takeError();
+          V = *ExpV;
           store(V, RD);
         }
       // Internal call
@@ -567,14 +572,63 @@ Error Translator::buildStack()
 }
 
 
-Value *Translator::call(StringRef Func)
+Expected<Value *> Translator::call(StringRef Func)
 {
-  FunctionType *FT =
-    FunctionType::get(I32, { I32 }, !VAR_ARG);
-  Function *F =
-    Function::Create(FT, Function::ExternalLinkage, "puts", Module);
+  // Load LibC module
+  if (!LCModule) {
+    auto Res = MemoryBuffer::getFile(*LIBC_BC);
+    if (!Res)
+      return errorCodeToError(Res.getError());
+    MemoryBufferRef Buf = **Res;
 
-  std::vector<Value *> Args = { load(RV_A0) };
+    auto ExpMod = parseBitcodeFile(Buf, *Context);
+    if (!ExpMod)
+      return ExpMod.takeError();
+    LCModule = std::move(*ExpMod);
+  }
+
+  Function *F = Module->getFunction(Func);
+  // "Import" function from LibC module if not found
+  if (!F) {
+    Function *LCF = LCModule->getFunction(Func);
+    if (!LCF) {
+      SBTError SE;
+      SE << "Function not found: " << Func;
+      return error(SE);
+    }
+
+    F = Function::Create(LCF->getFunctionType(),
+          Function::ExternalLinkage, LCF->getName(), Module);
+  }
+
+  const auto &ArgList = F->getArgumentList();
+
+  std::vector<Value *> Args;
+  size_t N = F->arg_size();
+  assert(N < 9 &&
+      "External functions with more than 8 arguments are not supported!");
+
+  unsigned Reg = RV_A0;
+  for (const auto &Arg : ArgList) {
+    Value *V = load(Reg++);
+    Type *Ty = Arg.getType();
+
+    // need to cast?
+    if (Ty != I32) {
+      V = Builder->CreateBitOrPointerCast(V, Ty);
+      updateFirst(V);
+    }
+
+    Args.push_back(V);
+  }
+
+  // VarArgs: passing 4 extra args for now
+  if (F->isVarArg()) {
+    unsigned LastReg = MIN(Reg + 3, RV_A7);
+    for (; Reg <= LastReg; Reg++)
+      Args.push_back(load(Reg));
+  }
+
   Value *V = Builder->CreateCall(F, Args, F->getName());
   updateFirst(V);
   return V;

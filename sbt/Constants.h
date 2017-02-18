@@ -9,6 +9,7 @@ namespace sbt {
 
 // name of the SBT binary/executable
 extern const std::string *BIN_NAME;
+extern const std::string *LIBC_BC;
 
 // (these are only the make the code easier to read)
 static const bool ADD_NULL = true;
