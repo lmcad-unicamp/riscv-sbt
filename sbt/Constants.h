@@ -17,6 +17,7 @@ static const bool ERROR = true;
 static const bool SIGNED = true;
 static const bool VAR_ARG = true;
 static const bool VOLATILE = true;
+static const char nl = '\n';
 
 void initConstants();
 void destroyConstants();

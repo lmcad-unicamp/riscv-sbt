@@ -48,7 +48,6 @@ namespace sbt {
 
 void SBT::init()
 {
-  initConstants();
   Object::init();
 
   // Print stack trace if we signal out.
@@ -74,7 +73,6 @@ void SBT::finish()
 {
   llvm_shutdown();
   Object::finish();
-  destroyConstants();
 }
 
 Expected<SBT> SBT::create(
@@ -82,6 +80,7 @@ Expected<SBT> SBT::create(
     const std::string &OutputFile)
 {
   Error Err = Error::success();
+  llvm::consumeError(std::move(Err));
   SBT S(InputFiles, OutputFile, Err);
   if (Err)
     return std::move(Err);
@@ -102,7 +101,7 @@ SBT::SBT(
   for (auto File : InputFilesList) {
     if (!sys::fs::exists(File)) {
       SBTError SE(File);
-      SE << "No such file.\n";
+      SE << "No such file.";
       E = error(SE);
       return;
     }
@@ -123,14 +122,14 @@ SBT::SBT(
   Target = &getTheRISCVMaster32Target();
   // Target = TargetRegistry::lookupTarget(TripleName, StrError);
   if (!Target) {
-    SE << "Target not found: " << TripleName << ": " << StrError << "\n";
+    SE << "Target not found: " << TripleName << ": " << StrError;
     error(SE);
     return;
   }
 
   MRI.reset(Target->createMCRegInfo(TripleName));
   if (!MRI) {
-    SE << "No register info for target " << TripleName << "\n";
+    SE << "No register info for target " << TripleName;
     error(SE);
     return;
   }
@@ -138,7 +137,7 @@ SBT::SBT(
   // Set up disassembler.
   AsmInfo.reset(Target->createMCAsmInfo(*MRI, TripleName));
   if (!AsmInfo) {
-    SE << "No assembly info for target " << TripleName << "\n";
+    SE << "No assembly info for target " << TripleName;
     error(SE);
     return;
   }
@@ -147,7 +146,7 @@ SBT::SBT(
   STI.reset(
       Target->createMCSubtargetInfo(TripleName, "", Features.getString()));
   if (!STI) {
-    SE << "No subtarget info for target " << TripleName << "\n";
+    SE << "No subtarget info for target " << TripleName;
     error(SE);
     return;
   }
@@ -156,13 +155,13 @@ SBT::SBT(
   MC.reset(new MCContext(AsmInfo.get(), MRI.get(), MOFI.get()));
   DisAsm.reset(Target->createMCDisassembler(*STI, *MC));
   if (!DisAsm) {
-    SE << "No disassembler for target " << TripleName << "\n";
+    SE << "No disassembler for target " << TripleName;
     error(SE);
   }
 
   MII.reset(Target->createMCInstrInfo());
   if (!MII) {
-    SE << "No instruction info for target " << TripleName << "\n";
+    SE << "No instruction info for target " << TripleName;
     error(SE);
     return;
   }
@@ -170,7 +169,7 @@ SBT::SBT(
   InstPrinter.reset(
     Target->createMCInstPrinter(Triple, 0, *AsmInfo, *MII, *MRI));
   if (!InstPrinter) {
-    SE << "No instruction printer for target " << TripleName << "\n";
+    SE << "No instruction printer for target " << TripleName;
     error(SE);
     return;
   }
@@ -306,7 +305,7 @@ Error SBT::translate(const std::string &File)
           if (E)
             return E;
         } else {
-          SE << "Invalid instruction encoding\n";
+          SE << "Invalid instruction encoding";
           return error(SE);
         }
 
@@ -380,6 +379,14 @@ Error SBT::genHello()
   return Error::success();
 }
 
+Error SBT::genSCHandler()
+{
+  if (auto E = SBTTranslator->genSCHandler())
+    return E;
+  write();
+  return Error::success();
+}
+
 ///
 
 struct SBTFinish
@@ -395,8 +402,6 @@ static void handleError(Error &&E)
   Error E2 = llvm::handleErrors(std::move(E),
     [](const SBTError &SE) {
       SE.log(errs());
-      errs() << "\n";
-      errs().flush();
       std::exit(EXIT_FAILURE);
     });
 
@@ -429,19 +434,47 @@ int main(int argc, char *argv[])
 {
   test();
 
+  // initialize constants
+  sbt::initConstants();
+  struct DestroyConstants {
+    ~DestroyConstants() {
+      sbt::destroyConstants();
+    }
+  } DestroyConstants;
+
   // options
   cl::list<std::string> InputFiles(
       cl::Positional,
       cl::desc("<input object files>"),
-      cl::OneOrMore);
+      cl::ZeroOrMore);
 
   cl::opt<std::string> OutputFileOpt(
       "o",
       cl::desc("output filename"));
 
+  cl::opt<bool> GenSCHandlerOpt(
+      "gen-sc-handler",
+      cl::desc("generate syscall handler"));
+
   // parse args
   cl::ParseCommandLineOptions(argc, argv);
 
+  // gen syscall handlers
+  if (GenSCHandlerOpt) {
+    if (OutputFileOpt.empty()) {
+      errs() << *sbt::BIN_NAME
+        << ": Output file not specified.\n";
+      return 1;
+    }
+  // translate
+  } else {
+    if (InputFiles.empty()) {
+      errs() << *sbt::BIN_NAME << ": No input files.\n";
+      return 1;
+    }
+  }
+
+  // set output file
   std::string OutputFile;
   if (OutputFileOpt.empty()) {
     OutputFile = "x86-" + InputFiles.front();
@@ -461,7 +494,11 @@ int main(int argc, char *argv[])
   sbt::SBT &SBT = Exp.get();
 
   // translate files
-  sbt::handleError(SBT.run());
+  if (GenSCHandlerOpt) {
+    sbt::handleError(SBT.genSCHandler());
+    return EXIT_SUCCESS;
+  } else
+    sbt::handleError(SBT.run());
 
   // dump resulting IR
   SBT.dump();

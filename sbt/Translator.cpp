@@ -253,8 +253,7 @@ Error Translator::translate(const llvm::MCInst &Inst)
     }
 
     default: {
-      SE << "Unknown instruction opcode: "
-         << Inst.getOpcode() << "\n";
+      SE << "Unknown instruction opcode: " << Inst.getOpcode();
       return error(SE);
     }
   }
@@ -264,12 +263,23 @@ Error Translator::translate(const llvm::MCInst &Inst)
 
 Error Translator::startModule()
 {
-  buildRegisterFile();
-
-  if (Error E = buildShadowImage())
+  if (auto E = declRegisterFile())
     return E;
 
-  if (Error E = buildStack())
+  if (auto E = buildShadowImage())
+    return E;
+
+  if (auto E = buildStack())
+    return E;
+
+  declSyscallHandler();
+
+  return Error::success();
+}
+
+Error Translator::genSCHandler()
+{
+  if (auto E = buildRegisterFile())
     return E;
 
   if (Error E = genSyscallHandler())
@@ -333,19 +343,21 @@ Error Translator::finishFunction()
   return Error::success();
 }
 
-void Translator::buildRegisterFile()
+Error Translator::declOrBuildRegisterFile(bool decl)
 {
   Constant *X0 = ConstantInt::get(I32, 0u);
   X[0] = new GlobalVariable(*Module, I32, CONSTANT,
-    GlobalValue::ExternalLinkage, X0, IR_XREGNAME + "0");
+    GlobalValue::ExternalLinkage, decl? nullptr : X0, IR_XREGNAME + "0");
 
   for (int I = 1; I < 32; ++I) {
     std::string S;
     raw_string_ostream SS(S);
     SS << IR_XREGNAME << I;
     X[I] = new GlobalVariable(*Module, I32, !CONSTANT,
-        GlobalValue::ExternalLinkage, X0, SS.str());
+        GlobalValue::ExternalLinkage, decl? nullptr : X0, SS.str());
   }
+
+  return Error::success();
 }
 
 Error Translator::buildShadowImage()
@@ -386,6 +398,13 @@ Error Translator::buildShadowImage()
       GlobalValue::ExternalLinkage, CDA, "ShadowMemory");
 
   return Error::success();
+}
+
+void Translator::declSyscallHandler()
+{
+  FTRVSC = FunctionType::get(I32, { I32 }, !VAR_ARG);
+  FRVSC =
+    Function::Create(FTRVSC, Function::ExternalLinkage, "rv_syscall", Module);
 }
 
 Error Translator::genSyscallHandler()
@@ -432,10 +451,7 @@ Error Translator::genSyscallHandler()
   const std::string BBPrefix = "bb_rvsc_";
   First = nullptr;
 
-  // Define rv_syscall function
-  FTRVSC = FunctionType::get(I32, { I32 }, !VAR_ARG);
-  FRVSC =
-    Function::Create(FTRVSC, Function::ExternalLinkage, "rv_syscall", Module);
+  declSyscallHandler();
 
   // Entry
   BasicBlock *BBEntry = BasicBlock::Create(*Context, BBPrefix + "entry", FRVSC);

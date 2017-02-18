@@ -118,6 +118,8 @@ public:
   Translator(Translator &&) = default;
   Translator(const Translator &) = delete;
 
+  llvm::Error genSCHandler();
+
   // translate one instruction
   llvm::Error translate(const llvm::MCInst &Inst);
 
@@ -188,8 +190,20 @@ private:
 
 
   // Methods
-  void buildRegisterFile();
+  llvm::Error declOrBuildRegisterFile(bool decl);
+
+  llvm::Error declRegisterFile()
+  {
+    return declOrBuildRegisterFile(true);
+  }
+
+  llvm::Error buildRegisterFile()
+  {
+    return declOrBuildRegisterFile(false);
+  }
+
   llvm::Error buildShadowImage();
+  void declSyscallHandler();
   llvm::Error genSyscallHandler();
   llvm::Error buildStack();
 

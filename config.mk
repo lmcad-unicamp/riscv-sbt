@@ -5,6 +5,12 @@ CFLAGS    = -Wall -Werror -O2
 CXXFLAGS  = $(CFLAGS) -std=c++11
 MAKE_OPTS ?= -j9
 
+# toolchain
+TOOLCHAIN         := $(TOPDIR)/toolchain
+TOOLCHAIN_RELEASE := $(TOOLCHAIN)/release
+TOOLCHAIN_DEBUG   := $(TOOLCHAIN)/debug
+TOOLCHAIN_X86     := $(TOOLCHAIN)/x86
+
 # build type
 BUILD_TYPE ?= Debug
 ifeq ($(BUILD_TYPE),Debug)
@@ -13,18 +19,15 @@ else
   BUILD_TYPE_DIR := release
 endif
 
-# SBT
-SBT_BUILD_DIR := $(TOPDIR)/build/sbt/$(BUILD_TYPE_DIR)
-X86_SYSCALL_O := $(SBT_BUILD_DIR)/CMakeFiles/x86_syscall.dir/x86_syscall.s.o
+TOOLCHAIN_DIR  := $(TOOLCHAIN)/$(BUILD_TYPE_DIR)
 
 #
 # tools
 #
 
-TOOLCHAIN         := $(TOPDIR)/toolchain
-TOOLCHAIN_RELEASE := $(TOOLCHAIN)/release
-TOOLCHAIN_DEBUG   := $(TOOLCHAIN)/debug
-TOOLCHAIN_X86     := $(TOOLCHAIN)/x86
+SBT_SHARE_DIR := $(TOOLCHAIN_DIR)/share/riscv-sbt
+X86_SYSCALL_O := $(SBT_SHARE_DIR)/x86-syscall.o
+X86_RVSC_O    := $(SBT_SHARE_DIR)/x86-rvsc.o
 
 RV32_TRIPLE   := riscv32-unknown-elf
 RV64_TRIPLE   := riscv64-unknown-elf

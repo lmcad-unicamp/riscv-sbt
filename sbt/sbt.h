@@ -57,6 +57,8 @@ public:
   // write generated IR to output file
   void write();
 
+  llvm::Error genSCHandler();
+
 private:
   std::vector<std::string> InputFiles;
   std::string OutputFile;

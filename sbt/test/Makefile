@@ -2,7 +2,6 @@ include $(TOPDIR)/config.mk
 
 ### config ####
 
-X86_LIBS = $(X86_SYSCALL_O)
 CXXFLAGS = -m32 -Wall -Werror -O0 -g -std=c++11 -pedantic
 LDFLAGS  = -m32
 
@@ -33,17 +32,20 @@ rv32-x86-hello.bc: rv32-hello.o
 rv32-x86-hello.s: rv32-x86-hello.bc
 	llc -O3 -o $@ -march x86 $<
 
+X86_LIBS = $(X86_SYSCALL_O) $(X86_RVSC_O)
 CLEAN_EXTRA = rv32-x86-hello.s
 $(eval $(call BUILD,X86,rv32-x86-hello))
+X86_LIBS =
 CLEAN_EXTRA =
 
 ### x86-test-syscall ###
 
+X86_LIBS = $(X86_SYSCALL_O)
 $(eval $(call BUILD,X86,x86-test-syscall))
+X86_LIBS =
 
 ### main ###
 
-X86_LIBS =
 $(eval $(call BUILD,X86,x86-main,CLANG,main))
 $(eval $(call BUILD,RV32,rv32-main,CLANG,main))
 
@@ -53,11 +55,12 @@ rv32-x86-main.bc: rv32-main.o
 rv32-x86-main.s: rv32-x86-main.bc
 	llc -O3 -o $@ -march x86 $<
 
-X86_LIBS = $(X86_SYSCALL_O)
+X86_LIBS = $(X86_SYSCALL_O) $(X86_RVSC_O)
 $(eval $(call AS,X86,rv32-x86-main))
 $(eval $(call CLINK,X86,rv32-x86-main))
 $(eval $(call RUN,X86,rv32-x86-main))
 $(eval $(call CLEAN,rv32-x86-main,all))
+X86_LIBS =
 
 ###
 
