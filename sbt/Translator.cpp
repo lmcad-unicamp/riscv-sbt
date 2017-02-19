@@ -606,8 +606,7 @@ Expected<Value *> Translator::call(StringRef Func)
   const auto &ArgList = F->getArgumentList();
 
   std::vector<Value *> Args;
-  size_t N = F->arg_size();
-  assert(N < 9 &&
+  assert(F->arg_size() < 9 &&
       "External functions with more than 8 arguments are not supported!");
 
   unsigned Reg = RV_A0;

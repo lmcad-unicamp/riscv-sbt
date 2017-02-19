@@ -21,7 +21,12 @@ void initConstants()
     // get dir
     P1 = Path.find_first_of(':', P0);
     std::string Dir = Path.substr(P0, P1);
-    P0 = P1;
+    if (P1 == std::string::npos)
+      P0 = P1;
+    else if (P1 == Path.size() - 1)
+      P0 = std::string::npos;
+    else
+      P0 = P1 + 1;
     if (Dir.empty())
       continue;
 
@@ -42,7 +47,7 @@ void initConstants()
       LIBC_BC = new std::string(LibCBC);
       break;
     }
-  } while (P1 != std::string::npos);
+  } while (P0 != std::string::npos);
 
   // Note: LIBC_BC can be NULL if it was not found above
 }
