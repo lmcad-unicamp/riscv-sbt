@@ -18,9 +18,20 @@ void initConstants()
   size_t P1 = 0;
   // for each PATH dir
   do {
-    // get dir
+    // find next :
     P1 = Path.find_first_of(':', P0);
-    std::string Dir = Path.substr(P0, P1);
+
+    // get len
+    size_t Len;
+    if (P1 == std::string::npos)
+      Len = P1;
+    else
+      Len = P1 - P0;
+
+    // get dir
+    std::string Dir = Path.substr(P0, Len);
+
+    // update P0
     if (P1 == std::string::npos)
       P0 = P1;
     else if (P1 == Path.size() - 1)

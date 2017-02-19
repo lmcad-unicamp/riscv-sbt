@@ -31,7 +31,11 @@ Translator::Translator(
   llvm::Module *Mod)
   :
   I32(Type::getInt32Ty(*Ctx)),
+  I16(Type::getInt32Ty(*Ctx)),
+  I8(Type::getInt32Ty(*Ctx)),
   I32Ptr(Type::getInt32PtrTy(*Ctx)),
+  I16Ptr(Type::getInt32PtrTy(*Ctx)),
+  I8Ptr(Type::getInt8PtrTy(*Ctx)),
   ZERO(ConstantInt::get(I32, 0)),
   Context(Ctx),
   Builder(Bldr),
@@ -96,6 +100,13 @@ Error Translator::translate(const llvm::MCInst &Inst)
 #endif
   SS << formatv("{0:X-4}:   ", CurAddr);
 
+  if (NextBB && CurAddr == NextBB) {
+    BasicBlock **BB = BBS[CurAddr];
+    assert(BB && "BasicBlock not found!");
+    Builder->CreateBr(*BB);
+    Builder->SetInsertPoint(*BB);
+  }
+
   switch (Inst.getOpcode())
   {
     case RISCV::ADD: {
@@ -149,6 +160,11 @@ Error Translator::translate(const llvm::MCInst &Inst)
       dbgprint(SS);
       break;
     }
+
+    case RISCV::BEQ:
+      if (auto E = translateBranch(Inst, BEQ, SS))
+        return E;
+      break;
 
     case RISCV::ECALL: {
       SS << "ecall";
@@ -207,33 +223,30 @@ Error Translator::translate(const llvm::MCInst &Inst)
       break;
     }
 
-    case RISCV::LW: {
-      SS << "lw\t";
-
-      unsigned O = getRD(Inst, SS);
-      Value *RS1 = getReg(Inst, 1, SS);
-      Value *Imm = getImm(Inst, 2, SS);
-
-      Value *V = add(RS1, Imm);
-      Value *Ptr = Builder->CreateCast(
-        llvm::Instruction::CastOps::IntToPtr, V, I32Ptr);
-      updateFirst(Ptr);
-      V = Builder->CreateLoad(Ptr);
-      updateFirst(V);
-
-      store(V, O);
-
-      setRelInfo(O);
-      dbgprint(SS);
+    case RISCV::LBU:
+      if (auto E = translateLoad(Inst, U8, SS))
+        return E;
       break;
-    }
+
+    case RISCV::LW:
+      if (auto E = translateLoad(Inst, U32, SS))
+        return E;
+      break;
 
     case RISCV::LUI: {
       SS << "lui\t";
 
       unsigned O = getRD(Inst, SS);
       Value *Imm = getImm(Inst, 1, SS);
-      store(Imm, O);
+
+      Value *V;
+      if (IsRel)
+        V = Imm;
+      else {
+        V = Builder->CreateShl(Imm, ConstantInt::get(I32, 12));
+        updateFirst(V);
+      }
+      store(V, O);
 
       setRelInfo(O);
       dbgprint(SS);
@@ -309,8 +322,7 @@ Error Translator::startMain(StringRef Name, uint64_t Addr)
     Function::Create(FT, Function::ExternalLinkage, Name, Module);
 
   // BB
-  Twine BBName = Twine("bb").concat(Twine::utohexstr(Addr));
-  BasicBlock *BB = BasicBlock::Create(*Context, BBName, F);
+  BasicBlock *BB = BasicBlock::Create(*Context, getBBName(Addr), F);
   Builder->SetInsertPoint(BB);
 
   // Set stack pointer.
@@ -335,8 +347,7 @@ Error Translator::startFunction(StringRef Name, uint64_t Addr)
     Function::Create(FT, Function::ExternalLinkage, Name, Module);
 
   // BB
-  Twine BBName = Twine("bb").concat(Twine::utohexstr(Addr));
-  BasicBlock *BB = BasicBlock::Create(*Context, BBName, F);
+  BasicBlock *BB = BasicBlock::Create(*Context, getBBName(Addr), F);
   Builder->SetInsertPoint(BB);
 
   return Error::success();
@@ -578,6 +589,12 @@ Expected<Value *> Translator::call(StringRef Func)
 {
   // Load LibC module
   if (!LCModule) {
+    if (!LIBC_BC) {
+      SBTError SE;
+      SE << "libc.bc file not found";
+      return error(SE);
+    }
+
     auto Res = MemoryBuffer::getFile(*LIBC_BC);
     if (!Res)
       return errorCodeToError(Res.getError());
@@ -719,6 +736,151 @@ llvm::Value *Translator::handleRelocation(llvm::raw_ostream &SS)
   IsRel = true;
   RelSym = SymbolName;
   return V;
+}
+
+
+Error Translator::translateLoad(
+  const llvm::MCInst &Inst,
+  IntType IT,
+  llvm::raw_string_ostream &SS)
+{
+  switch (IT) {
+    case U8:
+      SS << "lbu";
+      break;
+
+    case U16:
+      SS << "lhu";
+      break;
+
+    case U32:
+      SS << "lw";
+      break;
+  }
+  SS << '\t';
+
+  unsigned O = getRD(Inst, SS);
+  Value *RS1 = getReg(Inst, 1, SS);
+  Value *Imm = getImm(Inst, 2, SS);
+
+  Value *V = add(RS1, Imm);
+
+  Value *Ptr;
+  switch (IT) {
+    case U8:
+      Ptr = Builder->CreateCast(
+        llvm::Instruction::CastOps::IntToPtr, V, I8Ptr);
+      break;
+
+    case U16:
+      Ptr = Builder->CreateCast(
+        llvm::Instruction::CastOps::IntToPtr, V, I16Ptr);
+      break;
+
+    case U32:
+      Ptr = Builder->CreateCast(
+        llvm::Instruction::CastOps::IntToPtr, V, I32Ptr);
+      break;
+  }
+  updateFirst(Ptr);
+
+  V = Builder->CreateLoad(Ptr);
+  updateFirst(V);
+
+  // to int32
+  switch (IT) {
+    case U8:
+    case U16:
+      V = Builder->CreateZExt(V, I32);
+      updateFirst(V);
+      break;
+
+    case U32:
+      break;
+  }
+  store(V, O);
+
+  setRelInfo(O);
+  dbgprint(SS);
+  return Error::success();
+}
+
+
+llvm::Error Translator::translateBranch(
+  const llvm::MCInst &Inst,
+  BranchType BT,
+  llvm::raw_string_ostream &SS)
+{
+  // Inst print
+  switch (BT) {
+    case BEQ:
+      SS << "beq";
+      break;
+  }
+  SS << '\t';
+
+  // get ops
+  Value *RS1 = getReg(Inst, 0, SS);
+  Value *RS2 = getReg(Inst, 1, SS);
+  Value *Imm = getImm(Inst, 2, SS);
+
+  // get target
+
+  // << 1
+  // Imm = Builder->CreateShl(Imm, ConstantInt::get(I32, 1));
+  // updateFirst(Imm);
+
+  // + PC
+  int64_t BV = cast<ConstantInt>(Imm)->getSExtValue();
+  uint64_t Target;
+  if (BV >= 0) {
+    Target = static_cast<uint64_t>(BV) + CurAddr;
+  } else {
+    SBTError SE;
+    SE << "TODO Support negative branches";
+    return error(SE);
+  }
+
+  // Get current function
+  const Function *CF = Builder->GetInsertBlock()->getParent();
+  Function *F = Module->getFunction(CF->getName());
+
+  // Next BB
+  BasicBlock *Next = BasicBlock::Create(*Context, getBBName(CurAddr + 4), F);
+
+  // Target BB
+  BasicBlock *BeforeBB = nullptr;
+  typedef decltype(BBS) BBSType;
+  typedef BBSType::Item Item;
+  auto Iter = std::lower_bound(BBS.begin(), BBS.end(), Target,
+      [](const Item& a, uint64_t b){ return a.IKey < b; });
+  if (Iter != BBS.end())
+    BeforeBB = Iter->IVal;
+
+  BasicBlock *BB = BasicBlock::Create(*Context, getBBName(Target), F, BeforeBB);
+  BBS(Target, std::move(BB));
+
+  if (Target < NextBB || NextBB < CurAddr)
+    NextBB = Target;
+
+  // Evaluate condition
+  Value *Cond;
+  switch (BT) {
+    case BEQ:
+      Cond = Builder->CreateICmpEQ(RS1, RS2);
+      break;
+  }
+  updateFirst(Cond);
+
+  // Branch
+  Value *V = Builder->CreateCondBr(Cond, BB, Next);
+  updateFirst(V);
+
+  // Use next BB
+  Builder->SetInsertPoint(Next);
+
+  dbgprint(SS);
+  return Error::success();
 }
 
 

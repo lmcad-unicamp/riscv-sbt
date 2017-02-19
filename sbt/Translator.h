@@ -2,6 +2,7 @@
 #define SBT_TRANSLATOR_H
 
 #include "Constants.h"
+#include "Map.h"
 #include "Object.h"
 #include "SBTError.h"
 
@@ -156,7 +157,11 @@ public:
 private:
   // Constants
   llvm::IntegerType *I32;
+  llvm::IntegerType *I16;
+  llvm::IntegerType *I8;
   llvm::Type *I32Ptr;
+  llvm::Type *I16Ptr;
+  llvm::Type *I8Ptr;
   llvm::Value *ZERO;
   const std::string IR_XREGNAME = "x";
 
@@ -188,6 +193,9 @@ private:
   std::string XSyms[32];
 
   bool InMain = false;
+
+  Map<uint64_t, llvm::BasicBlock *> BBS;
+  uint64_t NextBB = 0;
 
 
   // Methods
@@ -351,6 +359,35 @@ private:
     IsRel = false;
     XSyms[Reg] = "";
   }
+
+  static std::string getBBName(uint64_t Addr)
+  {
+    std::string BBName = "bb";
+    llvm::raw_string_ostream SS(BBName);
+    SS << llvm::Twine::utohexstr(Addr);
+    SS.flush();
+    return BBName;
+  }
+
+  enum IntType {
+    U8,
+    U16,
+    U32
+  };
+
+  llvm::Error translateLoad(
+    const llvm::MCInst &Inst,
+    IntType IT,
+    llvm::raw_string_ostream &SS);
+
+  enum BranchType {
+    BEQ
+  };
+
+  llvm::Error translateBranch(
+    const llvm::MCInst &Inst,
+    BranchType BT,
+    llvm::raw_string_ostream &SS);
 
 #if SBT_DEBUG
   // Add RV Inst metadata and print it in debug mode

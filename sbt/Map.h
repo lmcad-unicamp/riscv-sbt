@@ -44,6 +44,7 @@ public:
 
   typedef std::vector<Item> Vec;
   typedef typename Vec::const_iterator CIter;
+  typedef typename Vec::iterator Iter;
 
   Map() = default;
 
@@ -82,6 +83,16 @@ public:
   }
 
   CIter end() const
+  {
+    return Data.end();
+  }
+
+  Iter begin()
+  {
+    return Data.begin();
+  }
+
+  Iter end()
   {
     return Data.end();
   }
