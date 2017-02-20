@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-char v = 2;
+char v = 0;
 
 int main()
 {

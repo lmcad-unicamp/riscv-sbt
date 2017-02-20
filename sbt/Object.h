@@ -93,6 +93,11 @@ public:
     return Sec.isData();
   }
 
+  bool isBSS() const
+  {
+    return Sec.isBSS();
+  }
+
   std::error_code contents(llvm::StringRef &S) const
   {
     return Sec.getContents(S);

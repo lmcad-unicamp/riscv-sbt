@@ -21,6 +21,9 @@
 #include <algorithm>
 #include <vector>
 
+#undef NDEBUG
+#include <cassert>
+
 using namespace llvm;
 
 namespace sbt {
@@ -385,24 +388,29 @@ Error Translator::buildShadowImage()
   std::vector<uint8_t> Vec;
   for (ConstSectionPtr Sec : CurObj->sections()) {
     // Skip non text/data sections
-    if (!Sec->isText() && !Sec->isData())
+    if (!Sec->isText() && !Sec->isData() && !Sec->isBSS())
       continue;
 
-    // Read contents
     StringRef Bytes;
-    std::error_code EC = Sec->contents(Bytes);
-    if (EC) {
-      SE  << __FUNCTION__ << ": failed to get section ["
-          << Sec->name() << "] contents";
-      return error(SE);
+    std::string Z;
+    // .bss
+    if (Sec->isBSS()) {
+      Z = std::string(Sec->size(), 0);
+      Bytes = Z;
+
+    // !.bss
+    } else {
+      // Read contents
+      std::error_code EC = Sec->contents(Bytes);
+      if (EC) {
+        SE  << __FUNCTION__ << ": failed to get section ["
+            << Sec->name() << "] contents";
+        return error(SE);
+      }
     }
 
     // Set Shadow Offset of Section
     Sec->shadowOffs(Vec.size());
-
-    ArrayRef<uint8_t> ByteArray(
-      reinterpret_cast<const uint8_t *>(Bytes.data()),
-      Bytes.size());
 
     // Append to vector
     for (size_t I = 0; I < Bytes.size(); I++)
@@ -673,14 +681,10 @@ llvm::Value *Translator::handleRelocation(llvm::raw_ostream &SS)
   ConstSymbolPtr Sym = CurReloc->symbol();
   llvm::StringRef SymbolName = Sym->name();
   uint64_t Type = CurReloc->type();
-  ConstSectionPtr Sec = Sym->section();
   bool IsLO = false;
-  uint64_t Rel = Sym->address();
+  uint64_t Rel;
   uint64_t Mask;
-
-  // Add Section Offset (if any)
-  if (Sec)
-    Rel += Sec->shadowOffs();
+  ConstSymbolPtr RealSym = Sym;
 
   switch (Type) {
     case llvm::ELF::R_RISCV_PCREL_HI20:
@@ -691,8 +695,7 @@ llvm::Value *Translator::handleRelocation(llvm::raw_ostream &SS)
     // Symbol info is present on the PCREL_HI20 Reloc
     case llvm::ELF::R_RISCV_PCREL_LO12_I:
       IsLO = true;
-      Rel = (**RLast).symbol()->address();
-      Rel += (**RLast).section()->shadowOffs();
+      RealSym = (**RLast).symbol();
       break;
 
     case llvm::ELF::R_RISCV_LO12_I:
@@ -702,6 +705,15 @@ llvm::Value *Translator::handleRelocation(llvm::raw_ostream &SS)
     default:
       DBGS << "Relocation Type: " << Type << '\n';
       llvm_unreachable("unknown relocation");
+  }
+
+  Rel = RealSym->address();
+  ConstSectionPtr Sec = RealSym->section();
+  // !Sec && Rel == 0: external symbols
+  assert((Sec || !Rel) && "No section found for relocation");
+  if (Sec) {
+    assert(Rel < Sec->size() && "Out of bounds relocation");
+    Rel += Sec->shadowOffs();
   }
 
   // Increment relocation iterator
