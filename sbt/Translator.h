@@ -11,6 +11,7 @@
 #include <llvm/Support/ELF.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/ErrorHandling.h>
+#include <llvm/Support/FormatVariadic.h>
 
 namespace llvm {
 class LLVMContext;
@@ -188,14 +189,34 @@ private:
   size_t StackSize = 4096;
 
   // Relocation Info
-  bool IsRel = false;
-  std::string RelSym;
-  std::string XSyms[32];
+  struct SymbolReloc
+  {
+    bool IsValid = false;
+    std::string Name;
+    uint64_t Addr = 0;
+    ConstSectionPtr Sec = nullptr;
+    uint64_t Val = 0;
+  };
+
+  struct LastImm
+  {
+    bool IsSym;
+    SymbolReloc SymRel;
+  } LastImm;
+
+  SymbolReloc XSyms[32];
+
+  ConstSectionPtr BSS = nullptr;
+  size_t BSSSize = 0;
+
+  ///
 
   bool InMain = false;
 
-  Map<uint64_t, llvm::BasicBlock *> BBS;
+  Map<uint64_t, llvm::BasicBlock *> BBMap;
+  Map<uint64_t, llvm::Instruction *> InstrMap;
   uint64_t NextBB = 0;
+  bool BrWasLast = false;
 
 
   // Methods
@@ -319,7 +340,7 @@ private:
 
     int64_t Imm = Inst.getOperand(Op).getImm();
     llvm::Value *V = llvm::ConstantInt::get(I32, Imm);
-    SS << Imm;
+    SS << llvm::formatv("0x{0:X-4}", uint32_t(Imm));
     return V;
   }
 
@@ -348,16 +369,15 @@ private:
 
   void setRelInfo(unsigned Reg)
   {
-    if (IsRel)
-      XSyms[Reg] = RelSym;
+    if (LastImm.IsSym)
+      XSyms[Reg] = LastImm.SymRel;
     else
-      XSyms[Reg] = "";
+      XSyms[Reg].IsValid = false;
   }
 
   void resetRelInfo(unsigned Reg)
   {
-    IsRel = false;
-    XSyms[Reg] = "";
+    XSyms[Reg].IsValid = false;
   }
 
   static std::string getBBName(uint64_t Addr)
@@ -369,8 +389,21 @@ private:
     return BBName;
   }
 
+  enum ALUOp {
+    ADD,
+    SLL
+  };
+
+  llvm::Error translateALUOp(
+    const llvm::MCInst &Inst,
+    ALUOp Op,
+    bool HasImm,
+    llvm::raw_string_ostream &SS);
+
   enum IntType {
+    S8,
     U8,
+    S16,
     U16,
     U32
   };
@@ -381,13 +414,33 @@ private:
     llvm::raw_string_ostream &SS);
 
   enum BranchType {
-    BEQ
+    JAL,
+    JALR,
+    BEQ,
+    BGE,
+    BLTU
   };
 
   llvm::Error translateBranch(
     const llvm::MCInst &Inst,
     BranchType BT,
     llvm::raw_string_ostream &SS);
+
+  llvm::Error handleJumpToOffs(
+    uint64_t Target,
+    llvm::Value *Cond,
+    unsigned LinkReg);
+
+  llvm::BasicBlock *splitBB(
+    llvm::BasicBlock *BB,
+    uint64_t Addr);
+
+
+  void updateNextBB(uint64_t Addr)
+  {
+    if (NextBB <= CurAddr || Addr < NextBB)
+      NextBB = Addr;
+  }
 
 #if SBT_DEBUG
   // Add RV Inst metadata and print it in debug mode

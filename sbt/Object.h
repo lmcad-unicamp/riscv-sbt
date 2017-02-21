@@ -57,14 +57,6 @@ public:
     return Name;
   }
 
-  // delegate to llvm::object::SectionRef
-  /*
-  const llvm::object::SectionRef *operator->() const
-  {
-    return &Sec;
-  }
-  */
-
   // get llvm::object::SectionRef
   const llvm::object::SectionRef &section() const
   {
@@ -182,6 +174,11 @@ public:
   uint32_t flags() const
   {
     return Sym.getFlags();
+  }
+
+  llvm::object::SymbolRef symbol() const
+  {
+    return Sym;
   }
 
   // print "Symbol header" (used by dump)

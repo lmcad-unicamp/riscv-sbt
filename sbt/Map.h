@@ -97,6 +97,20 @@ public:
     return Data.end();
   }
 
+  Iter lower_bound(const Key& KK)
+  {
+    return std::lower_bound(begin(), end(), KK,
+      [](const Item& I, const Key& KK) {
+        return I.IKey < KK; });
+  }
+
+  CIter lower_bound(const Key& KK) const
+  {
+    return std::lower_bound(begin(), end(), KK,
+      [](const Item& I, const Key& KK) {
+        return I.IKey < KK; });
+  }
+
 private:
   Vec Data;
 

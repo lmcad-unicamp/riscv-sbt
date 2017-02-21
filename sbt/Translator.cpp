@@ -9,7 +9,6 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/Object/ObjectFile.h>
-#include <llvm/Support/FormatVariadic.h>
 #include <llvm/Support/MemoryBuffer.h>
 
 // LLVM internal instruction info
@@ -104,43 +103,33 @@ Error Translator::translate(const llvm::MCInst &Inst)
   SS << formatv("{0:X-4}:   ", CurAddr);
 
   if (NextBB && CurAddr == NextBB) {
-    BasicBlock **BB = BBS[CurAddr];
+    BasicBlock **BB = BBMap[CurAddr];
     assert(BB && "BasicBlock not found!");
-    Builder->CreateBr(*BB);
+    if (!BrWasLast)
+      Builder->CreateBr(*BB);
     Builder->SetInsertPoint(*BB);
+
+    auto Iter = BBMap.lower_bound(CurAddr + 4);
+    if (Iter != BBMap.end())
+      updateNextBB(Iter->IKey);
   }
+
+  Error E = Error::success();
+  llvm::consumeError(std::move(E));
+  BrWasLast = false;
 
   switch (Inst.getOpcode())
   {
-    case RISCV::ADD: {
-      SS << "add\t";
-
-      unsigned O = getRD(Inst, SS);
-      Value *O1 = getReg(Inst, 1, SS);
-      Value *O2 = getReg(Inst, 2, SS);
-
-      Value *V = add(O1, O2);
-      store(V, O);
-
-      resetRelInfo(O);
-      dbgprint(SS);
+    // ALU Ops
+    case RISCV::ADD:
+      E = translateALUOp(Inst, ADD, false, SS);
       break;
-    }
-
-    case RISCV::ADDI: {
-      SS << "addi\t";
-
-      unsigned O = getRD(Inst, SS);
-      Value *O1 = getReg(Inst, 1, SS);
-      Value *O2 = getRegOrImm(Inst, 2, SS);
-
-      Value *V = add(O1, O2);
-      store(V, O);
-
-      setRelInfo(O);
-      dbgprint(SS);
+    case RISCV::ADDI:
+      E = translateALUOp(Inst, ADD, true, SS);
       break;
-    }
+    case RISCV::SLLI:
+      E = translateALUOp(Inst, SLL, true, SS);
+      break;
 
     case RISCV::AUIPC: {
       SS << "auipc\t";
@@ -164,9 +153,15 @@ Error Translator::translate(const llvm::MCInst &Inst)
       break;
     }
 
+    // Branch
     case RISCV::BEQ:
-      if (auto E = translateBranch(Inst, BEQ, SS))
-        return E;
+      E = translateBranch(Inst, BEQ, SS);
+      break;
+    case RISCV::BGE:
+      E = translateBranch(Inst, BGE, SS);
+      break;
+    case RISCV::BLTU:
+      E = translateBranch(Inst, BLTU, SS);
       break;
 
     case RISCV::ECALL: {
@@ -179,61 +174,29 @@ Error Translator::translate(const llvm::MCInst &Inst)
       break;
     }
 
-    case RISCV::JALR: {
-      SS << "jalr\t";
-
-      unsigned RD = getRD(Inst, SS);
-      unsigned RS1 = getRegNum(1, Inst, SS);
-      Value *Imm = getImm(Inst, 2, SS);
-      Value *V;
-
-      // Check for 'return'
-      if (RD == RV_ZERO &&
-          RS1 == RV_RA &&
-          isa<ConstantInt>(Imm) &&
-          cast<ConstantInt>(Imm)->getValue() == 0)
-      {
-        if (InMain)
-          V = Builder->CreateRet(load(RV_A0));
-        else
-          V = Builder->CreateRetVoid();
-        updateFirst(V);
-
-      // External call
-      } else if (RD == RV_RA &&
-          isa<ConstantInt>(Imm) &&
-          cast<ConstantInt>(Imm)->getValue() == 0)
-      {
-        StringRef Sym = XSyms[RS1];
-        if (!Sym.empty()) {
-          auto ExpV = call(Sym);
-          if (!ExpV)
-            return ExpV.takeError();
-          V = *ExpV;
-          if (!V->getType()->isVoidTy())
-            store(V, RV_A0);
-        }
-
-      // TODO Internal call
-      } else {
-        assert(false && "TODO implement Internal call");
-        // Value *Target = add(V, Imm);
-        // Target = Builder->CreateAnd(Target, ~1U);
-        // updateFirst(Target);
-      }
-
-      dbgprint(SS);
+    // Jump
+    case RISCV::JAL:
+      E = translateBranch(Inst, JAL, SS);
       break;
-    }
+    case RISCV::JALR:
+      E = translateBranch(Inst, JALR, SS);
+      break;
 
+    // Load
+    case RISCV::LB:
+      E = translateLoad(Inst, S8, SS);
+      break;
     case RISCV::LBU:
-      if (auto E = translateLoad(Inst, U8, SS))
-        return E;
+      E = translateLoad(Inst, U8, SS);
       break;
-
+    case RISCV::LH:
+      E = translateLoad(Inst, S16, SS);
+      break;
+    case RISCV::LHU:
+      E = translateLoad(Inst, U16, SS);
+      break;
     case RISCV::LW:
-      if (auto E = translateLoad(Inst, U32, SS))
-        return E;
+      E = translateLoad(Inst, U32, SS);
       break;
 
     case RISCV::LUI: {
@@ -243,7 +206,7 @@ Error Translator::translate(const llvm::MCInst &Inst)
       Value *Imm = getImm(Inst, 1, SS);
 
       Value *V;
-      if (IsRel)
+      if (LastImm.IsSym)
         V = Imm;
       else {
         V = Builder->CreateShl(Imm, ConstantInt::get(I32, 12));
@@ -281,6 +244,11 @@ Error Translator::translate(const llvm::MCInst &Inst)
     }
   }
 
+  if (E)
+    return E;
+
+  assert(First && "No First Instruction!");
+  InstrMap(CurAddr, std::move(First));
   return Error::success();
 }
 
@@ -326,6 +294,7 @@ Error Translator::startMain(StringRef Name, uint64_t Addr)
 
   // BB
   BasicBlock *BB = BasicBlock::Create(*Context, getBBName(Addr), F);
+  BBMap(Addr, std::move(BB));
   Builder->SetInsertPoint(BB);
 
   // Set stack pointer.
@@ -351,6 +320,7 @@ Error Translator::startFunction(StringRef Name, uint64_t Addr)
 
   // BB
   BasicBlock *BB = BasicBlock::Create(*Context, getBBName(Addr), F);
+  BBMap(Addr, std::move(BB));
   Builder->SetInsertPoint(BB);
 
   return Error::success();
@@ -395,7 +365,10 @@ Error Translator::buildShadowImage()
     std::string Z;
     // .bss
     if (Sec->isBSS()) {
-      Z = std::string(Sec->size(), 0);
+      // TODO Calculate BSS size based on Common Symbols Size
+      BSS = Sec;
+      BSSSize = 36;
+      Z = std::string(BSSSize, 0);
       Bytes = Z;
 
     // !.bss
@@ -408,6 +381,10 @@ Error Translator::buildShadowImage()
         return error(SE);
       }
     }
+
+    // Align all sections
+    while (Vec.size() % 4 != 0)
+      Vec.push_back(0);
 
     // Set Shadow Offset of Section
     Sec->shadowOffs(Vec.size());
@@ -667,7 +644,7 @@ Expected<Value *> Translator::call(StringRef Func)
 
 llvm::Value *Translator::handleRelocation(llvm::raw_ostream &SS)
 {
-  IsRel = false;
+  LastImm.IsSym = false;
 
   // No more relocations exist
   if (RI == RE)
@@ -679,10 +656,8 @@ llvm::Value *Translator::handleRelocation(llvm::raw_ostream &SS)
     return nullptr;
 
   ConstSymbolPtr Sym = CurReloc->symbol();
-  llvm::StringRef SymbolName = Sym->name();
   uint64_t Type = CurReloc->type();
   bool IsLO = false;
-  uint64_t Rel;
   uint64_t Mask;
   ConstSymbolPtr RealSym = Sym;
 
@@ -707,13 +682,31 @@ llvm::Value *Translator::handleRelocation(llvm::raw_ostream &SS)
       llvm_unreachable("unknown relocation");
   }
 
-  Rel = RealSym->address();
-  ConstSectionPtr Sec = RealSym->section();
-  // !Sec && Rel == 0: external symbols
-  assert((Sec || !Rel) && "No section found for relocation");
-  if (Sec) {
-    assert(Rel < Sec->size() && "Out of bounds relocation");
-    Rel += Sec->shadowOffs();
+  // Set Symbol Relocation info
+  SymbolReloc SR;
+  SR.IsValid = true;
+  SR.Name = RealSym->name();
+  SR.Addr = RealSym->address();
+  SR.Val = SR.Addr;
+  SR.Sec = RealSym->section();
+
+  // BSS?
+  if (!SR.Sec) {
+    if (RealSym->flags() & llvm::object::SymbolRef::SF_Common)
+      SR.Sec = BSS;
+  }
+
+  // Note: !SR.Sec && SR.Addr == External Symbol
+  assert((SR.Sec || !SR.Addr) && "No section found for relocation");
+  if (SR.Sec) {
+    if (SR.Sec == BSS) {
+      // TODO Calculate the correct BSS symbol addresses
+      SR.Addr = 0;
+      SR.Val = 0;
+      assert(SR.Addr < BSSSize);
+    } else
+      assert(SR.Addr < SR.Sec->size() && "Out of bounds relocation");
+    SR.Val += SR.Sec->shadowOffs();
   }
 
   // Increment relocation iterator
@@ -729,25 +722,71 @@ llvm::Value *Translator::handleRelocation(llvm::raw_ostream &SS)
     Mask = 0xFFFFF000;
     SS << "%hi(";
   }
-  SS << SymbolName << ") = " << Rel;
+  SS << SR.Name << ") = " << SR.Addr;
 
   // Now add the relocation offset to ShadowImage to get the final address
+  llvm::Value *V;
+  if (SR.Sec) {
+    // Get char * to memory
+    std::vector<llvm::Value *> Idx = { ZERO,
+      llvm::ConstantInt::get(I32, SR.Val) };
+    V = Builder->CreateGEP(ShadowImage, Idx);
+    updateFirst(V);
 
-  // Get char * to memory
-  std::vector<llvm::Value *> Idx = { ZERO, llvm::ConstantInt::get(I32, Rel) };
-  llvm::Value *V =
-    Builder->CreateGEP(ShadowImage, Idx);
-  updateFirst(V);
+    V = i8PtrToI32(V);
 
-  V = i8PtrToI32(V);
+    // Finally, get only the upper or lower part of the result
+    V = Builder->CreateAnd(V, llvm::ConstantInt::get(I32, Mask));
+    updateFirst(V);
+  } else
+    V = ZERO;
 
-  // Finally, get only the upper or lower part of the result
-  V = Builder->CreateAnd(V, llvm::ConstantInt::get(I32, Mask));
-  updateFirst(V);
-
-  IsRel = true;
-  RelSym = SymbolName;
+  LastImm.IsSym = true;
+  LastImm.SymRel = std::move(SR);
   return V;
+}
+
+
+llvm::Error Translator::translateALUOp(
+  const llvm::MCInst &Inst,
+  ALUOp Op,
+  bool HasImm,
+  llvm::raw_string_ostream &SS)
+{
+  switch (Op) {
+    case ADD: SS << "add"; break;
+    case SLL: SS << "sll"; break;
+  }
+  if (HasImm)
+    SS << "i";
+  SS << '\t';
+
+  unsigned O = getRD(Inst, SS);
+  Value *O1 = getReg(Inst, 1, SS);
+  Value *O2;
+  if (HasImm)
+    O2 = getImm(Inst, 2, SS);
+  else
+    O2 = getReg(Inst, 2, SS);
+
+  Value *V;
+
+  switch (Op) {
+    case ADD:
+      V = add(O1, O2);
+      break;
+
+    case SLL:
+      V = Builder->CreateShl(O1, O2);
+      break;
+  }
+  updateFirst(V);
+
+  store(V, O);
+
+  setRelInfo(O);
+  dbgprint(SS);
+  return Error::success();
 }
 
 
@@ -757,8 +796,16 @@ Error Translator::translateLoad(
   llvm::raw_string_ostream &SS)
 {
   switch (IT) {
+    case S8:
+      SS << "lb";
+      break;
+
     case U8:
       SS << "lbu";
+      break;
+
+    case S16:
+      SS << "lh";
       break;
 
     case U16:
@@ -779,11 +826,13 @@ Error Translator::translateLoad(
 
   Value *Ptr;
   switch (IT) {
+    case S8:
     case U8:
       Ptr = Builder->CreateCast(
         llvm::Instruction::CastOps::IntToPtr, V, I8Ptr);
       break;
 
+    case S16:
     case U16:
       Ptr = Builder->CreateCast(
         llvm::Instruction::CastOps::IntToPtr, V, I16Ptr);
@@ -801,6 +850,12 @@ Error Translator::translateLoad(
 
   // to int32
   switch (IT) {
+    case S8:
+    case S16:
+      V = Builder->CreateSExt(V, I32);
+      updateFirst(V);
+      break;
+
     case U8:
     case U16:
       V = Builder->CreateZExt(V, I32);
@@ -823,76 +878,317 @@ llvm::Error Translator::translateBranch(
   BranchType BT,
   llvm::raw_string_ostream &SS)
 {
+  BrWasLast = true;
+
   // Inst print
   switch (BT) {
-    case BEQ:
-      SS << "beq";
-      break;
+    case JAL:   SS << "jal";  break;
+    case JALR:  SS << "jalr"; break;
+    case BEQ:   SS << "beq";  break;
+    case BGE:   SS << "bge";  break;
+    case BLTU:  SS << "bltu"; break;
   }
   SS << '\t';
 
-  // get ops
-  Value *RS1 = getReg(Inst, 0, SS);
-  Value *RS2 = getReg(Inst, 1, SS);
-  Value *Imm = getImm(Inst, 2, SS);
+  // Get Operands
+  unsigned O0N = getRegNum(0, Inst, SS);
+  Value *O0 = nullptr;
+  unsigned O1N = 0;
+  Value *O1 = nullptr;
+  Value *O2 = nullptr;
+  Value *JReg = nullptr;
+  Value *JImm = nullptr;
+  unsigned LinkReg = 0;
+  switch (BT) {
+    case JAL:
+      LinkReg = O0N;
+      O1 = getImm(Inst, 1, SS);
+      JImm = O1;
+      break;
 
-  // get target
+    case JALR:
+      LinkReg = O0N;
+      O1N = getRegNum(1, Inst, SS);
+      O1 = getReg(Inst, 1, SS);
+      O2 = getImm(Inst, 2, SS);
+      JReg = O1;
+      JImm = O2;
+      break;
 
-  // << 1
-  // Imm = Builder->CreateShl(Imm, ConstantInt::get(I32, 1));
-  // updateFirst(Imm);
-
-  // + PC
-  int64_t BV = cast<ConstantInt>(Imm)->getSExtValue();
-  uint64_t Target;
-  if (BV >= 0) {
-    Target = static_cast<uint64_t>(BV) + CurAddr;
-  } else {
-    SBTError SE;
-    SE << "TODO Support negative branches";
-    return error(SE);
+    case BEQ:
+    case BGE:
+    case BLTU:
+      O0 = getReg(Inst, 0, SS);
+      O1 = getReg(Inst, 1, SS);
+      O2 = getImm(Inst, 2, SS);
+      JImm = O2;
+      break;
   }
 
+  int64_t JImmI = 0;
+  bool JImmIsZeroImm = false;
+  if (isa<ConstantInt>(JImm)) {
+    JImmI = cast<ConstantInt>(JImm)->getValue().getSExtValue();
+    JImmIsZeroImm = JImmI == 0 && !LastImm.IsSym;
+  }
+  bool Done = false;
+  bool JRegIsExtSym = false;
+  if (BT == JALR) {
+    const auto& JRegSym = XSyms[O1N];
+    if (JRegSym.IsValid && JRegSym.Addr == 0 && !JRegSym.Sec) {
+      JRegIsExtSym = true;
+      assert(!JRegSym.Name.empty());
+    }
+  }
+  Value *V = nullptr;
+
+  // Return?
+  if (BT == JALR &&
+      O0N == RV_ZERO &&
+      O1N == RV_RA &&
+      JImmIsZeroImm)
+  {
+    if (InMain)
+      V = Builder->CreateRet(load(RV_A0));
+    else
+      V = Builder->CreateRetVoid();
+    updateFirst(V);
+    Done = true;
+
+  // External call?
+  } else if (BT == JALR &&
+    O0N == RV_RA &&
+    JRegIsExtSym)
+  {
+    StringRef SymbolName = XSyms[O1N].Name;
+
+    auto ExpV = call(SymbolName);
+    if (!ExpV)
+      return ExpV.takeError();
+    V = *ExpV;
+    if (!V->getType()->isVoidTy())
+      store(V, RV_A0);
+    Done = true;
+  }
+
+  if (Done) {
+    dbgprint(SS);
+    return Error::success();
+  }
+
+  // Get target
+  uint64_t Target = 0;
+  bool IsSymbol = LastImm.IsSym;
+  SymbolReloc SR;
+
+  enum Action {
+    JUMP_TO_SYMBOL,
+    JUMP_TO_OFFS,
+    IJUMP
+  };
+  Action Act;
+
+  // JALR
+  //
+  // TODO Set Target LSB to zero
+  if (BT == JALR) {
+    // No base reg
+    if (O1N == RV_ZERO) {
+      assert(IsSymbol && "Unexpected JALR with absolute immediate");
+      SR = LastImm.SymRel;
+      Act = JUMP_TO_SYMBOL;
+
+    // No immediate
+    } else if (JImmIsZeroImm) {
+      SR = XSyms[O1N];
+      if (SR.IsValid)
+        Act = JUMP_TO_SYMBOL;
+      else
+        Act = IJUMP;
+
+    // Base + Offset
+    } else {
+      V = Builder->CreateAdd(JReg, JImm);
+      updateFirst(V);
+      Act = IJUMP;
+    }
+
+  // JAL to Symbol
+  } else if (BT == JAL && IsSymbol) {
+    SR = LastImm.SymRel;
+    Act = JUMP_TO_SYMBOL;
+
+  // JAL/Branches to PC offsets
+  //
+  // Add PC
+  } else {
+    Target = JImmI + CurAddr;
+    Act = JUMP_TO_OFFS;
+  }
+
+  if (Act == JUMP_TO_SYMBOL) {
+    assert(SR.Sec && SR.Sec->isText() && "Jump to non Text Section!");
+    Target = SR.Addr;
+    Act = JUMP_TO_OFFS;
+  }
+
+  // Evaluate condition
+  Value *Cond = nullptr;
+  switch (BT) {
+    case BEQ:
+      Cond = Builder->CreateICmpEQ(O0, O1);
+      break;
+
+    case BGE:
+      Cond = Builder->CreateICmpSGE(O0, O1);
+      break;
+
+    case BLTU:
+      Cond = Builder->CreateICmpULT(O0, O1);
+
+    case JAL:
+    case JALR:
+      break;
+  }
+  if (Cond)
+    updateFirst(Cond);
+
+  switch (Act) {
+    case JUMP_TO_SYMBOL:
+      llvm_unreachable("JUMP_TO_SYMBOL should become JUMP_TO_OFFS");
+      break;
+
+    case JUMP_TO_OFFS:
+      if (auto E = handleJumpToOffs(Target, Cond, LinkReg))
+        return E;
+      break;
+
+    case IJUMP:
+      assert(false && "IJUMP not supported yet!");
+      break;
+  }
+
+  dbgprint(SS);
+  return Error::success();
+}
+
+
+llvm::Error Translator::handleJumpToOffs(
+  uint64_t Target,
+  llvm::Value *Cond,
+  unsigned LinkReg)
+{
   // Get current function
   const Function *CF = Builder->GetInsertBlock()->getParent();
   Function *F = Module->getFunction(CF->getName());
 
   // Next BB
-  BasicBlock *Next = BasicBlock::Create(*Context, getBBName(CurAddr + 4), F);
+  uint64_t NextInstrAddr = CurAddr + 4;
+
+  // Link
+  if (!Cond && LinkReg != RV_ZERO)
+    store(ConstantInt::get(I32, NextInstrAddr), LinkReg);
 
   // Target BB
-  BasicBlock *BeforeBB = nullptr;
-  typedef decltype(BBS) BBSType;
-  typedef BBSType::Item Item;
-  auto Iter = std::lower_bound(BBS.begin(), BBS.end(), Target,
-      [](const Item& a, uint64_t b){ return a.IKey < b; });
-  if (Iter != BBS.end())
-    BeforeBB = Iter->IVal;
+  assert(Target != CurAddr && "Unexpected jump to self instruction!");
 
-  BasicBlock *BB = BasicBlock::Create(*Context, getBBName(Target), F, BeforeBB);
-  BBS(Target, std::move(BB));
+  BasicBlock *BB = nullptr;
+  auto Iter = BBMap.lower_bound(Target);
+  // Jump forward
+  if (Target > CurAddr) {
+    BasicBlock *BeforeBB = nullptr;
+    if (Iter != BBMap.end())
+      BeforeBB = Iter->IVal;
 
-  if (Target < NextBB || NextBB < CurAddr)
-    NextBB = Target;
+    // BB already exists
+    if (Target == Iter->IKey)
+      BB = Iter->IVal;
+    // Need to create new BB
+    else {
+      BB = BasicBlock::Create(*Context, getBBName(Target), F, BeforeBB);
+      BBMap(Target, std::move(BB));
 
-  // Evaluate condition
-  Value *Cond;
-  switch (BT) {
-    case BEQ:
-      Cond = Builder->CreateICmpEQ(RS1, RS2);
-      break;
+      updateNextBB(Target);
+    }
+
+  // Jump backward
+  } else {
+    bool Split = true;
+    if (Iter != BBMap.end()) {
+      if (Target == Iter->IKey) {
+        Split = false;
+        BB = Iter->IVal;
+      } else if (Iter != BBMap.begin()) {
+        BB = (--Iter)->IVal;
+      } else {
+        BB = Iter->IVal;
+      }
+    } else {
+      assert(BBMap.begin() != BBMap.end());
+      BB = (--Iter)->IVal;
+    }
+
+    if (Split)
+      BB = splitBB(BB, Target);
   }
-  updateFirst(Cond);
 
   // Branch
-  Value *V = Builder->CreateCondBr(Cond, BB, Next);
+  Value *V;
+  if (Cond && Target != NextInstrAddr) {
+    Iter = BBMap.lower_bound(NextInstrAddr);
+    BasicBlock *BeforeBB = nullptr;
+    if (Iter != BBMap.end())
+      BeforeBB = Iter->IVal;
+
+    BasicBlock *Next =
+      BasicBlock::Create(*Context, getBBName(NextInstrAddr), F, BeforeBB);
+    BBMap(NextInstrAddr, std::move(Next));
+
+    updateNextBB(NextInstrAddr);
+
+    V = Builder->CreateCondBr(Cond, BB, Next);
+    // Use next BB
+    Builder->SetInsertPoint(Next);
+  } else
+    V = Builder->CreateBr(BB);
   updateFirst(V);
 
-  // Use next BB
-  Builder->SetInsertPoint(Next);
-
-  dbgprint(SS);
   return Error::success();
+}
+
+
+llvm::BasicBlock *Translator::splitBB(
+  llvm::BasicBlock *BB,
+  uint64_t Addr)
+{
+  auto Res = InstrMap[Addr];
+  assert(Res && "Instruction not found!");
+
+  Instruction *TgtInstr = *Res;
+
+  BasicBlock::iterator I, E;
+  for (I = BB->begin(), E = BB->end(); I != E; ++I) {
+    if (&*I == TgtInstr)
+      break;
+  }
+  assert(I != E);
+
+  BasicBlock *BB2;
+  if (BB->getTerminator()) {
+    BB2 = BB->splitBasicBlock(I, getBBName(Addr));
+    BBMap(Addr, std::move(BB2));
+    return BB2;
+  }
+
+  // Insert dummy terminator
+  assert(Builder->GetInsertBlock() == BB);
+  Instruction *Instr = Builder->CreateRetVoid();
+  BB2 = BB->splitBasicBlock(I, getBBName(Addr));
+  BBMap(Addr, std::move(BB2));
+  Instr->eraseFromParent();
+  Builder->SetInsertPoint(BB2, BB2->end());
+
+  return BB2;
 }
 
 
