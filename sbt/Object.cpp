@@ -75,30 +75,6 @@ static std::string getTypeStr(Symbol::Type Type)
 /// Section
 ///
 
-Section::Section(
-  ConstObjectPtr Obj,
-  object::SectionRef Sec,
-  Error &E)
-  :
-  Obj(Obj),
-  Sec(Sec)
-{
-  // Get SectionName
-  if (Sec.getName(Name)) {
-    SBTError SE;
-    SE << "Failed to get SectionName";
-    E = error(SE);
-    return;
-  }
-}
-
-uint64_t Section::getELFOffset() const
-{
-  object::DataRefImpl Impl = Sec.getRawDataRefImpl();
-  auto EI = reinterpret_cast<ELFObj::Elf_Shdr *>(Impl.p);
-  return EI->sh_offset;
-}
-
 void Section::header(llvm::raw_ostream &OS)
 {
   OS << "Sections:\n";
@@ -115,6 +91,40 @@ std::string Section::str() const
     SS << "\n    " << Sym->str();
   SS << " }";
   return S;
+}
+
+void CommonSection::symbols(ConstSymbolPtrVec &&S)
+{
+  Symbols = std::move(S);
+
+  for (auto &S : Symbols)
+    Size += S->commonSize();
+}
+
+LLVMSection::LLVMSection(
+  ConstObjectPtr Obj,
+  object::SectionRef Sec,
+  Error &E)
+  :
+  Section(Obj, ""),
+  Sec(Sec)
+{
+  // Get SectionName
+  StringRef NameRef;
+  if (Sec.getName(NameRef)) {
+    SBTError SE;
+    SE << "Failed to get SectionName";
+    E = error(SE);
+    return;
+  } else
+    Name = NameRef;
+}
+
+uint64_t LLVMSection::getELFOffset() const
+{
+  object::DataRefImpl Impl = Sec.getRawDataRefImpl();
+  auto EI = reinterpret_cast<ELFObj::Elf_Shdr *>(Impl.p);
+  return EI->sh_offset;
 }
 
 ///
@@ -226,10 +236,12 @@ std::string Relocation::str() const
   raw_string_ostream SS(S);
   SS  << "Reloc{"
       << " Offs=[" << offset()
-      << "], Type=[" << typeName()
-      << "], Section=[" << section()->name()
-      << "], Symbol=[" << symbol()->name()
-      << "] }";
+      << "], Type=[" << typeName();
+  if (section())
+    SS << "], Section=[" << section()->name();
+  if (symbol())
+    SS  << "], Symbol=[" << symbol()->name();
+  SS << "] }";
   return S;
 }
 
@@ -273,8 +285,7 @@ Object::Object(
   FileName = Obj->getFileName();
 
   // object::ObjectFile created, now process its symbols
-  E = readSymbols();
-}
+  E = readSymbols(); }
 
 Error Object::readSymbols()
 {
@@ -287,7 +298,7 @@ Error Object::readSymbols()
 
   // Read Sections
   for (const object::SectionRef &S : Obj->sections()) {
-    auto ExpSec = create<Section*>(this, S);
+    auto ExpSec = create<LLVMSection*>(this, S);
     if (!ExpSec)
       return ExpSec.takeError();
     Section *Sec = ExpSec.get();
@@ -299,6 +310,12 @@ Error Object::readSymbols()
     // add to sections vector
     Sections.push_back(NCPtr);
   }
+
+  // Add Common Section
+  SectionPtr CommonSec(new CommonSection(this));
+  NameToSection(CommonSec->name(), ConstSectionPtr(CommonSec));
+  Sections.push_back(CommonSec);
+  uint64_t CommonOffs = 0;
 
   // Read Symbols
   for (const object::SymbolRef &S : Obj->symbols()) {
@@ -315,8 +332,16 @@ Error Object::readSymbols()
     PtrToSymbol(S.getRawDataRefImpl().p, ConstSymbolPtr(Ptr));
 
     // Add Symbol to corresponding Section vector
-    if (Sym->section()) {
-      StringRef SectionName = Sym->section()->name();
+    ConstSectionPtr Sec = nullptr;
+    if (S.getFlags() & llvm::object::SymbolRef::SF_Common) {
+      Sec = CommonSec;
+      Sym->address(CommonOffs);
+      Sym->section(Sec);
+      CommonOffs += Sym->commonSize();
+    } else
+      Sec = Sym->section();
+    if (Sec) {
+      StringRef SectionName = Sec->name();
       ConstSymbolPtrVec *P = SectionToSymbols[SectionName];
       // New section
       if (!P)
@@ -372,13 +397,6 @@ void Object::dump() const
   Section::header(OS);
   for (ConstSectionPtr Sec : sections())
     OS << Sec->str() << "\n";
-
-  /*
-  // Symbols
-  Symbol::header(OS);
-  for (ConstSymbolPtr Sym : symbols())
-    OS << Sym->str() << "\n";
-   */
 
   // Relocations
   Relocation::header(OS);

@@ -488,6 +488,8 @@ void elf::dump_sh(uint16_t index, const section_header *sh) const
     dump_symtab(offs, size);
   else if (sh->sh_type == SHT_RELA)
     dump_rela(offs, size);
+  else if (name == ".bss")
+    ;
   else
     dump_data(offs, size);
 }

@@ -27,8 +27,6 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
 
-#define TEST 0
-
 using namespace llvm;
 
 // RISCVMaster initializers
@@ -415,12 +413,13 @@ static void handleError(Error &&E)
 
 static void test()
 {
+#if 1
   using namespace sbt;
-#if TEST
+
   // ExitOnError ExitOnErr;
   SBT::init();
   SBTFinish Finish;
-  StringRef FilePath = "hello.o";
+  StringRef FilePath = "sbt/test/rv32-main.o";
   auto ExpObj = create<Object>(FilePath);
   if (!ExpObj)
     handleError(ExpObj.takeError());
@@ -432,8 +431,6 @@ static void test()
 
 int main(int argc, char *argv[])
 {
-  test();
-
   // initialize constants
   sbt::initConstants();
   struct DestroyConstants {
@@ -456,6 +453,8 @@ int main(int argc, char *argv[])
       "gen-sc-handler",
       cl::desc("generate syscall handler"));
 
+  cl::opt<bool> TestOpt("test");
+
   // parse args
   cl::ParseCommandLineOptions(argc, argv);
 
@@ -466,6 +465,9 @@ int main(int argc, char *argv[])
         << ": Output file not specified.\n";
       return 1;
     }
+  // debug test
+  } else if (TestOpt) {
+    test();
   // translate
   } else {
     if (InputFiles.empty()) {

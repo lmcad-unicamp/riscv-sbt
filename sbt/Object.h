@@ -42,79 +42,89 @@ typedef Map<uintptr_t, ConstSectionPtr> PtrToSectionMap;
 
 
 /// Section
+
 class Section
 {
 public:
-  // ctor
   Section(
     ConstObjectPtr Obj,
-    llvm::object::SectionRef Sec,
-    llvm::Error &E);
+    const std::string &Name)
+    :
+    Obj(Obj),
+    Name(Name)
+  {}
 
-  // name
-  const llvm::StringRef &name() const
+  virtual ~Section() = default;
+
+  // Name
+  const std::string &name() const
   {
     return Name;
   }
 
-  // get llvm::object::SectionRef
-  const llvm::object::SectionRef &section() const
+  // Get llvm::object::SectionRef (if any)
+  virtual const llvm::object::SectionRef section() const
   {
-    return Sec;
+    return llvm::object::SectionRef();
   }
 
-  // address
-  uint64_t address() const
+  // Address
+  virtual uint64_t address() const
   {
-    return Sec.getAddress();
+    return 0;
   }
 
-  // size
-  uint64_t size() const
+  // Size
+  virtual uint64_t size() const = 0;
+
+  // Type
+
+  virtual bool isText() const
   {
-    return Sec.getSize();
+    return false;
   }
 
-  bool isText() const
+  virtual bool isData() const
   {
-    return Sec.isText();
+    return false;
   }
 
-  bool isData() const
+  virtual bool isBSS() const
   {
-    return Sec.isData();
+    return false;
   }
 
-  bool isBSS() const
+  virtual bool isCommon() const
   {
-    return Sec.isBSS();
+    return false;
   }
 
-  std::error_code contents(llvm::StringRef &S) const
+  // Contents
+  virtual std::error_code contents(llvm::StringRef &S) const
   {
-    return Sec.getContents(S);
+    S = "";
+    return std::error_code();
   }
 
-  // symbols, ordered by address
+  // Symbols, ordered by address
   const ConstSymbolPtrVec &symbols() const
   {
     return Symbols;
   }
 
-  // set symbols (can't be done at construction time)
-  void symbols(ConstSymbolPtrVec &&S)
+  // Set symbols (can't be done at construction time)
+  virtual void symbols(ConstSymbolPtrVec &&S)
   {
     Symbols = std::move(S);
   }
 
-  uint64_t getELFOffset() const;
+  // ELFOffset
+  virtual uint64_t getELFOffset() const
+  {
+    return 0;
+  }
 
-  // print "Section header" (used by dump)
-  static void header(llvm::raw_ostream &OS);
-
-  // get string representation
-  std::string str() const;
-
+  // Offset in Shadow Image
   uint64_t shadowOffs() const
   {
     return ShadowOffs;
@@ -126,11 +136,103 @@ public:
     ShadowOffs = Offs;
   }
 
+  // print "Section header" (used by dump)
+  static void header(llvm::raw_ostream &OS);
+
+  // get string representation
+  std::string str() const;
+
+protected:
+  ConstObjectPtr Obj;
+  std::string Name;
+  ConstSymbolPtrVec Symbols;
+  mutable uint64_t ShadowOffs = 0;
+};
+
+
+class CommonSection : public Section
+{
+public:
+  // ctor
+  CommonSection(ConstObjectPtr Obj) :
+    Section(Obj, ".common")
+  {}
+
+  // Size
+  uint64_t size() const override
+  {
+    return Size;
+  }
+
+  // Type
+  bool isCommon() const override
+  {
+    return true;
+  }
+
+  // Set symbols
+  void symbols(ConstSymbolPtrVec &&S) override;
+
+private:
+  uint64_t Size = 0;
+};
+
+class LLVMSection : public Section
+{
+public:
+  // ctor
+  LLVMSection(
+    ConstObjectPtr Obj,
+    llvm::object::SectionRef Sec,
+    llvm::Error &E);
+
+  // Get llvm::object::SectionRef
+  const llvm::object::SectionRef section() const override
+  {
+    return Sec;
+  }
+
+  // Address
+  uint64_t address() const override
+  {
+    return Sec.getAddress();
+  }
+
+  // Size
+  uint64_t size() const override
+  {
+    return Sec.getSize();
+  }
+
+  // Type
+
+  bool isText() const override
+  {
+    return Sec.isText();
+  }
+
+  bool isData() const override
+  {
+    return Sec.isData();
+  }
+
+  bool isBSS() const override
+  {
+    return Sec.isBSS();
+  }
+
+  // Contents
+  std::error_code contents(llvm::StringRef &S) const override
+  {
+    return Sec.getContents(S);
+  }
+
+  // ELFOffset
+  uint64_t getELFOffset() const override;
+
 private:
   ConstObjectPtr Obj;
   llvm::object::SectionRef Sec;
-  llvm::StringRef Name;
-  ConstSymbolPtrVec Symbols;
   mutable uint64_t ShadowOffs = 0;
 };
 
@@ -146,31 +248,41 @@ public:
     llvm::object::SymbolRef Sym,
     llvm::Error &E);
 
-  // name
+  // Name
   const llvm::StringRef &name() const
   {
     return Name;
   }
 
-  // type
+  // Type
   Type type() const
   {
     return TheType;
   }
 
-  // section
+  // Section
   ConstSectionPtr section() const
   {
     return Sec;
   }
 
-  // address
+  void section(ConstSectionPtr S)
+  {
+    Sec = S;
+  }
+
+  // Address
   uint64_t address() const
   {
     return Address;
   }
 
-  // flags
+  void address(uint64_t Addr)
+  {
+    Address = Addr;
+  }
+
+  // Flags
   uint32_t flags() const
   {
     return Sym.getFlags();
@@ -179,6 +291,12 @@ public:
   llvm::object::SymbolRef symbol() const
   {
     return Sym;
+  }
+
+  // CommonSize
+  uint64_t commonSize() const
+  {
+    return Sym.getCommonSize();
   }
 
   // print "Symbol header" (used by dump)
@@ -214,6 +332,8 @@ public:
   // section
   ConstSectionPtr section() const
   {
+    if (!symbol())
+      return nullptr;
     return Sym->section();
   }
 

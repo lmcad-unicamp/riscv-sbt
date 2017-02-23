@@ -358,20 +358,16 @@ Error Translator::buildShadowImage()
   std::vector<uint8_t> Vec;
   for (ConstSectionPtr Sec : CurObj->sections()) {
     // Skip non text/data sections
-    if (!Sec->isText() && !Sec->isData() && !Sec->isBSS())
+    if (!Sec->isText() && !Sec->isData() && !Sec->isBSS() && !Sec->isCommon())
       continue;
 
     StringRef Bytes;
     std::string Z;
-    // .bss
-    if (Sec->isBSS()) {
-      // TODO Calculate BSS size based on Common Symbols Size
-      BSS = Sec;
-      BSSSize = 36;
-      Z = std::string(BSSSize, 0);
+    // .bss/.common
+    if (Sec->isBSS() || Sec->isCommon()) {
+      Z = std::string(Sec->size(), 0);
       Bytes = Z;
-
-    // !.bss
+    // others
     } else {
       // Read contents
       std::error_code EC = Sec->contents(Bytes);
@@ -690,22 +686,10 @@ llvm::Value *Translator::handleRelocation(llvm::raw_ostream &SS)
   SR.Val = SR.Addr;
   SR.Sec = RealSym->section();
 
-  // BSS?
-  if (!SR.Sec) {
-    if (RealSym->flags() & llvm::object::SymbolRef::SF_Common)
-      SR.Sec = BSS;
-  }
-
   // Note: !SR.Sec && SR.Addr == External Symbol
   assert((SR.Sec || !SR.Addr) && "No section found for relocation");
   if (SR.Sec) {
-    if (SR.Sec == BSS) {
-      // TODO Calculate the correct BSS symbol addresses
-      SR.Addr = 0;
-      SR.Val = 0;
-      assert(SR.Addr < BSSSize);
-    } else
-      assert(SR.Addr < SR.Sec->size() && "Out of bounds relocation");
+    assert(SR.Addr < SR.Sec->size() && "Out of bounds relocation");
     SR.Val += SR.Sec->shadowOffs();
   }
 
