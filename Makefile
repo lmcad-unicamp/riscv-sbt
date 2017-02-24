@@ -458,5 +458,6 @@ lc:
 .PHONY: test
 test:
 	$(MAKE) $(SBT)-build1 $(SBT)-install
-	#rm -f $(TOPDIR)/sbt/test/rv32-x86-main.bc
-	#$(MAKE) -C $(TOPDIR)/sbt/test rv32-x86-main
+	rm -f $(TOPDIR)/sbt/test/rv32-x86-main.bc
+	$(MAKE) -C $(TOPDIR)/sbt/test rv32-x86-main
+	$(TOPDIR)/sbt/test/rv32-x86-main

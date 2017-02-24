@@ -13,6 +13,7 @@ extern const std::string *LIBC_BC;
 
 // (these are only the make the code easier to read)
 static const bool ADD_NULL = true;
+static const bool ALLOW_INTERNAL = true;
 static const bool CONSTANT = true;
 static const bool ERROR = true;
 static const bool SIGNED = true;

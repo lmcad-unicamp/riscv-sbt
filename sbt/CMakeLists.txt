@@ -156,12 +156,12 @@ target_link_libraries (riscv-sbt
   ${SBT_SYS_LIBS}
 )
 
-set (LIBC_C ${PROJECT_SOURCE_DIR}/libc.c)
+set (LIBC_CPP ${PROJECT_SOURCE_DIR}/libc.cpp)
 
 # libc.bc
 add_custom_command(OUTPUT libc.bc
-  COMMAND clang -O0 -femit-all-decls -emit-llvm -c ${LIBC_C}
-  MAIN_DEPENDENCY ${LIBC_C})
+  COMMAND clang -O0 -std=c++11 -femit-all-decls -emit-llvm -c ${LIBC_CPP}
+  MAIN_DEPENDENCY ${LIBC_CPP})
 add_custom_target(libc DEPENDS libc.bc)
 add_dependencies(riscv-sbt libc)
 

@@ -1,0 +1,8 @@
+#include <cstdio>
+
+#define F(x) \
+  auto rv32_##x = x;
+
+F(perror)
+F(printf)
+F(puts)

@@ -28,8 +28,6 @@ namespace sbt {
 
 class Translator
 {
-  static const bool HANDLE_RELOCATION = true;
-
   // RISC-V ABI
   static const unsigned RV_ZERO = 0;
   static const unsigned RV_RA = 1;    // Return address
@@ -196,6 +194,11 @@ private:
     uint64_t Addr = 0;
     ConstSectionPtr Sec = nullptr;
     uint64_t Val = 0;
+
+    bool isExternal() const
+    {
+      return IsValid && Addr == 0 && !Sec;
+    }
   };
 
   struct LastImm
@@ -429,6 +432,10 @@ private:
   llvm::Error handleJumpToOffs(
     uint64_t Target,
     llvm::Value *Cond,
+    unsigned LinkReg);
+
+  llvm::Error handleIJump(
+    llvm::Value *Target,
     unsigned LinkReg);
 
   llvm::BasicBlock *splitBB(

@@ -30,7 +30,7 @@ int main()
   for (i = 0; i < N; i++)
     printf("C[%d]=%d\n", i, C[i]);
 
-  //printf("D[0]=%d\n", D[0]);
+  printf("D[0]=%d\n", D[0]);
   D[2] = 2;
   printf("D[2]=%d\n", D[2]);
 

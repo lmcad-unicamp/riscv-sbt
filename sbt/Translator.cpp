@@ -587,30 +587,64 @@ Expected<Value *> Translator::call(StringRef Func)
     LCModule = std::move(*ExpMod);
   }
 
-  Function *F = Module->getFunction(Func);
+  // Get function pointer
+  std::string RV32Func = "rv32_" + Func.str();
+  GlobalVariable *FP = Module->getGlobalVariable(RV32Func, ALLOW_INTERNAL);
+  llvm::Value *V = nullptr;
   // "Import" function from LibC module if not found
-  if (!F) {
-    Function *LCF = LCModule->getFunction(Func);
-    if (!LCF) {
+  if (!FP) {
+
+    /*
+    // lookup function
+    Function *LF = LCModule->getFunction(Func);
+    if (!LF) {
       SBTError SE;
       SE << "Function not found: " << Func;
       return error(SE);
     }
+    FunctionType *FT = LF->getFunctionType();
+    */
 
-    F = Function::Create(LCF->getFunctionType(),
-          Function::ExternalLinkage, LCF->getName(), Module);
+    // lookup function pointer
+    GlobalVariable *LFP = LCModule->getGlobalVariable(RV32Func);
+    if (!LFP) {
+      SBTError SE;
+      SE << "GlobalVariable not found: " << RV32Func;
+      return error(SE);
+    }
+
+
+    Function::Create(FT, GlobalValue::ExternalLinkage, Func, Module);
+
+    llvm::APInt I;
+    LFP->getInitializer()->getIntegerValue(I32, I);
+    V = ConstantInt::getIntegerValue(I32, I);
+    V = Builder->CreateIntToPtr(V, I32Ptr);
+    V = Builder->CreatePointerBitCastOrAddrSpaceCast(V, LFP->getValueType());
+
+    FP = new GlobalVariable(*Module,
+      LFP->getValueType(), !CONSTANT, GlobalValue::PrivateLinkage,
+      cast<Constant>(V), RV32Func);
   }
 
-  const auto &ArgList = F->getArgumentList();
-
-  std::vector<Value *> Args;
-  assert(F->arg_size() < 9 &&
+  // Get FunctionType
+  auto PT = cast<PointerType>(FP->getValueType());
+  auto ET = PT->getPointerElementType();
+  FunctionType *FT = cast<FunctionType>(ET);
+  unsigned NumParams = FT->getNumParams();
+  assert(NumParams < 9 &&
       "External functions with more than 8 arguments are not supported!");
+  // Get Function Pointer Value
+  //llvm::Value *FPV = Builder->CreateLoad(FP);
+  llvm::Value *FPV = FP->getInitializer();
 
+  // Build Args
+  std::vector<Value *> Args;
   unsigned Reg = RV_A0;
-  for (const auto &Arg : ArgList) {
+  unsigned I = 0;
+  for (; I < NumParams; I++) {
     Value *V = load(Reg++);
-    Type *Ty = Arg.getType();
+    Type *Ty = FT->getParamType(I);
 
     // need to cast?
     if (Ty != I32) {
@@ -622,17 +656,17 @@ Expected<Value *> Translator::call(StringRef Func)
   }
 
   // VarArgs: passing 4 extra args for now
-  if (F->isVarArg()) {
-    unsigned LastReg = MIN(Reg + 3, RV_A7);
-    for (; Reg <= LastReg; Reg++)
-      Args.push_back(load(Reg));
+  if (FT->isVarArg()) {
+    unsigned N = MIN(I + 4, 8);
+    for (; I < N; I++)
+      Args.push_back(load(Reg++));
   }
 
-  Value *V;
-  if (F->getReturnType()->isVoidTy())
-    V = Builder->CreateCall(F, Args);
+  // Call the Function
+  if (FT->getReturnType()->isVoidTy())
+    V = Builder->CreateCall(FPV, Args);
   else
-    V = Builder->CreateCall(F, Args, F->getName());
+    V = Builder->CreateCall(FPV, Args, FP->getName());
   updateFirst(V);
   return V;
 }
@@ -987,8 +1021,10 @@ llvm::Error Translator::translateBranch(
       SR = XSyms[O1N];
       if (SR.IsValid)
         Act = JUMP_TO_SYMBOL;
-      else
+      else {
+        V = JReg;
         Act = IJUMP;
+      }
 
     // Base + Offset
     } else {
@@ -1048,7 +1084,8 @@ llvm::Error Translator::translateBranch(
       break;
 
     case IJUMP:
-      assert(false && "IJUMP not supported yet!");
+      if (auto E = handleIJump(V, LinkReg))
+        return E;
       break;
   }
 
@@ -1173,6 +1210,26 @@ llvm::BasicBlock *Translator::splitBB(
   Builder->SetInsertPoint(BB2, BB2->end());
 
   return BB2;
+}
+
+llvm::Error Translator::handleIJump(
+  llvm::Value *Target,
+  unsigned LinkReg)
+{
+  // TODO
+
+  /*
+  // Link
+  if (LinkReg != RV_ZERO)
+    store(ConstantInt::get(I32, CurAddr + 4), LinkReg);
+
+  Value *V = Builder->CreateIntToPtr(Target, I32Ptr);
+  updateFirst(V);
+  V = Builder->CreateIndirectBr(V);
+  updateFirst(V);
+  */
+
+  return Error::success();
 }
 
 
