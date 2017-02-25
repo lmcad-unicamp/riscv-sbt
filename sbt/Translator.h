@@ -21,6 +21,7 @@ class IntegerType;
 class GlobalVariable;
 class MCInst;
 class Module;
+class Target;
 class Value;
 }
 
@@ -130,6 +131,10 @@ public:
   llvm::Error startFunction(llvm::StringRef Name, uint64_t Addr);
   llvm::Error finishFunction();
 
+  llvm::Error startup();
+
+  llvm::Expected<llvm::GlobalVariable *> import(llvm::StringRef Func);
+
   void setCurAddr(uint64_t Addr)
   {
     CurAddr = Addr;
@@ -143,6 +148,11 @@ public:
   void setCurSection(ConstSectionPtr Section)
   {
     CurSection = Section;
+  }
+
+  void setTarget(const llvm::Target *T)
+  {
+    TheTarget = T;
   }
 
   typedef decltype(ConstRelocationPtrVec().cbegin()) ConstRelocIter;
@@ -172,6 +182,7 @@ private:
   llvm::FunctionType *FTRVSC;
   llvm::Function *FRVSC;
   std::unique_ptr<llvm::Module> LCModule;
+  const llvm::Target *TheTarget = nullptr;
 
   uint64_t CurAddr;
   ConstObjectPtr CurObj = nullptr;

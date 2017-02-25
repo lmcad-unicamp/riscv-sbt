@@ -7,6 +7,7 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/ValueSymbolTable.h>
 #include <llvm/IR/Type.h>
 #include <llvm/Object/ObjectFile.h>
 #include <llvm/Support/MemoryBuffer.h>
@@ -305,6 +306,10 @@ Error Translator::startMain(StringRef Name, uint64_t Addr)
   StackEnd = i8PtrToI32(V);
 
   store(StackEnd, RV_SP);
+
+  // if (auto E = startup())
+  //  return E;
+
   InMain = true;
 
   return Error::success();
@@ -593,38 +598,10 @@ Expected<Value *> Translator::call(StringRef Func)
   llvm::Value *V = nullptr;
   // "Import" function from LibC module if not found
   if (!FP) {
-
-    /*
-    // lookup function
-    Function *LF = LCModule->getFunction(Func);
-    if (!LF) {
-      SBTError SE;
-      SE << "Function not found: " << Func;
-      return error(SE);
-    }
-    FunctionType *FT = LF->getFunctionType();
-    */
-
-    // lookup function pointer
-    GlobalVariable *LFP = LCModule->getGlobalVariable(RV32Func);
-    if (!LFP) {
-      SBTError SE;
-      SE << "GlobalVariable not found: " << RV32Func;
-      return error(SE);
-    }
-
-
-    Function::Create(FT, GlobalValue::ExternalLinkage, Func, Module);
-
-    llvm::APInt I;
-    LFP->getInitializer()->getIntegerValue(I32, I);
-    V = ConstantInt::getIntegerValue(I32, I);
-    V = Builder->CreateIntToPtr(V, I32Ptr);
-    V = Builder->CreatePointerBitCastOrAddrSpaceCast(V, LFP->getValueType());
-
-    FP = new GlobalVariable(*Module,
-      LFP->getValueType(), !CONSTANT, GlobalValue::PrivateLinkage,
-      cast<Constant>(V), RV32Func);
+    auto ExpFP = import(Func);
+    if (!ExpFP)
+      return ExpFP.takeError();
+    FP = ExpFP.get();
   }
 
   // Get FunctionType
@@ -635,8 +612,8 @@ Expected<Value *> Translator::call(StringRef Func)
   assert(NumParams < 9 &&
       "External functions with more than 8 arguments are not supported!");
   // Get Function Pointer Value
-  //llvm::Value *FPV = Builder->CreateLoad(FP);
-  llvm::Value *FPV = FP->getInitializer();
+  llvm::Value *FPV = Builder->CreateLoad(FP);
+  updateFirst(FPV);
 
   // Build Args
   std::vector<Value *> Args;
@@ -1232,6 +1209,69 @@ llvm::Error Translator::handleIJump(
   return Error::success();
 }
 
+llvm::Error Translator::startup()
+{
+  FunctionType *FT = FunctionType::get(Type::getVoidTy(*Context), !VAR_ARG);
+  Function *F =
+    Function::Create(FT, Function::PrivateLinkage, "rv32_startup", Module);
+
+  // BB
+  BasicBlock *BB = BasicBlock::Create(*Context, "bb_startup", F);
+  BasicBlock *MainBB = Builder->GetInsertBlock();
+
+  Builder->CreateCall(F);
+  Builder->SetInsertPoint(BB);
+  Builder->CreateRetVoid();
+  Builder->SetInsertPoint(MainBB);
+
+  return Error::success();
+}
+
+llvm::Expected<llvm::GlobalVariable *> Translator::import(llvm::StringRef Func)
+{
+  Value *V = nullptr;
+
+  // lookup function
+  Function *LF = LCModule->getFunction(Func);
+  if (!LF) {
+    SBTError SE;
+    SE << "Function not found: " << Func;
+    return error(SE);
+  }
+  FunctionType *FT = LF->getFunctionType();
+
+  // declare function in our module
+  Function::Create(FT, GlobalValue::ExternalLinkage, Func, Module);
+
+  V = Module->getValueSymbolTable().lookup(Func);
+  assert(V);
+  Constant *Sym = cast<Constant>(V);
+
+  // create function pointer
+  std::string RV32Func = "rv32_" + Func.str();
+  GlobalVariable *FP = new GlobalVariable(*Module,
+    FT->getPointerTo(), CONSTANT, GlobalValue::PrivateLinkage,
+    Sym, RV32Func);
+
+  /*
+  BasicBlock *CurBB = Builder->GetInsertBlock();
+
+  Function *FST = Module->getFunction("rv32_startup");
+  assert(FST);
+
+  // insert code to set up pointer at rv32_startup()
+  BasicBlock *BB = &FST->getEntryBlock();
+  Builder->SetInsertPoint(BB->getTerminator());
+
+  //llvm::EngineBuilder EB;
+  //void *RawPtr = LLVM_ExecutionEngine::get->getPointerToFunction(F);
+
+  Builder->CreateStore(Sym, FP);
+
+  Builder->SetInsertPoint(CurBB);
+  */
+  return FP;
+}
 
 #if SBT_DEBUG
 static std::string getMDName(const llvm::StringRef &S)
