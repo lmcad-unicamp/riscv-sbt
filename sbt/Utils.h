@@ -4,6 +4,7 @@
 #include <llvm/Support/Error.h>
 #include <llvm/Support/raw_ostream.h>
 
+#include <functional>
 #include <type_traits>
 #include <vector>
 
@@ -63,6 +64,45 @@ create(Args&&... args)
   if (E)
     return std::move(E);
   return std::move(Inst);
+}
+
+class OnScopeExit
+{
+public:
+  typedef std::function<void()> FnType;
+
+  OnScopeExit(FnType&& Fn) :
+    Fn(std::move(Fn))
+  {}
+
+  ~OnScopeExit()
+  {
+    Fn();
+  }
+
+private:
+  FnType Fn;
+};
+
+
+static inline llvm::Error noError()
+{
+  llvm::Error E = llvm::Error::success();
+  llvm::consumeError(std::move(E));
+  return E;
+}
+
+
+template <typename T>
+bool exp(llvm::Expected<T> Exp, T& Val, llvm::Error& E)
+{
+  if (!Exp) {
+    E = std::move(Exp.takeError());
+    return false;
+  } else {
+    Val = std::move(Exp.get());
+    return true;
+  }
 }
 
 } // sbt

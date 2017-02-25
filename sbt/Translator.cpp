@@ -115,8 +115,7 @@ Error Translator::translate(const llvm::MCInst &Inst)
       updateNextBB(Iter->IKey);
   }
 
-  Error E = Error::success();
-  llvm::consumeError(std::move(E));
+  Error E = noError();
   BrWasLast = false;
 
   switch (Inst.getOpcode())
@@ -136,10 +135,13 @@ Error Translator::translate(const llvm::MCInst &Inst)
       SS << "auipc\t";
 
       unsigned O = getRD(Inst, SS);
-      Value *V = getImm(Inst, 1, SS);
+      auto ExpV = getImm(Inst, 1, SS);
+      if (!ExpV)
+        return ExpV.takeError();
+      Value *V = ExpV.get();
 
       // Add PC (CurAddr) if V is not a relocation
-      if (!isRelocation(V)) {
+      if (!LastImm.IsSym) {
         V = add(V, ConstantInt::get(I32, CurAddr));
         // Get upper 20 bits only
         V = Builder->CreateAnd(V, ConstantInt::get(I32, 0xFFFFF000));
@@ -148,9 +150,6 @@ Error Translator::translate(const llvm::MCInst &Inst)
       // Note: for relocations, the mask was already applied to the result
 
       store(V, O);
-
-      setRelInfo(O);
-      dbgprint(SS);
       break;
     }
 
@@ -170,8 +169,6 @@ Error Translator::translate(const llvm::MCInst &Inst)
 
       if (Error E = handleSyscall())
         return E;
-
-      dbgprint(SS);
       break;
     }
 
@@ -204,7 +201,10 @@ Error Translator::translate(const llvm::MCInst &Inst)
       SS << "lui\t";
 
       unsigned O = getRD(Inst, SS);
-      Value *Imm = getImm(Inst, 1, SS);
+      auto ExpImm = getImm(Inst, 1, SS);
+      if (!ExpImm)
+        return ExpImm.takeError();
+      Value *Imm = ExpImm.get();
 
       Value *V;
       if (LastImm.IsSym)
@@ -215,8 +215,6 @@ Error Translator::translate(const llvm::MCInst &Inst)
       }
       store(V, O);
 
-      setRelInfo(O);
-      dbgprint(SS);
       break;
     }
 
@@ -225,7 +223,10 @@ Error Translator::translate(const llvm::MCInst &Inst)
 
       Value *RS1 = getReg(Inst, 0, SS);
       Value *RS2 = getReg(Inst, 1, SS);
-      Value *Imm = getImm(Inst, 2, SS);
+      auto ExpImm = getImm(Inst, 2, SS);
+      if (!ExpImm)
+        return ExpImm.takeError();
+      Value *Imm = ExpImm.get();
 
       Value *V = add(RS1, Imm);
 
@@ -234,8 +235,6 @@ Error Translator::translate(const llvm::MCInst &Inst)
       updateFirst(Ptr);
       V = Builder->CreateStore(RS2, Ptr);
       updateFirst(V);
-
-      dbgprint(SS);
       break;
     }
 
@@ -248,6 +247,7 @@ Error Translator::translate(const llvm::MCInst &Inst)
   if (E)
     return E;
 
+  dbgprint(SS);
   assert(First && "No First Instruction!");
   InstrMap(CurAddr, std::move(First));
   return Error::success();
@@ -571,85 +571,8 @@ Error Translator::buildStack()
 }
 
 
-Expected<Value *> Translator::call(StringRef Func)
-{
-  // Load LibC module
-  if (!LCModule) {
-    if (!LIBC_BC) {
-      SBTError SE;
-      SE << "libc.bc file not found";
-      return error(SE);
-    }
-
-    auto Res = MemoryBuffer::getFile(*LIBC_BC);
-    if (!Res)
-      return errorCodeToError(Res.getError());
-    MemoryBufferRef Buf = **Res;
-
-    auto ExpMod = parseBitcodeFile(Buf, *Context);
-    if (!ExpMod)
-      return ExpMod.takeError();
-    LCModule = std::move(*ExpMod);
-  }
-
-  // Get function pointer
-  std::string RV32Func = "rv32_" + Func.str();
-  GlobalVariable *FP = Module->getGlobalVariable(RV32Func, ALLOW_INTERNAL);
-  llvm::Value *V = nullptr;
-  // "Import" function from LibC module if not found
-  if (!FP) {
-    auto ExpFP = import(Func);
-    if (!ExpFP)
-      return ExpFP.takeError();
-    FP = ExpFP.get();
-  }
-
-  // Get FunctionType
-  auto PT = cast<PointerType>(FP->getValueType());
-  auto ET = PT->getPointerElementType();
-  FunctionType *FT = cast<FunctionType>(ET);
-  unsigned NumParams = FT->getNumParams();
-  assert(NumParams < 9 &&
-      "External functions with more than 8 arguments are not supported!");
-  // Get Function Pointer Value
-  llvm::Value *FPV = Builder->CreateLoad(FP);
-  updateFirst(FPV);
-
-  // Build Args
-  std::vector<Value *> Args;
-  unsigned Reg = RV_A0;
-  unsigned I = 0;
-  for (; I < NumParams; I++) {
-    Value *V = load(Reg++);
-    Type *Ty = FT->getParamType(I);
-
-    // need to cast?
-    if (Ty != I32) {
-      V = Builder->CreateBitOrPointerCast(V, Ty);
-      updateFirst(V);
-    }
-
-    Args.push_back(V);
-  }
-
-  // VarArgs: passing 4 extra args for now
-  if (FT->isVarArg()) {
-    unsigned N = MIN(I + 4, 8);
-    for (; I < N; I++)
-      Args.push_back(load(Reg++));
-  }
-
-  // Call the Function
-  if (FT->getReturnType()->isVoidTy())
-    V = Builder->CreateCall(FPV, Args);
-  else
-    V = Builder->CreateCall(FPV, Args, FP->getName());
-  updateFirst(V);
-  return V;
-}
-
-
-llvm::Value *Translator::handleRelocation(llvm::raw_ostream &SS)
+llvm::Expected<llvm::Value *>
+Translator::handleRelocation(llvm::raw_ostream &SS)
 {
   LastImm.IsSym = false;
 
@@ -719,10 +642,23 @@ llvm::Value *Translator::handleRelocation(llvm::raw_ostream &SS)
   }
   SS << SR.Name << ") = " << SR.Addr;
 
-  // Now add the relocation offset to ShadowImage to get the final address
-  llvm::Value *V;
-  if (SR.Sec) {
-    // Get char * to memory
+  Value *V = nullptr;
+  // special case: external functions: return our handler instead
+  if (SR.isExternal()) {
+    auto ExpF = import(SR.Name);
+    if (!ExpF)
+      return ExpF.takeError();
+    Function *F = ExpF.get();
+    V = Module->getValueSymbolTable().lookup(F->getName());
+    assert(V && "External function handler not found");
+    V = Builder->CreatePtrToInt(V, I32);
+    updateFirst(V);
+    V = Builder->CreateAnd(V, llvm::ConstantInt::get(I32, Mask));
+    updateFirst(V);
+
+  // add the relocation offset to ShadowImage to get the final address
+  } else if (SR.Sec) {
+    // get char * to memory
     std::vector<llvm::Value *> Idx = { ZERO,
       llvm::ConstantInt::get(I32, SR.Val) };
     V = Builder->CreateGEP(ShadowImage, Idx);
@@ -733,8 +669,9 @@ llvm::Value *Translator::handleRelocation(llvm::raw_ostream &SS)
     // Finally, get only the upper or lower part of the result
     V = Builder->CreateAnd(V, llvm::ConstantInt::get(I32, Mask));
     updateFirst(V);
+
   } else
-    V = ZERO;
+    llvm_unreachable("Failed to resolve relocation");
 
   LastImm.IsSym = true;
   LastImm.SymRel = std::move(SR);
@@ -759,9 +696,12 @@ llvm::Error Translator::translateALUOp(
   unsigned O = getRD(Inst, SS);
   Value *O1 = getReg(Inst, 1, SS);
   Value *O2;
-  if (HasImm)
-    O2 = getImm(Inst, 2, SS);
-  else
+  if (HasImm) {
+    auto ExpImm = getImm(Inst, 2, SS);
+    if (!ExpImm)
+      return ExpImm.takeError();
+    O2 = ExpImm.get();
+  } else
     O2 = getReg(Inst, 2, SS);
 
   Value *V;
@@ -779,8 +719,6 @@ llvm::Error Translator::translateALUOp(
 
   store(V, O);
 
-  setRelInfo(O);
-  dbgprint(SS);
   return Error::success();
 }
 
@@ -815,7 +753,10 @@ Error Translator::translateLoad(
 
   unsigned O = getRD(Inst, SS);
   Value *RS1 = getReg(Inst, 1, SS);
-  Value *Imm = getImm(Inst, 2, SS);
+  auto ExpImm = getImm(Inst, 2, SS);
+  if (!ExpImm)
+    return ExpImm.takeError();
+  Value *Imm = ExpImm.get();
 
   Value *V = add(RS1, Imm);
 
@@ -862,8 +803,6 @@ Error Translator::translateLoad(
   }
   store(V, O);
 
-  setRelInfo(O);
-  dbgprint(SS);
   return Error::success();
 }
 
@@ -885,6 +824,8 @@ llvm::Error Translator::translateBranch(
   }
   SS << '\t';
 
+  Error E = noError();
+
   // Get Operands
   unsigned O0N = getRegNum(0, Inst, SS);
   Value *O0 = nullptr;
@@ -897,7 +838,8 @@ llvm::Error Translator::translateBranch(
   switch (BT) {
     case JAL:
       LinkReg = O0N;
-      O1 = getImm(Inst, 1, SS);
+      if (!exp(getImm(Inst, 1, SS), O1, E))
+        return E;
       JImm = O1;
       break;
 
@@ -905,7 +847,8 @@ llvm::Error Translator::translateBranch(
       LinkReg = O0N;
       O1N = getRegNum(1, Inst, SS);
       O1 = getReg(Inst, 1, SS);
-      O2 = getImm(Inst, 2, SS);
+      if (!exp(getImm(Inst, 2, SS), O2, E))
+        return E;
       JReg = O1;
       JImm = O2;
       break;
@@ -915,7 +858,8 @@ llvm::Error Translator::translateBranch(
     case BLTU:
       O0 = getReg(Inst, 0, SS);
       O1 = getReg(Inst, 1, SS);
-      O2 = getImm(Inst, 2, SS);
+      if (!exp(getImm(Inst, 2, SS), O2, E))
+        return E;
       JImm = O2;
       break;
   }
@@ -925,15 +869,6 @@ llvm::Error Translator::translateBranch(
   if (isa<ConstantInt>(JImm)) {
     JImmI = cast<ConstantInt>(JImm)->getValue().getSExtValue();
     JImmIsZeroImm = JImmI == 0 && !LastImm.IsSym;
-  }
-  bool Done = false;
-  bool JRegIsExtSym = false;
-  if (BT == JALR) {
-    const auto& JRegSym = XSyms[O1N];
-    if (JRegSym.IsValid && JRegSym.Addr == 0 && !JRegSym.Sec) {
-      JRegIsExtSym = true;
-      assert(!JRegSym.Name.empty());
-    }
   }
   Value *V = nullptr;
 
@@ -948,26 +883,6 @@ llvm::Error Translator::translateBranch(
     else
       V = Builder->CreateRetVoid();
     updateFirst(V);
-    Done = true;
-
-  // External call?
-  } else if (BT == JALR &&
-    O0N == RV_RA &&
-    JRegIsExtSym)
-  {
-    StringRef SymbolName = XSyms[O1N].Name;
-
-    auto ExpV = call(SymbolName);
-    if (!ExpV)
-      return ExpV.takeError();
-    V = *ExpV;
-    if (!V->getType()->isVoidTy())
-      store(V, RV_A0);
-    Done = true;
-  }
-
-  if (Done) {
-    dbgprint(SS);
     return Error::success();
   }
 
@@ -995,13 +910,8 @@ llvm::Error Translator::translateBranch(
 
     // No immediate
     } else if (JImmIsZeroImm) {
-      SR = XSyms[O1N];
-      if (SR.IsValid)
-        Act = JUMP_TO_SYMBOL;
-      else {
-        V = JReg;
-        Act = IJUMP;
-      }
+      V = JReg;
+      Act = IJUMP;
 
     // Base + Offset
     } else {
@@ -1024,9 +934,14 @@ llvm::Error Translator::translateBranch(
   }
 
   if (Act == JUMP_TO_SYMBOL) {
-    assert(SR.Sec && SR.Sec->isText() && "Jump to non Text Section!");
-    Target = SR.Addr;
-    Act = JUMP_TO_OFFS;
+    if (SR.isExternal()) {
+      V = JImm;
+      Act = IJUMP;
+    } else {
+      assert(SR.Sec && SR.Sec->isText() && "Jump to non Text Section!");
+      Target = SR.Addr;
+      Act = JUMP_TO_OFFS;
+    }
   }
 
   // Evaluate condition
@@ -1066,7 +981,6 @@ llvm::Error Translator::translateBranch(
       break;
   }
 
-  dbgprint(SS);
   return Error::success();
 }
 
@@ -1193,18 +1107,25 @@ llvm::Error Translator::handleIJump(
   llvm::Value *Target,
   unsigned LinkReg)
 {
-  // TODO
+  assert(LinkReg == RV_RA);
 
-  /*
+  uint64_t NextInstrAddr = CurAddr + 4;
+  BasicBlock *CurBB = Builder->GetInsertBlock();
+
+  BasicBlock *TargetBB = BasicBlock::Create(
+    *Context, getBBName(NextInstrAddr), CurBB->getParent());
+  BBMap(NextInstrAddr, std::move(TargetBB));
+
   // Link
-  if (LinkReg != RV_ZERO)
-    store(ConstantInt::get(I32, CurAddr + 4), LinkReg);
+  store(ConstantInt::get(I32, NextInstrAddr), LinkReg);
+
+
 
   Value *V = Builder->CreateIntToPtr(Target, I32Ptr);
   updateFirst(V);
   V = Builder->CreateIndirectBr(V);
+  // Builder->CreateCall(V);
   updateFirst(V);
-  */
 
   return Error::success();
 }
@@ -1227,9 +1148,32 @@ llvm::Error Translator::startup()
   return Error::success();
 }
 
-llvm::Expected<llvm::GlobalVariable *> Translator::import(llvm::StringRef Func)
+llvm::Expected<llvm::Function *> Translator::import(llvm::StringRef Func)
 {
-  Value *V = nullptr;
+  std::string RV32Func = "rv32_" + Func.str();
+
+  // check if the function was already processed
+  if (Function *F = Module->getFunction(RV32Func))
+    return F;
+
+  // Load LibC module
+  if (!LCModule) {
+    if (!LIBC_BC) {
+      SBTError SE;
+      SE << "libc.bc file not found";
+      return error(SE);
+    }
+
+    auto Res = MemoryBuffer::getFile(*LIBC_BC);
+    if (!Res)
+      return errorCodeToError(Res.getError());
+    MemoryBufferRef Buf = **Res;
+
+    auto ExpMod = parseBitcodeFile(Buf, *Context);
+    if (!ExpMod)
+      return ExpMod.takeError();
+    LCModule = std::move(*ExpMod);
+  }
 
   // lookup function
   Function *LF = LCModule->getFunction(Func);
@@ -1240,37 +1184,62 @@ llvm::Expected<llvm::GlobalVariable *> Translator::import(llvm::StringRef Func)
   }
   FunctionType *FT = LF->getFunctionType();
 
-  // declare function in our module
-  Function::Create(FT, GlobalValue::ExternalLinkage, Func, Module);
+  // declare imported function in our module
+  Function *IF =
+    Function::Create(FT, GlobalValue::ExternalLinkage, Func, Module);
 
-  V = Module->getValueSymbolTable().lookup(Func);
-  assert(V);
-  Constant *Sym = cast<Constant>(V);
+  // create our caller to the external function
+  FunctionType *VFT = FunctionType::get(Builder->getVoidTy(), !VAR_ARG);
+  Function *F =
+    Function::Create(VFT, GlobalValue::PrivateLinkage, RV32Func, Module);
 
-  // create function pointer
-  std::string RV32Func = "rv32_" + Func.str();
-  GlobalVariable *FP = new GlobalVariable(*Module,
-    FT->getPointerTo(), CONSTANT, GlobalValue::PrivateLinkage,
-    Sym, RV32Func);
+  BasicBlock *BB = BasicBlock::Create(*Context, "entry", F);
+  BasicBlock *PrevBB = Builder->GetInsertBlock();
+  Builder->SetInsertPoint(BB);
 
-  /*
-  BasicBlock *CurBB = Builder->GetInsertBlock();
+  OnScopeExit RestoreInsertPoint(
+    [this, PrevBB]() {
+      Builder->SetInsertPoint(PrevBB);
+    });
 
-  Function *FST = Module->getFunction("rv32_startup");
-  assert(FST);
+  unsigned NumParams = FT->getNumParams();
+  assert(NumParams < 9 &&
+      "External functions with more than 8 arguments are not supported!");
 
-  // insert code to set up pointer at rv32_startup()
-  BasicBlock *BB = &FST->getEntryBlock();
-  Builder->SetInsertPoint(BB->getTerminator());
+  // build Args
+  std::vector<Value *> Args;
+  unsigned Reg = RV_A0;
+  unsigned I = 0;
+  for (; I < NumParams; I++) {
+    Value *V = load(Reg++);
+    Type *Ty = FT->getParamType(I);
 
-  //llvm::EngineBuilder EB;
-  //void *RawPtr = LLVM_ExecutionEngine::get->getPointerToFunction(F);
+    // need to cast?
+    if (Ty != I32)
+      V = Builder->CreateBitOrPointerCast(V, Ty);
 
-  Builder->CreateStore(Sym, FP);
+    Args.push_back(V);
+  }
 
-  Builder->SetInsertPoint(CurBB);
-  */
-  return FP;
+  // VarArgs: passing 4 extra args for now
+  if (FT->isVarArg()) {
+    unsigned N = MIN(I + 4, 8);
+    for (; I < N; I++)
+      Args.push_back(load(Reg++));
+  }
+
+  // call the Function
+  if (FT->getReturnType()->isVoidTy())
+    Builder->CreateCall(IF, Args);
+  else {
+    Value *V = Builder->CreateCall(IF, Args, IF->getName());
+    store(V, RV_A0);
+  }
+
+  Value *V = load(RV_RA);
+  Value *Ptr = Builder->CreateIntToPtr(V, I32Ptr);
+  Builder->CreateIndirectBr(Ptr);
+  return F;
 }
 
 #if SBT_DEBUG

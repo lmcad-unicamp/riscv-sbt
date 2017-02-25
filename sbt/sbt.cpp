@@ -9,6 +9,7 @@
 #include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/Verifier.h>
 #include <llvm/MC/MCAsmInfo.h>
 #include <llvm/MC/MCContext.h>
 #include <llvm/MC/MCDisassembler/MCDisassembler.h>
@@ -182,6 +183,14 @@ Error SBT::run()
     if (E)
       return E;
   }
+
+  if (llvm::verifyModule(*Module, &DBGS)) {
+    SBTError SE;
+    SE << "Translation produced invalid bitcode!";
+    dump();
+    return error(SE);
+  }
+
   return Error::success();
 }
 

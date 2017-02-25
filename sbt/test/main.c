@@ -22,6 +22,8 @@ int Z = 0;
 
 int main()
 {
+  puts("Hello\n");
+  /*
   int i;
 
   for (i = 0; i < N; i++)
@@ -38,6 +40,7 @@ int main()
   //printf("Z=%d\n", Z);
   //Z = 567;
   //printf("Z=%d\n", Z);
+  */
 
   return 0;
 }

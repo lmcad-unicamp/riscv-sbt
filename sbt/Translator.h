@@ -133,7 +133,7 @@ public:
 
   llvm::Error startup();
 
-  llvm::Expected<llvm::GlobalVariable *> import(llvm::StringRef Func);
+  llvm::Expected<llvm::Function *> import(llvm::StringRef Func);
 
   void setCurAddr(uint64_t Addr)
   {
@@ -285,8 +285,6 @@ private:
     return V;
   }
 
-  llvm::Expected<llvm::Value *> call(llvm::StringRef Func);
-
   // Get RISC-V register number
   static unsigned RVReg(unsigned Reg);
 
@@ -329,7 +327,7 @@ private:
   }
 
   // Get register or immediate
-  llvm::Value *getRegOrImm(
+  llvm::Expected<llvm::Value *> getRegOrImm(
     const llvm::MCInst &Inst,
     int Op,
     llvm::raw_ostream &SS)
@@ -344,23 +342,22 @@ private:
   }
 
   // Get immediate
-  llvm::Value *getImm(
+  llvm::Expected<llvm::Value *> getImm(
     const llvm::MCInst &Inst,
     int Op,
     llvm::raw_ostream &SS)
   {
-    if (llvm::Value *V = handleRelocation(SS))
+    auto ExpV = handleRelocation(SS);
+    if (!ExpV)
+      return ExpV.takeError();
+    llvm::Value *V = ExpV.get();
+    if (V)
       return V;
 
     int64_t Imm = Inst.getOperand(Op).getImm();
-    llvm::Value *V = llvm::ConstantInt::get(I32, Imm);
+    V = llvm::ConstantInt::get(I32, Imm);
     SS << llvm::formatv("0x{0:X-4}", uint32_t(Imm));
     return V;
-  }
-
-  bool isRelocation(const llvm::Value *V) const
-  {
-    return !llvm::isa<llvm::ConstantInt>(V);
   }
 
   llvm::Value *i8PtrToI32(llvm::Value *V8)
@@ -377,22 +374,7 @@ private:
     return V;
   }
 
-  // Handle relocation.
-  // Returns true if Rel was relocated.
-  llvm::Value *handleRelocation(llvm::raw_ostream &SS);
-
-  void setRelInfo(unsigned Reg)
-  {
-    if (LastImm.IsSym)
-      XSyms[Reg] = LastImm.SymRel;
-    else
-      XSyms[Reg].IsValid = false;
-  }
-
-  void resetRelInfo(unsigned Reg)
-  {
-    XSyms[Reg].IsValid = false;
-  }
+  llvm::Expected<llvm::Value *> handleRelocation(llvm::raw_ostream &SS);
 
   static std::string getBBName(uint64_t Addr)
   {
