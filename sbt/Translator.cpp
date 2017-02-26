@@ -127,6 +127,9 @@ Error Translator::translate(const llvm::MCInst &Inst)
     case RISCV::ADDI:
       E = translateALUOp(Inst, ADD, true, SS);
       break;
+    case RISCV::MUL:
+      E = translateALUOp(Inst, MUL, false, SS);
+      break;
     case RISCV::SLLI:
       E = translateALUOp(Inst, SLL, true, SS);
       break;
@@ -159,6 +162,9 @@ Error Translator::translate(const llvm::MCInst &Inst)
       break;
     case RISCV::BGE:
       E = translateBranch(Inst, BGE, SS);
+      break;
+    case RISCV::BLT:
+      E = translateBranch(Inst, BLT, SS);
       break;
     case RISCV::BLTU:
       E = translateBranch(Inst, BLTU, SS);
@@ -687,6 +693,7 @@ llvm::Error Translator::translateALUOp(
 {
   switch (Op) {
     case ADD: SS << "add"; break;
+    case MUL: SS << "mul"; break;
     case SLL: SS << "sll"; break;
   }
   if (HasImm)
@@ -709,6 +716,10 @@ llvm::Error Translator::translateALUOp(
   switch (Op) {
     case ADD:
       V = add(O1, O2);
+      break;
+
+    case MUL:
+      V = Builder->CreateMul(O1, O2);
       break;
 
     case SLL:
@@ -820,6 +831,7 @@ llvm::Error Translator::translateBranch(
     case JALR:  SS << "jalr"; break;
     case BEQ:   SS << "beq";  break;
     case BGE:   SS << "bge";  break;
+    case BLT:   SS << "blt";  break;
     case BLTU:  SS << "bltu"; break;
   }
   SS << '\t';
@@ -855,6 +867,7 @@ llvm::Error Translator::translateBranch(
 
     case BEQ:
     case BGE:
+    case BLT:
     case BLTU:
       O0 = getReg(Inst, 0, SS);
       O1 = getReg(Inst, 1, SS);
@@ -955,8 +968,13 @@ llvm::Error Translator::translateBranch(
       Cond = Builder->CreateICmpSGE(O0, O1);
       break;
 
+    case BLT:
+      Cond = Builder->CreateICmpSLT(O0, O1);
+      break;
+
     case BLTU:
       Cond = Builder->CreateICmpULT(O0, O1);
+      break;
 
     case JAL:
     case JALR:
@@ -1109,6 +1127,8 @@ llvm::Error Translator::handleIJump(
 {
   assert(LinkReg == RV_RA);
 
+  /*
+  // create BB for next instruction
   uint64_t NextInstrAddr = CurAddr + 4;
   BasicBlock *CurBB = Builder->GetInsertBlock();
 
@@ -1116,15 +1136,15 @@ llvm::Error Translator::handleIJump(
     *Context, getBBName(NextInstrAddr), CurBB->getParent());
   BBMap(NextInstrAddr, std::move(TargetBB));
 
-  // Link
+  // link
   store(ConstantInt::get(I32, NextInstrAddr), LinkReg);
+  */
 
-
-
-  Value *V = Builder->CreateIntToPtr(Target, I32Ptr);
+  // indirect call
+  FunctionType *FT = FunctionType::get(Builder->getVoidTy(), !VAR_ARG);
+  Value *V = Builder->CreateIntToPtr(Target, FT->getPointerTo());
   updateFirst(V);
-  V = Builder->CreateIndirectBr(V);
-  // Builder->CreateCall(V);
+  V = Builder->CreateCall(V);
   updateFirst(V);
 
   return Error::success();
@@ -1229,16 +1249,18 @@ llvm::Expected<llvm::Function *> Translator::import(llvm::StringRef Func)
   }
 
   // call the Function
-  if (FT->getReturnType()->isVoidTy())
-    Builder->CreateCall(IF, Args);
-  else {
-    Value *V = Builder->CreateCall(IF, Args, IF->getName());
+  Value *V;
+  if (FT->getReturnType()->isVoidTy()) {
+    V = Builder->CreateCall(IF, Args);
+    updateFirst(V);
+  } else {
+    V = Builder->CreateCall(IF, Args, IF->getName());
+    updateFirst(V);
     store(V, RV_A0);
   }
 
-  Value *V = load(RV_RA);
-  Value *Ptr = Builder->CreateIntToPtr(V, I32Ptr);
-  Builder->CreateIndirectBr(Ptr);
+  V = Builder->CreateRetVoid();
+  updateFirst(V);
   return F;
 }
 

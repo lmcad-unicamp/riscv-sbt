@@ -312,7 +312,9 @@ Error SBT::translate(const std::string &File)
           if (E)
             return E;
         } else {
-          SE << "Invalid instruction encoding";
+          Inst.dump();
+          SE << "Invalid instruction encoding: ";
+          SE << formatv("{0:X-8}", Inst.getOpcode());
           return error(SE);
         }
 

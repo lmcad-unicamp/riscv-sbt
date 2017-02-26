@@ -387,6 +387,7 @@ private:
 
   enum ALUOp {
     ADD,
+    MUL,
     SLL
   };
 
@@ -414,6 +415,7 @@ private:
     JALR,
     BEQ,
     BGE,
+    BLT,
     BLTU
   };
 
