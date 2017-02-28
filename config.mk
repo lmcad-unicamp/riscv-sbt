@@ -63,6 +63,7 @@ RV32_CRT0     := $(RV32_LIB)/crt0.o
 RV32_LD_FLAGS0 := -L$(RV32_LIB) -L$(RV32_LIB_GCC) \
                   -dT ldscripts/elf32lriscv.x $(RV32_CRT0)
 RV32_LD_FLAGS1 := -lc -lgloss -lc -lgcc
+RV32_PREFIX    := rv32
 
 # x86
 X86_CLANG       := $(CLANG)
@@ -78,3 +79,5 @@ X86_LGCC        := $(X86_LIB_GCC)/libgcc.a
 X86_LC          := $(X86_LIB)/libc.a
 X86_LD_FLAGS0   := $(X86_CRT1) $(X86_CRTI)
 X86_LD_FLAGS1   := $(X86_LC) $(X86_LGCC) $(X86_LC) $(X86_CRTN)
+X86_MARCH       := x86
+X86_PREFIX      := x86

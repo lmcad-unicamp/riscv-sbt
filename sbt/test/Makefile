@@ -63,6 +63,23 @@ $(eval $(call RUN,X86,rv32-x86-main))
 $(eval $(call CLEAN,rv32-x86-main,all))
 X86_LIBS =
 
+### RV32 Translator unit tests ###
+
+$(eval $(call ASNCLINK,RV32,rv32-load-store,,save-run.out))
+$(eval $(call TRANSLATE,RV32,X86,load-store))
+
+TESTS := load-store
+RV32_TESTS := $(foreach test,$(TESTS),rv32-$(test))
+RV32_X86_TESTS := $(foreach test,$(TESTS),rv32-x86-$(test))
+
+tests: $(RV32_TESTS) $(RV32_X86_TESTS)
+
+run-tests: tests $(foreach test,$(TESTS),test-$(test))
+	@echo "All tests passed!"
+
+clean-tests: $(foreach test,$(TESTS),clean-rv32-$(test)) \
+  $(foreach test,$(TEST_TARGETS),clean-$(test))
+
 ###
 
 run: $(foreach prog,$(RUN_BINS),run-$(prog))

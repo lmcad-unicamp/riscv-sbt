@@ -11,12 +11,21 @@ endef
 # RUN
 # 1: prefix
 # 2: program
+# 3: save output?
 define RUN
 run-$(2): $(2)
 ifeq ($$($(1)_RUN),)
+  ifeq ($(3),)
 	./$(2)
+  else
+	./$(2) | tee $(2).out
+  endif
 else
+  ifeq ($(3),)
 	$$($(1)_RUN) $(2)
+  else
+	$$($(1)_RUN) $(2) | tee $(2).out
+  endif
 endif
 endef
 
@@ -48,6 +57,18 @@ $(2): $(2).o
 	$$($(1)_LD) -o $$@ $$< $($(1)_LIBS)
 endef
 
+# Assemble and link with C libs
+# 1: prefix
+# 2: output module
+# 3: clean .s?
+# 4: save run output?
+define ASNCLINK
+$(call AS,$(1),$(2))
+$(call CLINK,$(1),$(2))
+$(call RUN,$(1),$(2),$(4))
+$(call CLEAN,$(2),$(3))
+endef
+
 # BUILD
 # 1: prefix
 # 2: output module
@@ -71,6 +92,27 @@ endif
 
 $(call RUN,$(1),$(2))
 $(call CLEAN,$(2),$(4))
+endef
+
+# TRANSLATE BINARY
+# 1: guest arch
+# 2: host arch
+# 3: module name, without extension and arch prefix
+define TRANSLATE
+# .o -> .bc
+$($(1)_PREFIX)-$($(2)_PREFIX)-$(3).bc: $($(1)_PREFIX)-$(3).o
+	riscv-sbt -o $$@ $$<
+
+# .bc -> .s
+$($(1)_PREFIX)-$($(2)_PREFIX)-$(3).s: $($(1)_PREFIX)-$($(2)_PREFIX)-$(3).bc
+	llc -O0 -o $$@ -march $($(2)_MARCH) $$<
+
+$(eval $(2)_LIBS = $($(2)_SYSCALL_O) $($(2)_RVSC_O))
+$(call ASNCLINK,$(2),$($(1)_PREFIX)-$($(2)_PREFIX)-$(3),clean.s,save-run.out)
+$(eval $(2)_LIBS =)
+
+test-$(3): run-$($(1)_PREFIX)-$(3) run-$($(1)_PREFIX)-$($(2)_PREFIX)-$(3)
+	diff $($(1)_PREFIX)-$(3).out $($(1)_PREFIX)-$($(2)_PREFIX)-$(3).out
 endef
 
 # NBUILD: native build
