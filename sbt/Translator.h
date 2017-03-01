@@ -387,6 +387,7 @@ private:
 
   enum ALUOp {
     ADD,
+    OR,
     MUL,
     SLL
   };
@@ -406,6 +407,11 @@ private:
   };
 
   llvm::Error translateLoad(
+    const llvm::MCInst &Inst,
+    IntType IT,
+    llvm::raw_string_ostream &SS);
+
+  llvm::Error translateStore(
     const llvm::MCInst &Inst,
     IntType IT,
     llvm::raw_string_ostream &SS);

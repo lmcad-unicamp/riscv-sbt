@@ -458,6 +458,4 @@ lc:
 .PHONY: test
 test:
 	$(MAKE) $(SBT)-build1 $(SBT)-install
-	touch $(TOPDIR)/sbt/test/main.c
-	$(MAKE) -C $(TOPDIR)/sbt/test all
-	$(TOPDIR)/sbt/test/rv32-x86-main
+	$(MAKE) -C $(TOPDIR)/sbt/test clean-tests run-tests

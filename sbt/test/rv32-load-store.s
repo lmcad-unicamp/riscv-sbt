@@ -1,3 +1,13 @@
+# 01 lb
+# 02 lbu
+# 03 lh
+# 04 lhu
+# 05 lw
+# 06 lui
+# 07 sb
+# 08 sh
+# 09 sw
+
 .text
 .global main
 main:
@@ -12,6 +22,8 @@ main:
   lui a0, %hi(str)
   addi a0, a0, %lo(str)
   jalr ra, s2, 0
+
+  ### load ###
 
   # lb
   # b0
@@ -103,6 +115,66 @@ main:
   add a2, a1, zero
   jalr ra, s2, 0
 
+  # lui
+  lui a0, %hi(w_fmt)
+  addi a0, a0, %lo(w_fmt)
+  lui a1, 0xCDEF5
+  jalr ra, s2, 0
+
+  ### store ###
+
+  lui s3, %hi(s)
+  addi s3, s3, %lo(s)
+
+  lui s4, %hi(s_fmt)
+  addi s4, s4, %lo(s_fmt)
+
+  # sb
+  # signed
+  addi t0, zero, -128
+  sb t0, 0(s3)
+  add a0, zero, s4
+  lw a1, 0(s3)
+  jalr ra, s2, 0
+  # unsigned
+  addi t0, zero, 255
+  sb t0, 0(s3)
+  add a0, zero, s4
+  lw a1, 0(s3)
+  jalr ra, s2, 0
+
+  # sh
+  # signed
+  lui t0, 0x10
+  addi t0, t0, -1
+  sh t0, 0(s3)
+  add a0, zero, s4
+  lw a1, 0(s3)
+  jalr ra, s2, 0
+  # unsigned
+  lui t0, 0x8
+  addi t0, t0, -1
+  sh t0, 0(s3)
+  add a0, zero, s4
+  lw a1, 0(s3)
+  jalr ra, s2, 0
+
+  # sw
+  # signed
+  lui t0, 0x80012
+  addi t0, t0, 0x345
+  sw t0, 0(s3)
+  add a0, zero, s4
+  lw a1, 0(s3)
+  jalr ra, s2, 0
+  # unsigned
+  lui t0, 0x80000
+  addi t0, t0, -1
+  sw t0, 0(s3)
+  add a0, zero, s4
+  lw a1, 0(s3)
+  jalr ra, s2, 0
+
   # restore ra
   add ra, zero, s1
 
@@ -133,3 +205,7 @@ hu1_fmt: .asciz "hu1=%hu 0x%08X\n"
 w: .dword 0x89ABCDEF
 w0_fmt: .asciz "w0=%i 0x%08X\n"
 w1_fmt: .asciz "w1=%u 0x%08X\n"
+w_fmt: .asciz "w=0x%08X\n"
+
+s: .dword 0
+s_fmt: .asciz "s=0x%08X\n"

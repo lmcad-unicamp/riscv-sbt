@@ -34,10 +34,10 @@ Translator::Translator(
   llvm::Module *Mod)
   :
   I32(Type::getInt32Ty(*Ctx)),
-  I16(Type::getInt32Ty(*Ctx)),
-  I8(Type::getInt32Ty(*Ctx)),
+  I16(Type::getInt16Ty(*Ctx)),
+  I8(Type::getInt8Ty(*Ctx)),
   I32Ptr(Type::getInt32PtrTy(*Ctx)),
-  I16Ptr(Type::getInt32PtrTy(*Ctx)),
+  I16Ptr(Type::getInt16PtrTy(*Ctx)),
   I8Ptr(Type::getInt8PtrTy(*Ctx)),
   ZERO(ConstantInt::get(I32, 0)),
   Context(Ctx),
@@ -126,6 +126,12 @@ Error Translator::translate(const llvm::MCInst &Inst)
       break;
     case RISCV::ADDI:
       E = translateALUOp(Inst, ADD, true, SS);
+      break;
+    case RISCV::OR:
+      E = translateALUOp(Inst, OR, false, SS);
+      break;
+    case RISCV::ORI:
+      E = translateALUOp(Inst, OR, true, SS);
       break;
     case RISCV::MUL:
       E = translateALUOp(Inst, MUL, false, SS);
@@ -224,25 +230,15 @@ Error Translator::translate(const llvm::MCInst &Inst)
       break;
     }
 
-    case RISCV::SW: {
-      SS << "sw\t";
-
-      Value *RS1 = getReg(Inst, 0, SS);
-      Value *RS2 = getReg(Inst, 1, SS);
-      auto ExpImm = getImm(Inst, 2, SS);
-      if (!ExpImm)
-        return ExpImm.takeError();
-      Value *Imm = ExpImm.get();
-
-      Value *V = add(RS1, Imm);
-
-      Value *Ptr = Builder->CreateCast(
-        llvm::Instruction::CastOps::IntToPtr, V, I32Ptr);
-      updateFirst(Ptr);
-      V = Builder->CreateStore(RS2, Ptr);
-      updateFirst(V);
+    case RISCV::SB:
+      E = translateStore(Inst, U8, SS);
       break;
-    }
+    case RISCV::SH:
+      E = translateStore(Inst, U16, SS);
+      break;
+    case RISCV::SW:
+      E = translateStore(Inst, U32, SS);
+      break;
 
     default: {
       SE << "Unknown instruction opcode: " << Inst.getOpcode();
@@ -693,6 +689,7 @@ llvm::Error Translator::translateALUOp(
 {
   switch (Op) {
     case ADD: SS << "add"; break;
+    case OR:  SS << "or"; break;
     case MUL: SS << "mul"; break;
     case SLL: SS << "sll"; break;
   }
@@ -716,6 +713,10 @@ llvm::Error Translator::translateALUOp(
   switch (Op) {
     case ADD:
       V = add(O1, O2);
+      break;
+
+    case OR:
+      V = Builder->CreateOr(O1, O2);
       break;
 
     case MUL:
@@ -813,6 +814,75 @@ Error Translator::translateLoad(
       break;
   }
   store(V, O);
+
+  return Error::success();
+}
+
+
+Error Translator::translateStore(
+  const llvm::MCInst &Inst,
+  IntType IT,
+  llvm::raw_string_ostream &SS)
+{
+  switch (IT) {
+    case U8:
+      SS << "sb";
+      break;
+
+    case U16:
+      SS << "sh";
+      break;
+
+    case U32:
+      SS << "sw";
+      break;
+
+    default:
+      llvm_unreachable("Unknown store type!");
+  }
+  SS << '\t';
+
+
+  Value *RS1 = getReg(Inst, 0, SS);
+  Value *RS2 = getReg(Inst, 1, SS);
+  auto ExpImm = getImm(Inst, 2, SS);
+  if (!ExpImm)
+    return ExpImm.takeError();
+  Value *Imm = ExpImm.get();
+
+  Value *V = add(RS1, Imm);
+
+  Value *Ptr;
+  switch (IT) {
+    case U8:
+      Ptr = Builder->CreateCast(
+        llvm::Instruction::CastOps::IntToPtr, V, I8Ptr);
+      updateFirst(Ptr);
+      V = Builder->CreateTruncOrBitCast(RS2, I8);
+      updateFirst(V);
+      break;
+
+    case U16:
+      Ptr = Builder->CreateCast(
+        llvm::Instruction::CastOps::IntToPtr, V, I16Ptr);
+      updateFirst(Ptr);
+      V = Builder->CreateTruncOrBitCast(RS2, I16);
+      updateFirst(V);
+      break;
+
+    case U32:
+      Ptr = Builder->CreateCast(
+        llvm::Instruction::CastOps::IntToPtr, V, I32Ptr);
+      updateFirst(Ptr);
+      V = RS2;
+      break;
+
+    default:
+      llvm_unreachable("Unknown store type!");
+  }
+
+  V = Builder->CreateStore(V, Ptr);
+  updateFirst(V);
 
   return Error::success();
 }
