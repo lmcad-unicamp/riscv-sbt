@@ -65,12 +65,12 @@ X86_LIBS =
 
 ### RV32 Translator unit tests ###
 
-$(eval $(call ASNCLINK,RV32,rv32-load-store,,save-run.out))
-$(eval $(call TRANSLATE,RV32,X86,load-store))
-
-TESTS := load-store
+TESTS := load-store alu-ops
 RV32_TESTS := $(foreach test,$(TESTS),rv32-$(test))
 RV32_X86_TESTS := $(foreach test,$(TESTS),rv32-x86-$(test))
+
+$(eval $(foreach test,$(RV32_TESTS),$(call ASNCLINK,RV32,$(test),,save-run.out)))
+$(eval $(foreach test,$(TESTS),$(call TRANSLATE,RV32,X86,$(test))))
 
 tests: $(RV32_TESTS) $(RV32_X86_TESTS)
 
