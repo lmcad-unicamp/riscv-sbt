@@ -25,6 +25,8 @@ main:
   ### load ###
 
   # lb
+  la a0, lb_str
+  jalr ra, s2, 0
   # b0
   lui a0, %hi(b0_fmt)
   addi a0, a0, %lo(b0_fmt)
@@ -61,6 +63,8 @@ main:
   jalr ra, s2, 0
 
   # lh
+  la a0, lh_str
+  jalr ra, s2, 0
   # h0
   lui a0, %hi(h0_fmt)
   addi a0, a0, %lo(h0_fmt)
@@ -97,6 +101,8 @@ main:
   jalr ra, s2, 0
 
   # lw
+  la a0, lw_str
+  jalr ra, s2, 0
   # signed
   lui a0, %hi(w0_fmt)
   addi a0, a0, %lo(w0_fmt)
@@ -123,6 +129,8 @@ main:
   addi s4, s4, %lo(s_fmt)
 
   # sb
+  la a0, sb_str
+  jalr ra, s2, 0
   # signed
   addi t0, zero, -128
   sb t0, 0(s3)
@@ -137,6 +145,8 @@ main:
   jalr ra, s2, 0
 
   # sh
+  la a0, sh_str
+  jalr ra, s2, 0
   # signed
   lui t0, 0x10
   addi t0, t0, -1
@@ -153,6 +163,8 @@ main:
   jalr ra, s2, 0
 
   # sw
+  la a0, sw_str
+  jalr ra, s2, 0
   # signed
   lui t0, 0x80012
   addi t0, t0, 0x345
@@ -175,6 +187,9 @@ main:
 
   lui s4, %hi(a_fmt)
   addi s4, s4, %lo(a_fmt)
+
+  la a0, a_str
+  jalr ra, s2, 0
 
   # 0
   add a0, zero, s4
@@ -252,3 +267,11 @@ a:
 .word 0x89ABCDEF
 .word 0xCDEF0123
 a_fmt: .asciz "a=0x%08X\n"
+
+lb_str: .asciz "lb\n"
+lh_str: .asciz "lh\n"
+lw_str: .asciz "lw\n"
+sb_str: .asciz "sb\n"
+sh_str: .asciz "sh\n"
+sw_str: .asciz "sw\n"
+a_str:  .asciz "array\n"

@@ -122,45 +122,73 @@ Error Translator::translate(const llvm::MCInst &Inst)
   {
     // ALU Ops
     case RISCV::ADD:
-      E = translateALUOp(Inst, ADD, false, SS);
+      E = translateALUOp(Inst, ADD, AF_NONE, SS);
       break;
     case RISCV::ADDI:
-      E = translateALUOp(Inst, ADD, true, SS);
+      E = translateALUOp(Inst, ADD, AF_IMM, SS);
       break;
-    case RISCV::OR:
-      E = translateALUOp(Inst, OR, false, SS);
+    case RISCV::AND:
+      E = translateALUOp(Inst, AND, AF_NONE, SS);
       break;
-    case RISCV::ORI:
-      E = translateALUOp(Inst, OR, true, SS);
+    case RISCV::ANDI:
+      E = translateALUOp(Inst, AND, AF_IMM, SS);
       break;
     case RISCV::MUL:
-      E = translateALUOp(Inst, MUL, false, SS);
+      E = translateALUOp(Inst, MUL, AF_NONE, SS);
+      break;
+    case RISCV::OR:
+      E = translateALUOp(Inst, OR, AF_NONE, SS);
+      break;
+    case RISCV::ORI:
+      E = translateALUOp(Inst, OR, AF_IMM, SS);
+      break;
+    case RISCV::SLL:
+      E = translateALUOp(Inst, SLL, AF_NONE, SS);
       break;
     case RISCV::SLLI:
-      E = translateALUOp(Inst, SLL, true, SS);
+      E = translateALUOp(Inst, SLL, AF_IMM, SS);
+      break;
+    case RISCV::SLT:
+      E = translateALUOp(Inst, SLT, AF_NONE, SS);
+      break;
+    case RISCV::SLTU:
+      E = translateALUOp(Inst, SLT, AF_UNSIGNED, SS);
+      break;
+    case RISCV::SLTI:
+      E = translateALUOp(Inst, SLT, AF_IMM, SS);
+      break;
+    case RISCV::SLTIU:
+      E = translateALUOp(Inst, SLT, AF_IMM | AF_UNSIGNED, SS);
+      break;
+    case RISCV::SRA:
+      E = translateALUOp(Inst, SRA, AF_NONE, SS);
+      break;
+    case RISCV::SRAI:
+      E = translateALUOp(Inst, SRA, AF_IMM, SS);
+      break;
+    case RISCV::SRL:
+      E = translateALUOp(Inst, SRL, AF_NONE, SS);
+      break;
+    case RISCV::SRLI:
+      E = translateALUOp(Inst, SRL, AF_IMM, SS);
+      break;
+    case RISCV::SUB:
+      E = translateALUOp(Inst, SUB, AF_NONE, SS);
+      break;
+    case RISCV::XOR:
+      E = translateALUOp(Inst, XOR, AF_NONE, SS);
+      break;
+    case RISCV::XORI:
+      E = translateALUOp(Inst, XOR, AF_IMM, SS);
       break;
 
-    case RISCV::AUIPC: {
-      SS << "auipc\t";
-
-      unsigned O = getRD(Inst, SS);
-      auto ExpV = getImm(Inst, 1, SS);
-      if (!ExpV)
-        return ExpV.takeError();
-      Value *V = ExpV.get();
-
-      // Add PC (CurAddr) if V is not a relocation
-      if (!LastImm.IsSym) {
-        V = add(V, ConstantInt::get(I32, CurAddr));
-        // Get upper 20 bits only
-        V = Builder->CreateAnd(V, ConstantInt::get(I32, 0xFFFFF000));
-        updateFirst(V);
-      }
-      // Note: for relocations, the mask was already applied to the result
-
-      store(V, O);
+    // UI
+    case RISCV::AUIPC:
+      E = translateUI(Inst, AUIPC, SS);
       break;
-    }
+    case RISCV::LUI:
+      E = translateUI(Inst, LUI, SS);
+      break;
 
     // Branch
     case RISCV::BEQ:
@@ -175,21 +203,18 @@ Error Translator::translate(const llvm::MCInst &Inst)
     case RISCV::BLTU:
       E = translateBranch(Inst, BLTU, SS);
       break;
-
-    case RISCV::ECALL: {
-      SS << "ecall";
-
-      if (Error E = handleSyscall())
-        return E;
-      break;
-    }
-
     // Jump
     case RISCV::JAL:
       E = translateBranch(Inst, JAL, SS);
       break;
     case RISCV::JALR:
       E = translateBranch(Inst, JALR, SS);
+      break;
+
+    // ecall
+    case RISCV::ECALL:
+      SS << "ecall";
+      E = handleSyscall();
       break;
 
     // Load
@@ -209,27 +234,7 @@ Error Translator::translate(const llvm::MCInst &Inst)
       E = translateLoad(Inst, U32, SS);
       break;
 
-    case RISCV::LUI: {
-      SS << "lui\t";
-
-      unsigned O = getRD(Inst, SS);
-      auto ExpImm = getImm(Inst, 1, SS);
-      if (!ExpImm)
-        return ExpImm.takeError();
-      Value *Imm = ExpImm.get();
-
-      Value *V;
-      if (LastImm.IsSym)
-        V = Imm;
-      else {
-        V = Builder->CreateShl(Imm, ConstantInt::get(I32, 12));
-        updateFirst(V);
-      }
-      store(V, O);
-
-      break;
-    }
-
+    // Store
     case RISCV::SB:
       E = translateStore(Inst, U8, SS);
       break;
@@ -240,10 +245,9 @@ Error Translator::translate(const llvm::MCInst &Inst)
       E = translateStore(Inst, U32, SS);
       break;
 
-    default: {
+    default:
       SE << "Unknown instruction opcode: " << Inst.getOpcode();
       return error(SE);
-    }
   }
 
   if (E)
@@ -630,6 +634,7 @@ Translator::handleRelocation(llvm::raw_ostream &SS)
   }
 
   // Increment relocation iterator
+  RLast = RI;
   do {
     ++RI;
   } while (RI != RE && (**RI).offset() == CurAddr);
@@ -684,17 +689,28 @@ Translator::handleRelocation(llvm::raw_ostream &SS)
 llvm::Error Translator::translateALUOp(
   const llvm::MCInst &Inst,
   ALUOp Op,
-  bool HasImm,
+  uint32_t Flags,
   llvm::raw_string_ostream &SS)
 {
+  bool HasImm = Flags & AF_IMM;
+  bool IsUnsigned = Flags & AF_UNSIGNED;
+
   switch (Op) {
-    case ADD: SS << "add"; break;
-    case OR:  SS << "or"; break;
-    case MUL: SS << "mul"; break;
-    case SLL: SS << "sll"; break;
+    case ADD: SS << "add";  break;
+    case AND: SS << "and";  break;
+    case MUL: SS << "mul";  break;
+    case OR:  SS << "or";   break;
+    case SLL: SS << "sll";  break;
+    case SLT: SS << "slt";  break;
+    case SRA: SS << "sra";  break;
+    case SRL: SS << "srl";  break;
+    case SUB: SS << "sub";  break;
+    case XOR: SS << "xor";  break;
   }
   if (HasImm)
     SS << "i";
+  if (IsUnsigned)
+    SS << "u";
   SS << '\t';
 
   unsigned O = getRD(Inst, SS);
@@ -715,16 +731,45 @@ llvm::Error Translator::translateALUOp(
       V = add(O1, O2);
       break;
 
-    case OR:
-      V = Builder->CreateOr(O1, O2);
+    case AND:
+      V = Builder->CreateAnd(O1, O2);
       break;
 
     case MUL:
       V = Builder->CreateMul(O1, O2);
       break;
 
+    case OR:
+      V = Builder->CreateOr(O1, O2);
+      break;
+
     case SLL:
       V = Builder->CreateShl(O1, O2);
+      break;
+
+    case SLT:
+      if (IsUnsigned)
+        V = Builder->CreateICmpULT(O1, O2);
+      else
+        V = Builder->CreateICmpSLT(O1, O2);
+      updateFirst(V);
+      V = Builder->CreateZExt(V, I32);
+      break;
+
+    case SRA:
+      V = Builder->CreateAShr(O1, O2);
+      break;
+
+    case SRL:
+      V = Builder->CreateLShr(O1, O2);
+      break;
+
+    case SUB:
+      V = Builder->CreateSub(O1, O2);
+      break;
+
+    case XOR:
+      V = Builder->CreateXor(O1, O2);
       break;
   }
   updateFirst(V);
@@ -1333,6 +1378,45 @@ llvm::Expected<llvm::Function *> Translator::import(llvm::StringRef Func)
   updateFirst(V);
   return F;
 }
+
+
+llvm::Error Translator::translateUI(
+  const llvm::MCInst &Inst,
+  UIOp UOP,
+  llvm::raw_string_ostream &SS)
+{
+  switch (UOP) {
+    case AUIPC: SS << "auipc";  break;
+    case LUI:   SS << "lui";    break;
+  }
+  SS << '\t';
+
+  unsigned O = getRD(Inst, SS);
+  auto ExpImm = getImm(Inst, 1, SS);
+  if (!ExpImm)
+    return ExpImm.takeError();
+  Value *Imm = ExpImm.get();
+  Value *V;
+
+  if (LastImm.IsSym)
+    V = Imm;
+  else {
+    // get upper immediate
+    V = Builder->CreateShl(Imm, ConstantInt::get(I32, 12));
+    updateFirst(V);
+
+    // Add PC (CurAddr)
+    if (UOP == AUIPC) {
+      V = add(V, ConstantInt::get(I32, CurAddr));
+      updateFirst(V);
+    }
+  }
+
+  store(V, O);
+
+  return Error::success();
+}
+
 
 #if SBT_DEBUG
 static std::string getMDName(const llvm::StringRef &S)

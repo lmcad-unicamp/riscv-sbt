@@ -387,15 +387,37 @@ private:
 
   enum ALUOp {
     ADD,
-    OR,
+    AND,
     MUL,
-    SLL
+    OR,
+    SLL,
+    SLT,
+    SRA,
+    SRL,
+    SUB,
+    XOR
+  };
+
+  enum ALUOpFlags {
+    AF_NONE = 0,
+    AF_IMM = 1,
+    AF_UNSIGNED = 2
   };
 
   llvm::Error translateALUOp(
     const llvm::MCInst &Inst,
     ALUOp Op,
-    bool HasImm,
+    uint32_t Flags,
+    llvm::raw_string_ostream &SS);
+
+  enum UIOp {
+    AUIPC,
+    LUI
+  };
+
+  llvm::Error translateUI(
+    const llvm::MCInst &Inst,
+    UIOp UOP,
     llvm::raw_string_ostream &SS);
 
   enum IntType {
