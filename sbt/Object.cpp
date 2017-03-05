@@ -4,6 +4,8 @@
 
 #include <llvm/Object/ELFObjectFile.h>
 
+#include <algorithm>
+
 using namespace llvm;
 
 namespace sbt {
@@ -126,6 +128,16 @@ uint64_t LLVMSection::getELFOffset() const
   auto EI = reinterpret_cast<ELFObj::Elf_Shdr *>(Impl.p);
   return EI->sh_offset;
 }
+
+ConstSymbolPtr Section::lookup(uint64_t Addr) const
+{
+  auto Iter = std::lower_bound(Symbols.begin(), Symbols.end(), Addr,
+    [](ConstSymbolPtr Sym, uint64_t Addr) { return Sym->address() < Addr; });
+  if (Iter != Symbols.end() && (*Iter)->address() == Addr)
+    return *Iter;
+  return nullptr;
+}
+
 
 ///
 /// Symbol

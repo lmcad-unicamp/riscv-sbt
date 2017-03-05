@@ -5,7 +5,8 @@
 # 2: clean .s?
 define CLEAN
 clean-$(1):
-	rm -f $(1) $(1).o $$(if $(2),$(1).s,) $(1).bc $(CLEAN_EXTRA)
+	rm -f $(1) $(1).o $$(if $(2),$(1).s) $(1).bc $(1).out $(CLEAN_EXTRA)
+###
 endef
 
 # RUN

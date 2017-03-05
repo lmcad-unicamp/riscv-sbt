@@ -40,6 +40,8 @@ Translator::Translator(
   I16Ptr(Type::getInt16PtrTy(*Ctx)),
   I8Ptr(Type::getInt8PtrTy(*Ctx)),
   ZERO(ConstantInt::get(I32, 0)),
+  Void(Type::getVoidTy(*Ctx)),
+  VoidFun(FunctionType::get(Void, !VAR_ARG)),
   Context(Ctx),
   Builder(Bldr),
   Module(Mod)
@@ -272,6 +274,13 @@ Error Translator::startModule()
 
   declSyscallHandler();
 
+  PointerType *Ty = VoidFun->getPointerTo();
+  ConstantPointerNull *NullPtr =
+    ConstantPointerNull::get(Ty);
+
+  FunTableVar = new GlobalVariable(*Module, Ty, CONSTANT,
+    GlobalValue::InternalLinkage, NullPtr, "FunTable");
+
   return Error::success();
 }
 
@@ -288,16 +297,33 @@ Error Translator::genSCHandler()
 
 Error Translator::finishModule()
 {
+  PointerType *Ty = VoidFun->getPointerTo();
+
+  // Build Function Table
+  for (Function *F : FunTable) {
+    std::string VarName = F->getName().str() + "_ptr";
+    Value *Sym = Module->getValueSymbolTable().lookup(F->getName());
+    new GlobalVariable(*Module, Ty, CONSTANT,
+      GlobalValue::InternalLinkage, cast<Constant>(Sym), VarName);
+  }
+  new GlobalVariable(*Module, Ty, CONSTANT,
+    GlobalValue::InternalLinkage, ConstantPointerNull::get(Ty),
+    "FunTableEnd");
+
   return Error::success();
 }
 
 Error Translator::startMain(StringRef Name, uint64_t Addr)
 {
+  if (auto E = finishFunction())
+    return E;
+
   // Create a function with no parameters
   FunctionType *FT =
     FunctionType::get(I32, !VAR_ARG);
   Function *F =
     Function::Create(FT, Function::ExternalLinkage, Name, Module);
+  CurFunc = F;
 
   // BB
   BasicBlock *BB = BasicBlock::Create(*Context, getBBName(Addr), F);
@@ -321,17 +347,46 @@ Error Translator::startMain(StringRef Name, uint64_t Addr)
   return Error::success();
 }
 
-Error Translator::startFunction(StringRef Name, uint64_t Addr)
+
+llvm::Expected<llvm::Function *>
+Translator::createFunction(llvm::StringRef Name)
 {
+  Function *F = Module->getFunction(Name);
+  if (F)
+    return F;
+
   // Create a function with no parameters
   FunctionType *FT =
     FunctionType::get(Type::getVoidTy(*Context), !VAR_ARG);
-  Function *F =
-    Function::Create(FT, Function::ExternalLinkage, Name, Module);
+  F = Function::Create(FT, Function::ExternalLinkage, Name, Module);
+
+  return F;
+}
+
+
+Error Translator::startFunction(StringRef Name, uint64_t Addr)
+{
+  if (auto E = finishFunction())
+    return E;
+
+  auto ExpF = createFunction(Name);
+  if (!ExpF)
+    return ExpF.takeError();
+  Function *F = ExpF.get();
+  CurFunc = F;
+  FunTable.push_back(F);
 
   // BB
-  BasicBlock *BB = BasicBlock::Create(*Context, getBBName(Addr), F);
-  BBMap(Addr, std::move(BB));
+  BasicBlock **BBPtr = BBMap[Addr];
+  BasicBlock *BB;
+  if (!BBPtr) {
+    BB = BasicBlock::Create(*Context, getBBName(Addr), F);
+    BBMap(Addr, std::move(BB));
+  } else {
+    BB = *BBPtr;
+    BB->removeFromParent();
+    BB->insertInto(F);
+  }
   Builder->SetInsertPoint(BB);
 
   return Error::success();
@@ -339,6 +394,10 @@ Error Translator::startFunction(StringRef Name, uint64_t Addr)
 
 Error Translator::finishFunction()
 {
+  if (!CurFunc)
+    return Error::success();
+  CurFunc = nullptr;
+
   if (Builder->GetInsertBlock()->getTerminator() == nullptr)
     Builder->CreateRetVoid();
   InMain = false;
@@ -972,7 +1031,7 @@ llvm::Error Translator::translateBranch(
 
     case JALR:
       LinkReg = O0N;
-      O1N = getRegNum(1, Inst, SS);
+      O1N = getRegNum(1, Inst, nulls());
       O1 = getReg(Inst, 1, SS);
       if (!exp(getImm(Inst, 2, SS), O2, E))
         return E;
@@ -1022,9 +1081,16 @@ llvm::Error Translator::translateBranch(
   enum Action {
     JUMP_TO_SYMBOL,
     JUMP_TO_OFFS,
-    IJUMP
+    IJUMP,
+    CALL_SYMBOL,
+    CALL_OFFS,
+    CALL_EXT,
+    ICALL
   };
   Action Act;
+
+  bool IsCall = (BT == JAL || BT == JALR) &&
+    LinkReg == RV_RA;
 
   // JALR
   //
@@ -1032,43 +1098,57 @@ llvm::Error Translator::translateBranch(
   if (BT == JALR) {
     // No base reg
     if (O1N == RV_ZERO) {
-      assert(IsSymbol && "Unexpected JALR with absolute immediate");
-      SR = LastImm.SymRel;
-      Act = JUMP_TO_SYMBOL;
+      llvm_unreachable("Unexpected JALR with base register equal to zero!");
 
     // No immediate
     } else if (JImmIsZeroImm) {
       V = JReg;
-      Act = IJUMP;
+      if (IsCall)
+        Act = ICALL;
+      else
+        Act = IJUMP;
 
     // Base + Offset
     } else {
       V = Builder->CreateAdd(JReg, JImm);
       updateFirst(V);
-      Act = IJUMP;
+      if (IsCall)
+        Act = ICALL;
+      else
+        Act = IJUMP;
     }
 
   // JAL to Symbol
   } else if (BT == JAL && IsSymbol) {
     SR = LastImm.SymRel;
-    Act = JUMP_TO_SYMBOL;
+    if (IsCall)
+      Act = CALL_SYMBOL;
+    else
+      Act = JUMP_TO_SYMBOL;
 
   // JAL/Branches to PC offsets
   //
   // Add PC
   } else {
     Target = JImmI + CurAddr;
-    Act = JUMP_TO_OFFS;
+    if (IsCall)
+      Act = CALL_OFFS;
+    else
+      Act = JUMP_TO_OFFS;
   }
 
-  if (Act == JUMP_TO_SYMBOL) {
+  if (Act == CALL_SYMBOL || Act == JUMP_TO_SYMBOL) {
     if (SR.isExternal()) {
       V = JImm;
-      Act = IJUMP;
+      assert(IsCall && "Jump to external module!");
+      Act = CALL_EXT;
     } else {
       assert(SR.Sec && SR.Sec->isText() && "Jump to non Text Section!");
       Target = SR.Addr;
-      Act = JUMP_TO_OFFS;
+      if (IsCall)
+        Act = CALL_OFFS;
+      else
+        Act = JUMP_TO_OFFS;
     }
   }
 
@@ -1101,10 +1181,26 @@ llvm::Error Translator::translateBranch(
   switch (Act) {
     case JUMP_TO_SYMBOL:
       llvm_unreachable("JUMP_TO_SYMBOL should become JUMP_TO_OFFS");
+    case CALL_SYMBOL:
+      llvm_unreachable("CALL_SYMBOL should become CALL_OFFS");
+
+    case CALL_OFFS:
+      if (auto E = handleCall(Target))
+        return E;
       break;
 
     case JUMP_TO_OFFS:
       if (auto E = handleJumpToOffs(Target, Cond, LinkReg))
+        return E;
+      break;
+
+    case ICALL:
+      if (auto E = handleICall(V))
+        return E;
+      break;
+
+    case CALL_EXT:
+      if (auto E = handleCallExt(V))
         return E;
       break;
 
@@ -1113,6 +1209,48 @@ llvm::Error Translator::translateBranch(
         return E;
       break;
   }
+
+  return Error::success();
+}
+
+
+llvm::Error Translator::handleCall(uint64_t Target)
+{
+  // Find function
+  // Get symbol by offset
+  ConstSectionPtr Sec = CurObj->section(".text");
+  assert(Sec && ".text section not found!");
+  ConstSymbolPtr Sym = Sec->lookup(Target);
+  assert(Sym &&
+      (Sym->type() == llvm::object::SymbolRef::ST_Function ||
+        (Sym->flags() & llvm::object::SymbolRef::SF_Global)) &&
+    "Target function not found!");
+
+  auto ExpF = createFunction(Sym->name());
+  if (!ExpF)
+    return ExpF.takeError();
+  Function *F = ExpF.get();
+  Value *V = Builder->CreateCall(F);
+  updateFirst(V);
+  return Error::success();
+}
+
+
+llvm::Error Translator::handleICall(llvm::Value *Target)
+{
+  // Type *Ty = VoidFun->getPointerTo();
+  // return Error::success();
+  assert(false && "TODO implement FunTable lookup");
+}
+
+
+llvm::Error Translator::handleCallExt(llvm::Value *Target)
+{
+  FunctionType *FT = FunctionType::get(Builder->getVoidTy(), !VAR_ARG);
+  Value *V = Builder->CreateIntToPtr(Target, FT->getPointerTo());
+  updateFirst(V);
+  V = Builder->CreateCall(V);
+  updateFirst(V);
 
   return Error::success();
 }
@@ -1236,34 +1374,14 @@ llvm::BasicBlock *Translator::splitBB(
   return BB2;
 }
 
+
 llvm::Error Translator::handleIJump(
   llvm::Value *Target,
   unsigned LinkReg)
 {
-  assert(LinkReg == RV_RA);
-
-  /*
-  // create BB for next instruction
-  uint64_t NextInstrAddr = CurAddr + 4;
-  BasicBlock *CurBB = Builder->GetInsertBlock();
-
-  BasicBlock *TargetBB = BasicBlock::Create(
-    *Context, getBBName(NextInstrAddr), CurBB->getParent());
-  BBMap(NextInstrAddr, std::move(TargetBB));
-
-  // link
-  store(ConstantInt::get(I32, NextInstrAddr), LinkReg);
-  */
-
-  // indirect call
-  FunctionType *FT = FunctionType::get(Builder->getVoidTy(), !VAR_ARG);
-  Value *V = Builder->CreateIntToPtr(Target, FT->getPointerTo());
-  updateFirst(V);
-  V = Builder->CreateCall(V);
-  updateFirst(V);
-
-  return Error::success();
+  llvm_unreachable("IJump support not implemented yet!");
 }
+
 
 llvm::Error Translator::startup()
 {

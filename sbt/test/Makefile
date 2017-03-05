@@ -65,7 +65,7 @@ X86_LIBS =
 
 ### RV32 Translator unit tests ###
 
-TESTS := load-store alu-ops
+TESTS := load-store alu-ops branch
 RV32_TESTS := $(foreach test,$(TESTS),rv32-$(test))
 RV32_X86_TESTS := $(foreach test,$(TESTS),rv32-x86-$(test))
 
@@ -77,11 +77,11 @@ tests: $(RV32_TESTS) $(RV32_X86_TESTS)
 run-tests: tests $(foreach test,$(TESTS),test-$(test))
 	@echo "All tests passed!"
 
-clean-tests: $(foreach test,$(TESTS),clean-rv32-$(test)) \
-  $(foreach test,$(TEST_TARGETS),clean-$(test))
+clean-tests: $(foreach test,$(RV32_TESTS),clean-$(test)) \
+  $(foreach test,$(RV32_X86_TESTS),clean-$(test))
 
 ###
 
 run: $(foreach prog,$(RUN_BINS),run-$(prog))
 
-clean: $(foreach prog,$(BINS),clean-$(prog))
+clean: $(foreach prog,$(BINS),clean-$(prog)) clean-tests

@@ -118,6 +118,9 @@ public:
     Symbols = std::move(S);
   }
 
+  // Lookup symbol by address
+  ConstSymbolPtr lookup(uint64_t Addr) const;
+
   // ELFOffset
   virtual uint64_t getELFOffset() const
   {

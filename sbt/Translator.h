@@ -127,6 +127,7 @@ public:
   llvm::Error startModule();
   llvm::Error finishModule();
 
+  llvm::Expected<llvm::Function *> createFunction(llvm::StringRef Name);
   llvm::Error startMain(llvm::StringRef Name, uint64_t Addr);
   llvm::Error startFunction(llvm::StringRef Name, uint64_t Addr);
   llvm::Error finishFunction();
@@ -172,6 +173,8 @@ private:
   llvm::Type *I16Ptr;
   llvm::Type *I8Ptr;
   llvm::Value *ZERO;
+  llvm::Type *Void;
+  llvm::FunctionType *VoidFun;
   const std::string IR_XREGNAME = "x";
 
   // Data
@@ -191,6 +194,9 @@ private:
   ConstRelocIter RE;
   ConstRelocIter RLast;
   llvm::Instruction *First = nullptr;
+  llvm::Function *CurFunc = nullptr;
+  std::vector<llvm::Function *> FunTable;
+  llvm::GlobalVariable *FunTableVar = nullptr;
 
   llvm::GlobalVariable *ShadowImage = nullptr;
   llvm::GlobalVariable *Stack = nullptr;
@@ -447,6 +453,8 @@ private:
     BLTU
   };
 
+  // branch/jump/call handlers
+
   llvm::Error translateBranch(
     const llvm::MCInst &Inst,
     BranchType BT,
@@ -465,6 +473,9 @@ private:
     llvm::BasicBlock *BB,
     uint64_t Addr);
 
+  llvm::Error handleCall(uint64_t Target);
+  llvm::Error handleICall(llvm::Value *Target);
+  llvm::Error handleCallExt(llvm::Value *Target);
 
   void updateNextBB(uint64_t Addr)
   {

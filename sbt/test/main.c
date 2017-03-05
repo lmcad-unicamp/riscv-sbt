@@ -27,6 +27,11 @@ int B[B_ROWS * B_COLS] = {
 
 int C[C_ROWS * C_COLS];
 
+static void test()
+{
+  printf("test\n");
+}
+
 int main()
 {
   assert(A_COLS == B_ROWS);
@@ -34,6 +39,8 @@ int main()
   int i;
   int j;
   int k;
+
+  test();
 
   for (i = 0; i < C_ROWS; i++)
     for (j = 0; j < C_COLS; j++)

@@ -280,14 +280,18 @@ Error SBT::translate(const std::string &File)
       else
         End = Symbols[SI + 1]->address();
 
-      if (Sym->flags() & object::SymbolRef::SF_Global) {
+      if (Sym->type() == object::SymbolRef::ST_Function ||
+          Sym->flags() & object::SymbolRef::SF_Global)
+      //if (Sym->name() != ".L0 ")
+      {
         const StringRef &SymbolName = Sym->name();
         DBGS << SymbolName << ":\n";
-        if (SymbolName == "_start") {
-          if (Error E = SBTTranslator->startFunction(SymbolName, Start))
-            return E;
-        } else if (SymbolName == "main") {
+
+        if (SymbolName == "main") {
           if (Error E = SBTTranslator->startMain(SymbolName, Start))
+            return E;
+        } else { // if (SymbolName == "_start") {
+          if (Error E = SBTTranslator->startFunction(SymbolName, Start))
             return E;
         }
       }
