@@ -5,7 +5,7 @@
 # 2: clean .s?
 define CLEAN
 clean-$(1):
-	rm -f $(1) $(1).o $$(if $(2),$(1).s) $(1).bc $(1).out $(CLEAN_EXTRA)
+	rm -f $(1) $(1).o $$(if $(2),$(1).s) $(1).bc $(1).ll $(1).out $(CLEAN_EXTRA)
 ###
 endef
 
@@ -104,8 +104,13 @@ define TRANSLATE
 $($(1)_PREFIX)-$($(2)_PREFIX)-$(3).bc: $($(1)_PREFIX)-$(3).o
 	riscv-sbt -o $$@ $$<
 
+# .bc -> .ll
+$($(1)_PREFIX)-$($(2)_PREFIX)-$(3).ll: $($(1)_PREFIX)-$($(2)_PREFIX)-$(3).bc
+	llvm-dis -o $$@ $$<
+
 # .bc -> .s
-$($(1)_PREFIX)-$($(2)_PREFIX)-$(3).s: $($(1)_PREFIX)-$($(2)_PREFIX)-$(3).bc
+$($(1)_PREFIX)-$($(2)_PREFIX)-$(3).s: $($(1)_PREFIX)-$($(2)_PREFIX)-$(3).bc \
+  $($(1)_PREFIX)-$($(2)_PREFIX)-$(3).ll
 	llc -O0 -o $$@ -march $($(2)_MARCH) $$<
 
 $(eval $(2)_LIBS = $($(2)_SYSCALL_O) $($(2)_RVSC_O))

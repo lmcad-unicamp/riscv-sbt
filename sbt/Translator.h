@@ -134,7 +134,7 @@ public:
 
   llvm::Error startup();
 
-  llvm::Expected<llvm::Function *> import(llvm::StringRef Func);
+  llvm::Expected<uint64_t> import(llvm::StringRef Func);
 
   void setCurAddr(uint64_t Addr)
   {
@@ -195,8 +195,6 @@ private:
   ConstRelocIter RLast;
   llvm::Instruction *First = nullptr;
   llvm::Function *CurFunc = nullptr;
-  std::vector<llvm::Function *> FunTable;
-  llvm::GlobalVariable *FunTableVar = nullptr;
 
   llvm::GlobalVariable *ShadowImage = nullptr;
   llvm::GlobalVariable *Stack = nullptr;
@@ -235,8 +233,14 @@ private:
 
   Map<uint64_t, llvm::BasicBlock *> BBMap;
   Map<uint64_t, llvm::Instruction *> InstrMap;
+  Map<llvm::Function *, uint64_t> FunMap;
   uint64_t NextBB = 0;
   bool BrWasLast = false;
+
+  // icaller
+  std::vector<llvm::Function *> FunTable;
+  llvm::Function *ICaller = nullptr;
+  uint64_t ExtFunAddr = 0;
 
 
   // Methods
@@ -258,6 +262,8 @@ private:
   llvm::Error buildStack();
 
   llvm::Error handleSyscall();
+
+  llvm::Error genICaller();
 
   // Helpers
 

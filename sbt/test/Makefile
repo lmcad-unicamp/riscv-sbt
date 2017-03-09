@@ -49,12 +49,7 @@ X86_LIBS =
 CFLAGS = -Wall -Werror -O0
 $(eval $(call BUILD,X86,x86-main,CLANG,main))
 $(eval $(call BUILD,RV32,rv32-main,CLANG,main))
-
-rv32-x86-main.bc: rv32-main.o
-	riscv-sbt -o $@ $<
-
-rv32-x86-main.s: rv32-x86-main.bc
-	llc -O0 -o $@ -march x86 $<
+$(eval $(call TRANSLATE,RV32,X86,main))
 
 X86_LIBS = $(X86_SYSCALL_O) $(X86_RVSC_O)
 $(eval $(call AS,X86,rv32-x86-main))

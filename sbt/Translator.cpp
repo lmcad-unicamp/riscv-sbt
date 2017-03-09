@@ -274,12 +274,10 @@ Error Translator::startModule()
 
   declSyscallHandler();
 
-  PointerType *Ty = VoidFun->getPointerTo();
-  ConstantPointerNull *NullPtr =
-    ConstantPointerNull::get(Ty);
-
-  FunTableVar = new GlobalVariable(*Module, Ty, CONSTANT,
-    GlobalValue::InternalLinkage, NullPtr, "FunTable");
+  auto ExpF = createFunction("rv32_icaller");
+  if (!ExpF)
+    return ExpF.takeError();
+  ICaller = ExpF.get();
 
   return Error::success();
 }
@@ -295,22 +293,60 @@ Error Translator::genSCHandler()
   return Error::success();
 }
 
-Error Translator::finishModule()
+llvm::Error Translator::genICaller()
 {
   PointerType *Ty = VoidFun->getPointerTo();
+  Value *Target = nullptr;
 
-  // Build Function Table
+  // basic blocks
+  BasicBlock *BBPrev = Builder->GetInsertBlock();
+  BasicBlock *BBBeg = BasicBlock::Create(*Context, "begin", ICaller);
+  BasicBlock *BBDfl = BasicBlock::Create(*Context, "default", ICaller);
+  BasicBlock *BBEnd = BasicBlock::Create(*Context, "end", ICaller);
+
+  // default:
+  // t1 = nullptr;
+  Builder->SetInsertPoint(BBDfl);
+  store(ZERO, RV_T1);
+  Builder->CreateBr(BBEnd);
+
+  // end: call t1
+  Builder->SetInsertPoint(BBEnd);
+  Target = load(RV_T1);
+  Target = Builder->CreateIntToPtr(Target, Ty);
+  Builder->CreateCall(Target);
+  Builder->CreateRetVoid();
+
+  // switch
+  Builder->SetInsertPoint(BBBeg);
+  Target = load(RV_T1);
+  SwitchInst *SW = Builder->CreateSwitch(Target, BBDfl, FunTable.size());
+
+  // cases
+  // case fun: t1 = realFunAddress;
   for (Function *F : FunTable) {
-    std::string VarName = F->getName().str() + "_ptr";
+    uint64_t *Addr = FunMap[F];
+    assert(Addr && "Indirect called function not found!");
+    std::string CaseStr = "case_" + F->getName().str();
     Value *Sym = Module->getValueSymbolTable().lookup(F->getName());
-    new GlobalVariable(*Module, Ty, CONSTANT,
-      GlobalValue::InternalLinkage, cast<Constant>(Sym), VarName);
-  }
-  new GlobalVariable(*Module, Ty, CONSTANT,
-    GlobalValue::InternalLinkage, ConstantPointerNull::get(Ty),
-    "FunTableEnd");
 
+    BasicBlock *Dest = BasicBlock::Create(*Context, CaseStr, ICaller, BBDfl);
+    Builder->SetInsertPoint(Dest);
+    Sym = Builder->CreatePtrToInt(Sym, I32);
+    store(Sym, RV_T1);
+    Builder->CreateBr(BBEnd);
+
+    Builder->SetInsertPoint(BBBeg);
+    SW->addCase(ConstantInt::get(I32, *Addr), Dest);
+  }
+
+  Builder->SetInsertPoint(BBPrev);
   return Error::success();
+}
+
+Error Translator::finishModule()
+{
+  return genICaller();
 }
 
 Error Translator::startMain(StringRef Name, uint64_t Addr)
@@ -375,6 +411,7 @@ Error Translator::startFunction(StringRef Name, uint64_t Addr)
   Function *F = ExpF.get();
   CurFunc = F;
   FunTable.push_back(F);
+  FunMap(F, std::move(Addr));
 
   // BB
   BasicBlock **BBPtr = BBMap[Addr];
@@ -709,18 +746,24 @@ Translator::handleRelocation(llvm::raw_ostream &SS)
   SS << SR.Name << ") = " << SR.Addr;
 
   Value *V = nullptr;
+  bool IsFunction =
+    SR.Sec && SR.Sec->isText() &&
+    RealSym->type() == llvm::object::SymbolRef::ST_Function;
+
   // special case: external functions: return our handler instead
   if (SR.isExternal()) {
     auto ExpF = import(SR.Name);
     if (!ExpF)
       return ExpF.takeError();
-    Function *F = ExpF.get();
-    V = Module->getValueSymbolTable().lookup(F->getName());
-    assert(V && "External function handler not found");
-    V = Builder->CreatePtrToInt(V, I32);
-    updateFirst(V);
-    V = Builder->CreateAnd(V, llvm::ConstantInt::get(I32, Mask));
-    updateFirst(V);
+    uint64_t Addr = ExpF.get();
+    Addr &= Mask;
+    V = ConstantInt::get(I32, Addr);
+
+  // special case: internal function
+  } else if (IsFunction) {
+    uint64_t Addr = SR.Addr;
+    Addr &= Mask;
+    V = ConstantInt::get(I32, Addr);
 
   // add the relocation offset to ShadowImage to get the final address
   } else if (SR.Sec) {
@@ -1238,9 +1281,11 @@ llvm::Error Translator::handleCall(uint64_t Target)
 
 llvm::Error Translator::handleICall(llvm::Value *Target)
 {
-  // Type *Ty = VoidFun->getPointerTo();
-  // return Error::success();
-  assert(false && "TODO implement FunTable lookup");
+  store(Target, RV_T1);
+  Value *V = Builder->CreateCall(ICaller);
+  updateFirst(V);
+
+  return Error::success();
 }
 
 
@@ -1401,13 +1446,13 @@ llvm::Error Translator::startup()
   return Error::success();
 }
 
-llvm::Expected<llvm::Function *> Translator::import(llvm::StringRef Func)
+llvm::Expected<uint64_t> Translator::import(llvm::StringRef Func)
 {
   std::string RV32Func = "rv32_" + Func.str();
 
   // check if the function was already processed
   if (Function *F = Module->getFunction(RV32Func))
-    return F;
+    return *FunMap[F];
 
   // Load LibC module
   if (!LCModule) {
@@ -1494,7 +1539,15 @@ llvm::Expected<llvm::Function *> Translator::import(llvm::StringRef Func)
 
   V = Builder->CreateRetVoid();
   updateFirst(V);
-  return F;
+
+  if (!ExtFunAddr)
+    ExtFunAddr = CurSection->size();
+  FunTable.push_back(F);
+  FunMap(F, std::move(ExtFunAddr));
+  uint64_t Ret = ExtFunAddr;
+  ExtFunAddr += 4;
+
+  return Ret;
 }
 
 
