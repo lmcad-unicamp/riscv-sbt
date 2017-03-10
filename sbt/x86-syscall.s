@@ -119,6 +119,47 @@ syscall6:
   pop %ebx
   ret
 
+.global get_cycles
+get_cycles:
+  push %ebx
+
+  xor %eax, %eax
+  cpuid
+  rdtsc
+
+  pop %ebx
+  ret
+
+# time in msec (10^-3)
+.global get_time
+get_time:
+  push %ebx
+
+  # cpuid 0x16: max freq in MHz: ebx[15..0]
+  mov $0x16, %eax
+  cpuid
+
+  # ebx = (ebx & 0xFFFF) * 1000
+  and $0xFFFF, %ebx
+  mov %ebx, %eax
+  mov $1000, %ebx
+  mul %ebx
+  mov %eax, %ebx
+
+  call get_cycles
+  div %ebx
+  pop %ebx
+  ret
+
+.global get_instret
+get_instret:
+  # INST_RETIRED
+P6CTR_U = 0x010000
+P6CTR_K = 0x020000
+P6CTR_EN = 0x400000
+  mov $0x004300C0, %ecx
+  rdpmc
+  ret
 
 ###
 ### UNUSED ###

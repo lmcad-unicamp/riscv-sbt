@@ -30,20 +30,34 @@ main:
   jalr ra, s2, 0
 
   # rdcycle
-  csrrs a2, RDCYCLE, zero
-  csrrs a3, RDCYCLEH, zero
-  la a0, cycles
-  jalr ra, s2, 0
-
   # rdtime
-  csrrs a2, RDTIME, zero
-  csrrs a3, RDTIMEH, zero
+  csrrs s3, RDCYCLE, zero
+
+  csrrs t3, RDTIME, zero
+  li t5, 500
+loop:
+  csrrs t4, RDTIME, zero
+  sub t4, t4, t3
+  blt t4, t5, loop
+
+  csrrs t4, RDTIME, zero
+  csrrs s4, RDCYCLE, zero
+
+  sub a1, t4, t3
   la a0, time
   jalr ra, s2, 0
 
+  sub a1, s4, s3
+  la a0, cycles
+  jalr ra, s2, 0
+
   # rdinstret
-  csrrs a2, RDINSTRET, zero
-  csrrs a3, RDINSTRETH, zero
+  csrrs t1, RDINSTRET, zero
+  nop
+  nop
+  nop
+  csrrs t2, RDINSTRET, zero
+  sub a1, t2, t1
   la a0, insts
   jalr ra, s2, 0
 
@@ -58,6 +72,6 @@ main:
 .p2align 2
 str: .asciz "*** rv32-system ***\n"
 
-cycles: .asciz "cycles=%llu\n"
-time:   .asciz "time=%llu\n"
-insts:  .asciz "insts=%llu\n"
+cycles: .asciz "cycles=%u\n"
+time:   .asciz "time=%u\n"
+insts:  .asciz "insts=%u\n"

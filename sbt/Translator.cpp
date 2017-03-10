@@ -289,7 +289,9 @@ Error Translator::translate(const llvm::MCInst &Inst)
   if (E)
     return E;
 
-  assert(First && "No First Instruction!");
+  if (!First)
+    First = load(RV_A0);
+
   dbgprint(SS);
   InstrMap(CurAddr, std::move(First));
   return Error::success();
@@ -312,6 +314,16 @@ Error Translator::startModule()
   if (!ExpF)
     return ExpF.takeError();
   ICaller = ExpF.get();
+
+  FunctionType *FT = FunctionType::get(I32, !VAR_ARG);
+  GetCycles = Function::Create(FT,
+    Function::ExternalLinkage, "get_cycles", Module);
+
+  GetTime = Function::Create(FT,
+    Function::ExternalLinkage, "get_time", Module);
+
+  InstRet = Function::Create(FT,
+    Function::ExternalLinkage, "get_instret", Module);
 
   return Error::success();
 }
@@ -1704,21 +1716,28 @@ llvm::Error Translator::translateCSR(
   assert(Mask == RV_ZERO && "No CSR write support for base I instructions!");
   SS << llvm::formatv("0x{0:X-4} = ", CSR);
 
+  Value *V = ConstantInt::get(I32, 0);
   switch (CSR) {
     case RDCYCLE:
       SS << "RDCYCLE";
+      V = Builder->CreateCall(GetCycles);
+      updateFirst(V);
       break;
     case RDCYCLEH:
       SS << "RDCYCLEH";
       break;
     case RDTIME:
       SS << "RDTIME";
+      V = Builder->CreateCall(GetTime);
+      updateFirst(V);
       break;
     case RDTIMEH:
       SS << "RDTIMEH";
       break;
     case RDINSTRET:
       SS << "RDINSTRET";
+      V = Builder->CreateCall(InstRet);
+      updateFirst(V);
       break;
     case RDINSTRETH:
       SS << "RDINSTRETH";
@@ -1728,9 +1747,7 @@ llvm::Error Translator::translateCSR(
       break;
   }
 
-  Value *V = ConstantInt::get(I32, 0);
   store(V, RD);
-
   return Error::success();
 }
 

@@ -250,6 +250,9 @@ private:
   llvm::Function *ICaller = nullptr;
   uint64_t ExtFunAddr = 0;
 
+  llvm::Function *GetCycles = nullptr;
+  llvm::Function *GetTime = nullptr;
+  llvm::Function *InstRet = nullptr;
 
   // Methods
   llvm::Error declOrBuildRegisterFile(bool decl);
@@ -292,6 +295,9 @@ private:
   // Store value to register
   llvm::StoreInst *store(llvm::Value *V, unsigned Reg)
   {
+    if (Reg == 0)
+      return nullptr;
+
     llvm::StoreInst *I = Builder->CreateStore(V, X[Reg], !VOLATILE);
     updateFirst(I);
     return I;
