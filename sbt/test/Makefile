@@ -51,13 +51,6 @@ $(eval $(call BUILD,X86,x86-main,CLANG,main))
 $(eval $(call BUILD,RV32,rv32-main,CLANG,main))
 $(eval $(call TRANSLATE,RV32,X86,main))
 
-X86_LIBS = $(X86_SYSCALL_O) $(X86_RVSC_O)
-$(eval $(call AS,X86,rv32-x86-main))
-$(eval $(call CLINK,X86,rv32-x86-main))
-$(eval $(call RUN,X86,rv32-x86-main))
-$(eval $(call CLEAN,rv32-x86-main,all))
-X86_LIBS =
-
 ### RV32 Translator unit tests ###
 
 TESTS := load-store alu-ops branch

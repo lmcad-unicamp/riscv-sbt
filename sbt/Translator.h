@@ -454,7 +454,9 @@ private:
     JAL,
     JALR,
     BEQ,
+    BNE,
     BGE,
+    BGEU,
     BLT,
     BLTU
   };

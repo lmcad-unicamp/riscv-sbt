@@ -196,8 +196,14 @@ Error Translator::translate(const llvm::MCInst &Inst)
     case RISCV::BEQ:
       E = translateBranch(Inst, BEQ, SS);
       break;
+    case RISCV::BNE:
+      E = translateBranch(Inst, BNE, SS);
+      break;
     case RISCV::BGE:
       E = translateBranch(Inst, BGE, SS);
+      break;
+    case RISCV::BGEU:
+      E = translateBranch(Inst, BGEU, SS);
       break;
     case RISCV::BLT:
       E = translateBranch(Inst, BLT, SS);
@@ -1040,14 +1046,14 @@ llvm::Error Translator::translateBranch(
   BranchType BT,
   llvm::raw_string_ostream &SS)
 {
-  BrWasLast = true;
-
   // Inst print
   switch (BT) {
     case JAL:   SS << "jal";  break;
     case JALR:  SS << "jalr"; break;
     case BEQ:   SS << "beq";  break;
+    case BNE:   SS << "bne";  break;
     case BGE:   SS << "bge";  break;
+    case BGEU:  SS << "bgeu";  break;
     case BLT:   SS << "blt";  break;
     case BLTU:  SS << "bltu"; break;
   }
@@ -1083,7 +1089,9 @@ llvm::Error Translator::translateBranch(
       break;
 
     case BEQ:
+    case BNE:
     case BGE:
+    case BGEU:
     case BLT:
     case BLTU:
       O0 = getReg(Inst, 0, SS);
@@ -1134,6 +1142,7 @@ llvm::Error Translator::translateBranch(
 
   bool IsCall = (BT == JAL || BT == JALR) &&
     LinkReg == RV_RA;
+  BrWasLast = !IsCall;
 
   // JALR
   //
@@ -1202,8 +1211,16 @@ llvm::Error Translator::translateBranch(
       Cond = Builder->CreateICmpEQ(O0, O1);
       break;
 
+    case BNE:
+      Cond = Builder->CreateICmpNE(O0, O1);
+      break;
+
     case BGE:
       Cond = Builder->CreateICmpSGE(O0, O1);
+      break;
+
+    case BGEU:
+      Cond = Builder->CreateICmpUGE(O0, O1);
       break;
 
     case BLT:
@@ -1314,7 +1331,8 @@ llvm::Error Translator::handleJumpToOffs(
   uint64_t NextInstrAddr = CurAddr + 4;
 
   // Link
-  if (!Cond && LinkReg != RV_ZERO)
+  bool IsCall = LinkReg != RV_ZERO;
+  if (!Cond && IsCall)
     store(ConstantInt::get(I32, NextInstrAddr), LinkReg);
 
   // Target BB
@@ -1322,6 +1340,7 @@ llvm::Error Translator::handleJumpToOffs(
 
   BasicBlock *BB = nullptr;
   auto Iter = BBMap.lower_bound(Target);
+
   // Jump forward
   if (Target > CurAddr) {
     BasicBlock *BeforeBB = nullptr;
@@ -1360,26 +1379,38 @@ llvm::Error Translator::handleJumpToOffs(
       BB = splitBB(BB, Target);
   }
 
-  // Branch
-  Value *V;
-  if (Cond && Target != NextInstrAddr) {
-    Iter = BBMap.lower_bound(NextInstrAddr);
-    BasicBlock *BeforeBB = nullptr;
-    if (Iter != BBMap.end())
-      BeforeBB = Iter->IVal;
+  // need NextBB?
+  bool NeedNextBB = !IsCall;
 
-    BasicBlock *Next =
-      BasicBlock::Create(*Context, getBBName(NextInstrAddr), F, BeforeBB);
-    BBMap(NextInstrAddr, std::move(Next));
+  BasicBlock *BeforeBB = nullptr;
+  BasicBlock *Next = nullptr;
+  if (NeedNextBB) {
+    auto P = BBMap[NextInstrAddr];
+    if (P)
+      Next = *P;
+    else {
+      Iter = BBMap.lower_bound(NextInstrAddr);
+      if (Iter != BBMap.end())
+        BeforeBB = Iter->IVal;
+
+      Next = BasicBlock::Create(*Context, getBBName(NextInstrAddr), F, BeforeBB);
+      BBMap(NextInstrAddr, std::move(Next));
+    }
 
     updateNextBB(NextInstrAddr);
+  }
 
+  // Branch
+  Value *V;
+  if (Cond)
     V = Builder->CreateCondBr(Cond, BB, Next);
-    // Use next BB
-    Builder->SetInsertPoint(Next);
-  } else
+  else
     V = Builder->CreateBr(BB);
   updateFirst(V);
+
+  // Use next BB
+  if (NeedNextBB)
+    Builder->SetInsertPoint(Next);
 
   return Error::success();
 }
