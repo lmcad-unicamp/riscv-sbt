@@ -11,6 +11,8 @@ rv32-load-store
 rv32-load-store.out
 rv32-main
 rv32-main.s
+rv32-system
+rv32-system.out
 rv32-x86-*
 x86-hello
 x86-main

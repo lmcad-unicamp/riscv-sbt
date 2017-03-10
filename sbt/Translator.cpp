@@ -261,6 +261,26 @@ Error Translator::translate(const llvm::MCInst &Inst)
       E = translateFence(Inst, true, SS);
       break;
 
+    // system
+    case RISCV::CSRRW:
+      E = translateCSR(Inst, RW, false, SS);
+      break;
+    case RISCV::CSRRWI:
+      E = translateCSR(Inst, RW, true, SS);
+      break;
+    case RISCV::CSRRS:
+      E = translateCSR(Inst, RS, false, SS);
+      break;
+    case RISCV::CSRRSI:
+      E = translateCSR(Inst, RS, true, SS);
+      break;
+    case RISCV::CSRRC:
+      E = translateCSR(Inst, RC, false, SS);
+      break;
+    case RISCV::CSRRCI:
+      E = translateCSR(Inst, RC, true, SS);
+      break;
+
     default:
       SE << "Unknown instruction opcode: " << Inst.getOpcode();
       return error(SE);
@@ -1650,6 +1670,70 @@ llvm::Error Translator::translateFence(
 
   return Error::success();
 }
+
+llvm::Error Translator::translateCSR(
+  const llvm::MCInst &Inst,
+  CSROp Op,
+  bool Imm,
+  llvm::raw_string_ostream &SS)
+{
+  switch (Op) {
+    case RW:
+      assert(false && "No CSR write support for base I instructions!");
+      break;
+
+    case RS:
+      SS << "csrrs";
+      break;
+
+    case RC:
+      SS << "csrrc";
+      break;
+  }
+  if (Imm)
+    SS << "i";
+  SS << '\t';
+
+  unsigned RD = getRegNum(0, Inst, SS);
+  uint64_t CSR = Inst.getOperand(1).getImm();
+  uint64_t Mask;
+  if (Imm)
+    Mask = RV_A0; // Inst.getOperand(2).getImm();
+  else
+    Mask = getRegNum(2, Inst, SS);
+  assert(Mask == RV_ZERO && "No CSR write support for base I instructions!");
+  SS << llvm::formatv("0x{0:X-4} = ", CSR);
+
+  switch (CSR) {
+    case RDCYCLE:
+      SS << "RDCYCLE";
+      break;
+    case RDCYCLEH:
+      SS << "RDCYCLEH";
+      break;
+    case RDTIME:
+      SS << "RDTIME";
+      break;
+    case RDTIMEH:
+      SS << "RDTIMEH";
+      break;
+    case RDINSTRET:
+      SS << "RDINSTRET";
+      break;
+    case RDINSTRETH:
+      SS << "RDINSTRETH";
+      break;
+    default:
+      assert(false && "Not implemented!");
+      break;
+  }
+
+  Value *V = ConstantInt::get(I32, 0);
+  store(V, RD);
+
+  return Error::success();
+}
+
 
 
 #if SBT_DEBUG

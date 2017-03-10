@@ -110,6 +110,14 @@ class Translator
     }
   }
 
+  // CSRs
+  static const unsigned RDCYCLE = 0xC00;
+  static const unsigned RDCYCLEH = 0xC80;
+  static const unsigned RDTIME = 0xC01;
+  static const unsigned RDTIMEH = 0xC81;
+  static const unsigned RDINSTRET = 0xC02;
+  static const unsigned RDINSTRETH = 0xC82;
+
 public:
   Translator(
     llvm::LLVMContext *Ctx,
@@ -494,6 +502,17 @@ private:
   // fence
   llvm::Error translateFence(const llvm::MCInst &Inst,
       bool FI,
+      llvm::raw_string_ostream &SS);
+
+  enum CSROp {
+    RW,
+    RS,
+    RC
+  };
+  llvm::Error translateCSR(
+      const llvm::MCInst &Inst,
+      CSROp Op,
+      bool Imm,
       llvm::raw_string_ostream &SS);
 
 #if SBT_DEBUG
