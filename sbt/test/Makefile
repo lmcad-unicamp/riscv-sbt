@@ -53,7 +53,7 @@ $(eval $(call TRANSLATE,RV32,X86,main))
 
 ### RV32 Translator unit tests ###
 
-TESTS := load-store alu-ops branch
+TESTS := load-store alu-ops branch fence
 RV32_TESTS := $(foreach test,$(TESTS),rv32-$(test))
 RV32_X86_TESTS := $(foreach test,$(TESTS),rv32-x86-$(test))
 

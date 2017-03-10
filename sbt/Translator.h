@@ -491,6 +491,11 @@ private:
       NextBB = Addr;
   }
 
+  // fence
+  llvm::Error translateFence(const llvm::MCInst &Inst,
+      bool FI,
+      llvm::raw_string_ostream &SS);
+
 #if SBT_DEBUG
   // Add RV Inst metadata and print it in debug mode
   void dbgprint(llvm::raw_string_ostream &SS);

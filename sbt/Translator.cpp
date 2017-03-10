@@ -253,6 +253,14 @@ Error Translator::translate(const llvm::MCInst &Inst)
       E = translateStore(Inst, U32, SS);
       break;
 
+    // fence
+    case RISCV::FENCE:
+      E = translateFence(Inst, false, SS);
+      break;
+    case RISCV::FENCEI:
+      E = translateFence(Inst, true, SS);
+      break;
+
     default:
       SE << "Unknown instruction opcode: " << Inst.getOpcode();
       return error(SE);
@@ -261,8 +269,8 @@ Error Translator::translate(const llvm::MCInst &Inst)
   if (E)
     return E;
 
-  dbgprint(SS);
   assert(First && "No First Instruction!");
+  dbgprint(SS);
   InstrMap(CurAddr, std::move(First));
   return Error::success();
 }
@@ -1615,6 +1623,30 @@ llvm::Error Translator::translateUI(
   }
 
   store(V, O);
+
+  return Error::success();
+}
+
+
+llvm::Error Translator::translateFence(
+  const llvm::MCInst &Inst,
+  bool FI,
+  llvm::raw_string_ostream &SS)
+{
+  if (FI) {
+    SS << "fence.i";
+    // nop
+    load(RV_ZERO);
+    return Error::success();
+  }
+
+  SS << "fence";
+  AtomicOrdering Order = llvm::AtomicOrdering::AcquireRelease;
+  SynchronizationScope Scope = llvm::SynchronizationScope::CrossThread;
+
+  Value *V;
+  V = Builder->CreateFence(Order, Scope);
+  updateFirst(V);
 
   return Error::success();
 }

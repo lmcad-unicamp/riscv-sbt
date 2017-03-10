@@ -4,6 +4,8 @@ rv32-alu-ops
 rv32-alu-ops.out
 rv32-branch
 rv32-branch.out
+rv32-fence
+rv32-fence.out
 rv32-hello
 rv32-load-store
 rv32-load-store.out
