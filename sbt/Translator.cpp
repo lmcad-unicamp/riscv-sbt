@@ -424,6 +424,11 @@ Error Translator::startMain(StringRef Name, uint64_t Addr)
   // if (auto E = startup())
   //  return E;
 
+  // init syscall module
+  F = Function::Create(VoidFun,
+    Function::ExternalLinkage, "syscall_init", Module);
+  Builder->CreateCall(F);
+
   InMain = true;
 
   return Error::success();

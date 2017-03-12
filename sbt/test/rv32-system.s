@@ -34,7 +34,7 @@ main:
   csrrs s3, RDCYCLE, zero
 
   csrrs t3, RDTIME, zero
-  li t5, 500
+  li t5, 500000
 loop:
   csrrs t4, RDTIME, zero
   sub t4, t4, t3
@@ -53,9 +53,13 @@ loop:
 
   # rdinstret
   csrrs t1, RDINSTRET, zero
-  nop
-  nop
-  nop
+  la t3, test
+  li t4, 123
+  sw t4, 0(t3)
+  li t4, 456
+  sw t4, 0(t3)
+  li t4, 789
+  sw t4, 0(t3)
   csrrs t2, RDINSTRET, zero
   sub a1, t2, t1
   la a0, insts
@@ -70,7 +74,8 @@ loop:
 
 .data
 .p2align 2
-str: .asciz "*** rv32-system ***\n"
+str:    .asciz "*** rv32-system ***\n"
+test:   .int 0
 
 cycles: .asciz "cycles=%u\n"
 time:   .asciz "time=%u\n"

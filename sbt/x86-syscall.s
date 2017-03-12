@@ -119,221 +119,180 @@ syscall6:
   pop %ebx
   ret
 
+
+.global syscall_init
+syscall_init:
+  push %ebx
+
+  ###
+  ### get CPU frequency
+  ###
+
+  # get CPU brand string
+  movl $0x80000002, %esi
+  movl $brand_str, %edi
+loop:
+  mov %esi, %eax
+  cpuid
+  movl %eax, (%edi)
+  movl %ebx, 4(%edi)
+  movl %ecx, 8(%edi)
+  movl %edx, 12(%edi)
+
+  addl $1, %esi
+  addl $16, %edi
+  cmpl $0x80000005, %esi
+  jne loop
+
+  # print it
+  # pushl $brand_str
+  # calll printf
+  # addl $4, %esp
+  # pushl $nl
+  # calll puts
+  # addl $4, %esp
+
+  # point esi to first non space char of brand_str,
+  # starting from the end
+  movl $brand_str, %esi
+  addl $47, %esi
+
+loop2:
+  subl $1, %esi
+  movb (%esi), %al
+  cmpb $0x20, %al
+  jne loop2
+  addl $1, %esi
+
+  # print it
+  # pushl %esi
+  # calll puts
+  # addl $4, %esp
+  # pushl $nl
+  # calll puts
+  # addl $4, %esp
+
+  # now parse frequency
+  pushl $freq_u
+  pushl $freq_r
+  pushl $freq_l
+  pushl $freq_str
+  pushl %esi
+  calll sscanf
+  addl $20, %esp
+
+  cmpl $3, %eax
+  jne error
+
+  # freq_l = number to the left of the '.'
+  movl freq_l, %eax
+
+  # GHz: multiply by 1000
+  movb freq_u, %dl
+  cmpb $'G', %dl
+  jne mhz
+  movl $1000, %ebx
+  mul %ebx
+  # then add freq_r: number to the right of the '.'
+  addl freq_r, %eax
+  jmp save_freq
+
+mhz:
+  # MHz: not tested: should work if brand_str contains a '.'
+  cmpb $'M', %dl
+  jne error
+
+save_freq:
+  movl %eax, freq
+
+  # print final frequency
+  # pushl %eax
+  # pushl $fmt
+  # calll printf
+  # addl $8, %esp
+
+  jmp end
+
+error:
+  pushl $error_str
+  calll puts
+  addl $4, %esp
+
+  pushl $1
+  calll exit
+
+end:
+  pop %ebx
+  ret
+
+
 .global get_cycles
 get_cycles:
   push %ebx
 
+  # flush pipeline
+  # TODO does this really changes ebx?
   xor %eax, %eax
   cpuid
+  # get cycles in edx:eax
   rdtsc
 
   pop %ebx
   ret
 
-# time in msec (10^-3)
+# time in usec (10^-6) (edx:eax)
 .global get_time
 get_time:
   push %ebx
+  mov freq, %ebx
 
-  # cpuid 0x16: max freq in MHz: ebx[15..0]
-  mov $0x16, %eax
-  cpuid
-
-  # ebx = (ebx & 0xFFFF) * 1000
-  and $0xFFFF, %ebx
-  mov %ebx, %eax
-  mov $1000, %ebx
-  mul %ebx
-  mov %eax, %ebx
-
+  # cycles: edx:eax
   call get_cycles
+
+  # time =  cycles / freq (64-bit div)
+  # cycles_hi (edx) = cycles >> 32
+  # cycles_lo (eax) = cycles & 0xFFFFFFFF
+  # time_hi (ecx) = cycles_hi / freq
+  # time_hi_remainder (edx) = cycles_hi % freq
+  # time_lo (eax) = ((time_hi_remainder << 32) | cycles_lo) / freq
+
+  # time_hi
+  push %eax
+  mov %edx, %eax
+  xor %edx, %edx
   div %ebx
+  mov %eax, %ecx
+  pop %eax
+
+  # time_lo
+  div %ebx
+  mov %ecx, %edx
+
   pop %ebx
   ret
 
 .global get_instret
 get_instret:
-  # INST_RETIRED
-P6CTR_U = 0x010000
-P6CTR_K = 0x020000
-P6CTR_EN = 0x400000
-  mov $0x004300C0, %ecx
+  mov $0x40000001, %ecx
   rdpmc
+  #pushl %eax
+  #pushl $instret_fmt
+  #calll printf
+  #addl $8, %esp
   ret
 
-###
-### UNUSED ###
-###
+.data
+.p2align 4
+freq:   .int 0
+freq_l: .int 0
+freq_r: .int 0
+freq_u: .byte 0
+freq_str: .asciz "%d.%d%c"
 
-#.data
-#
-#SYS_EXIT = 1
-#SYS_WRITE = 4
-#
-#args:
-#.long 9
-#.long 1  # 1: exit
-#.long 9
-#.long 9
-#.long 3  # 4: write
-#args_max = (. - args) / 4
-#
-#targets:
-#.long args0
-#.long args1
-#.long args2
-#.long args3
-#.long args4
-#.long args5
-#.long args6
-#
-#errmsg:
-#.ascii "Invalid syscall: "
-#errmsg_len = . - errmsg
-#
-#endl: .byte 0xA
-#
-#c: .byte 0
-#
-#### .text ###
-#.text
-#
-#print_c:
-#  push %ebx
-#
-#  movl $SYS_WRITE, %eax
-#  movl $2, %ebx
-#  movl $c, %ecx
-#  movl $1, %edx
-#  int $0x80
-#
-#  pop %ebx
-#  ret
-#
-#
-#print_eax:
-#  # shift amount and stop condition
-#  movl $28, %ecx
-#loop:
-#  movl %eax, %edx
-#  shr %cl, %edx
-#  andb $0xF, %dl
-#  # isdigit?
-#  cmpb $9, %dl
-#  jg letter
-#  addb $0x30, %dl
-#  jmp loop2
-#letter:
-#  addb $0x37, %dl
-#loop2:
-#
-#  # print char
-#  movb %dl, c
-#  push %eax
-#  push %ecx
-#  call print_c
-#  pop %ecx
-#  pop %eax
-#
-#  # loop
-#  subl $4, %ecx
-#  jge loop
-#  ret
-#
-#
-## X86
-##
-## syscall:
-##
-## syscall#: eax
-## arg1:     ebx
-## arg2:     ecx
-## arg3:     edx
-## arg4:     esi
-## arg5:     edi
-## arg6:     ebp
-##
-## int x86_syscall(
-##     int nr,   # syscall#
-##     int arg,* # args (n)
-##
-#.global syscall
-#syscall:
-#  push %ebp
-#  movl %esp, %ebp
-#
-#  # syscall#
-#  movl 8(%ebp), %eax
-#  # < max?
-#  cmpl $args_max, %eax
-#  jae abort
-#  # get # of args
-#  push %ebx
-#  movl $args, %edx
-#  movl 0(%edx,%eax,4), %ebx
-#  # 9 == invalid
-#  cmpl $9, %ebx
-#  je abort
-#  push %ebx
-#
-#  # get jump target from table
-#  movl $targets, %edx
-#  movl 0(%edx,%ebx,4), %edx
-#  jmp *%edx
-#
-#args6:
-#  # unsupported
-#  jmp abort
-#args5:
-#  push %edi
-#  movl 28(%ebp), %edi
-#args4:
-#  push %esi
-#  movl 24(%ebp), %esi
-#args3:
-#  movl 20(%ebp), %edx
-#args2:
-#  movl 16(%ebp), %ecx
-#args1:
-#  movl 12(%ebp), %ebx
-#args0:
-#  int $0x80
-#
-#  pop %ebx
-#  # pop esi?
-#  cmpl $4, %ebx
-#  jb end
-#  pop %esi
-#  # pop edi?
-#  cmpl $5, %ebx
-#  jb end
-#  pop %edi
-#
-#end:
-#  pop %ebx
-#  movl %ebp, %esp
-#  pop %ebp
-#  ret
-#
-#abort:
-#  # print error
-#  push %eax
-#  movl $SYS_WRITE, %eax
-#  movl $2, %ebx
-#  movl $errmsg, %ecx
-#  movl $errmsg_len, %edx
-#  int $0x80
-#  pop %eax
-#  # print eax
-#  call print_eax
-#  # print \n
-#  movl $SYS_WRITE, %eax
-#  movl $2, %ebx
-#  movl $endl, %ecx
-#  movl $1, %edx
-#  int $0x80
-#
-#  # exit
-#  movl $SYS_EXIT, %eax
-#  movl $1, %ebx
-#  int $0x80
+error_str:  .asciz "syscall_init failed!\n"
+fmt:        .asciz "freq=%uMHz\n"
+test_str:   .asciz "TEST\n"
+brand_str:  .zero 64
+nl:         .asciz "\n"
+
+instret_fmt:   .asciz "instret=0x%08X\n"
