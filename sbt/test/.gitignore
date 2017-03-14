@@ -9,6 +9,8 @@ rv32-fence.out
 rv32-hello
 rv32-load-store
 rv32-load-store.out
+rv32-m
+rv32-m.out
 rv32-main
 rv32-main.s
 rv32-system

@@ -458,8 +458,7 @@ lc:
 .PHONY: test
 test:
 	$(MAKE) $(SBT)-build1 $(SBT)-install
-	#$(MAKE) -C $(TOPDIR)/sbt/test clean all run
-	$(MAKE) -C $(TOPDIR)/sbt/test clean-tests run-tests
+	$(MAKE) -C $(TOPDIR)/sbt/test tests run-tests
 
 .PHONY: tests
 tests:
