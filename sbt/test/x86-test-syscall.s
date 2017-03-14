@@ -6,10 +6,8 @@ msg: .ascii "X86 syscall test\n"
 msg_len = . - msg
 
 .text
-.global _start
-.extern syscall1
-.extern syscall4
-_start:
+.global main
+main:
   pushl $msg_len
   pushl $msg
   pushl $1
