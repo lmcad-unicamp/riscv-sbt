@@ -6,12 +6,12 @@ How to Build
 
 Release:
 ```bash
-. setenv.sh release
+source setenv.sh release
 make
 ```
 Debug:
 ```bash
-. setenv.sh
+source setenv.sh
 make
 ```
 
@@ -23,6 +23,13 @@ Tests
 There are two kinds of tests: unit tests, that automatically check and report errors,
 and other tests, whose output must be manually verified. But even for unchecked tests,
 if they compile and run without errors/crashes, it is already a good signal.
+
+The rv32-system test requires enabling RDPMC fixed counters in user mode to be able to emulate
+the RDINSTRET CSR correctly:
+```bash
+sudo modprobe msr
+sudo scripts/setmsr.sh
+```
 
 Running the unit tests:
 ```bash
