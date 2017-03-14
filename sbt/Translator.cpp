@@ -225,6 +225,12 @@ Error Translator::translate(const llvm::MCInst &Inst)
       E = handleSyscall();
       break;
 
+    // ebreak
+    case RISCV::EBREAK:
+      SS << "ebreak";
+      nop();
+      break;
+
     // Load
     case RISCV::LB:
       E = translateLoad(Inst, S8, SS);
@@ -1672,8 +1678,7 @@ llvm::Error Translator::translateFence(
 {
   if (FI) {
     SS << "fence.i";
-    // nop
-    load(RV_ZERO);
+    nop();
     return Error::success();
   }
 

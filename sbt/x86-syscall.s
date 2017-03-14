@@ -273,7 +273,7 @@ get_time:
 
 .global get_instret
 get_instret:
-  mov $0x40000001, %ecx
+  mov $0x40000000, %ecx
   rdpmc
   #pushl %eax
   #pushl $instret_fmt

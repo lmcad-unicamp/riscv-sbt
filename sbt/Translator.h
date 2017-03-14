@@ -311,6 +311,12 @@ private:
     return V;
   }
 
+  // nop
+  void nop()
+  {
+    load(RV_ZERO);
+  }
+
   // Get RISC-V register number
   static unsigned RVReg(unsigned Reg);
 
