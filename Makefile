@@ -453,7 +453,7 @@ update_files:
 	$(UPDATE_FILE)
 
 lc:
-	cat $(TOPDIR)/sbt/*.h $(TOPDIR)/sbt/*.cpp | wc -l
+	cat $(TOPDIR)/sbt/*.h $(TOPDIR)/sbt/*.cpp $(TOPDIR)/sbt/*.s | wc -l
 
 .PHONY: test
 test:
