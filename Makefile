@@ -26,7 +26,8 @@ ALL := \
 	SBT_DEBUG \
 	SBT_RELEASE \
 	BINUTILS_X86 \
-	NEWLIB_GCC_X86
+	NEWLIB_GCC_X86 \
+	RVEMU
 
 all: \
 	$(SBT) \
@@ -104,7 +105,11 @@ define RULE_INSTALL =
 # unconditional install
 .PHONY: $$($(1)_ALIAS)-install
 $$($(1)_ALIAS)-install:
+ifeq ($$($(1)_INSTALL),)
 	$(MAKE) -C $$($(1)_BUILD) install
+else
+	$$($(1)_INSTALL)
+endif
 	echo "Updating file list..."
 	if [ ! -f $$(TOOLCHAIN)/pkg/all.files ]; then \
 		mkdir -p $$(TOOLCHAIN)/pkg; \
@@ -420,6 +425,51 @@ SBT_RELEASE_CONFIGURE := \
              -DCMAKE_INSTALL_PREFIX=$(TOOLCHAIN_RELEASE) $(TOPDIR)/sbt
 SBT_RELEASE_ALIAS := sbt-release
 SBT_RELEASE_DEPS := $(LLVM_RELEASE_TOOLCHAIN)
+
+###
+### riscvemu
+###
+
+RVEMU_PKG_FILE := riscvemu-2017-01-12.tar.gz
+RVEMU_URL   := http://www.bellard.org/riscvemu/$(RVEMU_PKG_FILE)
+RVEMU_PKG := $(REMOTE_DIR)/$(RVEMU_PKG_FILE)
+RVEMU_SRC := $(TOPDIR)/riscvemu-2017-01-12
+
+$(RVEMU_PKG):
+	wget $(RVEMU_URL) -O $@
+
+$(RVEMU_SRC): $(RVEMU_PKG)
+	tar -C $(TOPDIR) -xvf $(RVEMU_PKG)
+
+RVEMU_BUILD := $(TOPDIR)/build/riscvemu
+
+RVEMU_PKG_LINUX_FILE := diskimage-linux-riscv64-2017-01-07.tar.gz
+RVEMU_LINUX_URL  := http://www.bellard.org/riscvemu/$(RVEMU_PKG_LINUX_FILE)
+RVEMU_LINUX_PKG  := $(REMOTE_DIR)/$(RVEMU_PKG_LINUX_FILE)
+RVEMU_LINUX_SRC  := $(RVEMU_BUILD)/diskimage-linux-riscv64-2017-01-07
+
+RVEMU_MAKEFILE := $(RVEMU_BUILD)/Makefile
+RVEMU_OUT := $(RVEMU_BUILD)/riscvemu
+RVEMU_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/riscvemu
+RVEMU_CONFIGURE := cp -a $(RVEMU_SRC)/* $(RVEMU_BUILD)
+RVEMU_INSTALL   := cd $(RVEMU_BUILD) && \
+  cp riscvemu riscvemu32 riscvemu64 riscvemu128 $(TOOLCHAIN_RELEASE)/bin/ && \
+  DIR=$(TOOLCHAIN_RELEASE)/share/riscvemu && \
+  mkdir -p $$DIR && \
+  cp $(RVEMU_LINUX_SRC)/bbl.bin $(RVEMU_LINUX_SRC)/root.bin $$DIR && \
+  F=$(TOOLCHAIN_RELEASE)/bin/riscvemu64_linux && \
+  echo "riscvemu $$DIR/bbl.bin $$DIR/root.bin" > $$F && \
+  chmod +x $$F
+RVEMU_ALIAS := riscvemu
+
+RVEMU_DEPS := $(RVEMU_SRC) $(RVEMU_LINUX_SRC)
+
+$(RVEMU_LINUX_PKG):
+	wget $(RVEMU_LINUX_URL) -O $@
+
+$(RVEMU_LINUX_SRC): $(RVEMU_LINUX_PKG)
+	mkdir -p $(RVEMU_BUILD)
+	tar -C $(RVEMU_BUILD) -xvf $(RVEMU_LINUX_PKG)
 
 ###
 ### generate all rules

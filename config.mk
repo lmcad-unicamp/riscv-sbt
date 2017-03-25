@@ -20,6 +20,7 @@ else
 endif
 
 TOOLCHAIN_DIR  := $(TOOLCHAIN)/$(BUILD_TYPE_DIR)
+REMOTE_DIR     := $(TOPDIR)/remote
 
 #
 # tools

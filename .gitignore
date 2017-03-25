@@ -1,5 +1,7 @@
 build
 cmake
 merge_tools
+remote
+riscvemu-2017-01-12
 riscv-newlib-gcc
 toolchain
