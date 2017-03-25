@@ -27,7 +27,8 @@ ALL := \
 	SBT_RELEASE \
 	BINUTILS_X86 \
 	NEWLIB_GCC_X86 \
-	RVEMU
+	RVEMU \
+	QEMU
 
 all: \
 	$(SBT) \
@@ -461,7 +462,6 @@ RVEMU_INSTALL   := cd $(RVEMU_BUILD) && \
   echo "riscvemu $$DIR/bbl.bin $$DIR/root.bin" > $$F && \
   chmod +x $$F
 RVEMU_ALIAS := riscvemu
-
 RVEMU_DEPS := $(RVEMU_SRC) $(RVEMU_LINUX_SRC)
 
 $(RVEMU_LINUX_PKG):
@@ -470,6 +470,19 @@ $(RVEMU_LINUX_PKG):
 $(RVEMU_LINUX_SRC): $(RVEMU_LINUX_PKG)
 	mkdir -p $(RVEMU_BUILD)
 	tar -C $(RVEMU_BUILD) -xvf $(RVEMU_LINUX_PKG)
+
+###
+### QEMU
+###
+
+QEMU_BUILD := $(TOPDIR)/build/qemu
+QEMU_MAKEFILE := $(QEMU_BUILD)/Makefile
+QEMU_OUT := $(QEMU_BUILD)/qemu-system-riscv32
+QEMU_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/qemu-system-riscv32
+QEMU_CONFIGURE := $(TOPDIR)/riscv-qemu/configure \
+  --prefix=$(TOOLCHAIN_RELEASE) \
+  --target-list=riscv64-softmmu,riscv32-softmmu
+QEMU_ALIAS := qemu
 
 ###
 ### generate all rules

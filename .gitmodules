@@ -25,3 +25,6 @@
 [submodule "riscv-gnu-toolchain"]
 	path = riscv-gnu-toolchain
 	url = https://github.com/riscv/riscv-gnu-toolchain
+[submodule "riscv-qemu"]
+	path = riscv-qemu
+	url = https://github.com/riscv/riscv-qemu
