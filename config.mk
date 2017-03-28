@@ -30,9 +30,11 @@ SBT_SHARE_DIR := $(TOOLCHAIN_DIR)/share/riscv-sbt
 X86_SYSCALL_O := $(SBT_SHARE_DIR)/x86-syscall.o
 X86_RVSC_O    := $(SBT_SHARE_DIR)/x86-rvsc.o
 
-RV32_TRIPLE   := riscv32-unknown-elf
-RV64_TRIPLE   := riscv64-unknown-elf
-X86_TRIPLE    := i386-unknown-elf
+RV32_TRIPLE       := riscv32-unknown-elf
+RV32_LINUX_TRIPLE := riscv32-unknown-linux-gnu
+RV64_TRIPLE       := riscv64-unknown-elf
+RV64_LINUX_TRIPLE := riscv64-unknown-linux-gnu
+X86_TRIPLE        := i386-unknown-elf
 
 RV32_AS   := $(RV32_TRIPLE)-as
 RV32_LD   := $(RV32_TRIPLE)-ld
@@ -51,6 +53,7 @@ X86_LD    := $(X86_TRIPLE)-ld
 # clang
 CLANG := clang
 
+
 # RISC-V 32 bit
 RV32_CLANG        := $(CLANG)
 RV32_SYSROOT      := $(TOOLCHAIN_RELEASE)/$(RV32_TRIPLE)
@@ -65,6 +68,23 @@ RV32_LD_FLAGS0 := -L$(RV32_LIB) -L$(RV32_LIB_GCC) \
                   -dT ldscripts/elf32lriscv.x $(RV32_CRT0)
 RV32_LD_FLAGS1 := -lc -lgloss -lc -lgcc
 RV32_PREFIX    := rv32
+
+
+# RISC-V 64 bit
+RV64_CLANG        := $(CLANG)
+RV64_SYSROOT      := $(TOOLCHAIN_RELEASE)/$(RV64_TRIPLE)
+RV64_SYSROOT_FLAG := -isysroot $(RV64_SYSROOT) \
+                     -isystem $(RV64_SYSROOT)/include
+RV64_CLANG_FLAGS  := --target=riscv64 -mriscv=RV64IAMFD \
+                     $(RV64_SYSROOT_FLAG)
+RV64_LIB      := $(TOOLCHAIN_RELEASE)/$(RV64_TRIPLE)/lib
+RV64_LIB_GCC  := $(TOOLCHAIN_RELEASE)/lib/gcc/$(RV64_TRIPLE)/7.0.0
+RV64_CRT0     := $(RV64_LIB)/crt0.o
+RV64_LD_FLAGS0 := -L$(RV64_LIB) -L$(RV64_LIB_GCC) \
+                  -dT ldscripts/elf64lriscv.x $(RV64_CRT0)
+RV64_LD_FLAGS1 := -lc -lgloss -lc -lgcc
+RV64_PREFIX    := rv64
+
 
 # x86
 X86_CLANG       := $(CLANG)

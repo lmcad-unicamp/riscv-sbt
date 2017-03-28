@@ -28,3 +28,6 @@
 [submodule "riscv-qemu"]
 	path = riscv-qemu
 	url = https://github.com/riscv/riscv-qemu
+[submodule "riscv-glibc"]
+	path = riscv-glibc
+	url = https://github.com/riscv/riscv-glibc

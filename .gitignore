@@ -1,5 +1,6 @@
 build
 cmake
+linux-4.6.2
 merge_tools
 remote
 riscvemu-2017-01-12

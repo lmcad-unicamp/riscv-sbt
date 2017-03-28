@@ -1,5 +1,8 @@
 *.o
-rv32-hello
 rv32-clang-*
 rv32-gcc-*
+rv32-hello
+rv64-clang-*
+rv64-gcc-*
+rv64-hello
 x86-clang-*
