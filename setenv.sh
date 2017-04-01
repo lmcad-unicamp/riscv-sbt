@@ -24,8 +24,11 @@ else
   export BUILD_TYPE=Debug
 fi
 
-# PK32
-export PK32=$TC/release/riscv32-unknown-elf/bin/pk
-export PK64=$TC/release/riscv64-unknown-elf/bin/pk
+export TCR=$TC/release
+export PK32=$TCR/riscv32-unknown-elf/bin/pk
+export PK64=$TCR/riscv64-unknown-elf/bin/pk
+export BBL=$TCR/riscv64-unknown-elf/bin/bbl
+export ROOT_FS=$TCR/share/riscvemu/root.bin
 alias spike32="spike $PK32"
-alias spike64="spike --isa=RV64IMAFDC pk"
+alias spike64="spike --isa=RV64IMAFDC $PK64"
+alias linux="spike --isa=RV64IMAFDC $BBL"

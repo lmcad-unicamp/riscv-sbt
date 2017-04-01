@@ -85,7 +85,8 @@ endef
 # gen MAKEFILE
 define RULE_MAKEFILE =
 $$($(1)_MAKEFILE): $$($(1)_DEPS)
-	mkdir -p $$($(1)_BUILD)
+	@echo "*** $$@ ***"
+	if [ ! -d "$$($(1)_BUILD)" ]; then mkdir -p $$($(1)_BUILD); fi
 	cd $$($(1)_BUILD) && \
 	$$($(1)_CONFIGURE)
 	touch $$@
@@ -96,6 +97,7 @@ define RULE_BUILD =
 # unconditional build
 .PHONY: $$($(1)_ALIAS)-build
 $$($(1)_ALIAS)-build:
+	@echo "*** $$@ ***"
 	$(MAKE) -C $$($(1)_BUILD) $$($(1)_MAKE_FLAGS) $(MAKE_OPTS)
 
 # serial build
@@ -114,6 +116,7 @@ define RULE_INSTALL =
 # unconditional install
 .PHONY: $$($(1)_ALIAS)-install
 $$($(1)_ALIAS)-install:
+	@echo "*** $$@ ***"
 ifeq ($$($(1)_INSTALL),)
 	$(MAKE) -C $$($(1)_BUILD) install
 else
@@ -478,6 +481,51 @@ SIM_ALIAS := riscv-isa-sim
 SIM_DEPS := $(FESVR_TOOLCHAIN)
 
 ###
+### linux
+###
+
+LINUX_PKG_FILE := linux-4.6.2.tar.xz
+LINUX_URL := https://cdn.kernel.org/pub/linux/kernel/v4.x/$(LINUX_PKG_FILE)
+LINUX_PKG := $(REMOTE_DIR)/$(LINUX_PKG_FILE)
+LINUX_DIR := $(TOPDIR)/linux
+LINUX_SRC := $(TOPDIR)/build/linux-4.6.2
+
+LINUX_BUILD := $(LINUX_SRC)
+LINUX_MAKEFILE := $(LINUX_BUILD)/Makefile
+LINUX_OUT := $(LINUX_BUILD)/vmlinux
+LINUX_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/$(RV64_TRIPLE)/bin/vmlinux
+LINUX_CONFIGURE := cd $(LINUX_BUILD) && \
+                   $(MAKE) ARCH=riscv defconfig && \
+                   cp $(LINUX_DIR)/riscv.config .config
+LINUX_MAKE_FLAGS := ARCH=riscv vmlinux
+LINUX_INSTALL := cp $(LINUX_OUT) $(LINUX_TOOLCHAIN)
+LINUX_ALIAS := linux
+LINUX_DEPS  := $(LINUX_SRC)/stamps/initramfs
+
+$(LINUX_PKG):
+	wget $(LINUX_URL) -O $@
+
+$(LINUX_SRC)/stamps/source: $(LINUX_PKG)
+	tar -C $(TOPDIR)/build -xvf $(LINUX_PKG)
+	cd $(LINUX_SRC) && \
+	git init && \
+	git remote add -t master origin https://github.com/riscv/riscv-linux.git && \
+	git fetch && \
+	git checkout -f -t origin/master
+	mkdir -p $(dir $@) && touch $@
+
+$(LINUX_SRC)/stamps/initramfs: $(LINUX_SRC)/stamps/source
+	mkdir -p $(LINUX_BUILD)/rootfs
+	cd $(LINUX_BUILD) && \
+	sudo rm -rf initramfs && \
+	sudo mount -o loop $(ROOT_FS) rootfs && \
+	sudo cp -a rootfs initramfs && \
+	sudo umount rootfs && \
+	sudo cp $(LINUX_DIR)/init.sh initramfs/init && \
+	sudo rm -rf initramfs/lost+found && \
+	mkdir -p $(dir $@) && touch $@
+
+###
 ### riscv-pk
 ###
 
@@ -507,9 +555,10 @@ PK64_OUT := $(PK64_BUILD)/pk
 PK64_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/$(RV64_TRIPLE)/bin/pk
 PK64_CONFIGURE := $(TOPDIR)/riscv-pk/configure \
                   --prefix=$(TOOLCHAIN_RELEASE) \
-                  --host=$(RV64_TRIPLE)
+                  --host=$(RV64_TRIPLE) \
+                  --with-payload=$(LINUX_TOOLCHAIN)
 PK64_ALIAS := riscv-pk-64
-PK64_DEPS := $(PK_PATCHED)
+PK64_DEPS := $(PK_PATCHED) $(LINUX_TOOLCHAIN)
 
 ###
 ### cmake
@@ -650,36 +699,6 @@ QEMU_CONFIGURE := $(TOPDIR)/riscv-qemu/configure \
   --prefix=$(TOOLCHAIN_RELEASE) \
   --target-list=riscv64-softmmu,riscv32-softmmu
 QEMU_ALIAS := qemu
-
-###
-### linux
-###
-
-LINUX_PKG_FILE := linux-4.6.2.tar.xz
-LINUX_URL := https://cdn.kernel.org/pub/linux/kernel/v4.x/$(LINUX_PKG_FILE)
-LINUX_PKG := $(REMOTE_DIR)/$(LINUX_PKG_FILE)
-LINUX_SRC := $(TOPDIR)/linux-4.6.2
-
-LINUX_BUILD := $(LINUX_SRC)
-LINUX_MAKEFILE := $(LINUX_BUILD)/Makefile
-LINUX_OUT := $(LINUX_BUILD)/vmlinux
-LINUX_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/vmlinux
-LINUX_CONFIGURE := cd $(LINUX_BUILD) && $(MAKE) ARCH=riscv defconfig
-LINUX_MAKE_FLAGS := ARCH=riscv vmlinux
-LINUX_INSTALL := true
-LINUX_ALIAS := linux
-LINUX_DEPS  := $(LINUX_SRC)
-
-$(LINUX_PKG):
-	wget $(LINUX_URL) -O $@
-
-$(LINUX_SRC): $(LINUX_PKG)
-	tar -C $(TOPDIR) -xvf $(LINUX_PKG)
-	cd $(LINUX_SRC) && \
-	git init && \
-	git remote add -t master origin https://github.com/riscv/riscv-linux.git && \
-	git fetch && \
-	git checkout -f -t origin/master
 
 ###
 ### generate all rules
