@@ -1,4 +1,4 @@
-include $(TOPDIR)/config.mk
+include $(TOPDIR)/make/config.mk
 
 ### config ####
 
@@ -15,7 +15,7 @@ RUN_BINS := $(filter-out elf,$(BINS))
 
 all: $(BINS)
 
-include $(TOPDIR)/rules.mk
+include $(TOPDIR)/make/rules.mk
 
 ### elf ###
 

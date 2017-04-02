@@ -6,12 +6,12 @@ How to Build
 
 Release:
 ```bash
-source setenv.sh release
+source scripts/setenv.sh release
 make
 ```
 Debug:
 ```bash
-source setenv.sh
+source scripts/setenv.sh
 make
 ```
 

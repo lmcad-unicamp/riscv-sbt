@@ -23,6 +23,7 @@ TOOLCHAIN_DIR  := $(TOOLCHAIN)/$(BUILD_TYPE_DIR)
 REMOTE_DIR     := $(TOPDIR)/remote
 BUILD_DIR      := $(TOPDIR)/build
 PATCHES_DIR    := $(TOPDIR)/patches
+SUBMODULES_DIR := $(TOPDIR)/submodules
 
 #
 # tools

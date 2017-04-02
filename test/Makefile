@@ -1,13 +1,13 @@
-include $(TOPDIR)/config.mk
+include $(TOPDIR)/make/config.mk
 
 BINS := rv32-hello rv32-gcc-hello rv32-clang-hello x86-clang-hello
 EXTRA := rv64-hello rv64-gcc-hello rv64-clang-hello \
          rv32-gcc-linux-hello rv64-gcc-linux-hello
-BINS += $(EXTRA)
+#BINS += $(EXTRA)
 
 all: $(BINS)
 
-include $(TOPDIR)/rules.mk
+include $(TOPDIR)/make/rules.mk
 
 $(eval $(call BUILD,RV32,rv32-hello))
 $(eval $(call BUILD,RV64,rv64-hello))

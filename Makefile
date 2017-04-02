@@ -177,7 +177,7 @@ BINUTILS32_BUILD := $(BUILD_DIR)/riscv-binutils-gdb/32
 BINUTILS32_MAKEFILE := $(BINUTILS32_BUILD)/Makefile
 BINUTILS32_OUT := $(BINUTILS32_BUILD)/ld/ld-new
 BINUTILS32_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/$(RV32_TRIPLE)-ld
-BINUTILS32_CONFIGURE := $(TOPDIR)/riscv-binutils-gdb/configure \
+BINUTILS32_CONFIGURE := $(SUBMODULES_DIR)/riscv-binutils-gdb/configure \
                       --target=$(RV32_TRIPLE) \
                       --prefix=$(TOOLCHAIN_RELEASE) \
                       --disable-werror
@@ -189,7 +189,7 @@ BINUTILS64_BUILD := $(BUILD_DIR)/riscv-binutils-gdb/64
 BINUTILS64_MAKEFILE := $(BINUTILS64_BUILD)/Makefile
 BINUTILS64_OUT := $(BINUTILS64_BUILD)/ld/ld-new
 BINUTILS64_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/$(RV64_TRIPLE)-ld
-BINUTILS64_CONFIGURE := $(TOPDIR)/riscv-binutils-gdb/configure \
+BINUTILS64_CONFIGURE := $(SUBMODULES_DIR)/riscv-binutils-gdb/configure \
                       --target=$(RV64_TRIPLE) \
                       --prefix=$(TOOLCHAIN_RELEASE) \
                       --disable-werror
@@ -201,7 +201,7 @@ BINUTILS_X86_BUILD := $(BUILD_DIR)/x86-binutils-gdb
 BINUTILS_X86_MAKEFILE := $(BINUTILS_X86_BUILD)/Makefile
 BINUTILS_X86_OUT := $(BINUTILS_X86_BUILD)/ld/ld-new
 BINUTILS_X86_TOOLCHAIN := $(TOOLCHAIN_X86)/bin/$(X86_TRIPLE)-ld
-BINUTILS_X86_CONFIGURE := $(TOPDIR)/riscv-binutils-gdb/configure \
+BINUTILS_X86_CONFIGURE := $(SUBMODULES_DIR)/riscv-binutils-gdb/configure \
                           --target=$(X86_TRIPLE) \
                           --prefix=$(TOOLCHAIN_X86)
 BINUTILS_X86_ALIAS := x86-binutils-gdb
@@ -214,7 +214,7 @@ BINUTILS_LINUX_BUILD := $(BUILD_DIR)/riscv-binutils-gdb/linux
 BINUTILS_LINUX_MAKEFILE := $(BINUTILS_LINUX_BUILD)/Makefile
 BINUTILS_LINUX_OUT := $(BINUTILS_LINUX_BUILD)/ld/ld-new
 BINUTILS_LINUX_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/$(RV64_LINUX_TRIPLE)-ld
-BINUTILS_LINUX_CONFIGURE := $(TOPDIR)/riscv-binutils-gdb/configure \
+BINUTILS_LINUX_CONFIGURE := $(SUBMODULES_DIR)/riscv-binutils-gdb/configure \
                       --target=$(RV64_LINUX_TRIPLE) \
                       --prefix=$(TOOLCHAIN_RELEASE) \
                       --with-sysroot=$(SYSROOT) \
@@ -225,18 +225,18 @@ BINUTILS_LINUX_ALIAS := riscv-binutils-gdb-linux
 
 BINUTILS_LINUX_POSTINSTALL := \
   mkdir -p $(SYSROOT)/usr/ && \
-  cp -a $(TOPDIR)/riscv-gnu-toolchain/linux-headers/include $(SYSROOT)/usr/
+  cp -a $(SUBMODULES_DIR)/riscv-gnu-toolchain/linux-headers/include $(SYSROOT)/usr/
 
 
 ###
 ### riscv-newlib-gcc
 ###
 
-SRC_NEWLIB_GCC := $(TOPDIR)/riscv-newlib-gcc
+SRC_NEWLIB_GCC := $(BUILD_DIR)/riscv-newlib-gcc
 $(SRC_NEWLIB_GCC):
-	cp -a $(TOPDIR)/riscv-gcc $@.tmp
-	cp -a $(TOPDIR)/riscv-newlib/. $@.tmp
-	cp -a $(TOPDIR)/riscv-gcc/include/. $@.tmp/include
+	cp -a $(SUBMODULES_DIR)/riscv-gcc $@.tmp
+	cp -a $(SUBMODULES_DIR)/riscv-newlib/. $@.tmp
+	cp -a $(SUBMODULES_DIR)/riscv-gcc/include/. $@.tmp/include
 	mv $@.tmp $@
 
 # 32 bit
@@ -245,7 +245,7 @@ NEWLIB_GCC32_BUILD := $(BUILD_DIR)/riscv-newlib-gcc/32
 NEWLIB_GCC32_MAKEFILE := $(NEWLIB_GCC32_BUILD)/Makefile
 NEWLIB_GCC32_OUT := $(NEWLIB_GCC32_BUILD)/gcc/xgcc
 NEWLIB_GCC32_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/$(RV32_TRIPLE)-gcc
-NEWLIB_GCC32_CONFIGURE := $(TOPDIR)/riscv-newlib-gcc/configure \
+NEWLIB_GCC32_CONFIGURE := $(BUILD_DIR)/riscv-newlib-gcc/configure \
                  --target=$(RV32_TRIPLE) \
                  --prefix=$(TOOLCHAIN_RELEASE) \
                  --without-headers \
@@ -274,7 +274,7 @@ NEWLIB_GCC64_BUILD := $(BUILD_DIR)/riscv-newlib-gcc/64
 NEWLIB_GCC64_MAKEFILE := $(NEWLIB_GCC64_BUILD)/Makefile
 NEWLIB_GCC64_OUT := $(NEWLIB_GCC64_BUILD)/gcc/xgcc
 NEWLIB_GCC64_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/$(RV64_TRIPLE)-gcc
-NEWLIB_GCC64_CONFIGURE := $(TOPDIR)/riscv-newlib-gcc/configure \
+NEWLIB_GCC64_CONFIGURE := $(BUILD_DIR)/riscv-newlib-gcc/configure \
                  --target=$(RV64_TRIPLE) \
                  --prefix=$(TOOLCHAIN_RELEASE) \
                  --without-headers \
@@ -303,7 +303,7 @@ NEWLIB_GCC_X86_BUILD := $(BUILD_DIR)/x86-newlib-gcc
 NEWLIB_GCC_X86_MAKEFILE := $(NEWLIB_GCC_X86_BUILD)/Makefile
 NEWLIB_GCC_X86_OUT := $(NEWLIB_GCC_X86_BUILD)/gcc/xgcc
 NEWLIB_GCC_X86_TOOLCHAIN := $(TOOLCHAIN_X86)/bin/$(X86_TRIPLE)-gcc
-NEWLIB_GCC_X86_CONFIGURE := $(TOPDIR)/riscv-newlib-gcc/configure \
+NEWLIB_GCC_X86_CONFIGURE := $(BUILD_DIR)/riscv-newlib-gcc/configure \
                  --target=$(X86_TRIPLE) \
                  --prefix=$(TOOLCHAIN_X86) \
                  --without-headers \
@@ -336,7 +336,7 @@ LINUX_GCC_OUT := $(LINUX_GCC_BUILD)/gcc/xgcc
 LINUX_GCC_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/$(RV64_LINUX_TRIPLE)-gcc
 LINUX_GCC_CONFIGURE := \
     cd $(LINUX_GCC_BUILD) && \
-    $(TOPDIR)/riscv-gcc/configure \
+    $(SUBMODULES_DIR)/riscv-gcc/configure \
     --target=$(RV64_LINUX_TRIPLE) \
     --prefix=$(TOOLCHAIN_RELEASE) \
     --with-sysroot=$(SYSROOT) \
@@ -373,7 +373,7 @@ LINUX_GCC_STAGE1_OUT := $(LINUX_GCC_STAGE1)/output
 $(LINUX_GCC_STAMPS)/build-gcc-linux-stage1: $(BINUTILS_LINUX_TOOLCHAIN)
 	mkdir -p $(LINUX_GCC_STAGE1)
 	cd $(LINUX_GCC_STAGE1) && \
-	$(TOPDIR)/riscv-gcc/configure \
+	$(SUBMODULES_DIR)/riscv-gcc/configure \
 		--target=$(RV64_LINUX_TRIPLE) \
 		--prefix=$(LINUX_GCC_STAGE1_OUT) \
 		--with-sysroot=$(SYSROOT) \
@@ -427,7 +427,7 @@ $(LINUX_GCC_STAMPS)/build-glibc-linux-%: \
 		CC="$(GLIBC_CC_FOR_TARGET) $($@_CFLAGS)" \
 		CFLAGS="-g -O2 $($@_CFLAGS)" \
 		ASFLAGS="$($@_CFLAGS)" \
-		$(TOPDIR)/riscv-glibc/configure \
+		$(SUBMODULES_DIR)/riscv-glibc/configure \
 		--host=riscv$($@_XLEN)-unknown-linux-gnu \
 		--prefix=/usr \
 		--disable-werror \
@@ -446,7 +446,7 @@ $(LINUX_GCC_STAMPS)/build-glibc-linux-headers: \
 	mkdir -p $(LINUX_GLIBC_HEADERS)
 	cd $(LINUX_GLIBC_HEADERS) && \
 	CC="$(LINUX_GCC_STAGE1_OUT)/bin/$(RV64_LINUX_TRIPLE)-gcc" \
-	$(TOPDIR)/riscv-glibc/configure \
+	$(SUBMODULES_DIR)/riscv-glibc/configure \
 		--host=$(RV64_LINUX_TRIPLE) \
 		--prefix=$(SYSROOT)/usr \
 		--enable-shared \
@@ -464,7 +464,7 @@ FESVR_BUILD := $(BUILD_DIR)/riscv-fesvr
 FESVR_MAKEFILE := $(FESVR_BUILD)/Makefile
 FESVR_OUT := $(FESVR_BUILD)/libfesvr.so
 FESVR_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/lib/libfesvr.so
-FESVR_CONFIGURE := $(TOPDIR)/riscv-fesvr/configure \
+FESVR_CONFIGURE := $(SUBMODULES_DIR)/riscv-fesvr/configure \
                    --prefix=$(TOOLCHAIN_RELEASE)
 FESVR_ALIAS := riscv-fesvr
 
@@ -473,7 +473,7 @@ SIM_BUILD := $(BUILD_DIR)/riscv-isa-sim
 SIM_MAKEFILE := $(SIM_BUILD)/Makefile
 SIM_OUT := $(SIM_BUILD)/spike
 SIM_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/spike
-SIM_CONFIGURE := $(TOPDIR)/riscv-isa-sim/configure \
+SIM_CONFIGURE := $(SUBMODULES_DIR)/riscv-isa-sim/configure \
                  --prefix=$(TOOLCHAIN_RELEASE) \
                  --with-fesvr=$(TOOLCHAIN_RELEASE) \
                  --with-isa=RV32IMAFDC
@@ -487,7 +487,7 @@ SIM_DEPS := $(FESVR_TOOLCHAIN)
 LINUX_PKG_FILE := linux-4.6.2.tar.xz
 LINUX_URL := https://cdn.kernel.org/pub/linux/kernel/v4.x/$(LINUX_PKG_FILE)
 LINUX_PKG := $(REMOTE_DIR)/$(LINUX_PKG_FILE)
-LINUX_DIR := $(TOPDIR)/linux
+LINUX_DIR := $(TOPDIR)/riscv-linux
 LINUX_SRC := $(BUILD_DIR)/linux-4.6.2
 
 LINUX_BUILD := $(LINUX_SRC)
@@ -499,7 +499,7 @@ LINUX_CONFIGURE := cd $(LINUX_BUILD) && \
                    cp $(LINUX_DIR)/riscv.config .config
 LINUX_MAKE_FLAGS := ARCH=riscv vmlinux
 LINUX_INSTALL := cp $(LINUX_OUT) $(LINUX_TOOLCHAIN)
-LINUX_ALIAS := linux
+LINUX_ALIAS := riscv-linux
 LINUX_DEPS  := $(LINUX_SRC)/stamps/initramfs
 
 $(LINUX_PKG):
@@ -532,16 +532,22 @@ $(LINUX_SRC)/stamps/initramfs: $(LINUX_SRC)/stamps/source
 
 # 32 bit
 
-PK_PATCHED := $(TOPDIR)/riscv-pk/.patched
+PK_PATCHED := $(BUILD_DIR)/riscv-pk/.patched
 $(PK_PATCHED): $(PATCHES_DIR)/riscv-pk-32-bit-build-fix.patch
-	cd $(TOPDIR)/riscv-pk && patch < $<
-	@touch $@
+	cd $(SUBMODULES_DIR)/riscv-pk && patch < $<
+	mkdir -p $(dir $@) && touch $@
+
+.PHONY: riscv-pk-unpatch
+riscv-pk-unpatch:
+	cd $(SUBMODULES_DIR)/riscv-pk && \
+		git checkout configure configure.ac && \
+		rm -f $(PK_PATCHED)
 
 PK32_BUILD := $(BUILD_DIR)/riscv-pk/32
 PK32_MAKEFILE := $(PK32_BUILD)/Makefile
 PK32_OUT := $(PK32_BUILD)/pk
 PK32_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/$(RV32_TRIPLE)/bin/pk
-PK32_CONFIGURE := $(TOPDIR)/riscv-pk/configure \
+PK32_CONFIGURE := $(SUBMODULES_DIR)/riscv-pk/configure \
                   --prefix=$(TOOLCHAIN_RELEASE) \
                   --host=$(RV32_TRIPLE) \
                   --enable-32bit
@@ -554,7 +560,7 @@ PK64_BUILD := $(BUILD_DIR)/riscv-pk/64
 PK64_MAKEFILE := $(PK64_BUILD)/Makefile
 PK64_OUT := $(PK64_BUILD)/pk
 PK64_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/$(RV64_TRIPLE)/bin/pk
-PK64_CONFIGURE := $(TOPDIR)/riscv-pk/configure \
+PK64_CONFIGURE := $(SUBMODULES_DIR)/riscv-pk/configure \
                   --prefix=$(TOOLCHAIN_RELEASE) \
                   --host=$(RV64_TRIPLE) \
                   --with-payload=$(LINUX_TOOLCHAIN)
@@ -596,13 +602,13 @@ LLVM_DEBUG_TOOLCHAIN := $(TOOLCHAIN_DEBUG)/bin/clang
 LLVM_DEBUG_CONFIGURE := \
     $(CMAKE) -DCMAKE_BUILD_TYPE=Debug \
              -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86" \
-             -DCMAKE_INSTALL_PREFIX=$(TOOLCHAIN_DEBUG) $(TOPDIR)/llvm
+             -DCMAKE_INSTALL_PREFIX=$(TOOLCHAIN_DEBUG) $(SUBMODULES_DIR)/llvm
 LLVM_DEBUG_ALIAS := llvm-debug
-CLANG_LINK := $(TOPDIR)/llvm/tools/clang
+CLANG_LINK := $(SUBMODULES_DIR)/llvm/tools/clang
 LLVM_DEBUG_DEPS := $(NEWLIB_GCC32_TOOLCHAIN) $(CMAKE) $(CLANG_LINK)
 
 $(CLANG_LINK):
-	ln -sf $(TOPDIR)/clang $@
+	ln -sf $(SUBMODULES_DIR)/clang $@
 
 # release
 
@@ -613,7 +619,7 @@ LLVM_RELEASE_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/clang
 LLVM_RELEASE_CONFIGURE := \
     $(CMAKE) -DCMAKE_BUILD_TYPE=Release \
              -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86" \
-             -DCMAKE_INSTALL_PREFIX=$(TOOLCHAIN_RELEASE) $(TOPDIR)/llvm
+             -DCMAKE_INSTALL_PREFIX=$(TOOLCHAIN_RELEASE) $(SUBMODULES_DIR)/llvm
 LLVM_RELEASE_ALIAS := llvm-release
 LLVM_RELEASE_DEPS := $(NEWLIB_GCC32_TOOLCHAIN) $(CMAKE) $(CLANG_LINK)
 
