@@ -607,6 +607,14 @@ LLVM_DEBUG_ALIAS := llvm-debug
 CLANG_LINK := $(SUBMODULES_DIR)/llvm/tools/clang
 LLVM_DEBUG_DEPS := $(NEWLIB_GCC32_TOOLCHAIN) $(CMAKE) $(CLANG_LINK)
 
+LLVM_DEBUG_POSTINSTALL := \
+  SRC=$(LLVM_DEBUG_BUILD)/lib/Target/RISCVMaster && \
+  DST=$(TOOLCHAIN_DEBUG)/include/llvm/Target/RISCVMaster && \
+  mkdir -p $$DST && \
+  (for f in RISCVMasterGenInstrInfo.inc RISCVMasterGenRegisterInfo.inc; do \
+    cp $$SRC/$$f $$DST/$$f || exit 1; \
+  done)
+
 $(CLANG_LINK):
 	ln -sf $(SUBMODULES_DIR)/clang $@
 
@@ -622,6 +630,14 @@ LLVM_RELEASE_CONFIGURE := \
              -DCMAKE_INSTALL_PREFIX=$(TOOLCHAIN_RELEASE) $(SUBMODULES_DIR)/llvm
 LLVM_RELEASE_ALIAS := llvm-release
 LLVM_RELEASE_DEPS := $(NEWLIB_GCC32_TOOLCHAIN) $(CMAKE) $(CLANG_LINK)
+
+LLVM_RELEASE_POSTINSTALL := \
+  SRC=$(LLVM_RELEASE_BUILD)/lib/Target/RISCVMaster && \
+  DST=$(TOOLCHAIN_RELEASE)/include/llvm/Target/RISCVMaster && \
+  mkdir -p $$DST && \
+  (for f in RISCVMasterGenInstrInfo.inc RISCVMasterGenRegisterInfo.inc; do \
+    cp $$SRC/$$f $$DST/$$f || exit 1; \
+  done)
 
 ###
 ### sbt

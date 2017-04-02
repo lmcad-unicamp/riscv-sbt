@@ -14,9 +14,9 @@
 
 // LLVM internal instruction info
 #define GET_INSTRINFO_ENUM
-#include <lib/Target/RISCVMaster/RISCVMasterGenInstrInfo.inc>
+#include <llvm/Target/RISCVMaster/RISCVMasterGenInstrInfo.inc>
 #define GET_REGINFO_ENUM
-#include <lib/Target/RISCVMaster/RISCVMasterGenRegisterInfo.inc>
+#include <llvm/Target/RISCVMaster/RISCVMasterGenRegisterInfo.inc>
 
 #include <algorithm>
 #include <vector>
