@@ -2,7 +2,7 @@ ifeq ($(TOPDIR),)
 $(error "TOPDIR not set. Please run 'source setenv.sh' first.")
 endif
 
-include $(TOPDIR)/config.mk
+include $(TOPDIR)/make/config.mk
 
 # build type for LLVM and SBT (Release or Debug)
 # WARNING: using Release LLVM builds with Debug SBT CAN cause problems!
@@ -68,7 +68,7 @@ all: \
 ### rules
 ###
 
-include $(TOPDIR)/rules.mk
+include $(TOPDIR)/make/rules.mk
 
 
 ALL_FILES := find \! -type d | sed "s@^\./@@; /^pkg\//d;" | sort
@@ -173,7 +173,7 @@ endef
 
 # 32 bit
 
-BINUTILS32_BUILD := $(TOPDIR)/build/riscv-binutils-gdb/32
+BINUTILS32_BUILD := $(BUILD_DIR)/riscv-binutils-gdb/32
 BINUTILS32_MAKEFILE := $(BINUTILS32_BUILD)/Makefile
 BINUTILS32_OUT := $(BINUTILS32_BUILD)/ld/ld-new
 BINUTILS32_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/$(RV32_TRIPLE)-ld
@@ -185,7 +185,7 @@ BINUTILS32_ALIAS := riscv-binutils-gdb-32
 
 # 64 bit
 
-BINUTILS64_BUILD := $(TOPDIR)/build/riscv-binutils-gdb/64
+BINUTILS64_BUILD := $(BUILD_DIR)/riscv-binutils-gdb/64
 BINUTILS64_MAKEFILE := $(BINUTILS64_BUILD)/Makefile
 BINUTILS64_OUT := $(BINUTILS64_BUILD)/ld/ld-new
 BINUTILS64_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/$(RV64_TRIPLE)-ld
@@ -197,7 +197,7 @@ BINUTILS64_ALIAS := riscv-binutils-gdb-64
 
 # x86
 
-BINUTILS_X86_BUILD := $(TOPDIR)/build/x86-binutils-gdb
+BINUTILS_X86_BUILD := $(BUILD_DIR)/x86-binutils-gdb
 BINUTILS_X86_MAKEFILE := $(BINUTILS_X86_BUILD)/Makefile
 BINUTILS_X86_OUT := $(BINUTILS_X86_BUILD)/ld/ld-new
 BINUTILS_X86_TOOLCHAIN := $(TOOLCHAIN_X86)/bin/$(X86_TRIPLE)-ld
@@ -210,7 +210,7 @@ BINUTILS_X86_ALIAS := x86-binutils-gdb
 
 SYSROOT := $(TOOLCHAIN_RELEASE)/sysroot
 
-BINUTILS_LINUX_BUILD := $(TOPDIR)/build/riscv-binutils-gdb/linux
+BINUTILS_LINUX_BUILD := $(BUILD_DIR)/riscv-binutils-gdb/linux
 BINUTILS_LINUX_MAKEFILE := $(BINUTILS_LINUX_BUILD)/Makefile
 BINUTILS_LINUX_OUT := $(BINUTILS_LINUX_BUILD)/ld/ld-new
 BINUTILS_LINUX_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/$(RV64_LINUX_TRIPLE)-ld
@@ -241,7 +241,7 @@ $(SRC_NEWLIB_GCC):
 
 # 32 bit
 
-NEWLIB_GCC32_BUILD := $(TOPDIR)/build/riscv-newlib-gcc/32
+NEWLIB_GCC32_BUILD := $(BUILD_DIR)/riscv-newlib-gcc/32
 NEWLIB_GCC32_MAKEFILE := $(NEWLIB_GCC32_BUILD)/Makefile
 NEWLIB_GCC32_OUT := $(NEWLIB_GCC32_BUILD)/gcc/xgcc
 NEWLIB_GCC32_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/$(RV32_TRIPLE)-gcc
@@ -270,7 +270,7 @@ NEWLIB_GCC32_DEPS := $(BINUTILS32_TOOLCHAIN) $(SRC_NEWLIB_GCC)
 
 # 64 bit
 
-NEWLIB_GCC64_BUILD := $(TOPDIR)/build/riscv-newlib-gcc/64
+NEWLIB_GCC64_BUILD := $(BUILD_DIR)/riscv-newlib-gcc/64
 NEWLIB_GCC64_MAKEFILE := $(NEWLIB_GCC64_BUILD)/Makefile
 NEWLIB_GCC64_OUT := $(NEWLIB_GCC64_BUILD)/gcc/xgcc
 NEWLIB_GCC64_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/$(RV64_TRIPLE)-gcc
@@ -299,7 +299,7 @@ NEWLIB_GCC64_DEPS := $(BINUTILS64_TOOLCHAIN) $(SRC_NEWLIB_GCC)
 
 # x86
 
-NEWLIB_GCC_X86_BUILD := $(TOPDIR)/build/x86-newlib-gcc
+NEWLIB_GCC_X86_BUILD := $(BUILD_DIR)/x86-newlib-gcc
 NEWLIB_GCC_X86_MAKEFILE := $(NEWLIB_GCC_X86_BUILD)/Makefile
 NEWLIB_GCC_X86_OUT := $(NEWLIB_GCC_X86_BUILD)/gcc/xgcc
 NEWLIB_GCC_X86_TOOLCHAIN := $(TOOLCHAIN_X86)/bin/$(X86_TRIPLE)-gcc
@@ -328,7 +328,7 @@ NEWLIB_GCC_X86_DEPS := $(BINUTILS_X86_TOOLCHAIN)
 
 # multilib
 
-LINUX_GCC_BASE  := $(TOPDIR)/build/riscv-linux-gcc
+LINUX_GCC_BASE  := $(BUILD_DIR)/riscv-linux-gcc
 LINUX_GCC_STAGE2 := $(LINUX_GCC_BASE)/stage2
 LINUX_GCC_BUILD  := $(LINUX_GCC_STAGE2)
 LINUX_GCC_MAKEFILE := $(LINUX_GCC_BUILD)/Makefile
@@ -460,7 +460,7 @@ $(LINUX_GCC_STAMPS)/build-glibc-linux-headers: \
 ### riscv-fesvr
 ###
 
-FESVR_BUILD := $(TOPDIR)/build/riscv-fesvr
+FESVR_BUILD := $(BUILD_DIR)/riscv-fesvr
 FESVR_MAKEFILE := $(FESVR_BUILD)/Makefile
 FESVR_OUT := $(FESVR_BUILD)/libfesvr.so
 FESVR_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/lib/libfesvr.so
@@ -469,7 +469,7 @@ FESVR_CONFIGURE := $(TOPDIR)/riscv-fesvr/configure \
 FESVR_ALIAS := riscv-fesvr
 
 # riscv-isa-sim
-SIM_BUILD := $(TOPDIR)/build/riscv-isa-sim
+SIM_BUILD := $(BUILD_DIR)/riscv-isa-sim
 SIM_MAKEFILE := $(SIM_BUILD)/Makefile
 SIM_OUT := $(SIM_BUILD)/spike
 SIM_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/spike
@@ -488,7 +488,7 @@ LINUX_PKG_FILE := linux-4.6.2.tar.xz
 LINUX_URL := https://cdn.kernel.org/pub/linux/kernel/v4.x/$(LINUX_PKG_FILE)
 LINUX_PKG := $(REMOTE_DIR)/$(LINUX_PKG_FILE)
 LINUX_DIR := $(TOPDIR)/linux
-LINUX_SRC := $(TOPDIR)/build/linux-4.6.2
+LINUX_SRC := $(BUILD_DIR)/linux-4.6.2
 
 LINUX_BUILD := $(LINUX_SRC)
 LINUX_MAKEFILE := $(LINUX_BUILD)/Makefile
@@ -503,10 +503,11 @@ LINUX_ALIAS := linux
 LINUX_DEPS  := $(LINUX_SRC)/stamps/initramfs
 
 $(LINUX_PKG):
+	mkdir -p $(dir $@)
 	wget $(LINUX_URL) -O $@
 
 $(LINUX_SRC)/stamps/source: $(LINUX_PKG)
-	tar -C $(TOPDIR)/build -xvf $(LINUX_PKG)
+	tar -C $(BUILD_DIR) -xvf $(LINUX_PKG)
 	cd $(LINUX_SRC) && \
 	git init && \
 	git remote add -t master origin https://github.com/riscv/riscv-linux.git && \
@@ -532,11 +533,11 @@ $(LINUX_SRC)/stamps/initramfs: $(LINUX_SRC)/stamps/source
 # 32 bit
 
 PK_PATCHED := $(TOPDIR)/riscv-pk/.patched
-$(PK_PATCHED): $(TOPDIR)/riscv-pk-32-bit-build-fix.patch
+$(PK_PATCHED): $(PATCHES_DIR)/riscv-pk-32-bit-build-fix.patch
 	cd $(TOPDIR)/riscv-pk && patch < $<
 	@touch $@
 
-PK32_BUILD := $(TOPDIR)/build/riscv-pk/32
+PK32_BUILD := $(BUILD_DIR)/riscv-pk/32
 PK32_MAKEFILE := $(PK32_BUILD)/Makefile
 PK32_OUT := $(PK32_BUILD)/pk
 PK32_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/$(RV32_TRIPLE)/bin/pk
@@ -549,7 +550,7 @@ PK32_DEPS := $(PK_PATCHED)
 
 # 64 bit
 
-PK64_BUILD := $(TOPDIR)/build/riscv-pk/64
+PK64_BUILD := $(BUILD_DIR)/riscv-pk/64
 PK64_MAKEFILE := $(PK64_BUILD)/Makefile
 PK64_OUT := $(PK64_BUILD)/pk
 PK64_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/$(RV64_TRIPLE)/bin/pk
@@ -564,18 +565,19 @@ PK64_DEPS := $(PK_PATCHED) $(LINUX_TOOLCHAIN)
 ### cmake
 ###
 
-CMAKE_URL := http://www.cmake.org/files/v3.5/cmake-3.5.2-Linux-x86_64.tar.gz
-CMAKE_ROOT := $(TOPDIR)/cmake
-CMAKE_PKG := $(CMAKE_ROOT)/cmake-3.5.2-Linux-x86_64.tar.gz
-CMAKE := $(CMAKE_ROOT)/bin/cmake
+CMAKE_PKG_FILE := cmake-3.5.2-Linux-x86_64.tar.gz
+CMAKE_URL := http://www.cmake.org/files/v3.5/$(CMAKE_PKG_FILE)
+CMAKE_PKG := $(REMOTE_DIR)/$(CMAKE_PKG_FILE)
+CMAKE_BUILD := $(BUILD_DIR)/cmake
+CMAKE := $(CMAKE_BUILD)/bin/cmake
 
 $(CMAKE_PKG):
-	mkdir -p $(CMAKE_ROOT)
-	cd $(CMAKE_ROOT) && \
-	wget $(CMAKE_URL)
+	mkdir -p $(dir $@)
+	wget $(CMAKE_URL) -O $@
 
 $(CMAKE): $(CMAKE_PKG)
-	tar --strip-components=1 -xvf $(CMAKE_PKG) -C $(CMAKE_ROOT)
+	mkdir -p $(CMAKE_BUILD)
+	tar --strip-components=1 -xvf $(CMAKE_PKG) -C $(CMAKE_BUILD)
 	touch $(CMAKE)
 
 .PHONY: cmake
@@ -587,7 +589,7 @@ cmake: $(CMAKE)
 
 # debug
 
-LLVM_DEBUG_BUILD := $(TOPDIR)/build/llvm/debug
+LLVM_DEBUG_BUILD := $(BUILD_DIR)/llvm/debug
 LLVM_DEBUG_MAKEFILE := $(LLVM_DEBUG_BUILD)/Makefile
 LLVM_DEBUG_OUT := $(LLVM_DEBUG_BUILD)/bin/clang
 LLVM_DEBUG_TOOLCHAIN := $(TOOLCHAIN_DEBUG)/bin/clang
@@ -604,7 +606,7 @@ $(CLANG_LINK):
 
 # release
 
-LLVM_RELEASE_BUILD := $(TOPDIR)/build/llvm/release
+LLVM_RELEASE_BUILD := $(BUILD_DIR)/llvm/release
 LLVM_RELEASE_MAKEFILE := $(LLVM_RELEASE_BUILD)/Makefile
 LLVM_RELEASE_OUT := $(LLVM_RELEASE_BUILD)/bin/clang
 LLVM_RELEASE_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/clang
@@ -621,7 +623,7 @@ LLVM_RELEASE_DEPS := $(NEWLIB_GCC32_TOOLCHAIN) $(CMAKE) $(CLANG_LINK)
 
 # debug
 
-SBT_DEBUG_BUILD := $(TOPDIR)/build/sbt/debug
+SBT_DEBUG_BUILD := $(BUILD_DIR)/sbt/debug
 SBT_DEBUG_MAKEFILE := $(SBT_DEBUG_BUILD)/Makefile
 SBT_DEBUG_OUT := $(SBT_DEBUG_BUILD)/riscv-sbt
 SBT_DEBUG_TOOLCHAIN := $(TOOLCHAIN_DEBUG)/bin/riscv-sbt
@@ -633,7 +635,7 @@ SBT_DEBUG_DEPS := $(LLVM_DEBUG_TOOLCHAIN)
 
 # release
 
-SBT_RELEASE_BUILD := $(TOPDIR)/build/sbt/release
+SBT_RELEASE_BUILD := $(BUILD_DIR)/sbt/release
 SBT_RELEASE_MAKEFILE := $(SBT_RELEASE_BUILD)/Makefile
 SBT_RELEASE_OUT := $(SBT_RELEASE_BUILD)/riscv-sbt
 SBT_RELEASE_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/riscv-sbt
@@ -653,12 +655,13 @@ RVEMU_PKG := $(REMOTE_DIR)/$(RVEMU_PKG_FILE)
 RVEMU_SRC := $(TOPDIR)/riscvemu-2017-01-12
 
 $(RVEMU_PKG):
+	mkdir -p $(dir $@)
 	wget $(RVEMU_URL) -O $@
 
 $(RVEMU_SRC): $(RVEMU_PKG)
 	tar -C $(TOPDIR) -xvf $(RVEMU_PKG)
 
-RVEMU_BUILD := $(TOPDIR)/build/riscvemu
+RVEMU_BUILD := $(BUILD_DIR)/riscvemu
 
 RVEMU_PKG_LINUX_FILE := diskimage-linux-riscv64-2017-01-07.tar.gz
 RVEMU_LINUX_URL  := http://www.bellard.org/riscvemu/$(RVEMU_PKG_LINUX_FILE)
@@ -681,6 +684,7 @@ RVEMU_ALIAS := riscvemu
 RVEMU_DEPS := $(RVEMU_SRC) $(RVEMU_LINUX_SRC)
 
 $(RVEMU_LINUX_PKG):
+	mkdir -p $(dir $@)
 	wget $(RVEMU_LINUX_URL) -O $@
 
 $(RVEMU_LINUX_SRC): $(RVEMU_LINUX_PKG)
@@ -691,7 +695,7 @@ $(RVEMU_LINUX_SRC): $(RVEMU_LINUX_PKG)
 ### QEMU
 ###
 
-QEMU_BUILD := $(TOPDIR)/build/qemu
+QEMU_BUILD := $(BUILD_DIR)/qemu
 QEMU_MAKEFILE := $(QEMU_BUILD)/Makefile
 QEMU_OUT := $(QEMU_BUILD)/qemu-system-riscv32
 QEMU_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/qemu-system-riscv32
