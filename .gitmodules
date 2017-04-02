@@ -1,33 +1,33 @@
 [submodule "llvm"]
-	path = llvm
+	path = submodules/llvm
 	url = https://github.com/OpenISA/llvm
 [submodule "riscv-isa-sim"]
-	path = riscv-isa-sim
+	path = submodules/riscv-isa-sim
 	url = https://github.com/riscv/riscv-isa-sim
 [submodule "riscv-fesvr"]
-	path = riscv-fesvr
+	path = submodules/riscv-fesvr
 	url = https://github.com/riscv/riscv-fesvr
 [submodule "riscv-pk"]
-	path = riscv-pk
+	path = submodules/riscv-pk
 	url = https://github.com/riscv/riscv-pk
 [submodule "clang"]
-	path = clang
+	path = submodules/clang
 	url = https://github.com/OpenISA/clang
 [submodule "riscv-binutils-gdb"]
-	path = riscv-binutils-gdb
+	path = submodules/riscv-binutils-gdb
 	url = https://github.com/riscv/riscv-binutils-gdb
 [submodule "riscv-newlib"]
-	path = riscv-newlib
+	path = submodules/riscv-newlib
 	url = https://github.com/riscv/riscv-newlib
 [submodule "riscv-gcc"]
-	path = riscv-gcc
+	path = submodules/riscv-gcc
 	url = https://github.com/riscv/riscv-gcc
 [submodule "riscv-gnu-toolchain"]
-	path = riscv-gnu-toolchain
+	path = submodules/riscv-gnu-toolchain
 	url = https://github.com/riscv/riscv-gnu-toolchain
 [submodule "riscv-qemu"]
-	path = riscv-qemu
+	path = submodules/riscv-qemu
 	url = https://github.com/riscv/riscv-qemu
 [submodule "riscv-glibc"]
-	path = riscv-glibc
+	path = submodules/riscv-glibc
 	url = https://github.com/riscv/riscv-glibc
