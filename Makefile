@@ -1,5 +1,5 @@
 ifeq ($(TOPDIR),)
-$(error "TOPDIR not set. Please run 'source setenv.sh' first.")
+$(error "TOPDIR not set. Please run 'source scripts/setenv.sh' first.")
 endif
 
 include $(TOPDIR)/make/config.mk
@@ -432,7 +432,7 @@ $(LINUX_GCC_STAMPS)/build-glibc-linux-%: \
 		--prefix=/usr \
 		--disable-werror \
 		--enable-shared \
-		--with-headers=$(TOPDIR)/riscv-gnu-toolchain/linux-headers/include \
+		--with-headers=$(SUBMODULES_DIR)/riscv-gnu-toolchain/linux-headers/include \
 		--enable-multilib \
 		--enable-kernel=3.0.0 \
 		$($@_LIBDIROPTS)
@@ -450,7 +450,7 @@ $(LINUX_GCC_STAMPS)/build-glibc-linux-headers: \
 		--host=$(RV64_LINUX_TRIPLE) \
 		--prefix=$(SYSROOT)/usr \
 		--enable-shared \
-		--with-headers=$(TOPDIR)/riscv-gnu-toolchain/linux-headers/include \
+		--with-headers=$(SUBMODULES_DIR)/riscv-gnu-toolchain/linux-headers/include \
 		--disable-multilib \
 		--enable-kernel=3.0.0
 	$(MAKE) -C $(LINUX_GLIBC_HEADERS) install-headers
@@ -721,7 +721,7 @@ QEMU_BUILD := $(BUILD_DIR)/qemu
 QEMU_MAKEFILE := $(QEMU_BUILD)/Makefile
 QEMU_OUT := $(QEMU_BUILD)/qemu-system-riscv32
 QEMU_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/qemu-system-riscv32
-QEMU_CONFIGURE := $(TOPDIR)/riscv-qemu/configure \
+QEMU_CONFIGURE := $(SUBMODULES_DIR)/riscv-qemu/configure \
   --prefix=$(TOOLCHAIN_RELEASE) \
   --target-list=riscv64-softmmu,riscv32-softmmu
 QEMU_ALIAS := qemu
@@ -734,7 +734,8 @@ $(foreach prog,$(ALL),$(eval $(call RULE_ALL,$(prog))))
 
 # clean all
 clean: $(foreach prog,$(ALL),$($(prog)_ALIAS)-clean)
-	rm -rf $(TOOLCHAIN)
+	rm -rf $(BUILD_DIR)
+	rm -rf $(TOOLCHAIN)/*
 
 ###
 ### TEST targets
