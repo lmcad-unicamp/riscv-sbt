@@ -296,6 +296,9 @@ Error SBT::translate(const std::string &File)
         }
       }
 
+      if (!SBTTranslator->inFunc())
+        continue;
+
       // for each instruction
       uint64_t Size;
       for (uint64_t Index = Start; Index < End; Index += Size) {
@@ -317,8 +320,8 @@ Error SBT::translate(const std::string &File)
             return E;
         } else {
           Inst.dump();
-          SE << "Invalid instruction encoding: ";
-          SE << formatv("{0:X-8}", Inst.getOpcode());
+          SE << "Invalid instruction encoding at address ";
+          SE << formatv("{0:X-4}", Index);
           return error(SE);
         }
 

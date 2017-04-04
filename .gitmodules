@@ -31,3 +31,6 @@
 [submodule "riscv-glibc"]
 	path = submodules/riscv-glibc
 	url = https://github.com/riscv/riscv-glibc
+[submodule "submodules/riscv-qemu-tests"]
+	path = submodules/riscv-qemu-tests
+	url = https://github.com/arsv/riscv-qemu-tests

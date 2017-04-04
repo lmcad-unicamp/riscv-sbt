@@ -172,6 +172,11 @@ public:
     this->RLast = RI;
   }
 
+  bool inFunc() const
+  {
+    return CurFunc;
+  }
+
 private:
   // Constants
   llvm::IntegerType *I32;

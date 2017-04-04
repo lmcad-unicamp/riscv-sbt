@@ -30,6 +30,7 @@ ALL := \
 	RVEMU \
 	QEMU \
 	QEMU_USER \
+	QEMU_TESTS \
 	BINUTILS_LINUX \
 	LINUX_GCC \
 	LINUX
@@ -49,7 +50,8 @@ extra: \
 	riscvemu \
 	riscv-linux \
 	riscv-pk-64 \
-	qemu
+	qemu \
+	qemu-user
 
 ###
 ### rules
@@ -732,6 +734,20 @@ QEMU_USER_CONFIGURE := $(SUBMODULES_DIR)/riscv-qemu/configure \
   --target-list=riscv64-linux-user,riscv32-linux-user
 QEMU_USER_ALIAS := qemu-user
 
+# tests
+
+QEMU_TESTS_BUILD := $(BUILD_DIR)/riscv-qemu-tests
+QEMU_TESTS_MAKEFILE := $(QEMU_TESTS_BUILD)/Makefile
+QEMU_TESTS_CONFIGURE := \
+  cp -a $(SUBMODULES_DIR)/riscv-qemu-tests $(QEMU_TESTS_BUILD) && \
+  sed -i "s/^AS = \$(CROSS)as -m32/AS = \$(CROSS)as -march=rv32g/" \
+    $(QEMU_TESTS_BUILD)/common32.mk
+QEMU_TESTS_MAKE_FLAGS := all32
+QEMU_TESTS_OUT := $(QEMU_TESTS_BUILD)/test1
+QEMU_TESTS_TOOLCHAIN := $(QEMU_TESTS_BUILD)/rv32i/add.o
+QEMU_TESTS_INSTALL := true
+QEMU_TESTS_ALIAS := qemu-tests
+
 ###
 ### generate all rules
 ###
@@ -776,3 +792,9 @@ test:
 tests:
 	$(MAKE) -C $(TOPDIR)/test clean all run
 	$(MAKE) -C $(TOPDIR)/sbt/test clean all run tests run-tests
+
+.PHONY: rv32tests
+rv32tests: $(QEMU_TESTS_TOOLCHAIN)
+	$(MAKE) $(SBT)-build1 $(SBT)-install
+	cd $(QEMU_TESTS_BUILD)/rv32i && \
+		riscv-sbt add.o
