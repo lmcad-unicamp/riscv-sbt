@@ -29,6 +29,7 @@ ALL := \
 	NEWLIB_GCC_X86 \
 	RVEMU \
 	QEMU \
+	QEMU_USER \
 	BINUTILS_LINUX \
 	LINUX_GCC \
 	LINUX
@@ -39,30 +40,16 @@ all: \
 	riscv-pk-32 \
 	x86-newlib-gcc
 
-#
-# all targets
-#
-#all: \
-#	riscv-binutils-gdb-32 \
-#	riscv-newlib-gcc-32 \
-#	riscv-fesvr \
-#	riscv-isa-sim \
-#	riscv-pk-32 \
-#	riscv-binutils-gdb-64 \
-#	riscv-newlib-gcc-64 \
-#	riscv-pk-64 \
-#	llvm-debug \
-#	llvm-release \
-#	sbt-debug \
-#	sbt-release \
-#	x86-binutils-gdb \
-#	x86-newlib-gcc \
-#	riscvemu \
-#	riscv-qemu \
-#	riscv-binutils-gdb-linux \
-#	riscv-linux-gcc \
-#	linux
+gcc64: riscv-newlib-gcc-64
+gcc-linux: riscv-linux-gcc
 
+extra: \
+	gcc64 \
+	gcc-linux \
+	riscvemu \
+	riscv-linux \
+	riscv-pk-64 \
+	qemu
 
 ###
 ### rules
@@ -85,7 +72,7 @@ endef
 # gen MAKEFILE
 define RULE_MAKEFILE =
 $$($(1)_MAKEFILE): $$($(1)_DEPS)
-	@echo "*** $$@ ***"
+	@echo "*** $$@: $$? ***"
 	if [ ! -d "$$($(1)_BUILD)" ]; then mkdir -p $$($(1)_BUILD); fi
 	cd $$($(1)_BUILD) && \
 	$$($(1)_CONFIGURE)
@@ -126,13 +113,17 @@ ifneq ($$($(1)_POSTINSTALL),)
 	$$($(1)_POSTINSTALL)
 endif
 	echo "Updating file list..."
-	if [ ! -f $$(TOOLCHAIN)/pkg/all.files ]; then \
-		mkdir -p $$(TOOLCHAIN)/pkg; \
-		touch $$(TOOLCHAIN)/pkg/all.files; \
+	if [ -f $$(TOOLCHAIN)/pkg/$$($(1)_ALIAS).files ]; then \
+		echo "Skipped: file list already exists"; \
+	else \
+		if [ ! -f $$(TOOLCHAIN)/pkg/all.files ]; then \
+			mkdir -p $$(TOOLCHAIN)/pkg; \
+			touch $$(TOOLCHAIN)/pkg/all.files; \
+		fi; \
+		cd $$(TOOLCHAIN) && \
+		$$(NEW_FILES) > pkg/$$($(1)_ALIAS).files && \
+		$(call UPDATE_FILES,$(1)); \
 	fi
-	cd $$(TOOLCHAIN) && \
-	$$(NEW_FILES) > pkg/$$($(1)_ALIAS).files && \
-	$(call UPDATE_FILES,$(1))
 
 # install only when build OUTPUT changes
 $$($(1)_TOOLCHAIN): $$($(1)_OUT)
@@ -233,11 +224,11 @@ BINUTILS_LINUX_POSTINSTALL := \
 ###
 
 SRC_NEWLIB_GCC := $(BUILD_DIR)/riscv-newlib-gcc
-$(SRC_NEWLIB_GCC):
-	cp -a $(SUBMODULES_DIR)/riscv-gcc $@.tmp
-	cp -a $(SUBMODULES_DIR)/riscv-newlib/. $@.tmp
-	cp -a $(SUBMODULES_DIR)/riscv-gcc/include/. $@.tmp/include
-	mv $@.tmp $@
+$(SRC_NEWLIB_GCC)/stamp:
+	cp -a $(SUBMODULES_DIR)/riscv-gcc $(dir $@).tmp
+	cp -a $(SUBMODULES_DIR)/riscv-newlib/. $(dir $@).tmp
+	cp -a $(SUBMODULES_DIR)/riscv-gcc/include/. $(dir $@).tmp/include
+	mv $(dir $@).tmp $(dir $@) && touch $@
 
 # 32 bit
 
@@ -266,7 +257,7 @@ NEWLIB_GCC32_CONFIGURE := $(BUILD_DIR)/riscv-newlib-gcc/configure \
                  --with-arch=rv32g
 NEWLIB_GCC32_MAKE_FLAGS := inhibit-libc=true
 NEWLIB_GCC32_ALIAS := riscv-newlib-gcc-32
-NEWLIB_GCC32_DEPS := $(BINUTILS32_TOOLCHAIN) $(SRC_NEWLIB_GCC)
+NEWLIB_GCC32_DEPS := $(BINUTILS32_TOOLCHAIN) $(SRC_NEWLIB_GCC)/stamp
 
 # 64 bit
 
@@ -295,7 +286,7 @@ NEWLIB_GCC64_CONFIGURE := $(BUILD_DIR)/riscv-newlib-gcc/configure \
                  --with-arch=rv64g
 NEWLIB_GCC64_MAKE_FLAGS := inhibit-libc=true
 NEWLIB_GCC64_ALIAS := riscv-newlib-gcc-64
-NEWLIB_GCC64_DEPS := $(BINUTILS64_TOOLCHAIN) $(SRC_NEWLIB_GCC)
+NEWLIB_GCC64_DEPS := $(BINUTILS64_TOOLCHAIN) $(SRC_NEWLIB_GCC)/stamp
 
 # x86
 
@@ -399,7 +390,7 @@ $(LINUX_GCC_STAMPS)/build-gcc-linux-stage1: $(BINUTILS_LINUX_TOOLCHAIN)
 	$(MAKE) -C $(LINUX_GCC_STAGE1) inhibit-libc=true install-gcc
 	$(MAKE) $(MAKE_OPTS) -C $(LINUX_GCC_STAGE1) inhibit-libc=true all-target-libgcc
 	$(MAKE) -C $(LINUX_GCC_STAGE1) inhibit-libc=true install-target-libgcc
-	ln -s $(TOOLCHAIN_RELEASE)/bin/$(RV64_LINUX_TRIPLE)-as \
+	ln -sf $(TOOLCHAIN_RELEASE)/bin/$(RV64_LINUX_TRIPLE)-as \
 		$(LINUX_GCC_STAGE1_OUT)/libexec/gcc/$(RV64_LINUX_TRIPLE)/7.0.0/as
 	mkdir -p $(dir $@) && touch $@
 
@@ -602,6 +593,7 @@ LLVM_DEBUG_TOOLCHAIN := $(TOOLCHAIN_DEBUG)/bin/clang
 LLVM_DEBUG_CONFIGURE := \
     $(CMAKE) -DCMAKE_BUILD_TYPE=Debug \
              -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86" \
+             -DBUILD_SHARED_LIBS=ON \
              -DCMAKE_INSTALL_PREFIX=$(TOOLCHAIN_DEBUG) $(SUBMODULES_DIR)/llvm
 LLVM_DEBUG_ALIAS := llvm-debug
 CLANG_LINK := $(SUBMODULES_DIR)/llvm/tools/clang
@@ -718,6 +710,8 @@ $(RVEMU_LINUX_SRC)/extracted: $(RVEMU_LINUX_PKG)
 ### QEMU
 ###
 
+# system
+
 QEMU_BUILD := $(BUILD_DIR)/qemu
 QEMU_MAKEFILE := $(QEMU_BUILD)/Makefile
 QEMU_OUT := $(QEMU_BUILD)/qemu-system-riscv32
@@ -726,6 +720,17 @@ QEMU_CONFIGURE := $(SUBMODULES_DIR)/riscv-qemu/configure \
   --prefix=$(TOOLCHAIN_RELEASE) \
   --target-list=riscv64-softmmu,riscv32-softmmu
 QEMU_ALIAS := qemu
+
+# user
+
+QEMU_USER_BUILD := $(BUILD_DIR)/qemu-user
+QEMU_USER_MAKEFILE := $(QEMU_USER_BUILD)/Makefile
+QEMU_USER_OUT := $(QEMU_USER_BUILD)/qemu-riscv32
+QEMU_USER_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/qemu-riscv32
+QEMU_USER_CONFIGURE := $(SUBMODULES_DIR)/riscv-qemu/configure \
+  --prefix=$(TOOLCHAIN_RELEASE) \
+  --target-list=riscv64-linux-user,riscv32-linux-user
+QEMU_USER_ALIAS := qemu-user
 
 ###
 ### generate all rules

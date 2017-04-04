@@ -31,4 +31,5 @@ export BBL=$TCR/riscv64-unknown-elf/bin/bbl
 export ROOT_FS=$TCR/share/riscvemu/root.bin
 alias spike32="spike $PK32"
 alias spike64="spike --isa=RV64IMAFDC $PK64"
-alias linux="spike --isa=RV64IMAFDC $BBL"
+alias linux_spike="spike --isa=RV64IMAFDC $BBL"
+alias linux_qemu="qemu-system-riscv64 -kernel $BBL -m 2048M -nographic"
