@@ -207,137 +207,43 @@ void SBT::write()
   OS.flush();
 }
 
-Error SBT::translate(const std::string &File)
-{
-  SBTError SE(File);
 
+llvm::Error SBT::translate(const std::string &File)
+{
+  // parse object file
   auto ExpObj = sbt::create<Object>(File);
   if (!ExpObj)
     return ExpObj.takeError();
   Object *Obj = &ExpObj.get();
-  // Obj->dump();
   SBTTranslator->setCurObj(Obj);
 
-  /*
-  auto log = [&]() -> raw_ostream & {
-    return logs() << Obj->fileName()  << ": ";
-  };
-   */
+  SBTTranslator->setInstPrinter(&*InstPrinter);
+  SBTTranslator->setDisassembler(&*DisAsm);
+  SBTTranslator->setSTI(&*STI);
 
-  // log() << "File Format: " << Obj->fileFormatName() << "\n";
-
+  // start module
   if (Error E = SBTTranslator->startModule())
     return E;
 
-  const ConstRelocationPtrVec Relocs = Obj->relocs();
-  auto RI = Relocs.cbegin();
-  auto RE = Relocs.cend();
-
-  // for each section
+  // translate each section
   for (ConstSectionPtr Sec : Obj->sections()) {
-    uint64_t SectionAddr = Sec->address();
-    uint64_t SectionSize = Sec->size();
+    if (auto E = SBTTranslator->translateSection(Sec))
+      return E;
 
-    // Relocatable object?
-    uint64_t ELFOffset = SectionAddr;
-    if (SectionAddr == 0)
-      ELFOffset = Sec->getELFOffset();
+    // finish any pending function
+    if (Error E = SBTTranslator->finishFunction())
+      return E;
+  }
 
-    nulls() << "Section " << Sec->name()
-      << ": Addr=" << SectionAddr
-      << ", ELFOffs=" << ELFOffset
-      << ", Size=" << SectionSize << "\n";
-
-    // skip non code sections
-    if (!Sec->isText())
-      continue;
-
-    SBTTranslator->setCurSection(Sec);
-    SBTTranslator->setRelocIters(RI, RE);
-
-    // get section bytes
-    StringRef BytesStr;
-    std::error_code EC = Sec->contents(BytesStr);
-    if (EC) {
-      SE << "Failed to get Section Contents";
-      return error(SE);
-    }
-    ArrayRef<uint8_t> Bytes(reinterpret_cast<const uint8_t *>(BytesStr.data()),
-                            BytesStr.size());
-
-    const ConstSymbolPtrVec &Symbols = Sec->symbols();
-    size_t SN = Symbols.size();
-    // DBGS << "Symbols=" << SN << "\n";
-
-    // for each symbol
-    for (size_t SI = 0; SI != SN; ++SI) {
-      ConstSymbolPtr Sym = Symbols[SI];
-
-      uint64_t Start = Sym->address();
-      volatile uint64_t End;  // gcc bug: need to make it volatile
-      if (SI == SN - 1)
-        End = SectionSize;
-      else
-        End = Symbols[SI + 1]->address();
-
-      if (Sym->type() == object::SymbolRef::ST_Function ||
-          Sym->flags() & object::SymbolRef::SF_Global)
-      //if (Sym->name() != ".L0 ")
-      {
-        const StringRef &SymbolName = Sym->name();
-        DBGS << SymbolName << ":\n";
-
-        if (SymbolName == "main") {
-          if (Error E = SBTTranslator->startMain(SymbolName, Start))
-            return E;
-        } else { // if (SymbolName == "_start") {
-          if (Error E = SBTTranslator->startFunction(SymbolName, Start))
-            return E;
-        }
-      }
-
-      if (!SBTTranslator->inFunc())
-        continue;
-
-      // for each instruction
-      uint64_t Size;
-      for (uint64_t Index = Start; Index < End; Index += Size) {
-        // SBTTranslator->setCurAddr(Index + ELFOffset);
-        SBTTranslator->setCurAddr(Index);
-
-        MCInst Inst;
-        MCDisassembler::DecodeStatus st =
-          DisAsm->getInstruction(Inst, Size, Bytes.slice(Index),
-            SectionAddr + Index, DBGS, nulls());
-        if (st == MCDisassembler::DecodeStatus::Success) {
-#if SBT_DEBUG
-          DBGS << llvm::formatv("{0:X-4}: ", Index);
-          InstPrinter->printInst(&Inst, DBGS, "", *STI);
-          DBGS << "\n";
-#endif
-          Error E = SBTTranslator->translate(Inst);
-          if (E)
-            return E;
-        } else {
-          Inst.dump();
-          SE << "Invalid instruction encoding at address ";
-          SE << formatv("{0:X-4}", Index);
-          return error(SE);
-        }
-
-
-      } // for each instruction
-    } // for each symbol
-  } // for each section
-  if (Error E = SBTTranslator->finishFunction())
-    return E;
+  // finish module
   if (Error E = SBTTranslator->finishModule())
     return E;
 
   return Error::success();
 }
 
-Error SBT::genHello()
+
+llvm::Error SBT::genHello()
 {
   // constants
   static const int SYS_EXIT = 1;

@@ -19,7 +19,10 @@ class Function;
 class FunctionType;
 class IntegerType;
 class GlobalVariable;
+class MCDisassembler;
 class MCInst;
+class MCInstPrinter;
+class MCSubtargetInfo;
 class Module;
 class Target;
 class Value;
@@ -118,6 +121,8 @@ class Translator
   static const unsigned RDINSTRET = 0xC02;
   static const unsigned RDINSTRETH = 0xC82;
 
+  static const size_t InstrSize = 4;
+
 public:
   Translator(
     llvm::LLVMContext *Ctx,
@@ -131,6 +136,10 @@ public:
 
   // translate one instruction
   llvm::Error translate(const llvm::MCInst &Inst);
+
+  llvm::Error translateSection(ConstSectionPtr Sec);
+  llvm::Error translateSymbol(size_t SI);
+  llvm::Error translateInstrs(uint64_t Begin, uint64_t End);
 
   llvm::Error startModule();
   llvm::Error finishModule();
@@ -162,6 +171,21 @@ public:
   void setTarget(const llvm::Target *T)
   {
     TheTarget = T;
+  }
+
+  void setDisassembler(const llvm::MCDisassembler *D)
+  {
+    DisAsm = D;
+  }
+
+  void setInstPrinter(llvm::MCInstPrinter *P)
+  {
+    InstPrinter = P;
+  }
+
+  void setSTI(const llvm::MCSubtargetInfo *S)
+  {
+    STI = S;
   }
 
   typedef decltype(ConstRelocationPtrVec().cbegin()) ConstRelocIter;
@@ -199,10 +223,14 @@ private:
   llvm::Function *FRVSC;
   std::unique_ptr<llvm::Module> LCModule;
   const llvm::Target *TheTarget = nullptr;
+  const llvm::MCDisassembler *DisAsm = nullptr;
+  llvm::MCInstPrinter *InstPrinter = nullptr;
+  const llvm::MCSubtargetInfo *STI = nullptr;
 
   uint64_t CurAddr;
   ConstObjectPtr CurObj = nullptr;
   ConstSectionPtr CurSection;
+  llvm::ArrayRef<uint8_t> CurSectionBytes;
   ConstRelocIter RI;
   ConstRelocIter RE;
   ConstRelocIter RLast;

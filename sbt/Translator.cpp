@@ -9,6 +9,9 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/ValueSymbolTable.h>
 #include <llvm/IR/Type.h>
+#include <llvm/MC/MCDisassembler/MCDisassembler.h>
+#include <llvm/MC/MCInst.h>
+#include <llvm/MC/MCInstPrinter.h>
 #include <llvm/Object/ObjectFile.h>
 #include <llvm/Support/MemoryBuffer.h>
 
@@ -48,49 +51,142 @@ Translator::Translator(
 {
 }
 
-// MCInst register number to RISCV register number
-unsigned Translator::RVReg(unsigned Reg)
-{
-  namespace RISCV = RISCVMaster;
 
-  switch (Reg) {
-    case RISCV::X0_32:  return 0;
-    case RISCV::X1_32:  return 1;
-    case RISCV::X2_32:  return 2;
-    case RISCV::X3_32:  return 3;
-    case RISCV::X4_32:  return 4;
-    case RISCV::X5_32:  return 5;
-    case RISCV::X6_32:  return 6;
-    case RISCV::X7_32:  return 7;
-    case RISCV::X8_32:  return 8;
-    case RISCV::X9_32:  return 9;
-    case RISCV::X10_32: return 10;
-    case RISCV::X11_32: return 11;
-    case RISCV::X12_32: return 12;
-    case RISCV::X13_32: return 13;
-    case RISCV::X14_32: return 14;
-    case RISCV::X15_32: return 15;
-    case RISCV::X16_32: return 16;
-    case RISCV::X17_32: return 17;
-    case RISCV::X18_32: return 18;
-    case RISCV::X19_32: return 19;
-    case RISCV::X20_32: return 20;
-    case RISCV::X21_32: return 21;
-    case RISCV::X22_32: return 22;
-    case RISCV::X23_32: return 23;
-    case RISCV::X24_32: return 24;
-    case RISCV::X25_32: return 25;
-    case RISCV::X26_32: return 26;
-    case RISCV::X27_32: return 27;
-    case RISCV::X28_32: return 28;
-    case RISCV::X29_32: return 29;
-    case RISCV::X30_32: return 30;
-    case RISCV::X31_32: return 31;
-    default: return 0x1000;
+llvm::Error Translator::translateSection(ConstSectionPtr Sec)
+{
+  assert(!inFunc());
+
+  uint64_t SectionAddr = Sec->address();
+  uint64_t SectionSize = Sec->size();
+
+  // relocatable object?
+  uint64_t ELFOffset = SectionAddr;
+  if (SectionAddr == 0)
+    ELFOffset = Sec->getELFOffset();
+
+  // skip non code sections
+  if (!Sec->isText())
+    return Error::success();
+
+  // print section info
+  DBGS << "Section " << Sec->name()
+    << ": Addr=" << SectionAddr
+    << ", ELFOffs=" << ELFOffset
+    << ", Size=" << SectionSize << "\n";
+
+
+  setCurSection(Sec);
+
+  // get relocations
+  const ConstRelocationPtrVec Relocs = CurObj->relocs();
+  auto RI = Relocs.cbegin();
+  auto RE = Relocs.cend();
+  setRelocIters(RI, RE);
+
+  // get section bytes
+  StringRef BytesStr;
+  std::error_code EC = Sec->contents(BytesStr);
+  if (EC) {
+    SBTError SE;
+    SE << "Failed to get Section Contents";
+    return error(SE);
   }
+  CurSectionBytes = llvm::ArrayRef<uint8_t>(
+    reinterpret_cast<const uint8_t *>(BytesStr.data()), BytesStr.size());
+
+  // for each symbol
+  const ConstSymbolPtrVec &Symbols = Sec->symbols();
+  size_t SN = Symbols.size();
+  for (size_t SI = 0; SI != SN; ++SI)
+    if (auto E = translateSymbol(SI))
+      return E;
+
+  return Error::success();
 }
 
-Error Translator::translate(const llvm::MCInst &Inst)
+
+llvm::Error Translator::translateSymbol(size_t SI)
+{
+  const ConstSymbolPtrVec &Symbols = CurSection->symbols();
+  size_t SN = Symbols.size();
+  uint64_t SectionSize = CurSection->size();
+  ConstSymbolPtr Sym = Symbols[SI];
+
+  uint64_t Start = Sym->address();
+  volatile uint64_t End;  // XXX gcc bug: need to make it volatile
+  if (SI == SN - 1)
+    End = SectionSize;
+  else
+    End = Symbols[SI + 1]->address();
+
+  // XXX for now, translate only instructions that appear after a
+  // function or global symbol
+  if (Sym->type() == object::SymbolRef::ST_Function ||
+      Sym->flags() & object::SymbolRef::SF_Global)
+  {
+    const StringRef &SymbolName = Sym->name();
+    DBGS << SymbolName << ":\n";
+
+    if (SymbolName == "main") {
+      if (auto E = startMain(SymbolName, Start))
+        return E;
+    } else {
+      if (auto E = startFunction(SymbolName, Start))
+        return E;
+    }
+  }
+
+  // skip section bytes until a function like symbol is found
+  if (!inFunc())
+    return Error::success();
+
+  const StringRef &SymbolName = Sym->name();
+  DBGS << SymbolName << ":\n";
+  return translateInstrs(Start, End);
+}
+
+
+llvm::Error Translator::translateInstrs(uint64_t Begin, uint64_t End)
+{
+  DBGS << __FUNCTION__ << "(" << Begin << ", " << End << ")\n";
+
+  uint64_t SectionAddr = CurSection->address();
+
+  // for each instruction
+  uint64_t Size;
+  for (uint64_t Addr = Begin; Addr < End; Addr += Size) {
+    setCurAddr(Addr);
+
+    // disasm
+    MCInst Inst;
+    MCDisassembler::DecodeStatus st =
+      DisAsm->getInstruction(Inst, Size,
+        CurSectionBytes.slice(Addr),
+        SectionAddr + Addr, DBGS, nulls());
+    if (st == MCDisassembler::DecodeStatus::Success) {
+#if SBT_DEBUG
+      DBGS << llvm::formatv("{0:X-4}: ", Addr);
+      InstPrinter->printInst(&Inst, DBGS, "", *STI);
+      DBGS << "\n";
+#endif
+      // translate
+      if (auto E = translate(Inst))
+        return E;
+    // failed to disasm
+    } else {
+      SBTError SE;
+      SE << "Invalid instruction encoding at address ";
+      SE << formatv("{0:X-4}", Addr);
+      SE << formatv(": {0:X-8}", CurSectionBytes[Addr]);
+      return error(SE);
+    }
+  }
+
+  return Error::success();
+}
+
+
+llvm::Error Translator::translate(const llvm::MCInst &Inst)
 {
   namespace RISCV = RISCVMaster;
 
@@ -302,6 +398,7 @@ Error Translator::translate(const llvm::MCInst &Inst)
   InstrMap(CurAddr, std::move(First));
   return Error::success();
 }
+
 
 Error Translator::startModule()
 {
@@ -1391,6 +1488,7 @@ llvm::Error Translator::handleJumpToOffs(
 
   BasicBlock *BB = nullptr;
   auto Iter = BBMap.lower_bound(Target);
+  bool NeedToTranslateBB = false;
 
   // Jump forward
   if (Target > CurAddr) {
@@ -1409,24 +1507,32 @@ llvm::Error Translator::handleJumpToOffs(
       updateNextBB(Target);
     }
 
-  // Jump backward
+  // jump backward
   } else {
-    bool Split = true;
-    if (Iter != BBMap.end()) {
-      if (Target == Iter->IKey) {
-        Split = false;
-        BB = Iter->IVal;
-      } else if (Iter != BBMap.begin()) {
-        BB = (--Iter)->IVal;
-      } else {
-        BB = Iter->IVal;
-      }
-    } else {
-      assert(BBMap.begin() != BBMap.end());
-      BB = (--Iter)->IVal;
-    }
+    assert(Iter != BBMap.end() && "Target BB >= current BB!");
 
-    if (Split)
+    // BB entry matches target address
+    if (Target == Iter->IKey)
+      BB = Iter->IVal;
+    // target BB is probably the previous one
+    else if (Iter != BBMap.begin())
+      BB = (--Iter)->IVal;
+    // target BB is the first one
+    else
+      BB = Iter->IVal;
+
+    // check bounds
+    uint64_t Begin = Iter->IKey;
+    uint64_t End = Iter->IKey + BB->size() * InstrSize;
+    bool InBound = Target >= Begin && Target < End;
+
+    // need to translate target
+    if (!InBound) {
+      BB = BasicBlock::Create(*Context, getBBName(Target), F, BB);
+      BBMap(Target, std::move(BB));
+      NeedToTranslateBB = true;
+    // need to split BB?
+    } else if (Iter->IKey != Target)
       BB = splitBB(BB, Target);
   }
 
@@ -1462,6 +1568,21 @@ llvm::Error Translator::handleJumpToOffs(
   // Use next BB
   if (NeedNextBB)
     Builder->SetInsertPoint(Next);
+
+  // need to translate target BB?
+  if (NeedToTranslateBB) {
+    // save insert point
+    BasicBlock *PrevBB = Builder->GetInsertBlock();
+
+    // translate BB
+    Builder->SetInsertPoint(BB);
+    // translate up to the next BB
+    if (auto E = translateInstrs(Target, Iter->IKey))
+      return E;
+
+    // restore insert point
+    Builder->SetInsertPoint(PrevBB);
+  }
 
   return Error::success();
 }
@@ -1761,6 +1882,48 @@ llvm::Error Translator::translateCSR(
   return Error::success();
 }
 
+
+// MCInst register number to RISCV register number
+unsigned Translator::RVReg(unsigned Reg)
+{
+  namespace RISCV = RISCVMaster;
+
+  switch (Reg) {
+    case RISCV::X0_32:  return 0;
+    case RISCV::X1_32:  return 1;
+    case RISCV::X2_32:  return 2;
+    case RISCV::X3_32:  return 3;
+    case RISCV::X4_32:  return 4;
+    case RISCV::X5_32:  return 5;
+    case RISCV::X6_32:  return 6;
+    case RISCV::X7_32:  return 7;
+    case RISCV::X8_32:  return 8;
+    case RISCV::X9_32:  return 9;
+    case RISCV::X10_32: return 10;
+    case RISCV::X11_32: return 11;
+    case RISCV::X12_32: return 12;
+    case RISCV::X13_32: return 13;
+    case RISCV::X14_32: return 14;
+    case RISCV::X15_32: return 15;
+    case RISCV::X16_32: return 16;
+    case RISCV::X17_32: return 17;
+    case RISCV::X18_32: return 18;
+    case RISCV::X19_32: return 19;
+    case RISCV::X20_32: return 20;
+    case RISCV::X21_32: return 21;
+    case RISCV::X22_32: return 22;
+    case RISCV::X23_32: return 23;
+    case RISCV::X24_32: return 24;
+    case RISCV::X25_32: return 25;
+    case RISCV::X26_32: return 26;
+    case RISCV::X27_32: return 27;
+    case RISCV::X28_32: return 28;
+    case RISCV::X29_32: return 29;
+    case RISCV::X30_32: return 30;
+    case RISCV::X31_32: return 31;
+    default: return 0x1000;
+  }
+}
 
 
 #if SBT_DEBUG
