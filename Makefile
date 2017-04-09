@@ -227,10 +227,11 @@ BINUTILS_LINUX_POSTINSTALL := \
 
 SRC_NEWLIB_GCC := $(BUILD_DIR)/riscv-newlib-gcc
 $(SRC_NEWLIB_GCC)/stamp:
-	cp -a $(SUBMODULES_DIR)/riscv-gcc $(dir $@).tmp
-	cp -a $(SUBMODULES_DIR)/riscv-newlib/. $(dir $@).tmp
-	cp -a $(SUBMODULES_DIR)/riscv-gcc/include/. $(dir $@).tmp/include
-	mv $(dir $@).tmp $(dir $@) && touch $@
+	$(eval $@_DIR := $(shell dirname $@))
+	cp -a $(SUBMODULES_DIR)/riscv-gcc $($@_DIR).tmp
+	cp -a $(SUBMODULES_DIR)/riscv-newlib/. $($@_DIR).tmp
+	cp -a $(SUBMODULES_DIR)/riscv-gcc/include/. $($@_DIR).tmp/include
+	mv $($@_DIR).tmp $($@_DIR) && touch $@
 
 # 32 bit
 
