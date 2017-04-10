@@ -274,12 +274,16 @@ public:
 
 
   enum dump_flags : uint32_t {
-    DF_NONE = 0,
-    DF_EH = 1,
-    DF_PH = 2,
-    DF_SH = 4,
-    DF_LIST = 8,
-    DF_DEFAULT = DF_EH | DF_PH | DF_SH
+    DF_NONE = 0x00,
+    DF_EH   = 0x01,
+    DF_PH   = 0x02,
+    DF_SH   = 0x04,
+    DF_LIST = 0x08,
+    DF_HEX  = 0x10,
+    DF_DATA = 0x20,
+    DF_OFF0 = 0x40,
+    DF_FSYM = 0x80,
+    DF_DEFAULT = DF_EH | DF_PH | DF_SH | DF_DATA
   };
 
   void dump(

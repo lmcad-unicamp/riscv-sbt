@@ -227,6 +227,11 @@ private:
   llvm::MCInstPrinter *InstPrinter = nullptr;
   const llvm::MCSubtargetInfo *STI = nullptr;
 
+  enum State {
+    ST_DFL,
+    ST_PADDING
+  } State = ST_DFL;
+
   uint64_t CurAddr;
   ConstObjectPtr CurObj = nullptr;
   ConstSectionPtr CurSection;
@@ -441,14 +446,38 @@ private:
 
   llvm::Expected<llvm::Value *> handleRelocation(llvm::raw_ostream &SS);
 
-  static std::string getBBName(uint64_t Addr)
+  class SBTBasicBlock
   {
-    std::string BBName = "bb";
-    llvm::raw_string_ostream SS(BBName);
-    SS << llvm::Twine::utohexstr(Addr);
-    SS.flush();
-    return BBName;
-  }
+  public:
+    static std::string getBBName(uint64_t Addr)
+    {
+      std::string BBName = "bb";
+      llvm::raw_string_ostream SS(BBName);
+      SS << llvm::Twine::utohexstr(Addr);
+      SS.flush();
+      return BBName;
+    }
+
+    static llvm::BasicBlock* create(
+      llvm::LLVMContext& context,
+      uint64_t addr,
+      llvm::Function* f,
+      llvm::BasicBlock* beforeBB = nullptr)
+    {
+      return create(context, getBBName(addr), f, beforeBB);
+    }
+
+    static llvm::BasicBlock* create(
+      llvm::LLVMContext& context,
+      llvm::StringRef name,
+      llvm::Function* f,
+      llvm::BasicBlock* beforeBB = nullptr)
+    {
+      DBGS << name << ":\n";
+      return llvm::BasicBlock::Create(context, name, f, beforeBB);
+    }
+  };
+
 
   enum ALUOp {
     ADD,

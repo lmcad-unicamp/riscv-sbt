@@ -29,6 +29,7 @@ export PK32=$TCR/riscv32-unknown-elf/bin/pk
 export PK64=$TCR/riscv64-unknown-elf/bin/pk
 export BBL=$TCR/riscv64-unknown-elf/bin/bbl
 export ROOT_FS=$TCR/share/riscvemu/root.bin
+alias elf="$TOPDIR/sbt/test/elf"
 alias spike32="spike $PK32"
 alias spike64="spike --isa=RV64IMAFDC $PK64"
 alias linux_spike="spike --isa=RV64IMAFDC $BBL"

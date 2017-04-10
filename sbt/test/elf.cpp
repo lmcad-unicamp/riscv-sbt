@@ -282,12 +282,12 @@ void elf::dump_header() const
   PX(e_phoff, u)
   PX(e_shoff, u)
   PXS(e_flags, u)
-  PD(e_ehsize, s)
-  PD(e_phentsize, s)
-  PD(e_phnum, s)
-  PD(e_shentsize, s)
-  PD(e_shnum, s)
-  PD(e_shstrndx, s)
+  PX(e_ehsize, s)
+  PX(e_phentsize, s)
+  PX(e_phnum, s)
+  PX(e_shentsize, s)
+  PX(e_shnum, s)
+  PX(e_shstrndx, s)
 }
 
 
@@ -470,17 +470,22 @@ void elf::dump_sh(uint16_t index, const section_header *sh) const
   PXS(sh_flags, u)
   PX(sh_addr, u)
   PX(sh_offset, u)
-  PD(sh_size, u)
+  PX(sh_size, u)
   PX(sh_link, u)
   PX(sh_info, u)
   PX(sh_addralign, u)
-  PD(sh_entsize, u)
+  PX(sh_entsize, u)
+
+  if (!(flags & DF_DATA))
+    return;
 
   // dump contents
   uint32_t offs = sh->sh_offset;
   uint32_t size = sh->sh_size;
 
-  if (name == ".text")
+  if (flags & DF_HEX)
+    dump_data(offs, size, flags & DF_OFF0? 0 : -1);
+  else if (name == ".text")
     dump_text(offs, size);
   else if (name == ".data")
     dump_data(offs, size, sh->sh_addr);
@@ -594,6 +599,7 @@ static std::string st_shndx_str(uint16_t u)
   }
 }
 
+
 void elf::dump_symbol(const struct sym *sym) const
 {
   uint8_t  c;
@@ -603,7 +609,7 @@ void elf::dump_symbol(const struct sym *sym) const
   offs = 0;
   PXS(st_name, u)
   PX(st_value, u)
-  PD(st_size, u)
+  PX(st_size, u)
 
   // st_info
   c = sym->st_info;
@@ -624,6 +630,11 @@ void elf::dump_symbol(const struct sym *sym) const
   offs++;
 
   PXS(st_shndx, s)
+
+  cout << "section: ";
+  if (s < hdr.e_shnum)
+    cout << sh_name_str(sh[s].sh_name);
+  cout << nl;
 }
 
 void elf::dump_symbol_compact(const struct sym *sym, std::ostream &os) const
@@ -708,8 +719,10 @@ void elf::dump_symtab(uint32_t soffs, uint32_t ssize) const
   cout << "Symbols:" << nl;
   for (size_t i = 0; i < n; i++) {
     const struct sym *sym = &syms[i];
-    // dump_symbol(sym);
-    dump_symbol_compact(sym, cout);
+    if (flags & DF_FSYM)
+      dump_symbol(sym);
+    else
+      dump_symbol_compact(sym, cout);
     cout << nl;
   }
 }
@@ -781,6 +794,10 @@ void usage()
     "-p: program headers\n"
     "-s: sections headers\n"
     "-l: list sections headers\n"
+    "-h: dump headers only\n"
+    "-x: hexdump of sections\n"
+    "-z: hexdump offset start always at 0\n"
+    "-f: full symbol dump\n"
     ;
 }
 
@@ -793,6 +810,7 @@ int main(int argc, char *argv[])
 
   // parse options
   uint32_t flags = elf::dump_flags::DF_NONE;
+  bool nodata = false;
   std::string filepath;
   std::vector<std::string> sections;
   for (int i = 1; i < argc; i++) {
@@ -815,6 +833,19 @@ int main(int argc, char *argv[])
             flags |= elf::dump_flags::DF_SH;
             flags |= elf::dump_flags::DF_LIST;
             break;
+          case 'x':
+            flags |= elf::dump_flags::DF_HEX;
+            break;
+          case 'h':
+            nodata = true;
+            flags &= ~elf::dump_flags::DF_DATA;
+            break;
+          case 'z':
+            flags |= elf::dump_flags::DF_OFF0;
+            break;
+          case 'f':
+            flags |= elf::dump_flags::DF_FSYM;
+            break;
           default:
             usage();
             return 1;
@@ -836,7 +867,8 @@ int main(int argc, char *argv[])
   }
 
   if (!sections.empty())
-    flags |= elf::dump_flags::DF_SH;
+    flags |= elf::dump_flags::DF_SH |
+      (nodata? 0 : elf::dump_flags::DF_DATA);
 
   elf elf(filepath);
   elf.dump(flags == elf::dump_flags::DF_NONE?

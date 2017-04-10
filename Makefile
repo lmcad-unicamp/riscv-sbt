@@ -740,8 +740,9 @@ QEMU_USER_ALIAS := qemu-user
 QEMU_TESTS_BUILD := $(BUILD_DIR)/riscv-qemu-tests
 QEMU_TESTS_MAKEFILE := $(QEMU_TESTS_BUILD)/Makefile
 QEMU_TESTS_CONFIGURE := \
+  rm -rf $(QEMU_TESTS_BUILD) && \
   cp -a $(SUBMODULES_DIR)/riscv-qemu-tests $(QEMU_TESTS_BUILD) && \
-  sed -i "s/^AS = \$(CROSS)as -m32/AS = \$(CROSS)as -march=rv32g/" \
+  sed -i "s/^AS = \$$(CROSS)as -m32/AS = \$$(CROSS)as -march=rv32g/" \
     $(QEMU_TESTS_BUILD)/common32.mk
 QEMU_TESTS_MAKE_FLAGS := all32
 QEMU_TESTS_OUT := $(QEMU_TESTS_BUILD)/test1
@@ -798,4 +799,8 @@ tests:
 rv32tests: $(QEMU_TESTS_TOOLCHAIN)
 	$(MAKE) $(SBT)-build1 $(SBT)-install
 	cd $(QEMU_TESTS_BUILD)/rv32i && \
-		riscv-sbt add.o
+		riscv-sbt add.o && \
+		llc -O0 -o rv32-x86-add.s -march x86 x86-add.bc && \
+		$(X86_AS) -o rv32-x86-add.o -c rv32-x86-add.s && \
+		$(X86_LD) -o rv32-x86-add rv32-x86-add.o \
+			$(X86_SYSCALL_O) $(X86_RVSC_O) $(TOPDIR)/sbt/test/x86-dummy.o

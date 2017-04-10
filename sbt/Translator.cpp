@@ -69,12 +69,10 @@ llvm::Error Translator::translateSection(ConstSectionPtr Sec)
     return Error::success();
 
   // print section info
-  DBGS << "Section " << Sec->name()
-    << ": Addr=" << SectionAddr
-    << ", ELFOffs=" << ELFOffset
-    << ", Size=" << SectionSize << "\n";
+  DBGS << formatv("Section {0}: Addr={1:X+4}, ELFOffs={2:X+4}, Size={3:X+4}\n",
+      Sec->name(), SectionAddr, ELFOffset, SectionSize);
 
-
+  State = ST_DFL;
   setCurSection(Sec);
 
   // get relocations
@@ -121,12 +119,10 @@ llvm::Error Translator::translateSymbol(size_t SI)
 
   // XXX for now, translate only instructions that appear after a
   // function or global symbol
+  const StringRef &SymbolName = Sym->name();
   if (Sym->type() == object::SymbolRef::ST_Function ||
       Sym->flags() & object::SymbolRef::SF_Global)
   {
-    const StringRef &SymbolName = Sym->name();
-    DBGS << SymbolName << ":\n";
-
     if (SymbolName == "main") {
       if (auto E = startMain(SymbolName, Start))
         return E;
@@ -140,7 +136,6 @@ llvm::Error Translator::translateSymbol(size_t SI)
   if (!inFunc())
     return Error::success();
 
-  const StringRef &SymbolName = Sym->name();
   DBGS << SymbolName << ":\n";
   return translateInstrs(Start, End);
 }
@@ -148,7 +143,7 @@ llvm::Error Translator::translateSymbol(size_t SI)
 
 llvm::Error Translator::translateInstrs(uint64_t Begin, uint64_t End)
 {
-  DBGS << __FUNCTION__ << "(" << Begin << ", " << End << ")\n";
+  DBGS << __FUNCTION__ << formatv("({0:X+4}, {1:X+4})\n", Begin, End);
 
   uint64_t SectionAddr = CurSection->address();
 
@@ -158,6 +153,22 @@ llvm::Error Translator::translateInstrs(uint64_t Begin, uint64_t End)
     setCurAddr(Addr);
 
     // disasm
+    const uint8_t* RawBytes = &CurSectionBytes[Addr];
+    uint32_t RawInst = *reinterpret_cast<const uint32_t*>(RawBytes);
+
+    // consider 0 bytes as end-of-section padding
+    if (State == ST_PADDING) {
+      if (RawInst != 0) {
+        SBTError SE;
+        SE << "Found non-zero byte in zero-padding area";
+        return error(SE);
+      }
+      continue;
+    } else if (RawInst == 0) {
+      State = ST_PADDING;
+      continue;
+    }
+
     MCInst Inst;
     MCDisassembler::DecodeStatus st =
       DisAsm->getInstruction(Inst, Size,
@@ -177,7 +188,7 @@ llvm::Error Translator::translateInstrs(uint64_t Begin, uint64_t End)
       SBTError SE;
       SE << "Invalid instruction encoding at address ";
       SE << formatv("{0:X-4}", Addr);
-      SE << formatv(": {0:X-8}", CurSectionBytes[Addr]);
+      SE << formatv(": {0:X-8}", RawInst);
       return error(SE);
     }
   }
@@ -511,7 +522,7 @@ Error Translator::startMain(StringRef Name, uint64_t Addr)
   CurFunc = F;
 
   // BB
-  BasicBlock *BB = BasicBlock::Create(*Context, getBBName(Addr), F);
+  BasicBlock *BB = SBTBasicBlock::create(*Context, Addr, F);
   BBMap(Addr, std::move(BB));
   Builder->SetInsertPoint(BB);
 
@@ -571,7 +582,7 @@ Error Translator::startFunction(StringRef Name, uint64_t Addr)
   BasicBlock **BBPtr = BBMap[Addr];
   BasicBlock *BB;
   if (!BBPtr) {
-    BB = BasicBlock::Create(*Context, getBBName(Addr), F);
+    BB = SBTBasicBlock::create(*Context, Addr, F);
     BBMap(Addr, std::move(BB));
   } else {
     BB = *BBPtr;
@@ -1489,6 +1500,9 @@ llvm::Error Translator::handleJumpToOffs(
   BasicBlock *BB = nullptr;
   auto Iter = BBMap.lower_bound(Target);
   bool NeedToTranslateBB = false;
+  BasicBlock* entryBB = &F->getEntryBlock();
+  BasicBlock* PredBB = nullptr;
+  uint64_t BBEnd = 0;
 
   // Jump forward
   if (Target > CurAddr) {
@@ -1501,7 +1515,7 @@ llvm::Error Translator::handleJumpToOffs(
       BB = Iter->IVal;
     // Need to create new BB
     else {
-      BB = BasicBlock::Create(*Context, getBBName(Target), F, BeforeBB);
+      BB = SBTBasicBlock::create(*Context, Target, F, BeforeBB);
       BBMap(Target, std::move(BB));
 
       updateNextBB(Target);
@@ -1528,7 +1542,9 @@ llvm::Error Translator::handleJumpToOffs(
 
     // need to translate target
     if (!InBound) {
-      BB = BasicBlock::Create(*Context, getBBName(Target), F, BB);
+      BBEnd = Iter->IKey;
+      PredBB = Iter->IVal;
+      BB = SBTBasicBlock::create(*Context, Target, F, BB);
       BBMap(Target, std::move(BB));
       NeedToTranslateBB = true;
     // need to split BB?
@@ -1550,7 +1566,7 @@ llvm::Error Translator::handleJumpToOffs(
       if (Iter != BBMap.end())
         BeforeBB = Iter->IVal;
 
-      Next = BasicBlock::Create(*Context, getBBName(NextInstrAddr), F, BeforeBB);
+      Next = SBTBasicBlock::create(*Context, NextInstrAddr, F, BeforeBB);
       BBMap(NextInstrAddr, std::move(Next));
     }
 
@@ -1571,19 +1587,37 @@ llvm::Error Translator::handleJumpToOffs(
 
   // need to translate target BB?
   if (NeedToTranslateBB) {
+    DBGS << "NeedToTranslateBB\n";
+
     // save insert point
-    BasicBlock *PrevBB = Builder->GetInsertBlock();
+    BasicBlock* PrevBB = Builder->GetInsertBlock();
+
+    // add branch to correct function entry BB
+    if (entryBB->getName() != "entry") {
+      BasicBlock* newEntryBB =
+        SBTBasicBlock::create(*Context, "entry", F, BB);
+      Builder->SetInsertPoint(newEntryBB);
+      Builder->CreateBr(entryBB);
+    }
 
     // translate BB
     Builder->SetInsertPoint(BB);
     // translate up to the next BB
-    if (auto E = translateInstrs(Target, Iter->IKey))
+    if (auto E = translateInstrs(Target, BBEnd))
       return E;
+
+    // link to the next BB if there is no terminator
+    DBGS << "XBB=" << Builder->GetInsertBlock()->getName() << nl;
+    DBGS << "TBB=" << PredBB->getName() << nl;
+    if (Builder->GetInsertBlock()->getTerminator() == nullptr)
+      Builder->CreateBr(PredBB);
+    BrWasLast = true;
 
     // restore insert point
     Builder->SetInsertPoint(PrevBB);
   }
 
+  DBGS << "BB=" << Builder->GetInsertBlock()->getName() << nl;
   return Error::success();
 }
 
@@ -1606,7 +1640,7 @@ llvm::BasicBlock *Translator::splitBB(
 
   BasicBlock *BB2;
   if (BB->getTerminator()) {
-    BB2 = BB->splitBasicBlock(I, getBBName(Addr));
+    BB2 = BB->splitBasicBlock(I, SBTBasicBlock::getBBName(Addr));
     BBMap(Addr, std::move(BB2));
     return BB2;
   }
@@ -1614,7 +1648,7 @@ llvm::BasicBlock *Translator::splitBB(
   // Insert dummy terminator
   assert(Builder->GetInsertBlock() == BB);
   Instruction *Instr = Builder->CreateRetVoid();
-  BB2 = BB->splitBasicBlock(I, getBBName(Addr));
+  BB2 = BB->splitBasicBlock(I, SBTBasicBlock::getBBName(Addr));
   BBMap(Addr, std::move(BB2));
   Instr->eraseFromParent();
   Builder->SetInsertPoint(BB2, BB2->end());
