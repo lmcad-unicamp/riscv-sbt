@@ -25,6 +25,8 @@ BUILD_DIR      := $(TOPDIR)/build
 PATCHES_DIR    := $(TOPDIR)/patches
 SUBMODULES_DIR := $(TOPDIR)/submodules
 
+MAKE_DIR =
+
 #
 # tools
 #
@@ -32,6 +34,7 @@ SUBMODULES_DIR := $(TOPDIR)/submodules
 SBT_SHARE_DIR := $(TOOLCHAIN_DIR)/share/riscv-sbt
 X86_SYSCALL_O := $(SBT_SHARE_DIR)/x86-syscall.o
 X86_RVSC_O    := $(SBT_SHARE_DIR)/x86-rvsc.o
+X86_DUMMY_O   := $(TOPDIR)/sbt/test/x86-dummy.o
 
 RV32_TRIPLE       := riscv32-unknown-elf
 RV32_LINUX_TRIPLE := riscv32-unknown-linux-gnu

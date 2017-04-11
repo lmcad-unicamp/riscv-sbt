@@ -3,9 +3,9 @@ include $(TOPDIR)/make/config.mk
 BINS := rv32-hello rv32-gcc-hello rv32-clang-hello x86-clang-hello
 EXTRA := rv64-hello rv64-gcc-hello rv64-clang-hello \
          rv32-gcc-linux-hello rv64-gcc-linux-hello
-#BINS += $(EXTRA)
 
 all: $(BINS)
+extra: $(EXTRA)
 
 include $(TOPDIR)/make/rules.mk
 
@@ -55,4 +55,8 @@ run-rv64-gcc-linux-hello:
 # run/clean
 
 run: $(foreach prog,$(BINS),run-$(prog))
-clean: $(foreach prog,$(BINS),clean-$(prog))
+
+run-extra: $(foreach prog,$(EXTRA),run-$(prog))
+clean-extra: $(foreach prog,$(EXTRA),clean-$(prog))
+
+clean: $(foreach prog,$(BINS),clean-$(prog)) clean-extra

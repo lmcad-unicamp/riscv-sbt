@@ -1,5 +1,12 @@
 #!/bin/bash
 
+if [ x`whoami` != xroot ]; then
+  echo "$0 need to be run as root"
+  exit 1
+fi
+
+lsmod | grep msr >/dev/null || modprobe msr
+
 NCORES=`cat /proc/cpuinfo | grep -c processor`
 echo NCORES=$NCORES
 MAXCORE=$((NCORES-1))

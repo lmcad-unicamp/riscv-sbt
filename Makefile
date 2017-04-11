@@ -795,12 +795,37 @@ tests:
 	$(MAKE) -C $(TOPDIR)/test clean all run
 	$(MAKE) -C $(TOPDIR)/sbt/test clean all run tests run-tests
 
+
+MAKE_DIR := $(dir $(X86_DUMMY_O))
+$(eval $(call AS,X86,$(basename $(notdir $(X86_DUMMY_O)))))
+
+
+MAKE_DIR := $(QEMU_TESTS_BUILD)/rv32i/
+RV32_TESTS := add addi and andi beq bge bgeu blt bltu bne lui or ori \
+  sll slli slt slti sltiu sltu sra srai srl srli sub xor xori
+RV32_TESTS_FAILING := aiupc jal jalr lb lbu lhu lw sb sw
+RV32_TESTS_MISSING := \
+  csrrw csrrs csrrc csrrwi csrrsi csrrci \
+  ecall ebreak fence fence.i lh sh
+RV32_TESTS_TARGETS := $(addprefix $(MAKE_DIR)rv32-x86-,$(RV32_TESTS))
+RV32_TESTS_CLEAN := $(addprefix clean-rv32-x86-,$(RV32_TESTS))
+RV32_TESTS_RUN := $(addprefix run-rv32-x86-,$(RV32_TESTS))
+$(eval $(foreach test,$(RV32_TESTS),\
+  $(call TRANSLATE_ASM,RV32,X86,$(test),noprefix)))
+
+rv32tests_status:
+	@echo passing: `echo $(RV32_TESTS) | wc -w`
+	@echo $(RV32_TESTS)
+	@echo failing: `echo $(RV32_TESTS_FAILING) | wc -w`
+	@echo $(RV32_TESTS_FAILING)
+	@echo missing: `echo $(RV32_TESTS_MISSING) | wc -w`
+	@echo $(RV32_TESTS_MISSING)
+	@echo total: \
+		`echo $(RV32_TESTS) $(RV32_TESTS_FAILING) $(RV32_TESTS_MISSING) | wc -w`
+
 .PHONY: rv32tests
 rv32tests: $(QEMU_TESTS_TOOLCHAIN)
 	$(MAKE) $(SBT)-build1 $(SBT)-install
-	cd $(QEMU_TESTS_BUILD)/rv32i && \
-		riscv-sbt add.o && \
-		llc -O0 -o rv32-x86-add.s -march x86 x86-add.bc && \
-		$(X86_AS) -o rv32-x86-add.o -c rv32-x86-add.s && \
-		$(X86_LD) -o rv32-x86-add rv32-x86-add.o \
-			$(X86_SYSCALL_O) $(X86_RVSC_O) $(TOPDIR)/sbt/test/x86-dummy.o
+	$(MAKE) -C $(QEMU_TESTS_BUILD)/rv32i clean all
+	$(MAKE) $(X86_DUMMY_O) $(RV32_TESTS_CLEAN) $(RV32_TESTS_TARGETS) \
+		$(RV32_TESTS_RUN)

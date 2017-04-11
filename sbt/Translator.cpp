@@ -1523,10 +1523,11 @@ llvm::Error Translator::handleJumpToOffs(
 
   // jump backward
   } else {
-    assert(Iter != BBMap.end() && "Target BB >= current BB!");
-
+    if (Iter == BBMap.end()) {
+      assert(!BBMap.empty() && "BBMap is empty!");
+      BB = (--Iter)->IVal;
     // BB entry matches target address
-    if (Target == Iter->IKey)
+    } else if (Target == Iter->IKey)
       BB = Iter->IVal;
     // target BB is probably the previous one
     else if (Iter != BBMap.begin())

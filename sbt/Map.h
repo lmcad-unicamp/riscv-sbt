@@ -111,6 +111,16 @@ public:
         return I.IKey < KK; });
   }
 
+  bool empty() const
+  {
+    return Data.empty();
+  }
+
+  size_t size() const
+  {
+    return Data.size();
+  }
+
 private:
   Vec Data;
 

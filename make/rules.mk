@@ -1,11 +1,15 @@
 ### rules ###
 
+# $(warning CLEAN,$(1),$(2))
+
 # CLEAN
 # 1: module
 # 2: clean .s?
 define CLEAN
 clean-$(1):
-	rm -f $(1) $(1).o $$(if $(2),$(1).s) $(1).bc $(1).ll $(1).out $(CLEAN_EXTRA)
+	@echo $$@:
+	rm -f $(addprefix $(MAKE_DIR),\
+		$(1) $(1).o $(if $(2),$(1).s) $(1).bc $(1).ll $(1).out $(CLEAN_EXTRA))
 ###
 endef
 
@@ -14,18 +18,21 @@ endef
 # 2: program
 # 3: save output?
 define RUN
-run-$(2): $(2)
+$(eval RUN_DIR = $(if $(MAKE_DIR),$(MAKE_DIR),./))
+$(eval RUN_PROG = $(RUN_DIR)$(2))
+run-$(2): $(RUN_PROG)
+	@echo $$@:
 ifeq ($$($(1)_RUN),)
   ifeq ($(3),)
-	./$(2)
+	$(RUN_PROG)
   else
-	./$(2) | tee $(2).out
+	$(RUN_PROG) | tee $(RUN_PROG).out
   endif
 else
   ifeq ($(3),)
-	$$($(1)_RUN) $(2)
+	$$($(1)_RUN) $(RUN_PROG)
   else
-	$$($(1)_RUN) $(2) | tee $(2).out
+	$$($(1)_RUN) $(RUN_PROG) | tee $(RUN_PROG).out
   endif
 endif
 endef
@@ -34,8 +41,8 @@ endef
 # 1: prefix
 # 2: output module
 define AS
-# .s -> .o
-$(2).o: $(2).s
+$(eval AS_FILE = $(MAKE_DIR)$(2))
+$(AS_FILE).o: $(AS_FILE).s
 	$$($(1)_AS) -o $$@ -c $$<
 endef
 
@@ -43,7 +50,8 @@ endef
 # 1: prefix
 # 2: output module
 define CLINK
-$(2): $(2).o
+$(eval CLINK_FILE = $(MAKE_DIR)$(2))
+$(CLINK_FILE): $(CLINK_FILE).o
 	$$($(1)_LD) -o $$@ \
 		$$($(1)_LD_FLAGS0) $$< \
 		$($(1)_LIBS) \
@@ -54,7 +62,8 @@ endef
 # 1: prefix
 # 2: output module
 define LINK
-$(2): $(2).o
+$(eval LINK_FILE = $(MAKE_DIR)$(2))
+$(LINK_FILE): $(LINK_FILE).o
 	$$($(1)_LD) -o $$@ $$< $($(1)_LIBS)
 endef
 
@@ -76,9 +85,11 @@ endef
 # 3: [opt] GCC/CLANG
 # 4: [opt] source .c file
 define BUILD
+$(eval BUILD_FILE = $(MAKE_DIR)$(2))
+
 # .c -> .s
 ifneq ($(4),)
-$(2).s: $(4).c
+$(BUILD_FILE).s: $(MAKE_DIR)$(4).c
 	$$($(1)_$(3)) $$($(1)_$(3)_FLAGS) $(CFLAGS) -o $$@ -S $$<
 endif
 
@@ -99,35 +110,82 @@ endef
 # 1: guest arch
 # 2: host arch
 # 3: module name, without extension and arch prefix
+# 4: flag: no prefix in module
 define TRANSLATE
+$(eval TRANSLATE_FILE = $(MAKE_DIR)$($(1)_PREFIX)-$($(2)_PREFIX)-$(3))
+$(eval TRANSLATE_GUEST = $(MAKE_DIR)$(if $(4),$(3),$($(1)_PREFIX)-$(3)))
+
 # .o -> .bc
-$($(1)_PREFIX)-$($(2)_PREFIX)-$(3).bc: $($(1)_PREFIX)-$(3).o
+$(TRANSLATE_FILE).bc: $(TRANSLATE_GUEST).o
 	riscv-sbt -o $$@ $$<
 
 # .bc -> .ll
-$($(1)_PREFIX)-$($(2)_PREFIX)-$(3).ll: $($(1)_PREFIX)-$($(2)_PREFIX)-$(3).bc
+$(TRANSLATE_FILE).ll: $(TRANSLATE_FILE).bc
 	llvm-dis -o $$@ $$<
 
 # .bc -> .s
-$($(1)_PREFIX)-$($(2)_PREFIX)-$(3).s: $($(1)_PREFIX)-$($(2)_PREFIX)-$(3).bc \
-  $($(1)_PREFIX)-$($(2)_PREFIX)-$(3).ll
+$(TRANSLATE_FILE).s: $(TRANSLATE_FILE).bc $(TRANSLATE_FILE).ll
 	llc -O0 -o $$@ -march $($(2)_MARCH) $$<
+endef
+
+
+# TRANSLATE RUN target
+# 1: guest arch
+# 2: host arch
+# 3: module name, without extension and arch prefix
+define TRANSLATE_RUN
+$(eval TRANSLATE_RUN_FILE = $(MAKE_DIR)$($(1)_PREFIX)-$($(2)_PREFIX)-$(3))
+$(eval TRANSLATE_RUN_GUEST = $($(1)_PREFIX)-$(3))
+
+test-$(3): run-$(TRANSLATE_RUN_GUEST) run-$(TRANSLATE_RUN_FILE)
+	diff $(TRANSLATE_RUN_GUEST).out $(TRANSLATE_RUN_FILE).out
+endef
+
+
+# TRANSLATE from C
+# 1: guest arch
+# 2: host arch
+# 3: module name, without extension and arch prefix
+define TRANSLATE_C
+$(eval TRANSLATE_C_FILE = $($(1)_PREFIX)-$($(2)_PREFIX)-$(3))
+
+$(call TRANSLATE,$(1),$(2),$(3),)
 
 $(eval $(2)_LIBS = $($(2)_SYSCALL_O) $($(2)_RVSC_O))
-$(call ASNCLINK,$(2),$($(1)_PREFIX)-$($(2)_PREFIX)-$(3),clean.s,save-run.out)
+$(call ASNCLINK,$(2),$(TRANSLATE_C_FILE),clean.s,save-run.out)
 $(eval $(2)_LIBS =)
 
-test-$(3): run-$($(1)_PREFIX)-$(3) run-$($(1)_PREFIX)-$($(2)_PREFIX)-$(3)
-	diff $($(1)_PREFIX)-$(3).out $($(1)_PREFIX)-$($(2)_PREFIX)-$(3).out
+$(call TRANSLATE_RUN,$(1),$(2),$(3))
 endef
+
+
+# TRANSLATE from ASM
+# 1: guest arch
+# 2: host arch
+# 3: module name, without extension and arch prefix
+# 4: flag: no prefix in module
+define TRANSLATE_ASM
+$(eval TRANSLATE_ASM_FILE = $($(1)_PREFIX)-$($(2)_PREFIX)-$(3))
+
+$(call TRANSLATE,$(1),$(2),$(3),$(4))
+
+$(eval $(2)_LIBS = $($(2)_SYSCALL_O) $($(2)_RVSC_O) $($(2)_DUMMY_O))
+$(eval $(call BUILD,$(2),$(TRANSLATE_ASM_FILE)))
+$(eval $(2)_LIBS =)
+
+$(call TRANSLATE_RUN,$(1),$(2),$(3))
+endef
+
 
 # NBUILD: native build
 # 1: output module
 define NBUILD
-$(1).o: $(1).cpp $(1).hpp
+$(eval NBUILD_FILE = $(MAKE_DIR)$(1))
+
+$(NBUILD_FILE).o: $(NBUILD_FILE).cpp $(NBUILD_FILE).hpp
 	$(CXX) $(CXXFLAGS) -o $$@ -c $$<
 
-$(1): $(1).o
+$(NBUILD_FILE): $(NBUILD_FILE).o
 	$(CXX) $(LDFLAGS) -o $$@ $$<
 
 $(call RUN,X86,$(1))

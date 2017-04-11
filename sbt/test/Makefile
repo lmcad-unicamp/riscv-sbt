@@ -50,7 +50,7 @@ X86_LIBS =
 CFLAGS = -Wall -Werror -O0
 $(eval $(call BUILD,X86,x86-main,CLANG,main))
 $(eval $(call BUILD,RV32,rv32-main,CLANG,main))
-$(eval $(call TRANSLATE,RV32,X86,main))
+$(eval $(call TRANSLATE_C,RV32,X86,main))
 
 ### RV32 Translator unit tests ###
 
@@ -58,13 +58,19 @@ TESTS := load-store alu-ops branch fence system m
 RV32_TESTS := $(foreach test,$(TESTS),rv32-$(test))
 RV32_X86_TESTS := $(foreach test,$(TESTS),rv32-x86-$(test))
 
-$(eval $(foreach test,$(RV32_TESTS),$(call ASNCLINK,RV32,$(test),,save-run.out)))
-$(eval $(foreach test,$(TESTS),$(call TRANSLATE,RV32,X86,$(test))))
+$(eval $(foreach test,$(RV32_TESTS),\
+  $(call ASNCLINK,RV32,$(test),,save-run.out)))
+
+$(eval $(foreach test,$(TESTS),\
+  $(call TRANSLATE_C,RV32,X86,$(test))))
 
 tests: $(RV32_TESTS) $(RV32_X86_TESTS)
 
 run-tests: tests $(foreach test,$(TESTS),test-$(test))
 	@echo "All tests passed!"
+
+
+#$(warning clean-rv32-x86: $(foreach test,$(RV32_X86_TESTS),clean-$(test)))
 
 clean-tests: $(foreach test,$(RV32_TESTS),clean-$(test)) \
   $(foreach test,$(RV32_X86_TESTS),clean-$(test))
