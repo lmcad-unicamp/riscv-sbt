@@ -7,34 +7,34 @@ namespace sbt {
 
 char SBTError::ID = 'S';
 
-SBTError::SBTError(const std::string &Prefix) :
-  SS(new raw_string_ostream(S)),
-  Cause(Error::success())
+SBTError::SBTError(const std::string& prefix) :
+  _ss(new raw_string_ostream(_s)),
+  _cause(Error::success())
 {
   // error format: <sbt>: error: prefix: <msg>
-  *SS << *BIN_NAME << ": error: ";
-  if (!Prefix.empty())
-    *SS << Prefix << ": ";
+  *_ss << *BIN_NAME << ": error: ";
+  if (!prefix.empty())
+    *_ss << prefix << ": ";
 }
 
-SBTError::SBTError(SBTError &&X) :
-  S(std::move(X.SS->str())),
-  SS(new llvm::raw_string_ostream(S)),
-  Cause(std::move(X.Cause))
+SBTError::SBTError(SBTError&& other) :
+  _s(std::move(other._ss->str())),
+  _ss(new llvm::raw_string_ostream(_s)),
+  _cause(std::move(other._cause))
 {
 }
 
 SBTError::~SBTError()
 {
-  consumeError(std::move(Cause));
+  consumeError(std::move(_cause));
 }
 
-void SBTError::log(llvm::raw_ostream &OS) const
+void SBTError::log(llvm::raw_ostream& os) const
 {
-  OS << SS->str() << "\n";
-  if (Cause) {
-    logAllUnhandledErrors(std::move(Cause), OS, "Cause: ");
-    Cause = Error::success();
+  os << _ss->str() << "\n";
+  if (_cause) {
+    logAllUnhandledErrors(std::move(_cause), os, "Cause: ");
+    _cause = Error::success();
   }
 }
 

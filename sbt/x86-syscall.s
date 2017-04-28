@@ -1,22 +1,22 @@
 # RISC-V syscall:
 #
 # syscall#: a7
-# arg1:     a0
-# arg2:     a1
-# arg3:     a2
-# arg4:     a3
-# arg5:     a4
-# arg6:     a5
+# arg0:     a0
+# arg1:     a1
+# arg2:     a2
+# arg3:     a3
+# arg4:     a4
+# arg5:     a5
 
 # X86 syscall:
 #
 # syscall#: eax
-# arg1:     ebx
-# arg2:     ecx
-# arg3:     edx
-# arg4:     esi
-# arg5:     edi
-# arg6:     ebp
+# arg0:     ebx
+# arg1:     ecx
+# arg2:     edx
+# arg3:     esi
+# arg4:     edi
+# arg5:     ebp
 
 .text
 
@@ -120,6 +120,14 @@ syscall6:
   ret
 
 
+
+# XXX
+#
+# The code below is needed only to emulate
+# - get_cycles
+# - get_time
+# - get_instret
+
 .global syscall_init
 syscall_init:
   push %ebx
@@ -129,6 +137,7 @@ syscall_init:
   ###
 
   # get CPU brand string
+
   movl $0x80000002, %esi
   movl $brand_str, %edi
 loop:
@@ -144,35 +153,22 @@ loop:
   cmpl $0x80000005, %esi
   jne loop
 
-  # print it
-  # pushl $brand_str
-  # calll printf
-  # addl $4, %esp
-  # pushl $nl
-  # calll puts
-  # addl $4, %esp
-
   # point esi to first non space char of brand_str,
   # starting from the end
+  # (brand_str len is 48 bytes)
+
   movl $brand_str, %esi
   addl $47, %esi
 
 loop2:
   subl $1, %esi
   movb (%esi), %al
-  cmpb $0x20, %al
+  cmpb $' ', %al
   jne loop2
   addl $1, %esi
 
-  # print it
-  # pushl %esi
-  # calll puts
-  # addl $4, %esp
-  # pushl $nl
-  # calll puts
-  # addl $4, %esp
+  # now parse the frequency
 
-  # now parse frequency
   pushl $freq_u
   pushl $freq_r
   pushl $freq_l
@@ -204,13 +200,6 @@ mhz:
 
 save_freq:
   movl %eax, freq
-
-  # print final frequency
-  # pushl %eax
-  # pushl $fmt
-  # calll printf
-  # addl $8, %esp
-
   jmp end
 
 error:
@@ -231,7 +220,7 @@ get_cycles:
   push %ebx
 
   # flush pipeline
-  # TODO does this really changes ebx?
+  # XXX does this really changes ebx?
   xor %eax, %eax
   cpuid
   # get cycles in edx:eax
@@ -249,7 +238,8 @@ get_time:
   # cycles: edx:eax
   call get_cycles
 
-  # time =  cycles / freq (64-bit div)
+  # time =  cycles / freq (64-bit/32-bit div)
+  #
   # cycles_hi (edx) = cycles >> 32
   # cycles_lo (eax) = cycles & 0xFFFFFFFF
   # time_hi (ecx) = cycles_hi / freq
@@ -257,16 +247,16 @@ get_time:
   # time_lo (eax) = ((time_hi_remainder << 32) | cycles_lo) / freq
 
   # time_hi
-  push %eax
-  mov %edx, %eax
+  push %eax         # cycles_lo
+  mov %edx, %eax    # eax = cycles_hi
   xor %edx, %edx
-  div %ebx
-  mov %eax, %ecx
-  pop %eax
+  div %ebx          # cycles_hi / freq
+  mov %eax, %ecx    # ecx = cicles_hi / freq (time_hi)
+  pop %eax          # eax = cycles_lo
 
   # time_lo
-  div %ebx
-  mov %ecx, %edx
+  div %ebx          # remainder:cycles_lo / freq (time_lo)
+  mov %ecx, %edx    # edx = time_hi
 
   pop %ebx
   ret
@@ -275,24 +265,24 @@ get_time:
 get_instret:
   mov $0x40000000, %ecx
   rdpmc
-  #pushl %eax
-  #pushl $instret_fmt
-  #calll printf
-  #addl $8, %esp
   ret
 
 .data
 .p2align 4
+
+# CPU frequency
 freq:   .int 0
+# number to the left of the point
 freq_l: .int 0
+# number to the right of the point
 freq_r: .int 0
+# unity (M|G)
 freq_u: .byte 0
+# format string
 freq_str: .asciz "%d.%d%c"
 
+# error string
 error_str:  .asciz "syscall_init failed!\n"
-fmt:        .asciz "freq=%uMHz\n"
-test_str:   .asciz "TEST\n"
-brand_str:  .zero 64
-nl:         .asciz "\n"
 
-instret_fmt:   .asciz "instret=0x%08X\n"
+# CPU brand string
+brand_str:  .zero 64

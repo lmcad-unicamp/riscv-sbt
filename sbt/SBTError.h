@@ -8,24 +8,24 @@
 
 namespace sbt {
 
-// Our custom error class
+// custom error class
 class SBTError : public llvm::ErrorInfo<SBTError>
 {
 public:
   // ctor
-  // FileName - name of the input file that was being processed
+  // fileName - name of the input file that was being processed
   //            when the error happened
-  SBTError(const std::string &FileName = "");
+  SBTError(const std::string& fileName = "");
 
   // disallow copy
-  SBTError(const SBTError &) = delete;
+  SBTError(const SBTError&) = delete;
   // move
-  SBTError(SBTError &&X);
+  SBTError(SBTError&&);
   // dtor
   ~SBTError() override;
 
   // log error
-  void log(llvm::raw_ostream &OS) const override;
+  void log(llvm::raw_ostream& os) const override;
 
   // unused error_code conversion compatibility method
   std::error_code convertToErrorCode() const override
@@ -36,21 +36,21 @@ public:
   // stream insertion overloads to make it easy
   // to build the error message
   template <typename T>
-  llvm::raw_string_ostream &operator<<(const T &&Val)
+  llvm::raw_string_ostream &operator<<(const T&& val)
   {
-    *SS << Val;
-    return *SS;
+    *_ss << val;
+    return *_ss;
   }
 
-  llvm::raw_string_ostream &operator<<(const char *Val)
+  llvm::raw_string_ostream &operator<<(const char *val)
   {
-    *SS << Val;
-    return *SS;
+    *_ss << val;
+    return *_ss;
   }
 
-  SBTError &operator<<(llvm::Error &&E)
+  SBTError& operator<<(llvm::Error&& err)
   {
-    Cause = std::move(E);
+    _cause = std::move(err);
     return *this;
   }
 
@@ -58,19 +58,19 @@ public:
   static char ID;
 
 private:
-  std::string S;                                  // error message
-  std::unique_ptr<llvm::raw_string_ostream> SS;   // string stream
-  mutable llvm::Error Cause;
+  std::string _s;                                 // error message
+  std::unique_ptr<llvm::raw_string_ostream> _ss;  // string stream
+  mutable llvm::Error _cause;
 };
 
-static inline llvm::Error error(SBTError &&SE)
+static inline llvm::Error error(SBTError&& err)
 {
-  return llvm::make_error<SBTError>(std::move(SE));
+  return llvm::make_error<SBTError>(std::move(err));
 }
 
-static inline llvm::Error error(SBTError &SE)
+static inline llvm::Error error(SBTError& err)
 {
-  return error(std::move(SE));
+  return error(std::move(err));
 }
 
 } // sbt

@@ -8,14 +8,7 @@
 #include <type_traits>
 #include <vector>
 
-namespace llvm {
-namespace object {
-class ObjectFile;
-class SectionRef;
-}
-}
-
-#define DBGS_ON
+#define DBGS_ON 1
 
 #define UNUSED(x) (void)(x)
 
@@ -24,83 +17,94 @@ class SectionRef;
 
 namespace sbt {
 
+// get log stream
+// error: true -> errs() : false -> outs()
 llvm::raw_ostream &logs(bool error = false);
 
-#ifdef DBGS_ON
+// debug stream
+#if DBGS_ON
 static llvm::raw_ostream &DBGS = llvm::outs();
 #else
 static llvm::raw_ostream &DBGS = llvm::nulls();
 #endif
 
 
+// object creation functions
+
+// for pointers
 template <typename T, typename... Args>
 typename std::enable_if<
   std::is_pointer<T>::value,
   llvm::Expected<T>>::type
 create(Args&&... args)
 {
-  llvm::Error E = llvm::Error::success();
-  llvm::consumeError(std::move(E));
+  llvm::Error err = llvm::Error::success();
+  llvm::consumeError(std::move(err));
 
   typedef typename std::remove_pointer<T>::type TT;
-  T Ptr = new TT(args..., E);
-  if (E) {
-    delete Ptr;
-    return std::move(E);
+  T ptr = new TT(args..., err);
+  if (err) {
+    delete ptr;
+    return std::move(err);
   } else
-    return Ptr;
+    return ptr;
 }
 
+// for non-pointers
 template <typename T, typename... Args>
 typename std::enable_if<
   !std::is_pointer<T>::value,
   llvm::Expected<T>>::type
 create(Args&&... args)
 {
-  llvm::Error E = llvm::Error::success();
-  llvm::consumeError(std::move(E));
+  llvm::Error err = llvm::Error::success();
+  llvm::consumeError(std::move(err));
 
-  T Inst(args..., E);
-  if (E)
-    return std::move(E);
-  return std::move(Inst);
+  T inst(args..., err);
+  if (err)
+    return std::move(err);
+  return std::move(inst);
 }
 
+// execute some action when exiting scope
 class OnScopeExit
 {
 public:
-  typedef std::function<void()> FnType;
+  using FnType = std::function<void()>;
 
-  OnScopeExit(FnType&& Fn) :
-    Fn(std::move(Fn))
+  OnScopeExit(FnType&& fn) :
+    _fn(std::move(fn))
   {}
 
   ~OnScopeExit()
   {
-    Fn();
+    _fn();
   }
 
 private:
-  FnType Fn;
+  FnType _fn;
 };
 
-
+// return an already consumed error
 static inline llvm::Error noError()
 {
-  llvm::Error E = llvm::Error::success();
-  llvm::consumeError(std::move(E));
-  return E;
+  llvm::Error err = llvm::Error::success();
+  llvm::consumeError(std::move(err));
+  return err;
 }
 
-
+// helper to check if Expected has a value or an error
+// value: set val
+// error: set err
+// return: true if no errors
 template <typename T>
-bool exp(llvm::Expected<T> Exp, T& Val, llvm::Error& E)
+bool exp(llvm::Expected<T> exp, T& val, llvm::Error& err)
 {
-  if (!Exp) {
-    E = std::move(Exp.takeError());
+  if (!exp) {
+    err = std::move(exp.takeError());
     return false;
   } else {
-    Val = std::move(Exp.get());
+    val = std::move(exp.get());
     return true;
   }
 }
