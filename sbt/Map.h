@@ -17,29 +17,29 @@ public:
   class Item
   {
   public:
-    Item(const Key &Key, const Value &Val) :
-      IKey(Key),
-      IVal(Val)
+    Item(const Key& key, const Value& val) :
+      key(key),
+      val(val)
     {}
 
-    Item(Key &&Key, Value &&Val) :
-      IKey(std::move(Key)),
-      IVal(std::move(Val))
+    Item(Key&& key, Value&& val) :
+      key(std::move(key)),
+      val(std::move(val))
     {}
 
-    Item(const Item &) = delete;
-    Item(Item &&) = default;
+    Item(const Item&) = delete;
+    Item(Item&&) = default;
 
-    Item &operator=(const Item &) = delete;
-    Item &operator=(Item &&) = default;
+    Item& operator=(const Item&) = delete;
+    Item& operator=(Item&&) = default;
 
-    operator const Value &() const
+    operator const Value&() const
     {
-      return IVal;
+      return val;
     }
 
-    Key IKey;
-    Value IVal;
+    Key key;
+    Value val;
   };
 
   typedef std::vector<Item> Vec;
@@ -48,112 +48,112 @@ public:
 
   Map() = default;
 
-  Map(Vec &&VV) :
-    Data(std::move(VV))
+  Map(Vec&& vec) :
+    _data(std::move(vec))
   {
     sort();
   }
 
-  Value *operator[](const Key &Key)
+  Value* operator[](const Key& key)
   {
-    return lookupVal(this, Key);
+    return lookupVal(this, key);
   }
 
-  const Value *operator[](const Key &Key) const
+  const Value* operator[](const Key& key) const
   {
-    return lookupVal(this, Key);
+    return lookupVal(this, key);
   }
 
   // insert/update
-  void operator()(const Key &KK, Value &&Val)
+  void operator()(const Key& key, Value&& val)
   {
-    Value *DV = lookupVal(this, KK);
-    if (DV) {
-      *DV = std::move(Val);
+    Value *dv = lookupVal(this, key);
+    if (dv) {
+      *dv = std::move(val);
     } else {
-      auto I = Data.emplace(Data.end(), Item(KK, std::move(Val)));
-      std::inplace_merge(Data.begin(), I, Data.end(),
-        [](const Item &I1, const Item &I2){ return I1.IKey < I2.IKey; });
+      auto it = _data.emplace(_data.end(), Item(key, std::move(val)));
+      std::inplace_merge(_data.begin(), it, _data.end(),
+        [](const Item& i1, const Item& i2){ return i1.key < i2.key; });
     }
   }
 
   CIter begin() const
   {
-    return Data.begin();
+    return _data.begin();
   }
 
   CIter end() const
   {
-    return Data.end();
+    return _data.end();
   }
 
   Iter begin()
   {
-    return Data.begin();
+    return _data.begin();
   }
 
   Iter end()
   {
-    return Data.end();
+    return _data.end();
   }
 
-  Iter lower_bound(const Key& KK)
+  Iter lower_bound(const Key& key)
   {
-    return std::lower_bound(begin(), end(), KK,
-      [](const Item& I, const Key& KK) {
-        return I.IKey < KK; });
+    return std::lower_bound(begin(), end(), key,
+      [](const Item& i, const Key& key) {
+        return i.key < key; });
   }
 
-  CIter lower_bound(const Key& KK) const
+  CIter lower_bound(const Key& key) const
   {
-    return std::lower_bound(begin(), end(), KK,
-      [](const Item& I, const Key& KK) {
-        return I.IKey < KK; });
+    return std::lower_bound(begin(), end(), key,
+      [](const Item& i, const Key& key) {
+        return i.IKey < key; });
   }
 
   bool empty() const
   {
-    return Data.empty();
+    return _data.empty();
   }
 
   size_t size() const
   {
-    return Data.size();
+    return _data.size();
   }
 
 private:
-  Vec Data;
+  Vec _data;
 
   // methods
 
   void sort()
   {
-    std::sort(Data.begin(), Data.end());
+    std::sort(_data.begin(), _data.end());
   }
 
   // Implementation of const and non-const versions of operator[]
   template <typename T>
-  static auto lookup(T thiz, const Key &KK) -> decltype(&thiz->Data[0])
+  static auto lookup(T thiz, const Key& key) -> decltype(&thiz->_data[0])
   {
-    auto &Data = thiz->Data;
-    if (Data.empty())
+    auto &data = thiz->_data;
+    if (data.empty())
       return nullptr;
-    const Item &Dummy = Data.front();
+    const Item& dummy = data.front();
 
-    auto I = std::lower_bound(Data.begin(), Data.end(), Dummy,
-      [&KK](const Item &II, const Item &){ return II.IKey < KK; });
-    if (I == Data.end())
+    auto it = std::lower_bound(data.begin(), data.end(), dummy,
+      [&key](const Item &i, const Item &){ return i.key < key; });
+    if (it == data.end())
       return nullptr;
     else
-      return I->IKey == KK? &*I : nullptr;
+      return it->key == key? &*it : nullptr;
   }
 
   template <typename T>
-  static auto lookupVal(T thiz, const Key &Key) -> decltype(&thiz->Data[0].IVal)
+  static auto lookupVal(T thiz, const Key& key) -> decltype(&thiz->_data[0].val)
   {
-    auto I = lookup(thiz, Key);
-    if (I)
-      return &I->IVal;
+    auto it = lookup(thiz, key);
+    if (it)
+      return &it->val;
     else
       return nullptr;
   }

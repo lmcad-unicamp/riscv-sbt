@@ -83,8 +83,7 @@ llvm::Error Translator::translateSection(ConstSectionPtr Sec)
 
   // get section bytes
   StringRef BytesStr;
-  std::error_code EC = Sec->contents(BytesStr);
-  if (EC) {
+  if (Sec->contents(BytesStr)) {
     SBTError SE;
     SE << "Failed to get Section Contents";
     return error(SE);
@@ -221,7 +220,7 @@ llvm::Error Translator::translate(const llvm::MCInst &Inst)
 
     auto Iter = BBMap.lower_bound(CurAddr + 4);
     if (Iter != BBMap.end())
-      updateNextBB(Iter->IKey);
+      updateNextBB(Iter->key);
   }
 
   Error E = noError();
@@ -642,8 +641,7 @@ Error Translator::buildShadowImage()
     // others
     } else {
       // Read contents
-      std::error_code EC = Sec->contents(Bytes);
-      if (EC) {
+      if (Sec->contents(Bytes)) {
         SE  << __FUNCTION__ << ": failed to get section ["
             << Sec->name() << "] contents";
         return error(SE);
@@ -1437,7 +1435,7 @@ llvm::Error Translator::handleCall(uint64_t Target)
 {
   // Find function
   // Get symbol by offset
-  ConstSectionPtr Sec = CurObj->section(".text");
+  ConstSectionPtr Sec = CurObj->lookupSection(".text");
   assert(Sec && ".text section not found!");
   ConstSymbolPtr Sym = Sec->lookup(Target);
   assert(Sym &&
@@ -1508,11 +1506,11 @@ llvm::Error Translator::handleJumpToOffs(
   if (Target > CurAddr) {
     BasicBlock *BeforeBB = nullptr;
     if (Iter != BBMap.end())
-      BeforeBB = Iter->IVal;
+      BeforeBB = Iter->val;
 
     // BB already exists
-    if (Target == Iter->IKey)
-      BB = Iter->IVal;
+    if (Target == Iter->key)
+      BB = Iter->val;
     // Need to create new BB
     else {
       BB = SBTBasicBlock::create(*Context, Target, F, BeforeBB);
@@ -1525,31 +1523,31 @@ llvm::Error Translator::handleJumpToOffs(
   } else {
     if (Iter == BBMap.end()) {
       assert(!BBMap.empty() && "BBMap is empty!");
-      BB = (--Iter)->IVal;
+      BB = (--Iter)->val;
     // BB entry matches target address
-    } else if (Target == Iter->IKey)
-      BB = Iter->IVal;
+    } else if (Target == Iter->key)
+      BB = Iter->val;
     // target BB is probably the previous one
     else if (Iter != BBMap.begin())
-      BB = (--Iter)->IVal;
+      BB = (--Iter)->val;
     // target BB is the first one
     else
-      BB = Iter->IVal;
+      BB = Iter->val;
 
     // check bounds
-    uint64_t Begin = Iter->IKey;
-    uint64_t End = Iter->IKey + BB->size() * InstrSize;
+    uint64_t Begin = Iter->key;
+    uint64_t End = Iter->key + BB->size() * InstrSize;
     bool InBound = Target >= Begin && Target < End;
 
     // need to translate target
     if (!InBound) {
-      BBEnd = Iter->IKey;
-      PredBB = Iter->IVal;
+      BBEnd = Iter->key;
+      PredBB = Iter->val;
       BB = SBTBasicBlock::create(*Context, Target, F, BB);
       BBMap(Target, std::move(BB));
       NeedToTranslateBB = true;
     // need to split BB?
-    } else if (Iter->IKey != Target)
+    } else if (Iter->key != Target)
       BB = splitBB(BB, Target);
   }
 
@@ -1565,7 +1563,7 @@ llvm::Error Translator::handleJumpToOffs(
     else {
       Iter = BBMap.lower_bound(NextInstrAddr);
       if (Iter != BBMap.end())
-        BeforeBB = Iter->IVal;
+        BeforeBB = Iter->val;
 
       Next = SBTBasicBlock::create(*Context, NextInstrAddr, F, BeforeBB);
       BBMap(NextInstrAddr, std::move(Next));

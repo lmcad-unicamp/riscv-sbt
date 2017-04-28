@@ -20,25 +20,25 @@ class Section;
 class Symbol;
 
 // pointers
-typedef Object *ObjectPtr;
-typedef const Object *ConstObjectPtr;
-typedef std::shared_ptr<Relocation> RelocationPtr;
-typedef std::shared_ptr<const Relocation> ConstRelocationPtr;
-typedef std::shared_ptr<Symbol> SymbolPtr;
-typedef std::shared_ptr<const Symbol> ConstSymbolPtr;
-typedef std::shared_ptr<Section> SectionPtr;
-typedef std::shared_ptr<const Section> ConstSectionPtr;
+using ObjectPtr = Object *;
+using ConstObjectPtr = const Object *;
+using RelocationPtr = std::shared_ptr<Relocation>;
+using ConstRelocationPtr = std::shared_ptr<const Relocation>;
+using SymbolPtr = std::shared_ptr<Symbol>;
+using ConstSymbolPtr = std::shared_ptr<const Symbol>;
+using SectionPtr = std::shared_ptr<Section>;
+using ConstSectionPtr = std::shared_ptr<const Section>;
 
 // vectors
-typedef std::vector<SectionPtr> SectionPtrVec;
-typedef std::vector<ConstSymbolPtr> ConstSymbolPtrVec;
-typedef std::vector<ConstRelocationPtr> ConstRelocationPtrVec;
+using SectionPtrVec = std::vector<SectionPtr>;
+using ConstSymbolPtrVec = std::vector<ConstSymbolPtr>;
+using ConstRelocationPtrVec = std::vector<ConstRelocationPtr>;
 
 // maps
-typedef Map<llvm::StringRef, ConstSymbolPtr> NameToSymbolMap;
-typedef Map<llvm::StringRef, ConstSectionPtr> NameToSectionMap;
-typedef Map<uintptr_t, ConstSymbolPtr> PtrToSymbolMap;
-typedef Map<uintptr_t, ConstSectionPtr> PtrToSectionMap;
+using NameToSymbolMap = Map<llvm::StringRef, ConstSymbolPtr>;
+using NameToSectionMap = Map<llvm::StringRef, ConstSectionPtr>;
+using PtrToSymbolMap = Map<uintptr_t, ConstSymbolPtr>;
+using PtrToSectionMap = Map<uintptr_t, ConstSectionPtr>;
 
 
 /// Section
@@ -47,37 +47,37 @@ class Section
 {
 public:
   Section(
-    ConstObjectPtr Obj,
-    const std::string &Name)
+    ConstObjectPtr obj,
+    const std::string& name)
     :
-    Obj(Obj),
-    Name(Name)
+    _obj(obj),
+    _name(name)
   {}
 
   virtual ~Section() = default;
 
-  // Name
-  const std::string &name() const
+  // name
+  const std::string& name() const
   {
-    return Name;
+    return _name;
   }
 
-  // Get llvm::object::SectionRef (if any)
+  // get llvm::object::SectionRef (if any)
   virtual const llvm::object::SectionRef section() const
   {
     return llvm::object::SectionRef();
   }
 
-  // Address
+  // address
   virtual uint64_t address() const
   {
     return 0;
   }
 
-  // Size
+  // size
   virtual uint64_t size() const = 0;
 
-  // Type
+  // type
 
   virtual bool isText() const
   {
@@ -99,27 +99,27 @@ public:
     return false;
   }
 
-  // Contents
-  virtual std::error_code contents(llvm::StringRef &S) const
+  // contents
+  virtual llvm::Error contents(llvm::StringRef& s) const
   {
-    S = "";
-    return std::error_code();
+    s = "";
+    return llvm::Error::success();
   }
 
-  // Symbols, ordered by address
-  const ConstSymbolPtrVec &symbols() const
+  // symbols, ordered by address
+  const ConstSymbolPtrVec& symbols() const
   {
-    return Symbols;
+    return _symbols;
   }
 
-  // Set symbols (can't be done at construction time)
-  virtual void symbols(ConstSymbolPtrVec &&S)
+  // set symbols (can't be done at construction time)
+  virtual void symbols(ConstSymbolPtrVec&& s)
   {
-    Symbols = std::move(S);
+    _symbols = std::move(s);
   }
 
-  // Lookup symbol by address
-  ConstSymbolPtr lookup(uint64_t Addr) const;
+  // lookup symbol by address
+  ConstSymbolPtr lookup(uint64_t addr) const;
 
   // ELFOffset
   virtual uint64_t getELFOffset() const
@@ -127,209 +127,210 @@ public:
     return 0;
   }
 
-  // Offset in Shadow Image
+  // offset in Shadow Image
   uint64_t shadowOffs() const
   {
-    return ShadowOffs;
+    return _shadowOffs;
   }
 
-  // This needs to be set later...
-  void shadowOffs(uint64_t Offs) const
+  // this needs to be set later...
+  void shadowOffs(uint64_t offs) const
   {
-    ShadowOffs = Offs;
+    _shadowOffs = offs;
   }
-
-  // print "Section header" (used by dump)
-  static void header(llvm::raw_ostream &OS);
 
   // get string representation
   std::string str() const;
 
 protected:
-  ConstObjectPtr Obj;
-  std::string Name;
-  ConstSymbolPtrVec Symbols;
-  mutable uint64_t ShadowOffs = 0;
+  ConstObjectPtr _obj;
+  std::string _name;
+  ConstSymbolPtrVec _symbols;
+  mutable uint64_t _shadowOffs = 0;
 };
 
+
+/// CommonSection
 
 class CommonSection : public Section
 {
 public:
   // ctor
-  CommonSection(ConstObjectPtr Obj) :
-    Section(Obj, ".common")
+  CommonSection(ConstObjectPtr obj) :
+    Section(obj, ".common")
   {}
 
-  // Size
+  // size
   uint64_t size() const override
   {
-    return Size;
+    return _size;
   }
 
-  // Type
+  // type
   bool isCommon() const override
   {
     return true;
   }
 
-  // Set symbols
-  void symbols(ConstSymbolPtrVec &&S) override;
+  // set symbols
+  void symbols(ConstSymbolPtrVec&& s) override;
 
 private:
-  uint64_t Size = 0;
+  uint64_t _size = 0;
 };
+
+
+/// LLVMSection
 
 class LLVMSection : public Section
 {
 public:
   // ctor
   LLVMSection(
-    ConstObjectPtr Obj,
-    llvm::object::SectionRef Sec,
-    llvm::Error &E);
+    ConstObjectPtr obj,
+    llvm::object::SectionRef sec,
+    llvm::Error& err);
 
-  // Get llvm::object::SectionRef
+  // get llvm::object::SectionRef
   const llvm::object::SectionRef section() const override
   {
-    return Sec;
+    return _sec;
   }
 
-  // Address
+  // address
   uint64_t address() const override
   {
-    return Sec.getAddress();
+    return _sec.getAddress();
   }
 
-  // Size
+  // size
   uint64_t size() const override
   {
-    return Sec.getSize();
+    return _sec.getSize();
   }
 
-  // Type
+  // type
 
   bool isText() const override
   {
-    return Sec.isText();
+    return _sec.isText();
   }
 
   bool isData() const override
   {
-    return Sec.isData();
+    return _sec.isData();
   }
 
   bool isBSS() const override
   {
-    return Sec.isBSS();
+    return _sec.isBSS();
   }
 
-  // Contents
-  std::error_code contents(llvm::StringRef &S) const override
+  // contents
+  llvm::Error contents(llvm::StringRef& s) const override
   {
-    return Sec.getContents(S);
+    return llvm::errorCodeToError(_sec.getContents(s));
   }
 
   // ELFOffset
   uint64_t getELFOffset() const override;
 
 private:
-  ConstObjectPtr Obj;
-  llvm::object::SectionRef Sec;
-  mutable uint64_t ShadowOffs = 0;
+  llvm::object::SectionRef _sec;
 };
 
+
 /// Symbol
+
 class Symbol
 {
 public:
-  typedef llvm::object::SymbolRef::Type Type;
+  using Type = llvm::object::SymbolRef::Type;
 
   // ctor
   Symbol(
-    ConstObjectPtr Obj,
-    llvm::object::SymbolRef Sym,
-    llvm::Error &E);
+    ConstObjectPtr obj,
+    llvm::object::SymbolRef sym,
+    llvm::Error& err);
 
-  // Name
-  const llvm::StringRef &name() const
+  // name
+  const llvm::StringRef& name() const
   {
-    return Name;
+    return _name;
   }
 
-  // Type
+  // type
   Type type() const
   {
-    return TheType;
+    return _type;
   }
 
-  // Section
+  // section
   ConstSectionPtr section() const
   {
-    return Sec;
+    return _sec;
   }
 
-  void section(ConstSectionPtr S)
+  void section(ConstSectionPtr s)
   {
-    Sec = S;
+    _sec = s;
   }
 
-  // Address
+  // address
   uint64_t address() const
   {
-    return Address;
+    return _address;
   }
 
-  void address(uint64_t Addr)
+  void address(uint64_t addr)
   {
-    Address = Addr;
+    _address = addr;
   }
 
-  // Flags
+  // flags
   uint32_t flags() const
   {
-    return Sym.getFlags();
+    return _sym.getFlags();
   }
 
   llvm::object::SymbolRef symbol() const
   {
-    return Sym;
+    return _sym;
   }
 
-  // CommonSize
+  // commonSize
   uint64_t commonSize() const
   {
-    return Sym.getCommonSize();
+    return _sym.getCommonSize();
   }
-
-  // print "Symbol header" (used by dump)
-  static void header(llvm::raw_ostream &OS);
 
   // get string representation
   std::string str() const;
 
 private:
-  ConstObjectPtr Obj;
-  llvm::object::SymbolRef Sym;
-  llvm::StringRef Name;
-  Type TheType;
-  ConstSectionPtr Sec;
-  uint64_t Address = 0;
+  ConstObjectPtr _obj;
+  llvm::object::SymbolRef _sym;
+  llvm::StringRef _name;
+  Type _type;
+  ConstSectionPtr _sec;
+  uint64_t _address = 0;
 };
 
+
 /// Relocation
+
 class Relocation
 {
 public:
   Relocation(
-    ConstObjectPtr Obj,
-    llvm::object::RelocationRef Reloc,
-    llvm::Error &E);
+    ConstObjectPtr obj,
+    llvm::object::RelocationRef reloc,
+    llvm::Error& err);
 
   // symbol
   ConstSymbolPtr symbol() const
   {
-    return Sym;
+    return _sym;
   }
 
   // section
@@ -337,42 +338,41 @@ public:
   {
     if (!symbol())
       return nullptr;
-    return Sym->section();
+    return _sym->section();
   }
 
   // offset
   uint64_t offset() const
   {
-    return Reloc.getOffset();
+    return _reloc.getOffset();
   }
 
   uint64_t type() const
   {
-    return Reloc.getType();
+    return _reloc.getType();
   }
 
   // type name
-  typedef llvm::SmallVector<char, 128> TypeVec;
+  using TypeVec = llvm::SmallVector<char, 128>;
   TypeVec typeName() const
   {
-    TypeVec V;
-    Reloc.getTypeName(V);
-    return V;
+    TypeVec vec;
+    _reloc.getTypeName(vec);
+    return vec;
   }
-
-  // print "Relocation header" (used by dump)
-  static void header(llvm::raw_ostream &OS);
 
   // get string representation
   std::string str() const;
 
 private:
-  ConstObjectPtr Obj;
-  llvm::object::RelocationRef Reloc;
-  ConstSymbolPtr Sym;
+  ConstObjectPtr _obj;
+  llvm::object::RelocationRef _reloc;
+  ConstSymbolPtr _sym;
 };
 
+
 /// Object
+
 class Object
 {
 public:
@@ -380,112 +380,112 @@ public:
   static void finish();
 
   // ctor
-  Object(const llvm::StringRef &FilePath, llvm::Error &E);
+  Object(const llvm::StringRef& filePath, llvm::Error& err);
 
   // disallow copies
-  Object(const Object &) = delete;
-  Object &operator=(const Object &) = delete;
+  Object(const Object&) = delete;
+  Object& operator=(const Object&) = delete;
 
   // but allow move construction
-  Object(Object &&) = default;
+  Object(Object&&) = default;
 
   // get sections
-  const NameToSectionMap &sections() const
+  const NameToSectionMap& sections() const
   {
-    return NameToSection;
+    return _nameToSection;
   }
 
   // get symbols
-  const NameToSymbolMap &symbols() const
+  const NameToSymbolMap& symbols() const
   {
-    return NameToSymbol;
+    return _nameToSymbol;
   }
 
   // get section by Name
-  ConstSectionPtr section(const llvm::StringRef &Name) const
+  ConstSectionPtr lookupSection(const llvm::StringRef& name) const
   {
-    const ConstSectionPtr *P = NameToSection[Name];
-    if (!P)
+    const ConstSectionPtr *p = _nameToSection[name];
+    if (!p)
       return ConstSectionPtr(nullptr);
     else
-      return *P;
+      return *p;
   }
 
   // get section by SectionRef
-  ConstSectionPtr section(const llvm::object::SectionRef &S) const
+  ConstSectionPtr lookupSection(const llvm::object::SectionRef& s) const
   {
-    const ConstSectionPtr *P = PtrToSection[S.getRawDataRefImpl().p];
-    if (!P)
+    const ConstSectionPtr* p = _ptrToSection[s.getRawDataRefImpl().p];
+    if (!p)
       return ConstSectionPtr(nullptr);
     else
-      return *P;
+      return *p;
   }
 
   // get symbol by Name
-  ConstSymbolPtr symbol(const llvm::StringRef &Name) const
+  ConstSymbolPtr lookupSymbol(const llvm::StringRef& name) const
   {
-    const ConstSymbolPtr *P = NameToSymbol[Name];
-    if (!P)
+    const ConstSymbolPtr *p = _nameToSymbol[name];
+    if (!p)
       return ConstSymbolPtr(nullptr);
     else
-      return *P;
+      return *p;
   }
 
   // get symbol by SymbolRef
-  ConstSymbolPtr symbol(const llvm::object::SymbolRef &S) const
+  ConstSymbolPtr lookupSymbol(const llvm::object::SymbolRef& s) const
   {
-    const ConstSymbolPtr *P = PtrToSymbol[S.getRawDataRefImpl().p];
-    if (!P)
+    const ConstSymbolPtr *p = _ptrToSymbol[s.getRawDataRefImpl().p];
+    if (!p)
       return ConstSymbolPtr(nullptr);
     else
-      return *P;
+      return *p;
   }
 
   // sectionEnd iterator
   llvm::object::section_iterator sectionEnd() const
   {
-    return Obj->section_end();
+    return _obj->section_end();
   }
 
   // symbolEnd iterator
   llvm::object::symbol_iterator symbolEnd() const
   {
-    return Obj->symbol_end();
+    return _obj->symbol_end();
   }
 
   // name of the object file
   const llvm::StringRef &fileName() const
   {
-    return FileName;
+    return _fileName;
   }
 
   // file format name
   llvm::StringRef fileFormatName() const
   {
-    return Obj->getFileFormatName();
+    return _obj->getFileFormatName();
   }
 
   // relocs
   const ConstRelocationPtrVec relocs() const
   {
-    return Relocs;
+    return _relocs;
   }
 
   // dump object contents to stdout
   void dump() const;
 
 private:
-  llvm::object::OwningBinary<llvm::object::Binary> OB;
-  llvm::object::ObjectFile *Obj;
-  llvm::StringRef FileName;
+  llvm::object::OwningBinary<llvm::object::Binary> _ownBin;
+  llvm::object::ObjectFile *_obj;
+  llvm::StringRef _fileName;
 
   // maps
-  NameToSymbolMap NameToSymbol;
-  NameToSectionMap NameToSection;
-  PtrToSymbolMap PtrToSymbol;
-  PtrToSectionMap PtrToSection;
+  NameToSymbolMap _nameToSymbol;
+  NameToSectionMap _nameToSection;
+  PtrToSymbolMap _ptrToSymbol;
+  PtrToSectionMap _ptrToSection;
 
-  ConstRelocationPtrVec Relocs;
+  ConstRelocationPtrVec _relocs;
 
   // initialize everything
   llvm::Error readSymbols();

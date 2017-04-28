@@ -6,59 +6,59 @@
 
 namespace sbt {
 
-const std::string *BIN_NAME = nullptr;
-const std::string *LIBC_BC = nullptr;
+const std::string* BIN_NAME = nullptr;
+const std::string* LIBC_BC = nullptr;
 
 void initConstants()
 {
   BIN_NAME = new std::string("riscv-sbt");
 
-  std::string Path = getenv("PATH");
-  size_t P0 = 0;
-  size_t P1 = 0;
+  std::string path = getenv("PATH");
+  size_t p0 = 0;
+  size_t p1 = 0;
   // for each PATH dir
   do {
     // find next :
-    P1 = Path.find_first_of(':', P0);
+    p1 = path.find_first_of(':', p0);
 
     // get len
-    size_t Len;
-    if (P1 == std::string::npos)
-      Len = P1;
+    size_t len;
+    if (p1 == std::string::npos)
+      len = p1;
     else
-      Len = P1 - P0;
+      len = p1 - p0;
 
     // get dir
-    std::string Dir = Path.substr(P0, Len);
+    std::string dir = path.substr(p0, len);
 
     // update P0
-    if (P1 == std::string::npos)
-      P0 = P1;
-    else if (P1 == Path.size() - 1)
-      P0 = std::string::npos;
+    if (p1 == std::string::npos)
+      p0 = p1;
+    else if (p1 == path.size() - 1)
+      p0 = std::string::npos;
     else
-      P0 = P1 + 1;
-    if (Dir.empty())
+      p0 = p1 + 1;
+    if (dir.empty())
       continue;
 
     // check if riscv-sbt exists
-    std::string File = Dir + "/" + *BIN_NAME;
-    if (!llvm::sys::fs::exists(File))
+    std::string file = dir + "/" + *BIN_NAME;
+    if (!llvm::sys::fs::exists(file))
       continue;
 
     // strip last dir
-    size_t P = Dir.find_last_of('/');
-    if (P == std::string::npos)
+    size_t p = dir.find_last_of('/');
+    if (p == std::string::npos)
       continue;
 
-    std::string BaseDir = Dir.substr(0, P);
-    std::string ShareDir = BaseDir + "/share/" + *BIN_NAME;
-    std::string LibCBC = ShareDir + "/libc.bc";
-    if (llvm::sys::fs::exists(LibCBC)) {
-      LIBC_BC = new std::string(LibCBC);
+    std::string baseDir = dir.substr(0, p);
+    std::string shareDir = baseDir + "/share/" + *BIN_NAME;
+    std::string libCBC = shareDir + "/libc.bc";
+    if (llvm::sys::fs::exists(libCBC)) {
+      LIBC_BC = new std::string(libCBC);
       break;
     }
-  } while (P0 != std::string::npos);
+  } while (p0 != std::string::npos);
 
   // Note: LIBC_BC can be NULL if it was not found above
 }
