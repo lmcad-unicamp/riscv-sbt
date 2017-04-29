@@ -3,77 +3,32 @@ project (riscv-sbt)
 
 # get build options from llvm-config
 
-# CaptureStartOrSpace
-set (CStOrSp "\\(^\\| \\)")
-# CaptureNonSpace0ormore
-set (CNSp0 "\\([^ ]*\\)")
-# CaptureNonSpace1ormore
-set (CNSp1 "\\([^ ]\\+\\)")
-##
-# FilterD
-set (FilterD "s/${CStOrSp}-D[^ ]*//g")
-# FilterI
-set (FilterI "s/${CStOrSp}-I[^ ]*//g")
-# FilterNonI
-set (FilterNonI "s/${CStOrSp}-[^I][^ ]*//g")
-# FilterNonD
-set (FilterNonD "s/${CStOrSp}-[^D][^ ]*//g")
-# FilterNewLine
-set (FilterNL tr -d "\n")
-# Trim
-set (Trim "s/^ *//g;  s/ *$//g; s/ \\+/ /g")
-# Sep
-set (Sep "s/ /;/g")
-# FormatLibs
-set (FormatLibs "s/${CStOrSp}-l${CNSp1}/\\1\\2/g; ${Trim}; ${Sep}")
-
-# get BUILD_TYPE_DIR
-execute_process(
-  COMMAND echo ${CMAKE_BUILD_TYPE}
-  COMMAND sed "s/.*/\\l&/"
-  COMMAND ${FilterNL}
-  RESULT_VARIABLE RC1
-  OUTPUT_VARIABLE BUILD_TYPE_DIR
-)
-
-# set LLVM_CONFIG
-set (LLVM_CONFIG $ENV{TOPDIR}/toolchain/${BUILD_TYPE_DIR}/bin/llvm-config)
+set (LLVM_CONFIG "$ENV{TOPDIR}/scripts/llvm-config.sh")
 
 # include dirs
 execute_process(
-  COMMAND ${LLVM_CONFIG} --cxxflags
-  COMMAND sed "s/${CStOrSp}-I${CNSp1}/\\1\\2/g; ${FilterNonI}; ${Trim}; ${Sep}"
-  COMMAND ${FilterNL}
+  COMMAND ${LLVM_CONFIG} --inc
   RESULT_VARIABLE RC1
   OUTPUT_VARIABLE SBT_INCLUDE_DIRS
 )
 
 # compile options
 execute_process(
-  COMMAND ${LLVM_CONFIG} --cxxflags
-  COMMAND sed "${FilterD}; ${FilterI}; ${Trim}; ${Sep}"
-  COMMAND ${FilterNL}
+  COMMAND ${LLVM_CONFIG} --flags
   RESULT_VARIABLE RC2
   OUTPUT_VARIABLE SBT_COMPILE_OPTIONS
 )
 
-set (DefsSed "s/${CStOrSp}-D${CNSp1}/\\1\\2/g; ${FilterNonD}; ${Trim}; ${Sep}; "
-  "s/NDEBUG;\\?//")
-
 # compile defs
 execute_process(
-  COMMAND ${LLVM_CONFIG} --cxxflags
-  COMMAND sed "${DefsSed}"
-  COMMAND ${FilterNL}
+  COMMAND ${LLVM_CONFIG} --defs
   RESULT_VARIABLE RC3
   OUTPUT_VARIABLE SBT_COMPILE_DEFINITIONS
 )
 
 # link dirs
 execute_process(
-  COMMAND ${LLVM_CONFIG} --ldflags
-  COMMAND sed "s/-L//g; ${Trim}; ${Sep}"
-  COMMAND ${FilterNL}
+  COMMAND ${LLVM_CONFIG} --link-dirs
   RESULT_VARIABLE RC4
   OUTPUT_VARIABLE SBT_LINK_DIRS
 )
@@ -81,24 +36,21 @@ execute_process(
 # sys libs
 execute_process(
   COMMAND ${LLVM_CONFIG} --system-libs
-  COMMAND sed "${FormatLibs}"
-  COMMAND ${FilterNL}
   RESULT_VARIABLE RC5
   OUTPUT_VARIABLE SBT_SYS_LIBS
 )
 
 # libs
 execute_process(
-  COMMAND ${LLVM_CONFIG} --libs arm bitwriter core object riscv support target x86
-  COMMAND sed "${FormatLibs}"
-  COMMAND ${FilterNL}
+  COMMAND ${LLVM_CONFIG} --libs arm bitwriter core object riscv
+    support target x86
   RESULT_VARIABLE RC6
   OUTPUT_VARIABLE SBT_LIBS
 )
 
 # abort if llvm-config failed
 if (RC1 OR RC2 OR RC3 OR RC4 OR RC5 OR RC6)
-  message(FATAL_ERROR "Failed to execute llvm-config")
+  message(FATAL_ERROR "Failed to execute llvm-config.sh")
 endif()
 
 set (SBT_RISCV_MASTER_LIBS
@@ -113,7 +65,6 @@ set (SBT_RISCV_MASTER_LIBS
 # set debug options
 message(STATUS "This is a ${CMAKE_BUILD_TYPE} build")
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-  #  set (SBT_COMPILE_OPTIONS ${SBT_COMPILE_OPTIONS} -g -O0 -rdynamic)
   set (CMAKE_VERBOSE_MAKEFILE ON)
   message(STATUS "SBT_INCLUDE_DIRS = [${SBT_INCLUDE_DIRS}]")
   message(STATUS "SBT_COMPILE_OPTIONS = [${SBT_COMPILE_OPTIONS}]")
