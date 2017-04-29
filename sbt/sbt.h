@@ -2,8 +2,8 @@
 #define SBT_SBT_H
 
 #include <llvm/IR/IRBuilder.h>
-#include <llvm/Support/Error.h>
 #include <llvm/Support/CommandLine.h>
+#include <llvm/Support/Error.h>
 
 #include <memory>
 #include <string>
@@ -34,16 +34,15 @@ public:
   static void init();
   static void finish();
 
-  // SBT factory
-  static llvm::Expected<SBT>
-  create(
-    const llvm::cl::list<std::string> &InputFiles,
-    const std::string &OutputFile);
+  // ctor
+  SBT(
+    const llvm::cl::list<std::string>& inputFiles,
+    const std::string& outputFile,
+    llvm::Error& err);
 
-  // allow move
-  SBT(SBT &&) = default;
-  // disallow copy
-  SBT(const SBT &) = delete;
+  // allow move only
+  SBT(SBT&&) = default;
+  SBT(const SBT&) = delete;
 
   // dtor
   ~SBT() = default;
@@ -57,38 +56,33 @@ public:
   // write generated IR to output file
   void write();
 
+  // generate Syscall handler
   llvm::Error genSCHandler();
 
 private:
-  std::vector<std::string> InputFiles;
-  std::string OutputFile;
+  std::vector<std::string> _inputFiles;
+  std::string _outputFile;
 
-  std::unique_ptr<llvm::LLVMContext> Context;
-  std::unique_ptr<llvm::IRBuilder<>> Builder;
-  std::unique_ptr<llvm::Module> Module;
-  std::unique_ptr<Translator> SBTTranslator;
+  std::unique_ptr<llvm::LLVMContext> _context;
+  std::unique_ptr<llvm::IRBuilder<>> _builder;
+  std::unique_ptr<llvm::Module> _module;
+  std::unique_ptr<Translator> _translator;
 
   // Target info
-  const llvm::Target *Target;
-  std::unique_ptr<const llvm::MCRegisterInfo> MRI;
-  std::unique_ptr<const llvm::MCAsmInfo> AsmInfo;
-  std::unique_ptr<const llvm::MCSubtargetInfo> STI;
-  std::unique_ptr<const llvm::MCObjectFileInfo> MOFI;
-  std::unique_ptr<llvm::MCContext> MC;
-  std::unique_ptr<const llvm::MCDisassembler> DisAsm;
-  std::unique_ptr<const llvm::MCInstrInfo> MII;
-  std::unique_ptr<llvm::MCInstPrinter> InstPrinter;
+  const llvm::Target* _target;
+  std::unique_ptr<const llvm::MCRegisterInfo> _mri;
+  std::unique_ptr<const llvm::MCAsmInfo> _asmInfo;
+  std::unique_ptr<const llvm::MCSubtargetInfo> _sti;
+  std::unique_ptr<const llvm::MCObjectFileInfo> _mofi;
+  std::unique_ptr<llvm::MCContext> _mc;
+  std::unique_ptr<const llvm::MCDisassembler> _disAsm;
+  std::unique_ptr<const llvm::MCInstrInfo> _mii;
+  std::unique_ptr<llvm::MCInstPrinter> _instPrinter;
 
   /// private member functions
 
-  // ctor
-  SBT(
-    const llvm::cl::list<std::string> &InputFiles,
-    const std::string &OutputFile,
-    llvm::Error &Err);
-
   // translate one file
-  llvm::Error translate(const std::string &File);
+  llvm::Error translate(const std::string& file);
 
   // generate hello world IR (for test only)
   llvm::Error genHello();

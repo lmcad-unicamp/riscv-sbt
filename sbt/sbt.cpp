@@ -38,10 +38,9 @@ extern "C" void LLVMInitializeRISCVMasterTarget();
 extern "C" void LLVMInitializeRISCVMasterTargetInfo();
 
 namespace llvm {
-Target &getTheRISCVMaster32Target();
+Target& getTheRISCVMaster32Target();
 }
 
-// SBT
 
 namespace sbt {
 
@@ -49,7 +48,7 @@ void SBT::init()
 {
   Object::init();
 
-  // Print stack trace if we signal out.
+  // print stack trace if we signal out
   sys::PrintStackTraceOnErrorSignal("");
 
   // Init LLVM targets
@@ -68,176 +67,169 @@ void SBT::init()
   // LLVMInitializeRISCVMasterTarget();
 }
 
+
 void SBT::finish()
 {
   llvm_shutdown();
   Object::finish();
 }
 
-Expected<SBT> SBT::create(
-    const llvm::cl::list<std::string> &InputFiles,
-    const std::string &OutputFile)
-{
-  Error Err = Error::success();
-  llvm::consumeError(std::move(Err));
-  SBT S(InputFiles, OutputFile, Err);
-  if (Err)
-    return std::move(Err);
-  return std::move(S);
-}
 
 SBT::SBT(
-  const cl::list<std::string> &InputFilesList,
-  const std::string &OutputFile,
-  Error &E)
+  const cl::list<std::string>& inputFilesList,
+  const std::string& outputFile,
+  Error& err)
   :
-  OutputFile(OutputFile),
-  Context(new LLVMContext),
-  Builder(new IRBuilder<>(*Context)),
-  Module(new llvm::Module("main", *Context)),
-  SBTTranslator(new Translator(&*Context, &*Builder, &*Module))
+  _outputFile(outputFile),
+  _context(new LLVMContext),
+  _builder(new IRBuilder<>(*_context)),
+  _module(new llvm::Module("main", *_context)),
+  _translator(new Translator(&*_context, &*_builder, &*_module))
 {
-  for (auto File : InputFilesList) {
-    if (!sys::fs::exists(File)) {
-      SBTError SE(File);
-      SE << "No such file.";
-      E = error(SE);
+  for (const auto& file : inputFilesList) {
+    if (!sys::fs::exists(file)) {
+      SBTError serr(file);
+      serr << "No such file.";
+      err = error(serr);
       return;
     }
-    InputFiles.push_back(File);
+    _inputFiles.push_back(file);
   }
 
-  SBTError SE;
-  auto error = [&E](SBTError &EE) {
-    E = sbt::error(std::move(EE));
+  SBTError serr;
+  auto error = [&err](SBTError& serr) {
+    err = sbt::error(std::move(serr));
   };
 
   // get target
-  Triple Triple("riscv32-unknown-elf");
-  std::string TripleName = Triple.getTriple();
+  Triple triple("riscv32-unknown-elf");
+  std::string tripleName = triple.getTriple();
   // logs() << "Triple: " << TripleName << "\n";
 
-  std::string StrError;
-  Target = &getTheRISCVMaster32Target();
+  _target = &getTheRISCVMaster32Target();
   // Target = TargetRegistry::lookupTarget(TripleName, StrError);
-  if (!Target) {
-    SE << "Target not found: " << TripleName << ": " << StrError;
-    error(SE);
+  if (!_target) {
+    serr << "Target not found: " << tripleName;
+    error(serr);
     return;
   }
 
-  MRI.reset(Target->createMCRegInfo(TripleName));
-  if (!MRI) {
-    SE << "No register info for target " << TripleName;
-    error(SE);
+  _mri.reset(_target->createMCRegInfo(tripleName));
+  if (!_mri) {
+    serr << "No register info for target " << tripleName;
+    error(serr);
     return;
   }
 
   // Set up disassembler.
-  AsmInfo.reset(Target->createMCAsmInfo(*MRI, TripleName));
-  if (!AsmInfo) {
-    SE << "No assembly info for target " << TripleName;
-    error(SE);
+  _asmInfo.reset(_target->createMCAsmInfo(*_mri, tripleName));
+  if (!_asmInfo) {
+    serr << "No assembly info for target " << tripleName;
+    error(serr);
     return;
   }
 
-  SubtargetFeatures Features;
-  STI.reset(
-      Target->createMCSubtargetInfo(TripleName, "", Features.getString()));
-  if (!STI) {
-    SE << "No subtarget info for target " << TripleName;
-    error(SE);
+  SubtargetFeatures features;
+  _sti.reset(
+      _target->createMCSubtargetInfo(tripleName, "", features.getString()));
+  if (!_sti) {
+    serr << "No subtarget info for target " << tripleName;
+    error(serr);
     return;
   }
 
-  MOFI.reset(new MCObjectFileInfo);
-  MC.reset(new MCContext(AsmInfo.get(), MRI.get(), MOFI.get()));
-  DisAsm.reset(Target->createMCDisassembler(*STI, *MC));
-  if (!DisAsm) {
-    SE << "No disassembler for target " << TripleName;
-    error(SE);
-  }
-
-  MII.reset(Target->createMCInstrInfo());
-  if (!MII) {
-    SE << "No instruction info for target " << TripleName;
-    error(SE);
+  _mofi.reset(new MCObjectFileInfo);
+  _mc.reset(new MCContext(_asmInfo.get(), _mri.get(), _mofi.get()));
+  _disAsm.reset(_target->createMCDisassembler(*_sti, *_mc));
+  if (!_disAsm) {
+    serr << "No disassembler for target " << tripleName;
+    error(serr);
     return;
   }
 
-  InstPrinter.reset(
-    Target->createMCInstPrinter(Triple, 0, *AsmInfo, *MII, *MRI));
-  if (!InstPrinter) {
-    SE << "No instruction printer for target " << TripleName;
-    error(SE);
+  _mii.reset(_target->createMCInstrInfo());
+  if (!_mii) {
+    serr << "No instruction info for target " << tripleName;
+    error(serr);
+    return;
+  }
+
+  _instPrinter.reset(
+    _target->createMCInstPrinter(triple, 0, *_asmInfo, *_mii, *_mri));
+  if (!_instPrinter) {
+    serr << "No instruction printer for target " << tripleName;
+    error(serr);
     return;
   }
 }
+
 
 Error SBT::run()
 {
   // genHello();
 
-  for (auto &F : InputFiles) {
-    Error E = translate(F);
-    if (E)
-      return E;
+  for (const auto& f : _inputFiles) {
+    Error err = translate(f);
+    if (err)
+      return err;
   }
 
-  if (llvm::verifyModule(*Module, &DBGS)) {
-    SBTError SE;
-    SE << "Translation produced invalid bitcode!";
+  if (llvm::verifyModule(*_module, &DBGS)) {
+    SBTError serr;
+    serr << "Translation produced invalid bitcode!";
     dump();
-    return error(SE);
+    return error(serr);
   }
 
   return Error::success();
 }
 
+
 void SBT::dump() const
 {
-  Module->dump();
+  _module->dump();
 }
+
 
 void SBT::write()
 {
-  std::error_code EC;
-  raw_fd_ostream OS(OutputFile, EC, sys::fs::F_None);
-  WriteBitcodeToFile(&*Module, OS);
-  OS.flush();
+  std::error_code ec;
+  raw_fd_ostream os(_outputFile, ec, sys::fs::F_None);
+  WriteBitcodeToFile(&*_module, os);
+  os.flush();
 }
 
 
-llvm::Error SBT::translate(const std::string &File)
+llvm::Error SBT::translate(const std::string& file)
 {
   // parse object file
-  auto ExpObj = sbt::create<Object>(File);
-  if (!ExpObj)
-    return ExpObj.takeError();
-  Object *Obj = &ExpObj.get();
-  SBTTranslator->setCurObj(Obj);
+  auto expObj = create<Object>(file);
+  if (!expObj)
+    return expObj.takeError();
+  Object *obj = &expObj.get();
+  _translator->setCurObj(obj);
 
-  SBTTranslator->setInstPrinter(&*InstPrinter);
-  SBTTranslator->setDisassembler(&*DisAsm);
-  SBTTranslator->setSTI(&*STI);
+  _translator->setInstPrinter(&*_instPrinter);
+  _translator->setDisassembler(&*_disAsm);
+  _translator->setSTI(&*_sti);
 
   // start module
-  if (Error E = SBTTranslator->startModule())
-    return E;
+  if (auto err = _translator->startModule())
+    return err;
 
   // translate each section
-  for (ConstSectionPtr Sec : Obj->sections()) {
-    if (auto E = SBTTranslator->translateSection(Sec))
-      return E;
+  for (ConstSectionPtr sec : obj->sections()) {
+    if (auto err = _translator->translateSection(sec))
+      return err;
 
     // finish any pending function
-    if (Error E = SBTTranslator->finishFunction())
-      return E;
+    if (Error err = _translator->finishFunction())
+      return err;
   }
 
   // finish module
-  if (Error E = SBTTranslator->finishModule())
-    return E;
+  if (auto err = _translator->finishModule())
+    return err;
 
   return Error::success();
 }
@@ -250,64 +242,65 @@ llvm::Error SBT::genHello()
   static const int SYS_WRITE = 4;
 
   // types
-  Type *Int8 = Type::getInt8Ty(*Context);
-  Type *Int32 = Type::getInt32Ty(*Context);
+  Type *Int8 = Type::getInt8Ty(*_context);
+  Type *Int32 = Type::getInt32Ty(*_context);
 
   // syscall
-  FunctionType *FTSyscall =
+  FunctionType *ftSyscall =
     FunctionType::get(Int32, { Int32, Int32 }, VAR_ARG);
-  Function *FSyscall = Function::Create(FTSyscall,
-      Function::ExternalLinkage, "syscall", &*Module);
+  Function *fSyscall = Function::Create(ftSyscall,
+      Function::ExternalLinkage, "syscall", &*_module);
 
   // set data
-  std::string Hello("Hello, World!\n");
-  GlobalVariable *Msg =
+  std::string hello("Hello, World!\n");
+  GlobalVariable *msg =
     new GlobalVariable(
-      *Module,
-      ArrayType::get(Int8, Hello.size()),
+      *_module,
+      ArrayType::get(Int8, hello.size()),
       CONSTANT,
       GlobalVariable::PrivateLinkage,
-      ConstantDataArray::getString(*Context, Hello.c_str(), !ADD_NULL),
+      ConstantDataArray::getString(*_context, hello.c_str(), !ADD_NULL),
       "msg");
 
   // _start
-  FunctionType *FTStart = FunctionType::get(Int32, {}, !VAR_ARG);
-  Function *FStart =
-    Function::Create(FTStart, Function::ExternalLinkage, "_start", &*Module);
+  FunctionType *ftStart = FunctionType::get(Int32, {}, !VAR_ARG);
+  Function *fStart =
+    Function::Create(ftStart, Function::ExternalLinkage, "_start", &*_module);
 
   // entry basic block
-  BasicBlock *BB = BasicBlock::Create(*Context, "entry", FStart);
-  Builder->SetInsertPoint(BB);
+  BasicBlock *bb = BasicBlock::Create(*_context, "entry", fStart);
+  _builder->SetInsertPoint(bb);
 
   // call write
-  Value *SC = ConstantInt::get(Int32, APInt(32, SYS_WRITE, SIGNED));
-  Value *FD = ConstantInt::get(Int32, APInt(32, 1, SIGNED));
-  Value *Ptr = Msg;
-  Value *Len = ConstantInt::get(Int32, APInt(32, Hello.size(), SIGNED));
-  std::vector<Value *> Args = { SC, FD, Ptr, Len };
-  Builder->CreateCall(FSyscall, Args);
+  Value *sc = ConstantInt::get(Int32, APInt(32, SYS_WRITE, SIGNED));
+  Value *fd = ConstantInt::get(Int32, APInt(32, 1, SIGNED));
+  Value *ptr = msg;
+  Value *len = ConstantInt::get(Int32, APInt(32, hello.size(), SIGNED));
+  std::vector<Value *> args = { sc, fd, ptr, len };
+  _builder->CreateCall(fSyscall, args);
 
   // call exit
-  SC = ConstantInt::get(Int32, APInt(32, SYS_EXIT, SIGNED));
-  Value *RC = ConstantInt::get(Int32, APInt(32, 0, SIGNED));
-  Args = { SC, RC };
-  Builder->CreateCall(FSyscall, Args);
-  Builder->CreateRet(RC);
+  sc = ConstantInt::get(Int32, APInt(32, SYS_EXIT, SIGNED));
+  Value *rc = ConstantInt::get(Int32, APInt(32, 0, SIGNED));
+  args = { sc, rc };
+  _builder->CreateCall(fSyscall, args);
+  _builder->CreateRet(rc);
 
-  // XXX Used for testing only, remove
-  Module->dump();
+  _module->dump();
   std::exit(EXIT_FAILURE);
 
   return Error::success();
 }
 
+
 Error SBT::genSCHandler()
 {
-  if (auto E = SBTTranslator->genSCHandler())
-    return E;
+  if (auto err = _translator->genSCHandler())
+    return err;
   write();
   return Error::success();
 }
+
 
 ///
 
@@ -319,21 +312,23 @@ struct SBTFinish
   }
 };
 
-static void handleError(Error &&E)
+
+static void handleError(Error&& err)
 {
-  Error E2 = llvm::handleErrors(std::move(E),
-    [](const SBTError &SE) {
-      SE.log(errs());
+  Error err2 = llvm::handleErrors(std::move(err),
+    [](const SBTError& serr) {
+      serr.log(errs());
       std::exit(EXIT_FAILURE);
     });
 
-  if (E2) {
-    logAllUnhandledErrors(std::move(E2), errs(), *BIN_NAME + ": error: ");
+  if (err2) {
+    logAllUnhandledErrors(std::move(err2), errs(), *BIN_NAME + ": error: ");
     std::exit(EXIT_FAILURE);
   }
 }
 
 } // sbt
+
 
 static void test()
 {
@@ -342,16 +337,17 @@ static void test()
 
   // ExitOnError ExitOnErr;
   SBT::init();
-  SBTFinish Finish;
-  StringRef FilePath = "sbt/test/rv32-main.o";
-  auto ExpObj = create<Object>(FilePath);
-  if (!ExpObj)
-    handleError(ExpObj.takeError());
+  SBTFinish finish;
+  StringRef filePath = "sbt/test/rv32-main.o";
+  auto expObj = create<Object>(filePath);
+  if (!expObj)
+    handleError(expObj.takeError());
   else
-    ExpObj.get().dump();
+    expObj.get().dump();
   std::exit(EXIT_FAILURE);
 #endif
 }
+
 
 int main(int argc, char *argv[])
 {
@@ -361,76 +357,76 @@ int main(int argc, char *argv[])
     ~DestroyConstants() {
       sbt::destroyConstants();
     }
-  } DestroyConstants;
+  } destroyConstants;
 
   // options
-  cl::list<std::string> InputFiles(
+  cl::list<std::string> inputFiles(
       cl::Positional,
       cl::desc("<input object files>"),
       cl::ZeroOrMore);
 
-  cl::opt<std::string> OutputFileOpt(
+  cl::opt<std::string> outputFileOpt(
       "o",
       cl::desc("output filename"));
 
-  cl::opt<bool> GenSCHandlerOpt(
+  cl::opt<bool> genSCHandlerOpt(
       "gen-sc-handler",
       cl::desc("generate syscall handler"));
 
-  cl::opt<bool> TestOpt("test");
+  cl::opt<bool> testOpt("test");
 
   // parse args
   cl::ParseCommandLineOptions(argc, argv);
 
   // gen syscall handlers
-  if (GenSCHandlerOpt) {
-    if (OutputFileOpt.empty()) {
+  if (genSCHandlerOpt) {
+    if (outputFileOpt.empty()) {
       errs() << *sbt::BIN_NAME
-        << ": Output file not specified.\n";
+        << ": output file not specified.\n";
       return 1;
     }
   // debug test
-  } else if (TestOpt) {
+  } else if (testOpt) {
     test();
   // translate
   } else {
-    if (InputFiles.empty()) {
-      errs() << *sbt::BIN_NAME << ": No input files.\n";
+    if (inputFiles.empty()) {
+      errs() << *sbt::BIN_NAME << ": no input files.\n";
       return 1;
     }
   }
 
   // set output file
-  std::string OutputFile;
-  if (OutputFileOpt.empty()) {
-    OutputFile = "x86-" + InputFiles.front();
+  std::string outputFile;
+  if (outputFileOpt.empty()) {
+    outputFile = inputFiles.front();
     // remove file extension
-    OutputFile = OutputFile.substr(0, OutputFile.find_last_of('.')) + ".bc";
+    outputFile = outputFile.substr(0, outputFile.find_last_of('.')) + ".bc";
   } else
-    OutputFile = OutputFileOpt;
+    outputFile = outputFileOpt;
 
   // start SBT
   sbt::SBT::init();
-  sbt::SBTFinish Finish;
+  sbt::SBTFinish fini;
 
   // create SBT
-  auto Exp = sbt::SBT::create(InputFiles, OutputFile);
-  if (!Exp)
-    sbt::handleError(Exp.takeError());
-  sbt::SBT &SBT = Exp.get();
+  auto exp = sbt::create<sbt::SBT>(inputFiles, outputFile);
+  if (!exp)
+    sbt::handleError(exp.takeError());
+  sbt::SBT& sbt = exp.get();
 
   // translate files
-  if (GenSCHandlerOpt) {
-    sbt::handleError(SBT.genSCHandler());
+  if (genSCHandlerOpt) {
+    sbt::handleError(sbt.genSCHandler());
     return EXIT_SUCCESS;
   } else
-    sbt::handleError(SBT.run());
+    sbt::handleError(sbt.run());
 
   // dump resulting IR
-  SBT.dump();
+  sbt.dump();
 
   // write IR to output file
-  SBT.write();
+  sbt.write();
 
   return EXIT_SUCCESS;
 }
