@@ -4,6 +4,7 @@
 #include "Constants.h"
 #include "Map.h"
 #include "Object.h"
+#include "Register.h"
 #include "SBTError.h"
 
 #include <llvm/MC/MCInst.h>
@@ -14,17 +15,16 @@
 #include <llvm/Support/FormatVariadic.h>
 
 namespace llvm {
-class LLVMContext;
 class Function;
 class FunctionType;
-class IntegerType;
 class GlobalVariable;
+class IntegerType;
+class LLVMContext;
 class MCDisassembler;
 class MCInst;
 class MCInstPrinter;
 class MCSubtargetInfo;
 class Module;
-class Target;
 class Value;
 }
 
@@ -32,419 +32,197 @@ namespace sbt {
 
 class Translator
 {
-  // RISC-V ABI
-  static const unsigned RV_ZERO = 0;
-  static const unsigned RV_RA = 1;    // Return address
-  static const unsigned RV_SP = 2;    // Stack pointer
-  static const unsigned RV_GP = 3;    // Global pointer
-  static const unsigned RV_TP = 4;    // Thread pointer
-  static const unsigned RV_T0 = 5;    // Temporaries
-  static const unsigned RV_T1 = 6;
-  static const unsigned RV_T2 = 7;
-  static const unsigned RV_S0 = 8;    // Saved register
-  static const unsigned RV_FP = 8;    // Frame pointer
-  static const unsigned RV_S1 = 9;
-  static const unsigned RV_A0 = 10;   // Function argument 0/return value 0
-  static const unsigned RV_A1 = 11;   // Function argument 1/return value 1
-  static const unsigned RV_A2 = 12;   // Function arguments
-  static const unsigned RV_A3 = 13;
-  static const unsigned RV_A4 = 14;
-  static const unsigned RV_A5 = 15;
-  static const unsigned RV_A6 = 16;
-  static const unsigned RV_A7 = 17;
-  static const unsigned RV_S2 = 18;
-  static const unsigned RV_S3 = 19;
-  static const unsigned RV_S4 = 20;
-  static const unsigned RV_S5 = 21;
-  static const unsigned RV_S6 = 22;
-  static const unsigned RV_S7 = 23;
-  static const unsigned RV_S8 = 24;
-  static const unsigned RV_S9 = 25;
-  static const unsigned RV_S10 = 26;
-  static const unsigned RV_S11 = 27;
-  static const unsigned RV_T3 = 28;
-  static const unsigned RV_T4 = 29;
-  static const unsigned RV_T5 = 30;
-  static const unsigned RV_T6 = 31;
-
-  static std::string regName(unsigned Reg, bool ABI = true)
-  {
-    if (!ABI) {
-      std::string S;
-      llvm::raw_string_ostream SS(S);
-      SS << "x" << Reg;
-      return SS.str();
-    }
-
-    switch (Reg) {
-    case RV_ZERO: return "zero";
-    case RV_RA:   return "ra";
-    case RV_SP:   return "sp";
-    case RV_GP:   return "gp";
-    case RV_TP:   return "tp";
-    case RV_T0:   return "t0";
-    case RV_T1:   return "t1";
-    case RV_T2:   return "t2";
-    case RV_FP:   return "fp";
-    case RV_S1:   return "s1";
-    case RV_A0:   return "a0";
-    case RV_A1:   return "a1";
-    case RV_A2:   return "a2";
-    case RV_A3:   return "a3";
-    case RV_A4:   return "a4";
-    case RV_A5:   return "a5";
-    case RV_A6:   return "a6";
-    case RV_A7:   return "a7";
-    case RV_S2:   return "s2";
-    case RV_S3:   return "s3";
-    case RV_S4:   return "s4";
-    case RV_S5:   return "s5";
-    case RV_S6:   return "s6";
-    case RV_S7:   return "s7";
-    case RV_S8:   return "s8";
-    case RV_S9:   return "s9";
-    case RV_S10:  return "s10";
-    case RV_S11:  return "s11";
-    case RV_T3:   return "t3";
-    case RV_T4:   return "t4";
-    case RV_T5:   return "t5";
-    case RV_T6:   return "t6";
-    default:      return "??";
-    }
-  }
-
-  // CSRs
-  static const unsigned RDCYCLE = 0xC00;
-  static const unsigned RDCYCLEH = 0xC80;
-  static const unsigned RDTIME = 0xC01;
-  static const unsigned RDTIMEH = 0xC81;
-  static const unsigned RDINSTRET = 0xC02;
-  static const unsigned RDINSTRETH = 0xC82;
-
+public:
   static const size_t InstrSize = 4;
 
-public:
+  // ctor
   Translator(
-    llvm::LLVMContext *Ctx,
-    llvm::IRBuilder<> *Bldr,
-    llvm::Module *Mod);
+    llvm::LLVMContext *ctx,
+    llvm::IRBuilder<> *bldr,
+    llvm::Module *mod);
 
-  Translator(Translator &&) = default;
-  Translator(const Translator &) = delete;
+  // move only
+  Translator(Translator&&) = default;
+  Translator(const Translator&) = delete;
 
+  // gen syscall handler
   llvm::Error genSCHandler();
 
-  // translate one instruction
-  llvm::Error translate(const llvm::MCInst &Inst);
+  // translate file
+  llvm::Error translate(const std::string& file);
 
-  llvm::Error translateSection(ConstSectionPtr Sec);
-  llvm::Error translateSymbol(size_t SI);
-  llvm::Error translateInstrs(uint64_t Begin, uint64_t End);
+  // setters
 
-  llvm::Error startModule();
-  llvm::Error finishModule();
-
-  llvm::Expected<llvm::Function *> createFunction(llvm::StringRef Name);
-  llvm::Error startMain(llvm::StringRef Name, uint64_t Addr);
-  llvm::Error startFunction(llvm::StringRef Name, uint64_t Addr);
-  llvm::Error finishFunction();
-
-  llvm::Error startup();
-
-  llvm::Expected<uint64_t> import(llvm::StringRef Func);
-
-  void setCurAddr(uint64_t Addr)
+  void setDisassembler(const llvm::MCDisassembler* d)
   {
-    CurAddr = Addr;
+    _disAsm = d;
   }
 
-  void setCurObj(ConstObjectPtr Obj)
+  void setInstPrinter(llvm::MCInstPrinter* p)
   {
-    CurObj = Obj;
+    _instPrinter = p;
   }
 
-  void setCurSection(ConstSectionPtr Section)
+  void setSTI(const llvm::MCSubtargetInfo* s)
   {
-    CurSection = Section;
-  }
-
-  void setTarget(const llvm::Target *T)
-  {
-    TheTarget = T;
-  }
-
-  void setDisassembler(const llvm::MCDisassembler *D)
-  {
-    DisAsm = D;
-  }
-
-  void setInstPrinter(llvm::MCInstPrinter *P)
-  {
-    InstPrinter = P;
-  }
-
-  void setSTI(const llvm::MCSubtargetInfo *S)
-  {
-    STI = S;
-  }
-
-  typedef decltype(ConstRelocationPtrVec().cbegin()) ConstRelocIter;
-  void setRelocIters(ConstRelocIter RI, ConstRelocIter RE)
-  {
-    this->RI = RI;
-    this->RE = RE;
-    this->RLast = RI;
-  }
-
-  bool inFunc() const
-  {
-    return CurFunc;
+    _sti = s;
   }
 
 private:
-  // Constants
-  llvm::IntegerType *I32;
-  llvm::IntegerType *I16;
-  llvm::IntegerType *I8;
-  llvm::Type *I32Ptr;
-  llvm::Type *I16Ptr;
-  llvm::Type *I8Ptr;
-  llvm::Value *ZERO;
-  llvm::Type *Void;
-  llvm::FunctionType *VoidFun;
-  const std::string IR_XREGNAME = "x";
 
-  // Data
-  llvm::LLVMContext *Context;
-  llvm::IRBuilder<> *Builder;
-  llvm::Module *Module;
-  llvm::Value *X[32];
-  llvm::FunctionType *FTRVSC;
-  llvm::Function *FRVSC;
-  std::unique_ptr<llvm::Module> LCModule;
-  const llvm::Target *TheTarget = nullptr;
-  const llvm::MCDisassembler *DisAsm = nullptr;
-  llvm::MCInstPrinter *InstPrinter = nullptr;
-  const llvm::MCSubtargetInfo *STI = nullptr;
+  // types
 
-  enum State {
-    ST_DFL,
-    ST_PADDING
-  } State = ST_DFL;
+  enum ALUOp {
+    ADD,
+    AND,
+    MUL,
+    OR,
+    SLL,
+    SLT,
+    SRA,
+    SRL,
+    SUB,
+    XOR
+  };
 
-  uint64_t CurAddr;
-  ConstObjectPtr CurObj = nullptr;
-  ConstSectionPtr CurSection;
-  llvm::ArrayRef<uint8_t> CurSectionBytes;
-  ConstRelocIter RI;
-  ConstRelocIter RE;
-  ConstRelocIter RLast;
-  llvm::Instruction *First = nullptr;
-  llvm::Function *CurFunc = nullptr;
+  enum ALUOpFlags {
+    AF_NONE = 0,
+    AF_IMM = 1,
+    AF_UNSIGNED = 2
+  };
 
-  llvm::GlobalVariable *ShadowImage = nullptr;
-  llvm::GlobalVariable *Stack = nullptr;
-  llvm::Value *StackEnd = nullptr;
-  size_t StackSize = 4096;
+  enum UIOp {
+    AUIPC,
+    LUI
+  };
 
-  // Relocation Info
-  struct SymbolReloc
+  enum IntType {
+    S8,
+    U8,
+    S16,
+    U16,
+    U32
+  };
+
+  enum BranchType {
+    JAL,
+    JALR,
+    BEQ,
+    BNE,
+    BGE,
+    BGEU,
+    BLT,
+    BLTU
+  };
+
+  enum CSROp {
+    RW,
+    RS,
+    RC
+  };
+
+  using ConstRelocIter = ConstRelocationPtrVec::const_iterator;
+
+  // Symbol
+
+  class Symbol
   {
-    bool IsValid = false;
-    std::string Name;
-    uint64_t Addr = 0;
-    ConstSectionPtr Sec = nullptr;
-    uint64_t Val = 0;
+  public:
+    const std::string& name() const
+    {
+      return _name;
+    }
+
+    uint64_t addr() const
+    {
+      return _addr;
+    }
+
+    uint64_t val() const
+    {
+      return _val;
+    }
+
+    ConstSectionPtr sec() const
+    {
+      return _sec;
+    }
 
     bool isExternal() const
     {
-      return IsValid && Addr == 0 && !Sec;
+      return addr() == 0 && !sec();
     }
+
+  private:
+    std::string _name;
+    uint64_t _addr = 0;
+    uint64_t _val = 0;
+    ConstSectionPtr _sec = nullptr;
   };
 
-  struct LastImm
+  // Immediate
+
+  struct Imm
   {
-    bool IsSym;
-    SymbolReloc SymRel;
-  } LastImm;
+    bool isSym;
+    Symbol sym;
+  };
 
-  SymbolReloc XSyms[32];
+  // State
 
-  ConstSectionPtr BSS = nullptr;
-  size_t BSSSize = 0;
+  enum TranslationState {
+    ST_DFL,
+    ST_PADDING
+  };
 
-  ///
+  // per program state
+  bool _inMain = false;
 
-  bool InMain = false;
-
-  Map<uint64_t, llvm::BasicBlock *> BBMap;
-  Map<uint64_t, llvm::Instruction *> InstrMap;
-  Map<llvm::Function *, uint64_t> FunMap;
-  uint64_t NextBB = 0;
-  bool BrWasLast = false;
-
-  // icaller
-  std::vector<llvm::Function *> FunTable;
-  llvm::Function *ICaller = nullptr;
-  uint64_t ExtFunAddr = 0;
-
-  llvm::Function *GetCycles = nullptr;
-  llvm::Function *GetTime = nullptr;
-  llvm::Function *InstRet = nullptr;
-
-  // Methods
-  llvm::Error declOrBuildRegisterFile(bool decl);
-
-  llvm::Error declRegisterFile()
+  struct Module
   {
-    return declOrBuildRegisterFile(true);
-  }
+    llvm::Error startModule();
+    llvm::Error finishModule();
 
-  llvm::Error buildRegisterFile()
+    TranslationState _state = ST_DFL;
+    ConstObjectPtr _obj = nullptr;
+    Map<llvm::Function *, uint64_t> _funMap;
+    std::vector<llvm::Function *> _funTable;
+    // icaller
+    llvm::Function *ICaller = nullptr;
+    uint64_t ExtFunAddr = 0;
+  };
+
+  struct Section
   {
-    return declOrBuildRegisterFile(false);
-  }
+    void setRelocIters(ConstRelocIter RI, ConstRelocIter RE)
+    {
+      _ri = RI;
+      _re = RE;
+      _rlast = RI;
+    }
 
-  llvm::Error buildShadowImage();
-  void declSyscallHandler();
-  llvm::Error genSyscallHandler();
-  llvm::Error buildStack();
+    ConstSectionPtr _section;
+    llvm::ArrayRef<uint8_t> _sectionBytes;
+    llvm::Function* _func = nullptr;
+    ConstRelocIter _ri;
+    ConstRelocIter _re;
+    ConstRelocIter _rlast;
+  };
 
-  llvm::Error handleSyscall();
-
-  llvm::Error genICaller();
-
-  // Helpers
-
-  void updateFirst(llvm::Value *V)
+  class Function
   {
-    if (!First)
-      First = llvm::dyn_cast<llvm::Instruction>(V);
-  }
+    llvm::Expected<llvm::Function *> createFunction(llvm::StringRef Name);
+    llvm::Error startMain(llvm::StringRef Name, uint64_t Addr);
+    llvm::Error startFunction(llvm::StringRef Name, uint64_t Addr);
+    llvm::Error finishFunction();
+    llvm::Expected<uint64_t> import(llvm::StringRef func);
 
-  // Load register
-  llvm::LoadInst *load(unsigned Reg)
-  {
-    llvm::LoadInst *I = Builder->CreateLoad(X[Reg], X[Reg]->getName() + "_");
-    updateFirst(I);
-    return I;
-  }
-
-  // Store value to register
-  llvm::StoreInst *store(llvm::Value *V, unsigned Reg)
-  {
-    if (Reg == 0)
-      return nullptr;
-
-    llvm::StoreInst *I = Builder->CreateStore(V, X[Reg], !VOLATILE);
-    updateFirst(I);
-    return I;
-  }
-
-  // Add
-  llvm::Value *add(llvm::Value *O1, llvm::Value *O2)
-  {
-    llvm::Value *V = Builder->CreateAdd(O1, O2);
-    updateFirst(V);
-    return V;
-  }
-
-  // nop
-  void nop()
-  {
-    load(RV_ZERO);
-  }
-
-  // Get RISC-V register number
-  static unsigned RVReg(unsigned Reg);
-
-  // Get RD
-  unsigned getRD(const llvm::MCInst &Inst, llvm::raw_ostream &SS)
-  {
-    return getRegNum(0, Inst, SS);
-  }
-
-  // GetRegNum
-  unsigned getRegNum(
-    unsigned Num,
-    const llvm::MCInst &Inst,
-    llvm::raw_ostream &SS)
-  {
-    const llvm::MCOperand &R = Inst.getOperand(Num);
-    unsigned NR = RVReg(R.getReg());
-    SS << regName(NR) << ", ";
-    return NR;
-  }
-
-  // Get register
-  llvm::Value *getReg(
-    const llvm::MCInst &Inst,
-    int Op,
-    llvm::raw_ostream &SS)
-  {
-    const llvm::MCOperand &OR = Inst.getOperand(Op);
-    unsigned NR = RVReg(OR.getReg());
-    llvm::Value *V;
-    if (NR == 0)
-      V = ZERO;
-    else
-      V = load(NR);
-
-    SS << regName(NR);
-    if (Op < 2)
-       SS << ", ";
-    return V;
-  }
-
-  // Get register or immediate
-  llvm::Expected<llvm::Value *> getRegOrImm(
-    const llvm::MCInst &Inst,
-    int Op,
-    llvm::raw_ostream &SS)
-  {
-    const llvm::MCOperand &O = Inst.getOperand(Op);
-    if (O.isReg())
-      return getReg(Inst, Op, SS);
-    else if (O.isImm())
-      return getImm(Inst, Op, SS);
-    else
-      llvm_unreachable("Operand is neither a Reg nor Imm");
-  }
-
-  // Get immediate
-  llvm::Expected<llvm::Value *> getImm(
-    const llvm::MCInst &Inst,
-    int Op,
-    llvm::raw_ostream &SS)
-  {
-    auto ExpV = handleRelocation(SS);
-    if (!ExpV)
-      return ExpV.takeError();
-    llvm::Value *V = ExpV.get();
-    if (V)
-      return V;
-
-    int64_t Imm = Inst.getOperand(Op).getImm();
-    V = llvm::ConstantInt::get(I32, Imm);
-    SS << llvm::formatv("0x{0:X-4}", uint32_t(Imm));
-    return V;
-  }
-
-  llvm::Value *i8PtrToI32(llvm::Value *V8)
-  {
-    // Cast to int32_t *
-    llvm::Value *V =
-      Builder->CreateCast(llvm::Instruction::CastOps::BitCast,
-        V8, llvm::Type::getInt32PtrTy(*Context));
-    updateFirst(V);
-    // Cast to int32_t
-    V = Builder->CreateCast(llvm::Instruction::CastOps::PtrToInt,
-      V, I32);
-    updateFirst(V);
-    return V;
-  }
-
-  llvm::Expected<llvm::Value *> handleRelocation(llvm::raw_ostream &SS);
+    uint64_t _addr = 0;
+    Map<uint64_t, llvm::BasicBlock *> _bbMap;
+    Map<uint64_t, llvm::Instruction *> _instrMap;
+    uint64_t _nextBB = 0;
+    bool _brWasLast = false;
+  };
 
   class SBTBasicBlock
   {
@@ -476,27 +254,238 @@ private:
       DBGS << name << ":\n";
       return llvm::BasicBlock::Create(context, name, f, beforeBB);
     }
+
+    llvm::BasicBlock *splitBB(
+      llvm::BasicBlock *BB,
+      uint64_t Addr);
+
+    void updateNextBB(uint64_t Addr)
+    {
+      if (NextBB <= CurAddr || Addr < NextBB)
+        NextBB = Addr;
+    }
   };
 
+  struct Instruction
+  {
+    // get RD
+    unsigned getRD(const llvm::MCInst &Inst, llvm::raw_ostream &SS)
+    {
+      return getRegNum(0, Inst, SS);
+    }
 
-  enum ALUOp {
-    ADD,
-    AND,
-    MUL,
-    OR,
-    SLL,
-    SLT,
-    SRA,
-    SRL,
-    SUB,
-    XOR
+    // GetRegNum
+    unsigned getRegNum(
+      unsigned Num,
+      const llvm::MCInst &Inst,
+      llvm::raw_ostream &SS)
+    {
+      const llvm::MCOperand &R = Inst.getOperand(Num);
+      unsigned NR = RVReg(R.getReg());
+      SS << regName(NR) << ", ";
+      return NR;
+    }
+
+    // Get register
+    llvm::Value *getReg(
+      const llvm::MCInst &Inst,
+      int Op,
+      llvm::raw_ostream &SS)
+    {
+      const llvm::MCOperand &OR = Inst.getOperand(Op);
+      unsigned NR = RVReg(OR.getReg());
+      llvm::Value *V;
+      if (NR == 0)
+        V = ZERO;
+      else
+        V = load(NR);
+
+      SS << regName(NR);
+      if (Op < 2)
+         SS << ", ";
+      return V;
+    }
+
+    // Get register or immediate
+    llvm::Expected<llvm::Value *> getRegOrImm(
+      const llvm::MCInst &Inst,
+      int Op,
+      llvm::raw_ostream &SS)
+    {
+      const llvm::MCOperand &O = Inst.getOperand(Op);
+      if (O.isReg())
+        return getReg(Inst, Op, SS);
+      else if (O.isImm())
+        return getImm(Inst, Op, SS);
+      else
+        llvm_unreachable("Operand is neither a Reg nor Imm");
+    }
+
+    // Get immediate
+    llvm::Expected<llvm::Value *> getImm(
+      const llvm::MCInst &Inst,
+      int Op,
+      llvm::raw_ostream &SS)
+    {
+      auto ExpV = handleRelocation(SS);
+      if (!ExpV)
+        return ExpV.takeError();
+      llvm::Value *V = ExpV.get();
+      if (V)
+        return V;
+
+      int64_t Imm = Inst.getOperand(Op).getImm();
+      V = llvm::ConstantInt::get(I32, Imm);
+      SS << llvm::formatv("0x{0:X-4}", uint32_t(Imm));
+      return V;
+    }
+
+
+    // per instruction state
+    llvm::Instruction* _first = nullptr;
+    Imm _lastImm;
   };
 
-  enum ALUOpFlags {
-    AF_NONE = 0,
-    AF_IMM = 1,
-    AF_UNSIGNED = 2
+  // Builder
+
+  struct Builder
+  {
+    void updateFirst(llvm::Value *V)
+    {
+      if (!First)
+        First = llvm::dyn_cast<llvm::Instruction>(V);
+    }
+
+    // Load register
+    llvm::LoadInst *load(unsigned Reg)
+    {
+      llvm::LoadInst *I = Builder->CreateLoad(X[Reg], X[Reg]->getName() + "_");
+      updateFirst(I);
+      return I;
+    }
+
+    // Store value to register
+    llvm::StoreInst *store(llvm::Value *V, unsigned Reg)
+    {
+      if (Reg == 0)
+        return nullptr;
+
+      llvm::StoreInst *I = Builder->CreateStore(V, X[Reg], !VOLATILE);
+      updateFirst(I);
+      return I;
+    }
+
+    // Add
+    llvm::Value *add(llvm::Value *O1, llvm::Value *O2)
+    {
+      llvm::Value *V = Builder->CreateAdd(O1, O2);
+      updateFirst(V);
+      return V;
+    }
+
+    // nop
+    void nop()
+    {
+      load(RV_ZERO);
+    }
+
+    llvm::Value *i8PtrToI32(llvm::Value *V8)
+    {
+      // Cast to int32_t *
+      llvm::Value *V =
+        Builder->CreateCast(llvm::Instruction::CastOps::BitCast,
+          V8, llvm::Type::getInt32PtrTy(*Context));
+      updateFirst(V);
+      // Cast to int32_t
+      V = Builder->CreateCast(llvm::Instruction::CastOps::PtrToInt,
+        V, I32);
+      updateFirst(V);
+      return V;
+    }
   };
+
+  // data
+
+  // set by ctor
+  llvm::LLVMContext *_ctx;
+  llvm::IRBuilder<> *_builder;
+  llvm::Module *_module;
+
+  // set by sbt
+  const llvm::MCDisassembler *_disAsm = nullptr;
+  llvm::MCInstPrinter *_instPrinter = nullptr;
+  const llvm::MCSubtargetInfo *_sti = nullptr;
+
+  // internal
+
+  // libC module
+  std::unique_ptr<llvm::Module> _lcModule;
+
+  // image stuff
+  llvm::GlobalVariable* _shadowImage = nullptr;
+  llvm::GlobalVariable* _stack = nullptr;
+  llvm::Value* _stackEnd = nullptr;
+  size_t _stackSize = 4096;
+  ConstSectionPtr _bss = nullptr;
+  size_t _bssSize = 0;
+
+  // riscv syscall function
+  llvm::FunctionType* ftRVSC;
+  llvm::Function* fRVSC;
+
+  // host dependent ops
+  llvm::Function* _getCycles = nullptr;
+  llvm::Function* _getTime = nullptr;
+  llvm::Function* _instRet = nullptr;
+
+  //
+  // Methods
+  //
+
+  llvm::Error startup();
+
+
+  bool inFunc() const
+  {
+    return _func;
+  }
+
+  // register file
+
+  llvm::Error declOrBuildRegisterFile(bool decl);
+
+  llvm::Error declRegisterFile()
+  {
+    return declOrBuildRegisterFile(true);
+  }
+
+  llvm::Error buildRegisterFile()
+  {
+    return declOrBuildRegisterFile(false);
+  }
+
+  // image
+  llvm::Error buildShadowImage();
+  llvm::Error buildStack();
+
+  // syscall handler
+  void declSyscallHandler();
+  llvm::Error genSyscallHandler();
+  llvm::Error handleSyscall();
+
+  // indirect function caller
+  llvm::Error genICaller();
+
+  llvm::Expected<llvm::Value*> handleRelocation(llvm::raw_ostream &SS);
+
+  // translation
+
+  llvm::Error translateSection(ConstSectionPtr sec);
+  llvm::Error translateSymbol(size_t si);
+  llvm::Error translateInstrs(uint64_t begin, uint64_t end);
+  llvm::Error translateInstr(const llvm::MCInst& inst);
+
+  // ALU op
 
   llvm::Error translateALUOp(
     const llvm::MCInst &Inst,
@@ -504,23 +493,12 @@ private:
     uint32_t Flags,
     llvm::raw_string_ostream &SS);
 
-  enum UIOp {
-    AUIPC,
-    LUI
-  };
-
   llvm::Error translateUI(
     const llvm::MCInst &Inst,
     UIOp UOP,
     llvm::raw_string_ostream &SS);
 
-  enum IntType {
-    S8,
-    U8,
-    S16,
-    U16,
-    U32
-  };
+  // load/store
 
   llvm::Error translateLoad(
     const llvm::MCInst &Inst,
@@ -531,17 +509,6 @@ private:
     const llvm::MCInst &Inst,
     IntType IT,
     llvm::raw_string_ostream &SS);
-
-  enum BranchType {
-    JAL,
-    JALR,
-    BEQ,
-    BNE,
-    BGE,
-    BGEU,
-    BLT,
-    BLTU
-  };
 
   // branch/jump/call handlers
 
@@ -559,30 +526,17 @@ private:
     llvm::Value *Target,
     unsigned LinkReg);
 
-  llvm::BasicBlock *splitBB(
-    llvm::BasicBlock *BB,
-    uint64_t Addr);
-
   llvm::Error handleCall(uint64_t Target);
   llvm::Error handleICall(llvm::Value *Target);
   llvm::Error handleCallExt(llvm::Value *Target);
-
-  void updateNextBB(uint64_t Addr)
-  {
-    if (NextBB <= CurAddr || Addr < NextBB)
-      NextBB = Addr;
-  }
 
   // fence
   llvm::Error translateFence(const llvm::MCInst &Inst,
       bool FI,
       llvm::raw_string_ostream &SS);
 
-  enum CSROp {
-    RW,
-    RS,
-    RC
-  };
+  // CSR ops
+
   llvm::Error translateCSR(
       const llvm::MCInst &Inst,
       CSROp Op,

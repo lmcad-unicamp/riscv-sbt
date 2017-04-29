@@ -166,10 +166,13 @@ SBT::SBT(
 
 Error SBT::run()
 {
-  // genHello();
+  // setup translator
+  _translator->setDisassembler(&*_disAsm);
+  _translator->setInstPrinter(&*_instPrinter);
+  _translator->setSTI(&*_sti);
 
   for (const auto& f : _inputFiles) {
-    Error err = translate(f);
+    Error err = _translator->translate(f);
     if (err)
       return err;
   }
@@ -197,41 +200,6 @@ void SBT::write()
   raw_fd_ostream os(_outputFile, ec, sys::fs::F_None);
   WriteBitcodeToFile(&*_module, os);
   os.flush();
-}
-
-
-llvm::Error SBT::translate(const std::string& file)
-{
-  // parse object file
-  auto expObj = create<Object>(file);
-  if (!expObj)
-    return expObj.takeError();
-  Object *obj = &expObj.get();
-  _translator->setCurObj(obj);
-
-  _translator->setInstPrinter(&*_instPrinter);
-  _translator->setDisassembler(&*_disAsm);
-  _translator->setSTI(&*_sti);
-
-  // start module
-  if (auto err = _translator->startModule())
-    return err;
-
-  // translate each section
-  for (ConstSectionPtr sec : obj->sections()) {
-    if (auto err = _translator->translateSection(sec))
-      return err;
-
-    // finish any pending function
-    if (Error err = _translator->finishFunction())
-      return err;
-  }
-
-  // finish module
-  if (auto err = _translator->finishModule())
-    return err;
-
-  return Error::success();
 }
 
 

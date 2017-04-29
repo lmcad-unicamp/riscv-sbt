@@ -1,5 +1,8 @@
 #include "Constants.h"
 
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/Type.h>
 #include <llvm/Support/FileSystem.h>
 
 #include <cstdlib>
@@ -63,10 +66,29 @@ void initConstants()
   // Note: LIBC_BC can be NULL if it was not found above
 }
 
+
 void destroyConstants()
 {
   delete BIN_NAME;
   delete LIBC_BC;
+}
+
+
+void initLLVMConstants(llvm::LLVMContext& ctx)
+{
+  Void = llvm::Type::getVoidTy(ctx);
+
+  I8 = llvm::Type::getInt8Ty(ctx);
+  I16 = llvm::Type::getInt16Ty(ctx);
+  I32 = llvm::Type::getInt32Ty(ctx);
+
+  I8Ptr = llvm::Type::getInt8PtrTy(ctx);
+  I16Ptr = llvm::Type::getInt16PtrTy(ctx);
+  I32Ptr = llvm::Type::getInt32PtrTy(ctx);
+
+  VoidFun = llvm::FunctionType::get(Void, !VAR_ARG);
+
+  ZERO = llvm::ConstantInt::get(I32, 0);
 }
 
 } // sbt

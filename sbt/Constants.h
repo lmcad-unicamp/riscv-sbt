@@ -5,11 +5,20 @@
 
 #include <string>
 
+namespace llvm {
+class FunctionType;
+class IntegerType;
+class LLVMContext;
+class PointerType;
+class Type;
+class Value;
+}
+
 namespace sbt {
 
 // name of the SBT binary/executable
-extern const std::string *BIN_NAME;
-extern const std::string *LIBC_BC;
+extern const std::string* BIN_NAME;
+extern const std::string* LIBC_BC;
 
 // (these are only to make the code easier to read)
 static const bool ADD_NULL = true;
@@ -23,6 +32,25 @@ static const char nl = '\n';
 
 void initConstants();
 void destroyConstants();
+
+
+// LLVM constants
+
+llvm::Type* Void;
+
+llvm::IntegerType* I8;
+llvm::IntegerType* I16;
+llvm::IntegerType* I32;
+
+llvm::PointerType* I8Ptr;
+llvm::PointerType* I16Ptr;
+llvm::PointerType* I32Ptr;
+
+llvm::FunctionType* VoidFun;
+
+llvm::Value* ZERO;
+
+void initLLVMConstants(llvm::LLVMContext& ctx);
 
 } // sbt
 

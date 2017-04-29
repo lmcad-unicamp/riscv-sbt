@@ -18,8 +18,6 @@
 // LLVM internal instruction info
 #define GET_INSTRINFO_ENUM
 #include <llvm/Target/RISCVMaster/RISCVMasterGenInstrInfo.inc>
-#define GET_REGINFO_ENUM
-#include <llvm/Target/RISCVMaster/RISCVMasterGenRegisterInfo.inc>
 
 #include <algorithm>
 #include <vector>
@@ -32,23 +30,15 @@ using namespace llvm;
 namespace sbt {
 
 Translator::Translator(
-  LLVMContext *Ctx,
-  IRBuilder<> *Bldr,
-  llvm::Module *Mod)
+  LLVMContext* ctx,
+  IRBuilder<>* bldr,
+  llvm::Module* mod)
   :
-  I32(Type::getInt32Ty(*Ctx)),
-  I16(Type::getInt16Ty(*Ctx)),
-  I8(Type::getInt8Ty(*Ctx)),
-  I32Ptr(Type::getInt32PtrTy(*Ctx)),
-  I16Ptr(Type::getInt16PtrTy(*Ctx)),
-  I8Ptr(Type::getInt8PtrTy(*Ctx)),
-  ZERO(ConstantInt::get(I32, 0)),
-  Void(Type::getVoidTy(*Ctx)),
-  VoidFun(FunctionType::get(Void, !VAR_ARG)),
-  Context(Ctx),
-  Builder(Bldr),
-  Module(Mod)
+  _ctx(ctx),
+  _builder(bldr),
+  _module(mod)
 {
+  initLLVMConstants(*_ctx);
 }
 
 
@@ -1915,47 +1905,33 @@ llvm::Error Translator::translateCSR(
   return Error::success();
 }
 
-
-// MCInst register number to RISCV register number
-unsigned Translator::RVReg(unsigned Reg)
+llvm::Error Translator::translate(const std::string& file)
 {
-  namespace RISCV = RISCVMaster;
+  // parse object file
+  auto expObj = create<Object>(file);
+  if (!expObj)
+    return expObj.takeError();
+  _obj = &expObj.get();
 
-  switch (Reg) {
-    case RISCV::X0_32:  return 0;
-    case RISCV::X1_32:  return 1;
-    case RISCV::X2_32:  return 2;
-    case RISCV::X3_32:  return 3;
-    case RISCV::X4_32:  return 4;
-    case RISCV::X5_32:  return 5;
-    case RISCV::X6_32:  return 6;
-    case RISCV::X7_32:  return 7;
-    case RISCV::X8_32:  return 8;
-    case RISCV::X9_32:  return 9;
-    case RISCV::X10_32: return 10;
-    case RISCV::X11_32: return 11;
-    case RISCV::X12_32: return 12;
-    case RISCV::X13_32: return 13;
-    case RISCV::X14_32: return 14;
-    case RISCV::X15_32: return 15;
-    case RISCV::X16_32: return 16;
-    case RISCV::X17_32: return 17;
-    case RISCV::X18_32: return 18;
-    case RISCV::X19_32: return 19;
-    case RISCV::X20_32: return 20;
-    case RISCV::X21_32: return 21;
-    case RISCV::X22_32: return 22;
-    case RISCV::X23_32: return 23;
-    case RISCV::X24_32: return 24;
-    case RISCV::X25_32: return 25;
-    case RISCV::X26_32: return 26;
-    case RISCV::X27_32: return 27;
-    case RISCV::X28_32: return 28;
-    case RISCV::X29_32: return 29;
-    case RISCV::X30_32: return 30;
-    case RISCV::X31_32: return 31;
-    default: return 0x1000;
+  // start module
+  if (auto err = _translator->startModule())
+    return err;
+
+  // translate each section
+  for (ConstSectionPtr sec : obj->sections()) {
+    if (auto err = _translator->translateSection(sec))
+      return err;
+
+    // finish any pending function
+    if (Error err = _translator->finishFunction())
+      return err;
   }
+
+  // finish module
+  if (auto err = _translator->finishModule())
+    return err;
+
+  return Error::success();
 }
 
 

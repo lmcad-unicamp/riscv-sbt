@@ -81,9 +81,6 @@ private:
 
   /// private member functions
 
-  // translate one file
-  llvm::Error translate(const std::string& file);
-
   // generate hello world IR (for test only)
   llvm::Error genHello();
 };

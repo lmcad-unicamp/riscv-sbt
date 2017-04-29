@@ -92,6 +92,7 @@ link_directories (${SBT_LINK_DIRS})
 add_executable (riscv-sbt
   Constants.cpp
   Object.cpp
+  Register.cpp
   SBTError.cpp
   Translator.cpp
   Utils.cpp
