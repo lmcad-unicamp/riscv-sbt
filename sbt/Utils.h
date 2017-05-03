@@ -1,12 +1,24 @@
 #ifndef SBT_UTILS_H
 #define SBT_UTILS_H
 
+#include "Constants.h"
+
 #include <llvm/Support/Error.h>
 #include <llvm/Support/raw_ostream.h>
 
+#include <cassert>
 #include <functional>
 #include <type_traits>
 #include <vector>
+
+#if SBT_DEBUG
+# define xassert(expr) \
+  ((expr) \
+   ? static_cast<void>(0) \
+   : __assert_fail(#expr, __FILE__, __LINE__, __PRETTY_FUNCTION__))
+#else
+# define xassert(expr) static_cast<void>(expr)
+#endif
 
 #define DBGS_ON 1
 

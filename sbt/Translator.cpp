@@ -42,6 +42,48 @@ Translator::Translator(
 }
 
 
+llvm::Error Translator::genSCHandler()
+{
+  if (auto err = buildRegisterFile())
+    return err;
+
+  if (auto err = genSyscallHandler())
+    return err;
+
+  return Error::success();
+}
+
+
+llvm::Error Translator::translate(const std::string& file)
+{
+  // parse object file
+  auto expObj = create<Object>(file);
+  if (!expObj)
+    return expObj.takeError();
+  _obj = &expObj.get();
+
+  // start module
+  if (auto err = startModule())
+    return err;
+
+  // translate each section
+  for (ConstSectionPtr sec : _obj->sections()) {
+    if (auto err = translateSection(sec))
+      return err;
+
+    // finish any pending function
+    if (Error err = finishFunction())
+      return err;
+  }
+
+  // finish module
+  if (auto err = finishModule())
+    return err;
+
+  return Error::success();
+}
+
+
 llvm::Error Translator::translateSection(ConstSectionPtr Sec)
 {
   assert(!inFunc());
@@ -431,16 +473,6 @@ Error Translator::startModule()
   return Error::success();
 }
 
-Error Translator::genSCHandler()
-{
-  if (auto E = buildRegisterFile())
-    return E;
-
-  if (Error E = genSyscallHandler())
-    return E;
-
-  return Error::success();
-}
 
 llvm::Error Translator::genICaller()
 {
@@ -537,63 +569,6 @@ Error Translator::startMain(StringRef Name, uint64_t Addr)
   return Error::success();
 }
 
-
-llvm::Expected<llvm::Function *>
-Translator::createFunction(llvm::StringRef Name)
-{
-  Function *F = Module->getFunction(Name);
-  if (F)
-    return F;
-
-  // Create a function with no parameters
-  FunctionType *FT =
-    FunctionType::get(Type::getVoidTy(*Context), !VAR_ARG);
-  F = Function::Create(FT, Function::ExternalLinkage, Name, Module);
-
-  return F;
-}
-
-
-Error Translator::startFunction(StringRef Name, uint64_t Addr)
-{
-  if (auto E = finishFunction())
-    return E;
-
-  auto ExpF = createFunction(Name);
-  if (!ExpF)
-    return ExpF.takeError();
-  Function *F = ExpF.get();
-  CurFunc = F;
-  FunTable.push_back(F);
-  FunMap(F, std::move(Addr));
-
-  // BB
-  BasicBlock **BBPtr = BBMap[Addr];
-  BasicBlock *BB;
-  if (!BBPtr) {
-    BB = SBTBasicBlock::create(*Context, Addr, F);
-    BBMap(Addr, std::move(BB));
-  } else {
-    BB = *BBPtr;
-    BB->removeFromParent();
-    BB->insertInto(F);
-  }
-  Builder->SetInsertPoint(BB);
-
-  return Error::success();
-}
-
-Error Translator::finishFunction()
-{
-  if (!CurFunc)
-    return Error::success();
-  CurFunc = nullptr;
-
-  if (Builder->GetInsertBlock()->getTerminator() == nullptr)
-    Builder->CreateRetVoid();
-  InMain = false;
-  return Error::success();
-}
 
 Error Translator::declOrBuildRegisterFile(bool decl)
 {
@@ -1902,35 +1877,6 @@ llvm::Error Translator::translateCSR(
   }
 
   store(V, RD);
-  return Error::success();
-}
-
-llvm::Error Translator::translate(const std::string& file)
-{
-  // parse object file
-  auto expObj = create<Object>(file);
-  if (!expObj)
-    return expObj.takeError();
-  _obj = &expObj.get();
-
-  // start module
-  if (auto err = _translator->startModule())
-    return err;
-
-  // translate each section
-  for (ConstSectionPtr sec : obj->sections()) {
-    if (auto err = _translator->translateSection(sec))
-      return err;
-
-    // finish any pending function
-    if (Error err = _translator->finishFunction())
-      return err;
-  }
-
-  // finish module
-  if (auto err = _translator->finishModule())
-    return err;
-
   return Error::success();
 }
 

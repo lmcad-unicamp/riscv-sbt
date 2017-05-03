@@ -168,29 +168,9 @@ private:
     Symbol sym;
   };
 
-  // State
-
-  enum TranslationState {
-    ST_DFL,
-    ST_PADDING
-  };
-
   // per program state
   bool _inMain = false;
 
-  struct Module
-  {
-    llvm::Error startModule();
-    llvm::Error finishModule();
-
-    TranslationState _state = ST_DFL;
-    ConstObjectPtr _obj = nullptr;
-    Map<llvm::Function *, uint64_t> _funMap;
-    std::vector<llvm::Function *> _funTable;
-    // icaller
-    llvm::Function *ICaller = nullptr;
-    uint64_t ExtFunAddr = 0;
-  };
 
   struct Section
   {
@@ -209,20 +189,6 @@ private:
     ConstRelocIter _rlast;
   };
 
-  class Function
-  {
-    llvm::Expected<llvm::Function *> createFunction(llvm::StringRef Name);
-    llvm::Error startMain(llvm::StringRef Name, uint64_t Addr);
-    llvm::Error startFunction(llvm::StringRef Name, uint64_t Addr);
-    llvm::Error finishFunction();
-    llvm::Expected<uint64_t> import(llvm::StringRef func);
-
-    uint64_t _addr = 0;
-    Map<uint64_t, llvm::BasicBlock *> _bbMap;
-    Map<uint64_t, llvm::Instruction *> _instrMap;
-    uint64_t _nextBB = 0;
-    bool _brWasLast = false;
-  };
 
   class SBTBasicBlock
   {
@@ -417,6 +383,8 @@ private:
   const llvm::MCSubtargetInfo *_sti = nullptr;
 
   // internal
+
+  ConstObjectPtr _obj = nullptr;
 
   // libC module
   std::unique_ptr<llvm::Module> _lcModule;
