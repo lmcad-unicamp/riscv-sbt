@@ -6,6 +6,7 @@
 #include <string>
 
 namespace llvm {
+class ConstantInt;
 class FunctionType;
 class IntegerType;
 class LLVMContext;
@@ -36,19 +37,19 @@ void destroyConstants();
 
 // LLVM constants
 
-llvm::Type* Void;
+extern llvm::Type* Void;
 
-llvm::IntegerType* I8;
-llvm::IntegerType* I16;
-llvm::IntegerType* I32;
+extern llvm::IntegerType* I8;
+extern llvm::IntegerType* I16;
+extern llvm::IntegerType* I32;
 
-llvm::PointerType* I8Ptr;
-llvm::PointerType* I16Ptr;
-llvm::PointerType* I32Ptr;
+extern llvm::PointerType* I8Ptr;
+extern llvm::PointerType* I16Ptr;
+extern llvm::PointerType* I32Ptr;
 
-llvm::FunctionType* VoidFun;
+extern llvm::FunctionType* VoidFun;
 
-llvm::Value* ZERO;
+extern llvm::ConstantInt* ZERO;
 
 void initLLVMConstants(llvm::LLVMContext& ctx);
 

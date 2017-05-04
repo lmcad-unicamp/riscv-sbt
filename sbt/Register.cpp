@@ -5,7 +5,7 @@
 
 namespace sbt {
 
-std::string regName(unsigned reg, bool abi)
+std::string Register::getXRegName(unsigned reg, bool abi)
 {
   if (!abi) {
     std::string s;
@@ -52,11 +52,11 @@ std::string regName(unsigned reg, bool abi)
 }
 
 // MCInst register number to RISCV register number
-unsigned RVReg(unsigned Reg)
+unsigned Register::getXReg(unsigned reg)
 {
   namespace RISCV = llvm::RISCVMaster;
 
-  switch (Reg) {
+  switch (reg) {
     case RISCV::X0_32:  return 0;
     case RISCV::X1_32:  return 1;
     case RISCV::X2_32:  return 2;
@@ -92,5 +92,8 @@ unsigned RVReg(unsigned Reg)
     default: return 0x1000;
   }
 }
+
+
+llvm::GlobalVariable* Register::rvX[32];
 
 }

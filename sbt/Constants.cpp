@@ -12,6 +12,24 @@ namespace sbt {
 const std::string* BIN_NAME = nullptr;
 const std::string* LIBC_BC = nullptr;
 
+// LLVM types
+
+llvm::Type* Void;
+
+llvm::IntegerType* I8;
+llvm::IntegerType* I16;
+llvm::IntegerType* I32;
+
+llvm::PointerType* I8Ptr;
+llvm::PointerType* I16Ptr;
+llvm::PointerType* I32Ptr;
+
+llvm::FunctionType* VoidFun;
+
+llvm::ConstantInt* ZERO;
+
+//
+
 void initConstants()
 {
   BIN_NAME = new std::string("riscv-sbt");

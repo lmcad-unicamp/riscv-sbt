@@ -171,11 +171,17 @@ Error SBT::run()
   _translator->setInstPrinter(&*_instPrinter);
   _translator->setSTI(&*_sti);
 
+  if (auto err = _translator->start())
+    return err;
+
   for (const auto& f : _inputFiles) {
     Error err = _translator->translate(f);
     if (err)
       return err;
   }
+
+  if (auto err = _translator->finish())
+    return err;
 
   if (llvm::verifyModule(*_module, &DBGS)) {
     SBTError serr;
