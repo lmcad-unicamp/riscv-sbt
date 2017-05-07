@@ -1,11 +1,75 @@
 #include "Function.h"
 
+#include "BasicBlock.h"
 #include "Constants.h"
 
 #include <llvm/IR/Function.h>
 
 namespace sbt {
 
+llvm::Error Function::translate()
+{
+  DBGS << _name << ":\n";
+
+  if (_name == "main") {
+    if (auto err = startMain())
+      return err;
+  } else {
+    if (auto err = start())
+      return err;
+  }
+
+  if (auto err = translateInstrs(_addr, _end))
+    return err;
+
+  if (auto err = finish())
+    return err;
+
+  return llvm::Error::success();
+}
+
+
+llvm::Error Function::startMain()
+{
+  /*
+  // Create a function with no parameters
+  llvm::FunctionType *ft =
+    llvm::FunctionType::get(I32, !VAR_ARG);
+  llvm::Function *f =
+    llvm::Function::Create(ft, llvm::Function::ExternalLinkage,
+      _name, _module);
+
+  // BB
+  BasicBlock bb(*_ctx, _addr, f);
+  BBMap(Addr, std::move(BB));
+  Builder->SetInsertPoint(BB);
+
+  // Set stack pointer.
+
+  std::vector<Value *> Idx = { ZERO, ConstantInt::get(I32, StackSize) };
+  Value *V =
+    Builder->CreateGEP(Stack, Idx);
+  StackEnd = i8PtrToI32(V);
+
+  store(StackEnd, RV_SP);
+
+  // if (auto E = startup())
+  //  return E;
+
+  // init syscall module
+  F = Function::Create(VoidFun,
+    Function::ExternalLinkage, "syscall_init", Module);
+  Builder->CreateCall(F);
+
+  InMain = true;
+  */
+
+  return llvm::Error::success();
+}
+
+
+
+#if 0
 llvm::Expected<llvm::Function *>
 Function::create(llvm::StringRef name)
 {
@@ -64,42 +128,6 @@ llvm::Error Function::finish()
   return Error::success();
 }
 
-llvm::Error Translator::translateSymbol(size_t SI)
-{
-  const ConstSymbolPtrVec &Symbols = CurSection->symbols();
-  size_t SN = Symbols.size();
-  uint64_t SectionSize = CurSection->size();
-  ConstSymbolPtr Sym = Symbols[SI];
-
-  uint64_t Start = Sym->address();
-  volatile uint64_t End;  // XXX gcc bug: need to make it volatile
-  if (SI == SN - 1)
-    End = SectionSize;
-  else
-    End = Symbols[SI + 1]->address();
-
-  // XXX for now, translate only instructions that appear after a
-  // function or global symbol
-  const StringRef &SymbolName = Sym->name();
-  if (Sym->type() == object::SymbolRef::ST_Function ||
-      Sym->flags() & object::SymbolRef::SF_Global)
-  {
-    if (SymbolName == "main") {
-      if (auto E = startMain(SymbolName, Start))
-        return E;
-    } else {
-      if (auto E = startFunction(SymbolName, Start))
-        return E;
-    }
-  }
-
-  // skip section bytes until a function like symbol is found
-  if (!inFunc())
-    return Error::success();
-
-  DBGS << SymbolName << ":\n";
-  return translateInstrs(Start, End);
-}
 
 llvm::Error Translator::translateInstrs(uint64_t Begin, uint64_t End)
 {
@@ -299,6 +327,6 @@ llvm::Expected<uint64_t> Translator::import(llvm::StringRef Func)
 
   return Ret;
 }
-
+#endif
 
 }

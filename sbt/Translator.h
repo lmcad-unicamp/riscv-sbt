@@ -45,16 +45,23 @@ public:
   Translator(Translator&&) = default;
   Translator(const Translator&) = delete;
 
-  llvm::Error start();
-  llvm::Error finish();
+  void addInputFile(const std::string& file)
+  {
+    _inputFiles.push_back(file);
+  }
 
   // gen syscall handler
   llvm::Error genSCHandler();
 
-  // translate file
-  llvm::Error translate(const std::string& file);
+  // translate input files
+  llvm::Error translate();
 
   // setters
+
+  void setOutputFile(const std::string& file)
+  {
+    _outputFile = file;
+  }
 
   void setDisassembler(const llvm::MCDisassembler* d)
   {
@@ -80,6 +87,8 @@ private:
   llvm::Module* _module;
 
   // set by sbt
+  std::vector<std::string> _inputFiles;
+  std::string _outputFile;
   const llvm::MCDisassembler* _disAsm = nullptr;
   llvm::MCInstPrinter* _instPrinter = nullptr;
   const llvm::MCSubtargetInfo* _sti = nullptr;
@@ -93,6 +102,9 @@ private:
   size_t _stackSize = 4096;
 
   // methods
+
+  llvm::Error start();
+  llvm::Error finish();
 
   // register file
 

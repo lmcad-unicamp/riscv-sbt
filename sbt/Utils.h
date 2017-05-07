@@ -6,16 +6,24 @@
 #include <llvm/Support/Error.h>
 #include <llvm/Support/raw_ostream.h>
 
-#include <cassert>
 #include <functional>
 #include <type_traits>
 #include <vector>
 
 #if SBT_DEBUG
+# ifdef NDEBUG
+#   define DEF_NDEBUG
+#   undef NDEBUG
+#   include <cassert>
+# endif
 # define xassert(expr) \
   ((expr) \
    ? static_cast<void>(0) \
    : __assert_fail(#expr, __FILE__, __LINE__, __PRETTY_FUNCTION__))
+# ifdef DEF_NDEBUG
+#   undef DEF_NDEBUG
+#   define NDEBUG
+# endif
 #else
 # define xassert(expr) static_cast<void>(expr)
 #endif

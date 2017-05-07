@@ -1,13 +1,19 @@
 #include "Module.h"
 
+#include "SBTError.h"
+#include "Section.h"
+
+#include <llvm/IR/Constant.h>
+#include <llvm/IR/Constants.h>
+
 namespace sbt {
 
 llvm::Error Module::start()
 {
-  /*
-  if (auto E = buildShadowImage())
-    return E;
+  if (auto err = buildShadowImage())
+    return err;
 
+  /*
   auto ExpF = createFunction("rv32_icaller");
   if (!ExpF)
     return ExpF.takeError();
@@ -34,24 +40,23 @@ llvm::Error Module::finish()
 }
 
 
-llvm::Error Module::translate(ConstObjectPtr obj)
+llvm::Error Module::translate(const std::string& file)
 {
-  _obj = obj;
+  // parse object file
+  auto expObj = create<Object>(file);
+  if (!expObj)
+    return expObj.takeError();
+  _obj = &expObj.get();
 
   if (auto err = start())
     return err;
 
-  /*
   // translate each section
   for (ConstSectionPtr sec : _obj->sections()) {
-    if (auto err = translateSection(sec))
-      return err;
-
-    // finish any pending function
-    if (Error err = finishFunction())
+    SBTSection ssec(sec, _module, _builder, _ctx);
+    if (auto err = ssec.translate())
       return err;
   }
-  */
 
   // finish module
   if (auto err = finish())
@@ -117,49 +122,47 @@ llvm::Error Module::genICaller()
 
 llvm::Error Module::buildShadowImage()
 {
-  /*
-  SBTError SE;
+  SBTError serr;
 
-  std::vector<uint8_t> Vec;
-  for (ConstSectionPtr Sec : CurObj->sections()) {
+  std::vector<uint8_t> vec;
+  for (ConstSectionPtr sec : _obj->sections()) {
     // Skip non text/data sections
-    if (!Sec->isText() && !Sec->isData() && !Sec->isBSS() && !Sec->isCommon())
+    if (!sec->isText() && !sec->isData() && !sec->isBSS() && !sec->isCommon())
       continue;
 
-    StringRef Bytes;
-    std::string Z;
+    llvm::StringRef bytes;
+    std::string z;
     // .bss/.common
-    if (Sec->isBSS() || Sec->isCommon()) {
-      Z = std::string(Sec->size(), 0);
-      Bytes = Z;
+    if (sec->isBSS() || sec->isCommon()) {
+      z = std::string(sec->size(), 0);
+      bytes = z;
     // others
     } else {
       // Read contents
-      if (Sec->contents(Bytes)) {
-        SE  << __FUNCTION__ << ": failed to get section ["
-            << Sec->name() << "] contents";
-        return error(SE);
+      if (sec->contents(bytes)) {
+        serr  << __FUNCTION__ << ": failed to get section ["
+              << sec->name() << "] contents";
+        return error(serr);
       }
     }
 
     // Align all sections
-    while (Vec.size() % 4 != 0)
-      Vec.push_back(0);
+    while (vec.size() % 4 != 0)
+      vec.push_back(0);
 
     // Set Shadow Offset of Section
-    Sec->shadowOffs(Vec.size());
+    sec->shadowOffs(vec.size());
 
     // Append to vector
-    for (size_t I = 0; I < Bytes.size(); I++)
-      Vec.push_back(Bytes[I]);
+    for (size_t i = 0; i < bytes.size(); i++)
+      vec.push_back(bytes[i]);
   }
 
   // Create the ShadowImage
-  Constant *CDA = ConstantDataArray::get(*Context, Vec);
-  ShadowImage =
-    new GlobalVariable(*Module, CDA->getType(), !CONSTANT,
-      GlobalValue::ExternalLinkage, CDA, "ShadowMemory");
-  */
+  llvm::Constant* cda = llvm::ConstantDataArray::get(*_ctx, vec);
+  _shadowImage =
+    new llvm::GlobalVariable(*_module, cda->getType(), !CONSTANT,
+      llvm::GlobalValue::ExternalLinkage, cda, "ShadowMemory");
 
   return llvm::Error::success();
 }

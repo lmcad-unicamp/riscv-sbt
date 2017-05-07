@@ -62,6 +62,13 @@ public:
     return v;
   }
 
+  llvm::Instruction* retVoid()
+  {
+    auto v = _builder->CreateRetVoid();
+    updateFirst(v);
+    return v;
+  }
+
 private:
   llvm::IRBuilder<>* _builder;
   llvm::Value* _first = nullptr;

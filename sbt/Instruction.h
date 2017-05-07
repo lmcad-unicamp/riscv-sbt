@@ -1,10 +1,24 @@
 #ifndef SBT_INSTRUCTION_H
 #define SBT_INSTRUCTION_H
 
+namespace llvm {
+class Instruction;
+}
+
 namespace sbt {
 
-struct Instruction
+class Instruction
 {
+public:
+  const llvm::Instruction* instr() const
+  {
+    return _instr;
+  }
+
+private:
+  llvm::Instruction* _instr;
+
+/*
   static const size_t InstrSize = 4;
 
   enum ALUOp {
@@ -192,9 +206,10 @@ struct Instruction
       CSROp Op,
       bool Imm,
       llvm::raw_string_ostream &SS);
-
+*/
 };
 
+/*
 #if SBT_DEBUG
   // Add RV Inst metadata and print it in debug mode
   void dbgprint(llvm::raw_string_ostream &SS);
@@ -206,6 +221,7 @@ struct Instruction
   llvm::Function* _getCycles = nullptr;
   llvm::Function* _getTime = nullptr;
   llvm::Function* _instRet = nullptr;
+*/
 }
 
 #endif

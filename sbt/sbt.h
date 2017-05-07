@@ -60,9 +60,7 @@ public:
   llvm::Error genSCHandler();
 
 private:
-  std::vector<std::string> _inputFiles;
   std::string _outputFile;
-
   std::unique_ptr<llvm::LLVMContext> _context;
   std::unique_ptr<llvm::IRBuilder<>> _builder;
   std::unique_ptr<llvm::Module> _module;

@@ -139,6 +139,11 @@ public:
     _shadowOffs = offs;
   }
 
+  ConstObjectPtr object() const
+  {
+    return _obj;
+  }
+
   // get string representation
   std::string str() const;
 

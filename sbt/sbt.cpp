@@ -86,6 +86,7 @@ SBT::SBT(
   _module(new llvm::Module("main", *_context)),
   _translator(new Translator(&*_context, &*_builder, &*_module))
 {
+  _translator->setOutputFile(outputFile);
   for (const auto& file : inputFilesList) {
     if (!sys::fs::exists(file)) {
       SBTError serr(file);
@@ -93,7 +94,7 @@ SBT::SBT(
       err = error(serr);
       return;
     }
-    _inputFiles.push_back(file);
+    _translator->addInputFile(file);
   }
 
   SBTError serr;
@@ -171,16 +172,7 @@ Error SBT::run()
   _translator->setInstPrinter(&*_instPrinter);
   _translator->setSTI(&*_sti);
 
-  if (auto err = _translator->start())
-    return err;
-
-  for (const auto& f : _inputFiles) {
-    Error err = _translator->translate(f);
-    if (err)
-      return err;
-  }
-
-  if (auto err = _translator->finish())
+  if (auto err = _translator->translate())
     return err;
 
   if (llvm::verifyModule(*_module, &DBGS)) {

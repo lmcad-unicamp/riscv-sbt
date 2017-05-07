@@ -90,11 +90,14 @@ set (CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 include_directories (${SBT_INCLUDE_DIRS})
 link_directories (${SBT_LINK_DIRS})
 add_executable (riscv-sbt
+  BasicBlock.cpp
   Constants.cpp
+  Function.cpp
   Module.cpp
   Object.cpp
   Register.cpp
   SBTError.cpp
+  Section.cpp
   Syscall.cpp
   Translator.cpp
   Utils.cpp

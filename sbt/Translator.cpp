@@ -103,18 +103,20 @@ llvm::Error Translator::genSCHandler()
 }
 
 
-llvm::Error Translator::translate(const std::string& file)
+llvm::Error Translator::translate()
 {
-  // parse object file
-  auto expObj = create<Object>(file);
-  if (!expObj)
-    return expObj.takeError();
-  ConstObjectPtr obj = &expObj.get();
-
-  // start module
-  Module mod;
-  if (auto err = mod.translate(obj))
+  if (auto err = start())
     return err;
+
+  for (const auto& f : _inputFiles) {
+    Module mod(_ctx, _builder, _module);
+    if (auto err = mod.translate(f))
+      return err;
+  }
+
+  if (auto err = finish())
+    return err;
+
   return llvm::Error::success();
 }
 
