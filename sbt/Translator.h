@@ -1,32 +1,22 @@
 #ifndef SBT_TRANSLATOR_H
 #define SBT_TRANSLATOR_H
 
-#include "Constants.h"
-#include "Map.h"
-#include "Object.h"
-#include "Register.h"
-#include "Syscall.h"
-#include "SBTError.h"
+#include "Context.h"
 
-#include <llvm/MC/MCInst.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/Support/ELF.h>
 #include <llvm/Support/Error.h>
-#include <llvm/Support/ErrorHandling.h>
-#include <llvm/Support/FormatVariadic.h>
 
 namespace llvm {
-class Function;
-class FunctionType;
 class GlobalVariable;
-class IntegerType;
-class LLVMContext;
+class MCAsmInfo;
+class MCContext;
 class MCDisassembler;
 class MCInst;
 class MCInstPrinter;
+class MCInstrInfo;
+class MCObjectFileInfo;
+class MCRegisterInfo;
 class MCSubtargetInfo;
-class Module;
-class Value;
+class Target;
 }
 
 namespace sbt {
@@ -36,14 +26,13 @@ class Translator
 public:
 
   // ctor
-  Translator(
-    llvm::LLVMContext *ctx,
-    llvm::IRBuilder<> *bldr,
-    llvm::Module *mod);
+  Translator(Context* ctx);
 
   // move only
   Translator(Translator&&) = default;
   Translator(const Translator&) = delete;
+
+  ~Translator();
 
   void addInputFile(const std::string& file)
   {
@@ -63,43 +52,31 @@ public:
     _outputFile = file;
   }
 
-  void setDisassembler(const llvm::MCDisassembler* d)
-  {
-    _disAsm = d;
-  }
-
-  void setInstPrinter(llvm::MCInstPrinter* p)
-  {
-    _instPrinter = p;
-  }
-
-  void setSTI(const llvm::MCSubtargetInfo* s)
-  {
-    _sti = s;
-  }
-
 private:
   // data
 
   // set by ctor
-  llvm::LLVMContext* _ctx;
-  llvm::IRBuilder<>* _builder;
-  llvm::Module* _module;
+  Context* _ctx;
 
   // set by sbt
   std::vector<std::string> _inputFiles;
   std::string _outputFile;
-  const llvm::MCDisassembler* _disAsm = nullptr;
-  llvm::MCInstPrinter* _instPrinter = nullptr;
-  const llvm::MCSubtargetInfo* _sti = nullptr;
-
-  // internal
-
-  Syscall _sc;
 
   // stack
   llvm::GlobalVariable* _stack = nullptr;
   size_t _stackSize = 4096;
+
+  // Target info
+  const llvm::Target* _target;
+  std::unique_ptr<const llvm::MCRegisterInfo> _mri;
+  std::unique_ptr<const llvm::MCAsmInfo> _asmInfo;
+  std::unique_ptr<const llvm::MCSubtargetInfo> _sti;
+  std::unique_ptr<const llvm::MCObjectFileInfo> _mofi;
+  std::unique_ptr<llvm::MCContext> _mc;
+  std::unique_ptr<const llvm::MCDisassembler> _disAsm;
+  std::unique_ptr<const llvm::MCInstrInfo> _mii;
+  std::unique_ptr<llvm::MCInstPrinter> _instPrinter;
+
 
   // methods
 

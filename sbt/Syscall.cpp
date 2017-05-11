@@ -7,19 +7,21 @@
 
 namespace sbt {
 
-void Syscall::declHandler(llvm::Module* module)
+void Syscall::declHandler()
 {
   _ftRVSC = llvm::FunctionType::get(I32, { I32 }, !VAR_ARG);
   _fRVSC = llvm::Function::Create(
-      _ftRVSC, llvm::Function::ExternalLinkage, "rv_syscall", module);
+      _ftRVSC, llvm::Function::ExternalLinkage, "rv_syscall",
+      _ctx->module);
 }
 
 
-llvm::Error Syscall::genHandler(
-    llvm::LLVMContext* ctx,
-    llvm::IRBuilder<>* builder,
-    llvm::Module* module)
+llvm::Error Syscall::genHandler()
 {
+  llvm::LLVMContext* ctx = _ctx->ctx;
+  llvm::IRBuilder<>* builder = _ctx->builder;
+  llvm::Module* module = _ctx->module;
+
   // declare X86 syscall functions
   const size_t n = 5;
   llvm::FunctionType *ftX86SC[n];
@@ -61,7 +63,7 @@ llvm::Error Syscall::genHandler(
 
   const std::string bbPrefix = "bb_rvsc_";
 
-  declHandler(module);
+  declHandler();
   Builder bld(builder);
 
   // entry

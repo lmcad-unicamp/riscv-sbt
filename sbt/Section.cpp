@@ -61,7 +61,7 @@ llvm::Error SBTSection::translate()
         sym->flags() & llvm::object::SymbolRef::SF_Global)
     {
       // if (symname == "main")
-      Function func(symname, symaddr, end, _module, _builder, _ctx);
+      Function func(symname, symaddr, end, _ctx);
         if (auto err = func.translate())
           return err;
     // skip section bytes until a function like symbol is found

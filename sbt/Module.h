@@ -1,6 +1,7 @@
 #ifndef SBT_MODULE_H
 #define SBT_MODULE_H
 
+#include "Context.h"
 #include "Object.h"
 
 #include <llvm/IR/IRBuilder.h>
@@ -16,22 +17,14 @@ namespace sbt {
 class Module
 {
 public:
-  Module(
-    llvm::LLVMContext* ctx,
-    llvm::IRBuilder<>* builder,
-    llvm::Module* module)
-    :
-    _ctx(ctx),
-    _builder(builder),
-    _module(module)
+  Module(Context* ctx) :
+    _ctx(ctx)
   {}
 
   llvm::Error translate(const std::string& file);
 
 private:
-  llvm::LLVMContext* _ctx;
-  llvm::IRBuilder<>* _builder;
-  llvm::Module* _module;
+  Context* _ctx;
 
   ConstObjectPtr _obj = nullptr;
 

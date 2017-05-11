@@ -1,6 +1,7 @@
 #ifndef SBT_FUNCTION_H
 #define SBT_FUNCTION_H
 
+#include "Context.h"
 #include "Map.h"
 #include "Object.h"
 
@@ -27,15 +28,11 @@ public:
     const llvm::StringRef name,
     uint64_t addr,
     uint64_t end,
-    llvm::Module* mod,
-    llvm::IRBuilder<>* builder,
-    llvm::LLVMContext* ctx)
+    Context* ctx)
     :
     _name(name),
     _addr(addr),
     _end(end),
-    _module(mod),
-    _builder(builder),
     _ctx(ctx)
   {}
 
@@ -45,9 +42,7 @@ private:
   const llvm::StringRef _name;
   uint64_t _addr;
   uint64_t _end;
-  llvm::Module* _module;
-  llvm::IRBuilder<>* _builder;
-  llvm::LLVMContext* _ctx;
+  Context* _ctx;
 
 
   llvm::Error startMain();

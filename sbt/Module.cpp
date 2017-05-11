@@ -53,7 +53,7 @@ llvm::Error Module::translate(const std::string& file)
 
   // translate each section
   for (ConstSectionPtr sec : _obj->sections()) {
-    SBTSection ssec(sec, _module, _builder, _ctx);
+    SBTSection ssec(sec, _ctx);
     if (auto err = ssec.translate())
       return err;
   }
@@ -159,9 +159,9 @@ llvm::Error Module::buildShadowImage()
   }
 
   // Create the ShadowImage
-  llvm::Constant* cda = llvm::ConstantDataArray::get(*_ctx, vec);
+  llvm::Constant* cda = llvm::ConstantDataArray::get(*_ctx->ctx, vec);
   _shadowImage =
-    new llvm::GlobalVariable(*_module, cda->getType(), !CONSTANT,
+    new llvm::GlobalVariable(*_ctx->module, cda->getType(), !CONSTANT,
       llvm::GlobalValue::ExternalLinkage, cda, "ShadowMemory");
 
   return llvm::Error::success();

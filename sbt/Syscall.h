@@ -1,6 +1,7 @@
 #pragma once
 
-#include <llvm/IR/IRBuilder.h>
+#include "Context.h"
+
 #include <llvm/Support/Error.h>
 
 namespace llvm {
@@ -14,14 +15,17 @@ namespace sbt {
 class Syscall
 {
 public:
-  void declHandler(llvm::Module* module);
+  Syscall(Context* ctx) :
+    _ctx(ctx)
+  {}
 
-  llvm::Error genHandler(
-    llvm::LLVMContext* ctx,
-    llvm::IRBuilder<>* builder,
-    llvm::Module* module);
+  void declHandler();
+
+  llvm::Error genHandler();
 
 private:
+  Context* _ctx;
+
   // riscv syscall function
   llvm::FunctionType* _ftRVSC;
   llvm::Function* _fRVSC;
