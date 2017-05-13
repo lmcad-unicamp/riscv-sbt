@@ -49,6 +49,43 @@ static llvm::raw_ostream &DBGS = llvm::nulls();
 #endif
 
 
+template <typename A, typename E>
+class ArrayPtr
+{
+public:
+  ArrayPtr(A* ptr = nullptr) :
+    _ptr(ptr)
+  {}
+
+  ArrayPtr& operator=(A* ptr)
+  {
+    _ptr = ptr;
+    return *this;
+  }
+
+  /*
+  E& operator[](size_t p)
+  {
+    return (*_ptr)[p];
+  }
+  */
+
+  const E& operator[](size_t p) const
+  {
+    return (*_ptr)[p];
+  }
+
+
+  A* get()
+  {
+    return _ptr;
+  }
+
+private:
+  A* _ptr = nullptr;
+};
+
+
 // object creation functions
 
 // for pointers

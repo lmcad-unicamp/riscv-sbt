@@ -77,7 +77,7 @@ llvm::Error Syscall::genHandler()
   llvm::BasicBlock *bbExit = llvm::BasicBlock::Create(*ctx,
     bbPrefix + "exit", _fRVSC);
   builder->SetInsertPoint(bbExit);
-  builder->CreateRet(bld.load(Register::RV_A0));
+  builder->CreateRet(bld.load(XRegister::A0));
 
   // 2nd switch
   llvm::BasicBlock* bbSW2 = llvm::BasicBlock::Create(*ctx,
@@ -92,9 +92,9 @@ llvm::Error Syscall::genHandler()
   llvm::BasicBlock* bbSW1Dfl = llvm::BasicBlock::Create(*ctx,
     bbPrefix + "sw1_default", _fRVSC, bbSW2);
   builder->SetInsertPoint(bbSW1Dfl);
-  bld.store(llvm::ConstantInt::get(_t.i32, 1), Register::RV_T0);
-  bld.store(llvm::ConstantInt::get(_t.i32, X86_SYS_EXIT), Register::RV_A7);
-  bld.store(llvm::ConstantInt::get(_t.i32, 99), Register::RV_A0);
+  bld.store(llvm::ConstantInt::get(_t.i32, 1), XRegister::T0);
+  bld.store(llvm::ConstantInt::get(_t.i32, X86_SYS_EXIT), XRegister::A7);
+  bld.store(llvm::ConstantInt::get(_t.i32, 99), XRegister::A0);
   builder->CreateBr(bbSW2);
 
   builder->SetInsertPoint(bbEntry);
@@ -109,8 +109,8 @@ llvm::Error Syscall::genHandler()
     llvm::BasicBlock *bb = llvm::BasicBlock::Create(
       *ctx, ss.str(), _fRVSC, bbSW2);
     builder->SetInsertPoint(bb);
-    bld.store(llvm::ConstantInt::get(_t.i32, s.args), Register::RV_T0);
-    bld.store(llvm::ConstantInt::get(_t.i32, s.x86), Register::RV_A7);
+    bld.store(llvm::ConstantInt::get(_t.i32, s.args), XRegister::T0);
+    bld.store(llvm::ConstantInt::get(_t.i32, s.x86), XRegister::A7);
     builder->CreateBr(bbSW2);
     sw1->addCase(llvm::ConstantInt::get(_t.i32, s.rv), bb);
   };
@@ -132,13 +132,13 @@ llvm::Error Syscall::genHandler()
     builder->SetInsertPoint(bb);
 
     // Set args
-    std::vector<llvm::Value*> args = { bld.load(Register::RV_A7) };
+    std::vector<llvm::Value*> args = { bld.load(XRegister::A7) };
     for (size_t i = 0; i < val; i++)
-      args.push_back(bld.load(Register::RV_A0 + i));
+      args.push_back(bld.load(XRegister::A0 + i));
 
     // Make the syscall
     llvm::Value* v = builder->CreateCall(fX86SC[val], args);
-    bld.store(v, Register::RV_A0);
+    bld.store(v, XRegister::A0);
     builder->CreateBr(bbExit);
     return bb;
   };
@@ -147,7 +147,7 @@ llvm::Error Syscall::genHandler()
 
   builder->SetInsertPoint(bbSW2);
   llvm::SwitchInst* sw2 = builder->CreateSwitch(
-    bld.load(Register::RV_T0), sw2Case0);
+    bld.load(XRegister::T0), sw2Case0);
   sw2->addCase(_ctx->c.ZERO, sw2Case0);
   for (size_t i = 1; i < n; i++)
     sw2->addCase(llvm::ConstantInt::get(_t.i32, i), getSW2CaseBB(i));

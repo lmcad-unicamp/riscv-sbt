@@ -2,7 +2,7 @@
 #define SBT_BUILDER_H
 
 #include "Context.h"
-#include "Register.h"
+#include "XRegisters.h"
 
 namespace sbt {
 
@@ -21,8 +21,9 @@ public:
   // load register
   llvm::LoadInst* load(unsigned reg)
   {
+    const XRegister& x = _ctx->x[reg];
     llvm::LoadInst* i = _builder->CreateLoad(
-        Register::rvX[reg], Register::rvX[reg]->getName() + "_");
+        x.var(), x.name() + "_");
     updateFirst(i);
     return i;
   }
@@ -33,8 +34,9 @@ public:
     if (reg == 0)
       return nullptr;
 
+    const XRegister& x = _ctx->x[reg];
     llvm::StoreInst* i = _builder->CreateStore(v,
-        Register::rvX[reg], !VOLATILE);
+        x.var(), !VOLATILE);
     updateFirst(i);
     return i;
   }
@@ -50,7 +52,7 @@ public:
   // nop
   void nop()
   {
-    load(Register::RV_ZERO);
+    load(XRegister::ZERO);
   }
 
   llvm::Value *i8PtrToI32(llvm::Value* v8)

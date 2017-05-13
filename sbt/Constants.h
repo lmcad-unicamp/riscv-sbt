@@ -18,6 +18,7 @@ namespace sbt {
 static const bool ADD_NULL = true;
 static const bool ALLOW_INTERNAL = true;
 static const bool CONSTANT = true;
+static const bool DECL = true;
 static const bool ERROR = true;
 static const bool SIGNED = true;
 static const bool VAR_ARG = true;

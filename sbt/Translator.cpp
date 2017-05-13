@@ -2,7 +2,7 @@
 
 #include "Builder.h"
 #include "Module.h"
-#include "Register.h"
+#include "XRegisters.h"
 #include "SBTError.h"
 #include "Syscall.h"
 #include "Utils.h"
@@ -100,29 +100,10 @@ llvm::Error Translator::start()
   //
   //
   //
-  if (auto err = declRegisterFile())
-    return err;
+  _ctx->x = new XRegisters(_ctx, DECL);
 
   if (auto err = buildStack())
     return err;
-
-  return llvm::Error::success();
-}
-
-
-llvm::Error Translator::declOrBuildRegisterFile(bool decl)
-{
-  Register::rvX[0] = new llvm::GlobalVariable(*_ctx->module, _ctx->t.i32, CONSTANT,
-    llvm::GlobalValue::ExternalLinkage, decl? nullptr : _ctx->c.ZERO,
-    Register::getXRegName() + "0");
-
-  for (int i = 1; i < 32; ++i) {
-    std::string s;
-    llvm::raw_string_ostream ss(s);
-    ss << Register::getXRegName() << i;
-    Register::rvX[i] = new llvm::GlobalVariable(*_ctx->module, _ctx->t.i32, !CONSTANT,
-        llvm::GlobalValue::ExternalLinkage, decl? nullptr : _ctx->c.ZERO, ss.str());
-  }
 
   return llvm::Error::success();
 }
@@ -154,8 +135,7 @@ llvm::Error Translator::finish()
 
 llvm::Error Translator::genSCHandler()
 {
-  if (auto err = buildRegisterFile())
-    return err;
+  _ctx->x = new XRegisters(_ctx, !DECL);
 
   if (auto err = Syscall(_ctx).genHandler())
     return err;

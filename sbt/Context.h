@@ -3,10 +3,14 @@
 
 #include "Constants.h"
 #include "Types.h"
+#include "Utils.h"
 
 #include <llvm/IR/IRBuilder.h>
 
 namespace sbt {
+
+class XRegister;
+class XRegisters;
 
 class Context
 {
@@ -25,12 +29,14 @@ public:
     c.init(*ctx);
   }
 
+  ~Context();
 
   llvm::LLVMContext* ctx;
   llvm::Module* module;
   llvm::IRBuilder<>* builder;
   Constants c;
   Types t;
+  ArrayPtr<XRegisters, XRegister> x;
 };
 
 }

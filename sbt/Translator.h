@@ -83,20 +83,6 @@ private:
   llvm::Error start();
   llvm::Error finish();
 
-  // register file
-
-  llvm::Error declOrBuildRegisterFile(bool decl);
-
-  llvm::Error declRegisterFile()
-  {
-    return declOrBuildRegisterFile(true);
-  }
-
-  llvm::Error buildRegisterFile()
-  {
-    return declOrBuildRegisterFile(false);
-  }
-
   // image
   llvm::Error buildStack();
 };

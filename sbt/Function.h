@@ -6,7 +6,6 @@
 #include "Object.h"
 
 #include <llvm/ADT/StringRef.h>
-#include <llvm/IR/IRBuilder.h>
 #include <llvm/Support/Error.h>
 
 #include <memory>
@@ -58,7 +57,6 @@ private:
 
 
 private:
-  uint64_t _addr = 0;
   Map<uint64_t, llvm::BasicBlock *> _bbMap;
   uint64_t _nextBB = 0;
   bool _brWasLast = false;

@@ -92,16 +92,17 @@ link_directories (${SBT_LINK_DIRS})
 add_executable (riscv-sbt
   BasicBlock.cpp
   Constants.cpp
+  Context.cpp
   Function.cpp
   Module.cpp
   Object.cpp
-  Register.cpp
   SBTError.cpp
   Section.cpp
   Syscall.cpp
   Translator.cpp
   Types.cpp
   Utils.cpp
+  XRegisters.cpp
   sbt.cpp
   )
 target_compile_options (riscv-sbt PRIVATE ${SBT_COMPILE_OPTIONS})

@@ -1,12 +1,13 @@
 #ifndef SBT_POINTER_H
 #define SBT_POINTER_H
 
-#include <cassert>
+#include "Utils.h"
+
 #include <memory>
 
 namespace sbt {
 
-#define NULL_CHECK assert(_ptr && "null pointer")
+#define NULL_CHECK xassert(_ptr && "null pointer")
 
 template <typename T>
 class Pointer
