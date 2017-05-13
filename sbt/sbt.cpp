@@ -139,7 +139,7 @@ static void handleError(llvm::Error&& err)
 
   if (err2) {
     logAllUnhandledErrors(std::move(err2), llvm::errs(),
-      *BIN_NAME + ": error: ");
+      Constants::global().BIN_NAME + ": error: ");
     std::exit(EXIT_FAILURE);
   }
 }
@@ -168,14 +168,6 @@ static void test()
 
 int main(int argc, char *argv[])
 {
-  // initialize constants
-  sbt::initConstants();
-  struct DestroyConstants {
-    ~DestroyConstants() {
-      sbt::destroyConstants();
-    }
-  } destroyConstants;
-
   // options
   namespace cl = llvm::cl;
   cl::list<std::string> inputFiles(
@@ -196,10 +188,12 @@ int main(int argc, char *argv[])
   // parse args
   cl::ParseCommandLineOptions(argc, argv);
 
+  const sbt::Constants& c = sbt::Constants::global();
+
   // gen syscall handlers
   if (genSCHandlerOpt) {
     if (outputFileOpt.empty()) {
-      llvm::errs() << *sbt::BIN_NAME
+      llvm::errs() << c.BIN_NAME
         << ": output file not specified.\n";
       return 1;
     }
@@ -209,7 +203,7 @@ int main(int argc, char *argv[])
   // translate
   } else {
     if (inputFiles.empty()) {
-      llvm::errs() << *sbt::BIN_NAME << ": no input files.\n";
+      llvm::errs() << c.BIN_NAME << ": no input files.\n";
       return 1;
     }
   }

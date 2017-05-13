@@ -12,7 +12,7 @@ SBTError::SBTError(const std::string& prefix) :
   _cause(Error::success())
 {
   // error format: <sbt>: error: prefix: <msg>
-  *_ss << *BIN_NAME << ": error: ";
+  *_ss << Constants::global().BIN_NAME << ": error: ";
   if (!prefix.empty())
     *_ss << prefix << ": ";
 }

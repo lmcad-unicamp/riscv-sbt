@@ -6,17 +6,19 @@
 namespace sbt {
 
 BasicBlock::BasicBlock(
-  llvm::LLVMContext* ctx,
+  Context* ctx,
   llvm::StringRef name,
   llvm::Function* f,
   llvm::BasicBlock* beforeBB)
+  :
+  _ctx(ctx)
 {
   DBGS << name << ":\n";
-  _bb = llvm::BasicBlock::Create(*ctx, name, f, beforeBB);
+  _bb = llvm::BasicBlock::Create(*_ctx->ctx, name, f, beforeBB);
 }
 
 
-BasicBlock BasicBlock::split(uint64_t addr, llvm::IRBuilder<>* builder)
+BasicBlock BasicBlock::split(uint64_t addr)
 {
   auto res = _instrMap[addr];
   assert(res && "Instruction not found!");
@@ -34,19 +36,19 @@ BasicBlock BasicBlock::split(uint64_t addr, llvm::IRBuilder<>* builder)
   if (_bb->getTerminator()) {
     bb2 = _bb->splitBasicBlock(i, getBBName(addr));
     // XXX BBMap(addr, std::move(bb2));
-    return BasicBlock(bb2);
+    return BasicBlock(_ctx, bb2);
   }
 
   // Insert dummy terminator
-  xassert(builder->GetInsertBlock() == _bb);
-  Builder bld(builder);
+  xassert(_ctx->builder->GetInsertBlock() == _bb);
+  Builder bld(_ctx);
   llvm::Instruction* instr = bld.retVoid();
   bb2 = _bb->splitBasicBlock(i, getBBName(addr));
   // XXX BBMap(Addr, std::move(BB2));
   instr->eraseFromParent();
-  builder->SetInsertPoint(bb2, bb2->end());
+  _ctx->builder->SetInsertPoint(bb2, bb2->end());
 
-  return BasicBlock(bb2);
+  return BasicBlock(_ctx, bb2);
 }
 
 }

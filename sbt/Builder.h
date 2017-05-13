@@ -1,18 +1,21 @@
 #ifndef SBT_BUILDER_H
 #define SBT_BUILDER_H
 
-#include "Constants.h"
+#include "Context.h"
 #include "Register.h"
-
-#include <llvm/IR/IRBuilder.h>
 
 namespace sbt {
 
 class Builder
 {
+  Context* _ctx;
+  llvm::IRBuilder<>* _builder;
+  llvm::Value* _first = nullptr;
+
 public:
-  Builder(llvm::IRBuilder<>* builder) :
-    _builder(builder)
+  Builder(Context* ctx) :
+    _ctx(ctx),
+    _builder(ctx->builder)
   {}
 
   // load register
@@ -54,10 +57,11 @@ public:
   {
     // cast to int32_t *
     llvm::Value* v =
-      _builder->CreateCast(llvm::Instruction::CastOps::BitCast, v8, I32Ptr);
+      _builder->CreateCast(llvm::Instruction::CastOps::BitCast, v8, _ctx->t.i32ptr);
     updateFirst(v);
     // Cast to int32_t
-    v = _builder->CreateCast(llvm::Instruction::CastOps::PtrToInt, v, I32);
+    v = _builder->CreateCast(llvm::Instruction::CastOps::PtrToInt,
+      v, _ctx->t.i32);
     updateFirst(v);
     return v;
   }
@@ -70,9 +74,6 @@ public:
   }
 
 private:
-  llvm::IRBuilder<>* _builder;
-  llvm::Value* _first = nullptr;
-
   void updateFirst(llvm::Value* v)
   {
     if (!_first)

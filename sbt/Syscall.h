@@ -25,6 +25,7 @@ public:
 
 private:
   Context* _ctx;
+  Types& _t = _ctx->t;
 
   // riscv syscall function
   llvm::FunctionType* _ftRVSC;

@@ -9,7 +9,7 @@ namespace sbt {
 
 void Syscall::declHandler()
 {
-  _ftRVSC = llvm::FunctionType::get(I32, { I32 }, !VAR_ARG);
+  _ftRVSC = llvm::FunctionType::get(_t.i32, { _t.i32 }, !VAR_ARG);
   _fRVSC = llvm::Function::Create(
       _ftRVSC, llvm::Function::ExternalLinkage, "rv_syscall",
       _ctx->module);
@@ -26,7 +26,7 @@ llvm::Error Syscall::genHandler()
   const size_t n = 5;
   llvm::FunctionType *ftX86SC[n];
   llvm::Function* fX86SC[n];
-  std::vector<llvm::Type*> fArgs = { I32 };
+  std::vector<llvm::Type*> fArgs = { _t.i32 };
 
   const std::string scName = "syscall";
   for (size_t i = 0; i < n; i++) {
@@ -34,8 +34,8 @@ llvm::Error Syscall::genHandler()
     llvm::raw_string_ostream ss(s);
     ss << i;
 
-    ftX86SC[i] = llvm::FunctionType::get(I32, fArgs, !VAR_ARG);
-    fArgs.push_back(I32);
+    ftX86SC[i] = llvm::FunctionType::get(_t.i32, fArgs, !VAR_ARG);
+    fArgs.push_back(_t.i32);
 
     fX86SC[i] = llvm::Function::Create(ftX86SC[i],
       llvm::Function::ExternalLinkage, ss.str(), module);
@@ -64,7 +64,7 @@ llvm::Error Syscall::genHandler()
   const std::string bbPrefix = "bb_rvsc_";
 
   declHandler();
-  Builder bld(builder);
+  Builder bld(_ctx);
 
   // entry
   llvm::BasicBlock *bbEntry = llvm::BasicBlock::Create(
@@ -92,9 +92,9 @@ llvm::Error Syscall::genHandler()
   llvm::BasicBlock* bbSW1Dfl = llvm::BasicBlock::Create(*ctx,
     bbPrefix + "sw1_default", _fRVSC, bbSW2);
   builder->SetInsertPoint(bbSW1Dfl);
-  bld.store(llvm::ConstantInt::get(I32, 1), Register::RV_T0);
-  bld.store(llvm::ConstantInt::get(I32, X86_SYS_EXIT), Register::RV_A7);
-  bld.store(llvm::ConstantInt::get(I32, 99), Register::RV_A0);
+  bld.store(llvm::ConstantInt::get(_t.i32, 1), Register::RV_T0);
+  bld.store(llvm::ConstantInt::get(_t.i32, X86_SYS_EXIT), Register::RV_A7);
+  bld.store(llvm::ConstantInt::get(_t.i32, 99), Register::RV_A0);
   builder->CreateBr(bbSW2);
 
   builder->SetInsertPoint(bbEntry);
@@ -109,10 +109,10 @@ llvm::Error Syscall::genHandler()
     llvm::BasicBlock *bb = llvm::BasicBlock::Create(
       *ctx, ss.str(), _fRVSC, bbSW2);
     builder->SetInsertPoint(bb);
-    bld.store(llvm::ConstantInt::get(I32, s.args), Register::RV_T0);
-    bld.store(llvm::ConstantInt::get(I32, s.x86), Register::RV_A7);
+    bld.store(llvm::ConstantInt::get(_t.i32, s.args), Register::RV_T0);
+    bld.store(llvm::ConstantInt::get(_t.i32, s.x86), Register::RV_A7);
     builder->CreateBr(bbSW2);
-    sw1->addCase(llvm::ConstantInt::get(I32, s.rv), bb);
+    sw1->addCase(llvm::ConstantInt::get(_t.i32, s.rv), bb);
   };
 
   for (const Syscall& s : scv)
@@ -148,9 +148,9 @@ llvm::Error Syscall::genHandler()
   builder->SetInsertPoint(bbSW2);
   llvm::SwitchInst* sw2 = builder->CreateSwitch(
     bld.load(Register::RV_T0), sw2Case0);
-  sw2->addCase(ZERO, sw2Case0);
+  sw2->addCase(_ctx->c.ZERO, sw2Case0);
   for (size_t i = 1; i < n; i++)
-    sw2->addCase(llvm::ConstantInt::get(I32, i), getSW2CaseBB(i));
+    sw2->addCase(llvm::ConstantInt::get(_t.i32, i), getSW2CaseBB(i));
 
   return llvm::Error::success();
 }

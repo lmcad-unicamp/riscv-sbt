@@ -1,10 +1,10 @@
 #ifndef SBT_BASICBLOCK_H
 #define SBT_BASICBLOCK_H
 
+#include "Context.h"
 #include "Instruction.h"
 #include "Map.h"
 
-#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Function.h>
 #include <llvm/Support/raw_ostream.h>
 
@@ -14,7 +14,7 @@ class BasicBlock
 {
 public:
   BasicBlock(
-    llvm::LLVMContext* ctx,
+    Context* ctx,
     uint64_t addr,
     llvm::Function* f,
     llvm::BasicBlock* beforeBB = nullptr)
@@ -23,13 +23,14 @@ public:
   {}
 
   BasicBlock(
-    llvm::LLVMContext* ctx,
+    Context* ctx,
     llvm::StringRef name,
     llvm::Function* f,
     llvm::BasicBlock* beforeBB = nullptr);
 
 
 private:
+  Context* _ctx;
   llvm::BasicBlock* _bb;
   Map<uint64_t, Instruction> _instrMap;
 
@@ -44,11 +45,12 @@ private:
   }
 
 
-  BasicBlock(llvm::BasicBlock* bb) :
+  BasicBlock(Context* ctx, llvm::BasicBlock* bb) :
+    _ctx(ctx),
     _bb(bb)
   {}
 
-  BasicBlock split(uint64_t addr, llvm::IRBuilder<>* builder);
+  BasicBlock split(uint64_t addr);
 
   /*
   void updateNextBB(uint64_t Addr)

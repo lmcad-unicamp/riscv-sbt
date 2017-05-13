@@ -31,7 +31,6 @@ namespace sbt {
 Translator::Translator(Context* ctx)
   : _ctx(ctx)
 {
-  initLLVMConstants(*_ctx->ctx);
 }
 
 
@@ -113,16 +112,16 @@ llvm::Error Translator::start()
 
 llvm::Error Translator::declOrBuildRegisterFile(bool decl)
 {
-  Register::rvX[0] = new llvm::GlobalVariable(*_ctx->module, I32, CONSTANT,
-    llvm::GlobalValue::ExternalLinkage, decl? nullptr : ZERO,
+  Register::rvX[0] = new llvm::GlobalVariable(*_ctx->module, _ctx->t.i32, CONSTANT,
+    llvm::GlobalValue::ExternalLinkage, decl? nullptr : _ctx->c.ZERO,
     Register::getXRegName() + "0");
 
   for (int i = 1; i < 32; ++i) {
     std::string s;
     llvm::raw_string_ostream ss(s);
     ss << Register::getXRegName() << i;
-    Register::rvX[i] = new llvm::GlobalVariable(*_ctx->module, I32, !CONSTANT,
-        llvm::GlobalValue::ExternalLinkage, decl? nullptr : ZERO, ss.str());
+    Register::rvX[i] = new llvm::GlobalVariable(*_ctx->module, _ctx->t.i32, !CONSTANT,
+        llvm::GlobalValue::ExternalLinkage, decl? nullptr : _ctx->c.ZERO, ss.str());
   }
 
   return llvm::Error::success();

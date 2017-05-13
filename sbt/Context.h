@@ -1,6 +1,9 @@
 #ifndef SBT_CONTEXT_H
 #define SBT_CONTEXT_H
 
+#include "Constants.h"
+#include "Types.h"
+
 #include <llvm/IR/IRBuilder.h>
 
 namespace sbt {
@@ -16,13 +19,18 @@ public:
     :
     ctx(ctx),
     module(mod),
-    builder(bld)
-  {}
+    builder(bld),
+    t(*ctx)
+  {
+    c.init(*ctx);
+  }
 
 
   llvm::LLVMContext* ctx;
   llvm::Module* module;
   llvm::IRBuilder<>* builder;
+  Constants c;
+  Types t;
 };
 
 }

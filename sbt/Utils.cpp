@@ -8,7 +8,7 @@ namespace sbt {
 
 llvm::raw_ostream& logs(bool error)
 {
-  return (error? llvm::errs() : llvm::outs()) << *BIN_NAME << ": ";
+  return (error? llvm::errs() : llvm::outs()) << Constants::global().BIN_NAME << ": ";
 }
 
 }

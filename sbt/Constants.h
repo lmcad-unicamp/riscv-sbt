@@ -7,19 +7,12 @@
 
 namespace llvm {
 class ConstantInt;
-class FunctionType;
-class IntegerType;
 class LLVMContext;
-class PointerType;
-class Type;
-class Value;
 }
 
 namespace sbt {
 
 // name of the SBT binary/executable
-extern const std::string* BIN_NAME;
-extern const std::string* LIBC_BC;
 
 // (these are only to make the code easier to read)
 static const bool ADD_NULL = true;
@@ -31,27 +24,29 @@ static const bool VAR_ARG = true;
 static const bool VOLATILE = true;
 static const char nl = '\n';
 
-void initConstants();
-void destroyConstants();
 
+class Constants
+{
+public:
+  const std::string BIN_NAME = "riscv-sbt";
+  llvm::ConstantInt* ZERO = nullptr;
 
-// LLVM constants
+  const std::string& libCBC() const
+  {
+    return _libCBC;
+  }
 
-extern llvm::Type* Void;
+  void init(llvm::LLVMContext& ctx);
 
-extern llvm::IntegerType* I8;
-extern llvm::IntegerType* I16;
-extern llvm::IntegerType* I32;
+  static const Constants& global()
+  {
+    static Constants c;
+    return c;
+  }
 
-extern llvm::PointerType* I8Ptr;
-extern llvm::PointerType* I16Ptr;
-extern llvm::PointerType* I32Ptr;
-
-extern llvm::FunctionType* VoidFun;
-
-extern llvm::ConstantInt* ZERO;
-
-void initLLVMConstants(llvm::LLVMContext& ctx);
+private:
+  std::string _libCBC;
+};
 
 } // sbt
 

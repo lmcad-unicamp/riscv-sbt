@@ -9,31 +9,8 @@
 
 namespace sbt {
 
-const std::string* BIN_NAME = nullptr;
-const std::string* LIBC_BC = nullptr;
-
-// LLVM types
-
-llvm::Type* Void;
-
-llvm::IntegerType* I8;
-llvm::IntegerType* I16;
-llvm::IntegerType* I32;
-
-llvm::PointerType* I8Ptr;
-llvm::PointerType* I16Ptr;
-llvm::PointerType* I32Ptr;
-
-llvm::FunctionType* VoidFun;
-
-llvm::ConstantInt* ZERO;
-
-//
-
-void initConstants()
+static std::string getLibCBC(const std::string& binName)
 {
-  BIN_NAME = new std::string("riscv-sbt");
-
   std::string path = getenv("PATH");
   size_t p0 = 0;
   size_t p1 = 0;
@@ -63,7 +40,7 @@ void initConstants()
       continue;
 
     // check if riscv-sbt exists
-    std::string file = dir + "/" + *BIN_NAME;
+    std::string file = dir + "/" + binName;
     if (!llvm::sys::fs::exists(file))
       continue;
 
@@ -73,40 +50,21 @@ void initConstants()
       continue;
 
     std::string baseDir = dir.substr(0, p);
-    std::string shareDir = baseDir + "/share/" + *BIN_NAME;
+    std::string shareDir = baseDir + "/share/" + binName;
     std::string libCBC = shareDir + "/libc.bc";
-    if (llvm::sys::fs::exists(libCBC)) {
-      LIBC_BC = new std::string(libCBC);
-      break;
-    }
+    if (llvm::sys::fs::exists(libCBC))
+      return libCBC;
   } while (p0 != std::string::npos);
 
   // Note: LIBC_BC can be NULL if it was not found above
+  return "";
 }
 
 
-void destroyConstants()
+void Constants::init(llvm::LLVMContext& ctx)
 {
-  delete BIN_NAME;
-  delete LIBC_BC;
-}
-
-
-void initLLVMConstants(llvm::LLVMContext& ctx)
-{
-  Void = llvm::Type::getVoidTy(ctx);
-
-  I8 = llvm::Type::getInt8Ty(ctx);
-  I16 = llvm::Type::getInt16Ty(ctx);
-  I32 = llvm::Type::getInt32Ty(ctx);
-
-  I8Ptr = llvm::Type::getInt8PtrTy(ctx);
-  I16Ptr = llvm::Type::getInt16PtrTy(ctx);
-  I32Ptr = llvm::Type::getInt32PtrTy(ctx);
-
-  VoidFun = llvm::FunctionType::get(Void, !VAR_ARG);
-
-  ZERO = llvm::ConstantInt::get(I32, 0);
+  _libCBC = getLibCBC(BIN_NAME);
+  ZERO = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 0);
 }
 
 } // sbt

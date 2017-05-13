@@ -100,6 +100,7 @@ add_executable (riscv-sbt
   Section.cpp
   Syscall.cpp
   Translator.cpp
+  Types.cpp
   Utils.cpp
   sbt.cpp
   )
