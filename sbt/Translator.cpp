@@ -4,6 +4,7 @@
 #include "Module.h"
 #include "XRegisters.h"
 #include "SBTError.h"
+#include "Stack.h"
 #include "Syscall.h"
 #include "Utils.h"
 
@@ -101,27 +102,24 @@ llvm::Error Translator::start()
   //
   //
   _ctx->x = new XRegisters(_ctx, DECL);
+  _ctx->stack = new Stack(_ctx);
 
-  if (auto err = buildStack())
+  // host functions
+
+  llvm::FunctionType *ft = llvm::FunctionType::get(_ctx->t.i32, !VAR_ARG);
+
+  _getCycles.reset(new Function(_ctx, "get_cycles"));
+  _getTime.reset(new Function(_ctx, "get_time"));
+  _getInstRet.reset(new Function(_ctx, "get_instret"));
+
+  if (auto err = _getCycles->create(ft))
     return err;
 
-  return llvm::Error::success();
-}
+  if (auto err = _getTime->create(ft))
+    return err;
 
-
-llvm::Error Translator::buildStack()
-{
-  std::string bytes(_stackSize, 'S');
-
-  llvm::ArrayRef<uint8_t> byteArray(
-    reinterpret_cast<const uint8_t *>(bytes.data()),
-    _stackSize);
-
-  llvm::Constant *cda = llvm::ConstantDataArray::get(*_ctx->ctx, byteArray);
-
-  _stack = new llvm::GlobalVariable(
-    *_ctx->module, cda->getType(), !CONSTANT,
-      llvm::GlobalValue::ExternalLinkage, cda, "Stack");
+  if (auto err = _getInstRet->create(ft))
+    return err;
 
   return llvm::Error::success();
 }
@@ -149,9 +147,10 @@ llvm::Error Translator::translate()
   if (auto err = start())
     return err;
 
+  Syscall(_ctx).declHandler();
+
   for (const auto& f : _inputFiles) {
     Module mod(_ctx);
-    Syscall(_ctx).declHandler();
     if (auto err = mod.translate(f))
       return err;
   }

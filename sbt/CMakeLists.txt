@@ -98,6 +98,7 @@ add_executable (riscv-sbt
   Object.cpp
   SBTError.cpp
   Section.cpp
+  Stack.cpp
   Syscall.cpp
   Translator.cpp
   Types.cpp

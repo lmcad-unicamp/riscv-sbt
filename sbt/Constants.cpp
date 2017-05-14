@@ -61,10 +61,11 @@ static std::string getLibCBC(const std::string& binName)
 }
 
 
-void Constants::init(llvm::LLVMContext& ctx)
+void Constants::init(llvm::LLVMContext* ctx)
 {
+  _ctx = ctx;
   _libCBC = getLibCBC(BIN_NAME);
-  ZERO = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 0);
+  ZERO = i32(0);
 }
 
 } // sbt

@@ -1,11 +1,30 @@
 #include "Function.h"
 
 #include "BasicBlock.h"
+#include "Builder.h"
 #include "Constants.h"
+#include "Stack.h"
 
 #include <llvm/IR/Function.h>
+#include <llvm/IR/Module.h>
 
 namespace sbt {
+
+llvm::Error Function::create(llvm::FunctionType* ft)
+{
+  _f = _ctx->module->getFunction(_name);
+  if (_f)
+    return llvm::Error::success();
+
+  // create a function with no parameters
+  if (!ft)
+    ft = llvm::FunctionType::get(_ctx->t.voidT, !VAR_ARG);
+  _f = llvm::Function::Create(ft,
+    llvm::Function::ExternalLinkage, _name, _ctx->module);
+
+  return llvm::Error::success();
+}
+
 
 llvm::Error Function::translate()
 {
@@ -31,38 +50,31 @@ llvm::Error Function::translate()
 
 llvm::Error Function::startMain()
 {
-  /*
-  // Create a function with no parameters
+  const Types& t = _ctx->t;
+  auto builder = _ctx->builder;
+  Builder bld(_ctx);
+
+  // create a function with no parameters
   llvm::FunctionType *ft =
-    llvm::FunctionType::get(I32, !VAR_ARG);
-  llvm::Function *f =
-    llvm::Function::Create(ft, llvm::Function::ExternalLinkage,
-      _name, _module);
+    llvm::FunctionType::get(t.i32, !VAR_ARG);
+  _f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage,
+    _name, _ctx->module);
 
-  // BB
-  BasicBlock bb(*_ctx, _addr, f);
-  BBMap(Addr, std::move(BB));
-  Builder->SetInsertPoint(BB);
+  // bb
+  BasicBlock bb(_ctx, _addr, _f);
+  _bbMap(_addr, std::move(bb));
+  bld.setInsertPoint(bb);
 
-  // Set stack pointer.
-
-  std::vector<Value *> Idx = { ZERO, ConstantInt::get(I32, StackSize) };
-  Value *V =
-    Builder->CreateGEP(Stack, Idx);
-  StackEnd = i8PtrToI32(V);
-
-  store(StackEnd, RV_SP);
+  // set stack pointer
+  bld.store(_ctx->stack->end(), XRegister::SP);
 
   // if (auto E = startup())
   //  return E;
 
   // init syscall module
-  F = Function::Create(VoidFun,
-    Function::ExternalLinkage, "syscall_init", Module);
-  Builder->CreateCall(F);
-
-  InMain = true;
-  */
+  llvm::Function* f = llvm::Function::Create(t.voidFunc,
+    llvm::Function::ExternalLinkage, "syscall_init", _ctx->module);
+  builder->CreateCall(f);
 
   return llvm::Error::success();
 }
@@ -70,23 +82,6 @@ llvm::Error Function::startMain()
 
 
 #if 0
-llvm::Expected<llvm::Function *>
-Function::create(llvm::StringRef name)
-{
-  llvm::Function *f = module->getFunction(name);
-  if (f)
-    return f;
-
-  // Create a function with no parameters
-  llvm::FunctionType *ft =
-    llvm::FunctionType::get(Void, !VAR_ARG);
-  f = llvm::Function::Create(ft,
-      llvm::Function::ExternalLinkage, name, module);
-
-  return F;
-}
-
-
 llvm::Error Function::start(llvm::StringRef name, uint64_t addr)
 {
   if (auto E = finish())

@@ -9,6 +9,7 @@
 
 namespace sbt {
 
+class Stack;
 class XRegister;
 class XRegisters;
 
@@ -26,7 +27,7 @@ public:
     builder(bld),
     t(*ctx)
   {
-    c.init(*ctx);
+    c.init(ctx);
   }
 
   ~Context();
@@ -37,6 +38,7 @@ public:
   Constants c;
   Types t;
   ArrayPtr<XRegisters, XRegister> x;
+  Stack* stack = nullptr;
 };
 
 }

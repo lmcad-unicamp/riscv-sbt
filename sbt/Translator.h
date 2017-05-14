@@ -2,6 +2,7 @@
 #define SBT_TRANSLATOR_H
 
 #include "Context.h"
+#include "Function.h"
 
 #include <llvm/Support/Error.h>
 
@@ -62,11 +63,8 @@ private:
   std::vector<std::string> _inputFiles;
   std::string _outputFile;
 
-  // stack
-  llvm::GlobalVariable* _stack = nullptr;
-  size_t _stackSize = 4096;
 
-  // Target info
+  // target info
   const llvm::Target* _target;
   std::unique_ptr<const llvm::MCRegisterInfo> _mri;
   std::unique_ptr<const llvm::MCAsmInfo> _asmInfo;
@@ -77,14 +75,17 @@ private:
   std::unique_ptr<const llvm::MCInstrInfo> _mii;
   std::unique_ptr<llvm::MCInstPrinter> _instPrinter;
 
+  // host functions
+
+  FunctionPtr _getCycles;
+  FunctionPtr _getTime;
+  FunctionPtr _getInstRet;
+
 
   // methods
 
   llvm::Error start();
   llvm::Error finish();
-
-  // image
-  llvm::Error buildStack();
 };
 
 } // sbt

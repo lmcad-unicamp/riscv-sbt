@@ -4,10 +4,6 @@
 #include "Context.h"
 #include "Object.h"
 
-namespace llvm {
-class Module;
-}
-
 namespace sbt {
 
 class SBTSection

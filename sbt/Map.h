@@ -17,9 +17,9 @@ public:
   class Item
   {
   public:
-    Item(const Key& key, const Value& val) :
+    Item(const Key& key, Value&& val) :
       key(key),
-      val(val)
+      val(std::move(val))
     {}
 
     Item(Key&& key, Value&& val) :
@@ -47,6 +47,12 @@ public:
   typedef typename Vec::iterator Iter;
 
   Map() = default;
+
+  Map(const Map&) = delete;
+  Map(Map&&) = default;
+
+  Map& operator=(const Map&) = delete;
+  Map& operator=(Map&&) = default;
 
   Map(Vec&& vec) :
     _data(std::move(vec))

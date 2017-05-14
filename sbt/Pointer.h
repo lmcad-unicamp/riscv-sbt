@@ -13,7 +13,7 @@ template <typename T>
 class Pointer
 {
 public:
-  explicit Pointer(T* ptr) :
+  explicit Pointer(T* ptr = nullptr) :
     _ptr(ptr)
   {}
 

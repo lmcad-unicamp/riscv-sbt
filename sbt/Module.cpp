@@ -1,34 +1,31 @@
 #include "Module.h"
 
+#include "Builder.h"
+#include "Function.h"
 #include "SBTError.h"
 #include "Section.h"
 
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/ValueSymbolTable.h>
 
 namespace sbt {
+
+Module::Module(Context* ctx)
+  :
+  _ctx(ctx),
+  _iCaller(_ctx, "rv32_icaller")
+{}
+
 
 llvm::Error Module::start()
 {
   if (auto err = buildShadowImage())
     return err;
 
-  /*
-  auto ExpF = createFunction("rv32_icaller");
-  if (!ExpF)
-    return ExpF.takeError();
-  ICaller = ExpF.get();
-
-  FunctionType *FT = FunctionType::get(I32, !VAR_ARG);
-  GetCycles = Function::Create(FT,
-    Function::ExternalLinkage, "get_cycles", Module);
-
-  GetTime = Function::Create(FT,
-    Function::ExternalLinkage, "get_time", Module);
-
-  InstRet = Function::Create(FT,
-    Function::ExternalLinkage, "get_instret", Module);
-  */
+  if (auto err = _iCaller.create())
+    return err;
 
   return llvm::Error::success();
 }
@@ -68,54 +65,61 @@ llvm::Error Module::translate(const std::string& file)
 
 llvm::Error Module::genICaller()
 {
-/*
-  PointerType *Ty = VoidFun->getPointerTo();
-  Value *Target = nullptr;
+  llvm::LLVMContext& ctx = *_ctx->ctx;
+  const Constants& c = _ctx->c;
+  const Types& t = _ctx->t;
+  auto builder = _ctx->builder;
+  Builder bld(_ctx);
+  llvm::Function* ic = _iCaller.func();
+
+  llvm::PointerType* ty = t.voidFunc->getPointerTo();
+  llvm::Value* target = nullptr;
 
   // basic blocks
-  BasicBlock *BBPrev = Builder->GetInsertBlock();
-  BasicBlock *BBBeg = BasicBlock::Create(*Context, "begin", ICaller);
-  BasicBlock *BBDfl = BasicBlock::Create(*Context, "default", ICaller);
-  BasicBlock *BBEnd = BasicBlock::Create(*Context, "end", ICaller);
+  llvm::BasicBlock* bbPrev = builder->GetInsertBlock();
+  llvm::BasicBlock* bbBeg = llvm::BasicBlock::Create(ctx, "begin", ic);
+  llvm::BasicBlock* bbDfl = llvm::BasicBlock::Create(ctx, "default", ic);
+  llvm::BasicBlock* bbEnd = llvm::BasicBlock::Create(ctx, "end", ic);
 
   // default:
   // t1 = nullptr;
-  Builder->SetInsertPoint(BBDfl);
-  store(ZERO, RV_T1);
-  Builder->CreateBr(BBEnd);
+  builder->SetInsertPoint(bbDfl);
+  bld.store(c.ZERO, XRegister::T1);
+  builder->CreateBr(bbEnd);
 
   // end: call t1
-  Builder->SetInsertPoint(BBEnd);
-  Target = load(RV_T1);
-  Target = Builder->CreateIntToPtr(Target, Ty);
-  Builder->CreateCall(Target);
-  Builder->CreateRetVoid();
+  builder->SetInsertPoint(bbEnd);
+  target = bld.load(XRegister::T1);
+  target = builder->CreateIntToPtr(target, ty);
+  builder->CreateCall(target);
+  bld.retVoid();
 
   // switch
-  Builder->SetInsertPoint(BBBeg);
-  Target = load(RV_T1);
-  SwitchInst *SW = Builder->CreateSwitch(Target, BBDfl, FunTable.size());
+  builder->SetInsertPoint(bbBeg);
+  target = bld.load(XRegister::T1);
+  llvm::SwitchInst* sw = builder->CreateSwitch(target, bbDfl, _funMap.size());
 
   // cases
   // case fun: t1 = realFunAddress;
-  for (Function *F : FunTable) {
-    uint64_t *Addr = FunMap[F];
-    assert(Addr && "Indirect called function not found!");
-    std::string CaseStr = "case_" + F->getName().str();
-    Value *Sym = Module->getValueSymbolTable().lookup(F->getName());
+  for (const auto& p : _funMap) {
+    const FunctionPtr& f = p.key;
+    uint64_t addr = p.val;
 
-    BasicBlock *Dest = BasicBlock::Create(*Context, CaseStr, ICaller, BBDfl);
-    Builder->SetInsertPoint(Dest);
-    Sym = Builder->CreatePtrToInt(Sym, I32);
-    store(Sym, RV_T1);
-    Builder->CreateBr(BBEnd);
+    std::string caseStr = "case_" + f->name();
+    llvm::Value* sym = _ctx->module->getValueSymbolTable().lookup(f->name());
 
-    Builder->SetInsertPoint(BBBeg);
-    SW->addCase(ConstantInt::get(I32, *Addr), Dest);
+    llvm::BasicBlock* dest =
+      llvm::BasicBlock::Create(ctx, caseStr, ic, bbDfl);
+    builder->SetInsertPoint(dest);
+    sym = builder->CreatePtrToInt(sym, t.i32);
+    bld.store(sym, XRegister::T1);
+    builder->CreateBr(bbEnd);
+
+    builder->SetInsertPoint(bbBeg);
+    sw->addCase(llvm::ConstantInt::get(t.i32, addr), dest);
   }
 
-  Builder->SetInsertPoint(BBPrev);
-*/
+  builder->SetInsertPoint(bbPrev);
   return llvm::Error::success();
 }
 

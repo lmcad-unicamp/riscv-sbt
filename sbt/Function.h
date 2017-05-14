@@ -1,9 +1,11 @@
 #ifndef SBT_FUNCTION_H
 #define SBT_FUNCTION_H
 
+#include "BasicBlock.h"
 #include "Context.h"
 #include "Map.h"
 #include "Object.h"
+#include "Pointer.h"
 
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/Error.h>
@@ -24,24 +26,41 @@ class Function
 {
 public:
   Function(
-    const llvm::StringRef name,
-    uint64_t addr,
-    uint64_t end,
-    Context* ctx)
+    Context* ctx,
+    const std::string& name,
+    uint64_t addr = 0,
+    uint64_t end = 0)
     :
+    _ctx(ctx),
     _name(name),
     _addr(addr),
-    _end(end),
-    _ctx(ctx)
+    _end(end)
   {}
+
+  llvm::Error create(
+    llvm::FunctionType* ft = nullptr);
 
   llvm::Error translate();
 
+
+  const std::string& name() const
+  {
+    return _name;
+  }
+
+  llvm::Function* func() const
+  {
+    return _f;
+  }
+
 private:
-  const llvm::StringRef _name;
+  Context* _ctx;
+  std::string _name;
   uint64_t _addr;
   uint64_t _end;
-  Context* _ctx;
+
+  llvm::Function* _f = nullptr;
+  Map<uint64_t, BasicBlock> _bbMap;
 
 
   llvm::Error startMain();
@@ -52,18 +71,16 @@ private:
   { return llvm::Error::success(); }
 
   /*
-  llvm::Expected<llvm::Function *> create(llvm::StringRef name);
   llvm::Expected<uint64_t> import(llvm::StringRef func);
 
 
 private:
-  Map<uint64_t, llvm::BasicBlock *> _bbMap;
   uint64_t _nextBB = 0;
   bool _brWasLast = false;
   */
 };
 
-using FunctionPtr = std::unique_ptr<Function>;
+using FunctionPtr = Pointer<Function>;
 
 }
 

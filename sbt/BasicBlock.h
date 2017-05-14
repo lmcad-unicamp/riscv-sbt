@@ -28,6 +28,13 @@ public:
     llvm::Function* f,
     llvm::BasicBlock* beforeBB = nullptr);
 
+  BasicBlock(BasicBlock&&) = default;
+  BasicBlock& operator=(BasicBlock&&) = default;
+
+  llvm::BasicBlock* bb() const
+  {
+    return _bb;
+  }
 
 private:
   Context* _ctx;

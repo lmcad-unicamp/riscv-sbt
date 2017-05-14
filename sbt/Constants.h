@@ -3,10 +3,11 @@
 
 #define SBT_DEBUG 1
 
+#include <llvm/IR/Constants.h>
+
 #include <string>
 
 namespace llvm {
-class ConstantInt;
 class LLVMContext;
 }
 
@@ -37,7 +38,7 @@ public:
     return _libCBC;
   }
 
-  void init(llvm::LLVMContext& ctx);
+  void init(llvm::LLVMContext* ctx);
 
   static const Constants& global()
   {
@@ -45,8 +46,14 @@ public:
     return c;
   }
 
+  llvm::ConstantInt* i32(int32_t i) const
+  {
+    return llvm::ConstantInt::get(llvm::Type::getInt32Ty(*_ctx), i);
+  }
+
 private:
   std::string _libCBC;
+  llvm::LLVMContext* _ctx = nullptr;
 };
 
 } // sbt

@@ -31,6 +31,7 @@ llvm::Error SBTSection::translate()
   _re = relocs.cend();
   _rlast = _ri;
 
+  /*
   // get section bytes
   llvm::StringRef bytesStr;
   if (_section->contents(bytesStr)) {
@@ -40,6 +41,7 @@ llvm::Error SBTSection::translate()
   }
   auto bytes = llvm::ArrayRef<uint8_t>(
     reinterpret_cast<const uint8_t *>(bytesStr.data()), bytesStr.size());
+  */
 
   // for each symbol
   const ConstSymbolPtrVec &symbols = _section->symbols();
@@ -61,7 +63,7 @@ llvm::Error SBTSection::translate()
         sym->flags() & llvm::object::SymbolRef::SF_Global)
     {
       // if (symname == "main")
-      Function func(symname, symaddr, end, _ctx);
+      Function func(_ctx, symname, symaddr, end);
         if (auto err = func.translate())
           return err;
     // skip section bytes until a function like symbol is found

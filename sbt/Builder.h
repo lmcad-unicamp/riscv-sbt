@@ -1,6 +1,7 @@
 #ifndef SBT_BUILDER_H
 #define SBT_BUILDER_H
 
+#include "BasicBlock.h"
 #include "Context.h"
 #include "XRegisters.h"
 
@@ -73,6 +74,11 @@ public:
     auto v = _builder->CreateRetVoid();
     updateFirst(v);
     return v;
+  }
+
+  void setInsertPoint(BasicBlock& bb)
+  {
+    _builder->SetInsertPoint(bb.bb());
   }
 
 private:
