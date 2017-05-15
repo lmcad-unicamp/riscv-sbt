@@ -3,10 +3,13 @@
 #include "BasicBlock.h"
 #include "Builder.h"
 #include "Constants.h"
+#include "SBTError.h"
+#include "Section.h"
 #include "Stack.h"
 
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Module.h>
+#include <llvm/Support/FormatVariadic.h>
 
 namespace sbt {
 
@@ -80,145 +83,76 @@ llvm::Error Function::startMain()
 }
 
 
-
-#if 0
-llvm::Error Function::start(llvm::StringRef name, uint64_t addr)
+llvm::Error Function::start()
 {
-  if (auto E = finish())
-    return E;
+  if (auto err = create())
+    return err;
 
-  auto ExpF = create(name);
-  if (!ExpF)
-    return ExpF.takeError();
-  llvm::Function *f = ExpF.get();
-  CurFunc = F;
-  FunTable.push_back(F);
-  FunMap(F, std::move(Addr));
+  // FunMap(F, std::move(Addr));
 
   // BB
-  BasicBlock **BBPtr = BBMap[Addr];
-  BasicBlock *BB;
-  if (!BBPtr) {
-    BB = SBTBasicBlock::create(*Context, Addr, F);
-    BBMap(Addr, std::move(BB));
+  BasicBlock *bb = _bbMap[_addr];
+  if (!bb) {
+    _bbMap(_addr, BasicBlock(_ctx, _addr, _f));
+    bb = _bbMap[_addr];
   } else {
-    BB = *BBPtr;
-    BB->removeFromParent();
-    BB->insertInto(F);
+    auto b = bb->bb();
+    b->removeFromParent();
+    b->insertInto(_f);
   }
-  Builder->SetInsertPoint(BB);
+  Builder bld(_ctx);
+  bld.setInsertPoint(*bb);
 
-  return Error::success();
+  return llvm::Error::success();
 }
+
 
 llvm::Error Function::finish()
 {
-  if (!CurFunc)
-    return Error::success();
-  CurFunc = nullptr;
-
-  if (Builder->GetInsertBlock()->getTerminator() == nullptr)
-    Builder->CreateRetVoid();
-  InMain = false;
-  return Error::success();
+  auto builder = _ctx->builder;
+  if (builder->GetInsertBlock()->getTerminator() == nullptr)
+    builder->CreateRetVoid();
+  return llvm::Error::success();
 }
 
 
-llvm::Error Translator::translateInstrs(uint64_t Begin, uint64_t End)
+llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
 {
-  DBGS << __FUNCTION__ << formatv("({0:X+4}, {1:X+4})\n", Begin, End);
+  DBGS << __FUNCTION__ << llvm::formatv("({0:X+4}, {1:X+4})\n", st, end);
 
-  uint64_t SectionAddr = CurSection->address();
+  ConstSectionPtr section = _sec->section();
+  const llvm::ArrayRef<uint8_t> bytes = _sec->bytes();
 
   // for each instruction
-  uint64_t Size;
-  for (uint64_t Addr = Begin; Addr < End; Addr += Size) {
-    setCurAddr(Addr);
-
+  uint64_t size = Instruction::SIZE;
+  for (uint64_t addr = st; addr < end; addr += size) {
     // disasm
-    const uint8_t* RawBytes = &CurSectionBytes[Addr];
-    uint32_t RawInst = *reinterpret_cast<const uint32_t*>(RawBytes);
+    const uint8_t* rawBytes = &bytes[addr];
+    uint32_t rawInst = *reinterpret_cast<const uint32_t*>(rawBytes);
 
     // consider 0 bytes as end-of-section padding
-    if (State == ST_PADDING) {
-      if (RawInst != 0) {
-        SBTError SE;
-        SE << "Found non-zero byte in zero-padding area";
-        return error(SE);
+    if (_state == ST_PADDING) {
+      if (rawInst != 0) {
+        SBTError serr;
+        serr << "Found non-zero byte in zero-padding area";
+        return error(serr);
       }
       continue;
-    } else if (RawInst == 0) {
-      State = ST_PADDING;
+    } else if (rawInst == 0) {
+      _state = ST_PADDING;
       continue;
     }
 
-    MCInst Inst;
-    MCDisassembler::DecodeStatus st =
-      DisAsm->getInstruction(Inst, Size,
-        CurSectionBytes.slice(Addr),
-        SectionAddr + Addr, DBGS, nulls());
-    if (st == MCDisassembler::DecodeStatus::Success) {
-#if SBT_DEBUG
-      DBGS << llvm::formatv("{0:X-4}: ", Addr);
-      InstPrinter->printInst(&Inst, DBGS, "", *STI);
-      DBGS << "\n";
-#endif
-      // translate
-      if (auto E = translate(Inst))
-        return E;
-    // failed to disasm
-    } else {
-      SBTError SE;
-      SE << "Invalid instruction encoding at address ";
-      SE << formatv("{0:X-4}", Addr);
-      SE << formatv(": {0:X-8}", RawInst);
-      return error(SE);
-    }
+    Instruction inst(_ctx, rawInst);
+    if (auto err = inst.translate())
+      return err;
   }
 
-  return Error::success();
-}
-
-Error Translator::startMain(StringRef Name, uint64_t Addr)
-{
-  if (auto E = finishFunction())
-    return E;
-
-  // Create a function with no parameters
-  FunctionType *FT =
-    FunctionType::get(I32, !VAR_ARG);
-  Function *F =
-    Function::Create(FT, Function::ExternalLinkage, Name, Module);
-  CurFunc = F;
-
-  // BB
-  BasicBlock *BB = SBTBasicBlock::create(*Context, Addr, F);
-  BBMap(Addr, std::move(BB));
-  Builder->SetInsertPoint(BB);
-
-  // Set stack pointer.
-
-  std::vector<Value *> Idx = { ZERO, ConstantInt::get(I32, StackSize) };
-  Value *V =
-    Builder->CreateGEP(Stack, Idx);
-  StackEnd = i8PtrToI32(V);
-
-  store(StackEnd, RV_SP);
-
-  // if (auto E = startup())
-  //  return E;
-
-  // init syscall module
-  F = Function::Create(VoidFun,
-    Function::ExternalLinkage, "syscall_init", Module);
-  Builder->CreateCall(F);
-
-  InMain = true;
-
-  return Error::success();
+  return llvm::Error::success();
 }
 
 
+#if 0
 llvm::Expected<uint64_t> Translator::import(llvm::StringRef Func)
 {
   std::string RV32Func = "rv32_" + Func.str();

@@ -19,20 +19,23 @@ public:
 
   llvm::Error translate();
 
+  ConstSectionPtr section() const
+  {
+    return _section;
+  }
+
+  const llvm::ArrayRef<uint8_t> bytes() const
+  {
+    return _bytes;
+  }
+
 private:
   using ConstRelocIter = ConstRelocationPtrVec::const_iterator;
-
-  enum TranslationState {
-    ST_DFL,
-    ST_PADDING
-  };
-
-  TranslationState _state = ST_DFL;
 
   ConstSectionPtr _section;
   Context* _ctx;
 
-  llvm::ArrayRef<uint8_t> _sectionBytes;
+  llvm::ArrayRef<uint8_t> _bytes;
   ConstRelocIter _ri;
   ConstRelocIter _re;
   ConstRelocIter _rlast;

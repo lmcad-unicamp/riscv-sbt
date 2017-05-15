@@ -1,15 +1,27 @@
 #ifndef SBT_INSTRUCTION_H
 #define SBT_INSTRUCTION_H
 
+#include <llvm/Support/Error.h>
+
+#include <cstdint>
+
 namespace llvm {
 class Instruction;
 }
 
 namespace sbt {
 
+class Context;
+
 class Instruction
 {
 public:
+  static const std::size_t SIZE = 4;
+
+  Instruction(Context* ctx, std::uint32_t rawInst) {}
+
+  llvm::Error translate() { return llvm::Error::success(); }
+
   const llvm::Instruction* instr() const
   {
     return _instr;

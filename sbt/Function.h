@@ -22,17 +22,21 @@ class Module;
 
 namespace sbt {
 
+class SBTSection;
+
 class Function
 {
 public:
   Function(
     Context* ctx,
     const std::string& name,
+    SBTSection* sec = nullptr,
     uint64_t addr = 0,
     uint64_t end = 0)
     :
     _ctx(ctx),
     _name(name),
+    _sec(sec),
     _addr(addr),
     _end(end)
   {}
@@ -56,19 +60,26 @@ public:
 private:
   Context* _ctx;
   std::string _name;
+  SBTSection* _sec;
   uint64_t _addr;
   uint64_t _end;
 
   llvm::Function* _f = nullptr;
   Map<uint64_t, BasicBlock> _bbMap;
 
+  enum TranslationState {
+    ST_DFL,
+    ST_PADDING
+  };
+
+  TranslationState _state = ST_DFL;
+
 
   llvm::Error startMain();
-  llvm::Error start() { return llvm::Error::success(); }
-  llvm::Error finish() { return llvm::Error::success(); }
+  llvm::Error start();
+  llvm::Error finish();
 
-  llvm::Error translateInstrs(uint64_t st, uint64_t end)
-  { return llvm::Error::success(); }
+  llvm::Error translateInstrs(uint64_t st, uint64_t end);
 
   /*
   llvm::Expected<uint64_t> import(llvm::StringRef func);
