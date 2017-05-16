@@ -1,6 +1,7 @@
 #include "Translator.h"
 
 #include "Builder.h"
+#include "Disassembler.h"
 #include "Module.h"
 #include "XRegisters.h"
 #include "SBTError.h"
@@ -107,6 +108,8 @@ llvm::Error Translator::start()
   //
   _ctx->x = new XRegisters(_ctx, DECL);
   _ctx->stack = new Stack(_ctx);
+  _ctx->disasm = new Disassembler(&*_disAsm, &*_instPrinter, &*_sti);
+  _ctx->_func = &_funMap;
 
   if (auto err = _iCaller.create())
     return err;
@@ -223,6 +226,7 @@ llvm::Error Translator::import(const std::string& func)
     return err;
   if (!_extFuncAddr)
     _extFuncAddr = 0xFFFF0000;
+  // XXX need to always add to map?
   _funMap(std::move(f), std::move(_extFuncAddr));
   _extFuncAddr += Instruction::SIZE;
 

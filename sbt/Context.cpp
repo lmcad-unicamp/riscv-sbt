@@ -1,5 +1,6 @@
 #include "Context.h"
 
+#include "Disassembler.h"
 #include "Stack.h"
 #include "XRegisters.h"
 
@@ -9,6 +10,7 @@ Context::~Context()
 {
   delete x.get();
   delete stack;
+  delete disasm;
 }
 
 }

@@ -67,13 +67,10 @@ llvm::Error Function::startMain()
   // bb
   BasicBlock bb(_ctx, _addr, _f);
   _bbMap(_addr, std::move(bb));
-  bld.setInsertPoint(bb);
+  bld.setInsertPoint(*_bbMap[_addr]);
 
   // set stack pointer
   bld.store(_ctx->stack->end(), XRegister::SP);
-
-  // if (auto E = startup())
-  //  return E;
 
   // init syscall module
   llvm::Function* f = llvm::Function::Create(t.voidFunc,
@@ -89,10 +86,9 @@ llvm::Error Function::start()
   if (auto err = create())
     return err;
 
-  // FunMap(F, std::move(Addr));
-
-  // BB
-  BasicBlock *bb = _bbMap[_addr];
+  // bb
+  /*
+  BasicBlock* bb = _bbMap[_addr];
   if (!bb) {
     _bbMap(_addr, BasicBlock(_ctx, _addr, _f));
     bb = _bbMap[_addr];
@@ -101,6 +97,10 @@ llvm::Error Function::start()
     b->removeFromParent();
     b->insertInto(_f);
   }
+  */
+
+  _bbMap(_addr, BasicBlock(_ctx, _addr, _f));
+  BasicBlock* bb = _bbMap[_addr];
   Builder bld(_ctx);
   bld.setInsertPoint(*bb);
 
@@ -144,7 +144,7 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
       continue;
     }
 
-    Instruction inst(_ctx, rawInst);
+    Instruction inst(_ctx, addr, rawInst);
     if (auto err = inst.translate())
       return err;
   }

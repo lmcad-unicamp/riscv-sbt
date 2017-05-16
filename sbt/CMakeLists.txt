@@ -93,7 +93,9 @@ add_executable (riscv-sbt
   BasicBlock.cpp
   Constants.cpp
   Context.cpp
+  Disassembler.cpp
   Function.cpp
+  Instruction.cpp
   Module.cpp
   Object.cpp
   SBTError.cpp

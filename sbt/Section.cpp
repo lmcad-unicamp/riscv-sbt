@@ -61,9 +61,11 @@ llvm::Error SBTSection::translate()
         sym->flags() & llvm::object::SymbolRef::SF_Global)
     {
       // if (symname == "main")
-      Function func(_ctx, symname, this, symaddr, end);
-        if (auto err = func.translate())
-          return err;
+      Function* f = new Function(_ctx, symname, this, symaddr, end);
+      FunctionPtr func(f);
+      // _ctx->func()(std::move(func), std::move(symaddr));
+      if (auto err = f->translate())
+        return err;
     // skip section bytes until a function like symbol is found
     } else
       continue;

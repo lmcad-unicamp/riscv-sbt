@@ -18,9 +18,13 @@ class Instruction
 public:
   static const std::size_t SIZE = 4;
 
-  Instruction(Context* ctx, std::uint32_t rawInst) {}
+  Instruction(Context* ctx, uint64_t addr, uint32_t rawInst) :
+    _ctx(ctx),
+    _addr(addr),
+    _rawInst(rawInst)
+  {}
 
-  llvm::Error translate() { return llvm::Error::success(); }
+  llvm::Error translate();
 
   const llvm::Instruction* instr() const
   {
@@ -28,11 +32,16 @@ public:
   }
 
 private:
+  Context* _ctx;
+  uint64_t _addr;
+  uint32_t _rawInst;
+
   llvm::Instruction* _instr;
 
-/*
-  static const size_t InstrSize = 4;
 
+  // methods
+
+/*
   enum ALUOp {
     ADD,
     AND,

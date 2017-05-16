@@ -1,32 +1,33 @@
+#include "Instruction.h"
+
+#include "Context.h"
+#include "Disassembler.h"
+#include "SBTError.h"
+
+#include <llvm/MC/MCInst.h>
+#include <llvm/Support/FormatVariadic.h>
+
 // LLVM internal instruction info
 #define GET_INSTRINFO_ENUM
 #include <llvm/Target/RISCVMaster/RISCVMasterGenInstrInfo.inc>
 
-llvm::Error xxx()
+
+namespace sbt {
+
+llvm::Error Instruction::translate()
 {
-    llvm::MCInst inst;
-    llvm::MCDisassembler::DecodeStatus sts =
-      DisAsm->getInstruction(inst, size,
-        CurSectionBytes.slice(addr),
-        SectionAddr + addr, DBGS, llvm::nulls());
-    if (sts == llvm::MCDisassembler::DecodeStatus::Success) {
-#if SBT_DEBUG
-      DBGS << llvm::formatv("{0:X-4}: ", addr);
-      InstPrinter->printInst(&inst, DBGS, "", *sti);
-      DBGS << "\n";
-#endif
-      // translate
-      if (auto err = translate(inst))
-        return err;
-    // failed to disasm
-    } else {
-      SBTError serr;
-      serr << "Invalid instruction encoding at address ";
-      serr << llvm::formatv("{0:X-4}", addr);
-      serr << llvm::formatv(": {0:X-8}", RawInst);
-      return error(serr);
-    }
+  llvm::MCInst inst;
+  size_t size;
+  if (auto err = _ctx->disasm->disasm(_addr, _rawInst, inst, size))
+    return err;
+
+  return llvm::Error::success();
 }
+
+}
+
+#if 0
+
 
 llvm::Error Translator::translate(const llvm::MCInst &Inst)
 {
@@ -1094,3 +1095,4 @@ void Translator::dbgprint(llvm::raw_string_ostream &SS)
 }
 #endif
 
+#endif

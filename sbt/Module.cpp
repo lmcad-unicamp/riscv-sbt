@@ -64,7 +64,7 @@ llvm::Error Module::buildShadowImage()
 
   std::vector<uint8_t> vec;
   for (ConstSectionPtr sec : _obj->sections()) {
-    // Skip non text/data sections
+    // skip non text/data sections
     if (!sec->isText() && !sec->isData() && !sec->isBSS() && !sec->isCommon())
       continue;
 
@@ -76,7 +76,7 @@ llvm::Error Module::buildShadowImage()
       bytes = z;
     // others
     } else {
-      // Read contents
+      // read contents
       if (sec->contents(bytes)) {
         serr  << __FUNCTION__ << ": failed to get section ["
               << sec->name() << "] contents";
@@ -84,19 +84,19 @@ llvm::Error Module::buildShadowImage()
       }
     }
 
-    // Align all sections
+    // align all sections
     while (vec.size() % 4 != 0)
       vec.push_back(0);
 
-    // Set Shadow Offset of Section
+    // set Shadow Offset of Section
     sec->shadowOffs(vec.size());
 
-    // Append to vector
+    // append to vector
     for (size_t i = 0; i < bytes.size(); i++)
       vec.push_back(bytes[i]);
   }
 
-  // Create the ShadowImage
+  // create the ShadowImage
   llvm::Constant* cda = llvm::ConstantDataArray::get(*_ctx->ctx, vec);
   _shadowImage =
     new llvm::GlobalVariable(*_ctx->module, cda->getType(), !CONSTANT,
