@@ -46,6 +46,8 @@ public:
   // translate input files
   llvm::Error translate();
 
+  llvm::Error import(const std::string& func);
+
   // setters
 
   void setOutputFile(const std::string& file)
@@ -75,6 +77,13 @@ private:
   std::unique_ptr<const llvm::MCInstrInfo> _mii;
   std::unique_ptr<llvm::MCInstPrinter> _instPrinter;
 
+  // icaller
+  Function _iCaller;
+  Map<FunctionPtr, uint64_t> _funMap;
+
+  uint64_t _extFuncAddr = 0;
+  std::unique_ptr<llvm::Module> _lcModule;
+
   // host functions
 
   FunctionPtr _getCycles;
@@ -86,6 +95,9 @@ private:
 
   llvm::Error start();
   llvm::Error finish();
+
+  // indirect function caller
+  llvm::Error genICaller();
 };
 
 } // sbt

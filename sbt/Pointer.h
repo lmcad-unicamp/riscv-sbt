@@ -17,6 +17,9 @@ public:
     _ptr(ptr)
   {}
 
+  Pointer(Pointer&&) = default;
+  Pointer& operator=(Pointer&&) = default;
+
   T* get()
   {
     return _ptr.get();

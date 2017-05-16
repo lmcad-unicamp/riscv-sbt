@@ -42,7 +42,8 @@ public:
   {}
 
   llvm::Error create(
-    llvm::FunctionType* ft = nullptr);
+    llvm::FunctionType* ft = nullptr,
+    llvm::Function::LinkageTypes linkage = llvm::Function::ExternalLinkage);
 
   llvm::Error translate();
 

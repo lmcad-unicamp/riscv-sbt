@@ -2,6 +2,7 @@
 #define SBT_MAP_H
 
 #include <algorithm>
+#include <type_traits>
 #include <vector>
 
 namespace sbt {
@@ -74,13 +75,28 @@ public:
   void operator()(const Key& key, Value&& val)
   {
     Value *dv = lookupVal(this, key);
-    if (dv) {
+    if (dv)
       *dv = std::move(val);
-    } else {
-      auto it = _data.emplace(_data.end(), Item(key, std::move(val)));
-      std::inplace_merge(_data.begin(), it, _data.end(),
-        [](const Item& i1, const Item& i2){ return i1.key < i2.key; });
-    }
+    else
+      insert(Item(key, std::move(val)));
+  }
+
+  void operator()(Key&& key, Value&& val)
+  {
+    static_assert(std::is_move_constructible<Key>::value,
+      "key is not move constructible");
+    static_assert(std::is_move_assignable<Key>::value,
+      "key is not move assignable");
+    static_assert(std::is_move_constructible<Value>::value,
+      "value is not move constructible");
+    static_assert(std::is_move_assignable<Value>::value,
+      "value is not move assignable");
+
+    Value *dv = lookupVal(this, key);
+    if (dv)
+      *dv = std::move(val);
+    else
+      insert(Item(std::move(key), std::move(val)));
   }
 
   CIter begin() const
@@ -131,6 +147,13 @@ private:
   Vec _data;
 
   // methods
+
+  void insert(Item&& item)
+  {
+      auto it = _data.emplace(_data.end(), std::move(item));
+      std::inplace_merge(_data.begin(), it, _data.end(),
+        [](const Item& i1, const Item& i2){ return i1.key < i2.key; });
+  }
 
   void sort()
   {

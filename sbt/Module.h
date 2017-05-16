@@ -26,20 +26,11 @@ private:
   Context* _ctx;
   ConstObjectPtr _obj = nullptr;
   llvm::GlobalVariable* _shadowImage = nullptr;
-  // icaller
-  Function _iCaller;
-  Map<FunctionPtr, uint64_t> _funMap;
 
   // methods
 
   llvm::Error start();
   llvm::Error finish();
-
-  // indirect function caller
-  // FIXME this probably should be moved to Translator, in order
-  //       to handle indirect calls between different modules
-  llvm::Error genICaller();
-
   llvm::Error buildShadowImage();
 };
 
