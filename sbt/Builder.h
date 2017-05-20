@@ -11,13 +11,19 @@ class Builder
 {
   Context* _ctx;
   llvm::IRBuilder<>* _builder;
-  llvm::Value* _first = nullptr;
+  llvm::Instruction* _first = nullptr;
 
 public:
   Builder(Context* ctx) :
     _ctx(ctx),
     _builder(ctx->builder)
   {}
+
+  ~Builder()
+  {
+    if (!_first)
+      _first = load(XRegister::A0);
+  }
 
   // load register
   llvm::LoadInst* load(unsigned reg)
@@ -79,6 +85,11 @@ public:
   void setInsertPoint(BasicBlock& bb)
   {
     _builder->SetInsertPoint(bb.bb());
+  }
+
+  llvm::Instruction* first()
+  {
+    return _first;
   }
 
 private:

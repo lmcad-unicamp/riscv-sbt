@@ -74,6 +74,15 @@ public:
   // insert/update
   void operator()(const Key& key, Value&& val)
   {
+    static_assert(std::is_copy_constructible<Key>::value,
+      "key is not copy constructible");
+    static_assert(std::is_copy_assignable<Key>::value,
+      "key is not copy assignable");
+    static_assert(std::is_move_constructible<Value>::value,
+      "value is not move constructible");
+    static_assert(std::is_move_assignable<Value>::value,
+      "value is not move assignable");
+
     Value *dv = lookupVal(this, key);
     if (dv)
       *dv = std::move(val);

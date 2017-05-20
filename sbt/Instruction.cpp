@@ -1,10 +1,10 @@
 #include "Instruction.h"
 
+#include "Builder.h"
 #include "Context.h"
 #include "Disassembler.h"
 #include "SBTError.h"
 
-#include <llvm/MC/MCInst.h>
 #include <llvm/Support/FormatVariadic.h>
 
 // LLVM internal instruction info
@@ -14,233 +14,271 @@
 
 namespace sbt {
 
+Instruction::Instruction(Context* ctx, uint64_t addr, uint32_t rawInst)
+  :
+  _ctx(ctx),
+  _addr(addr),
+  _rawInst(rawInst),
+#if SBT_DEBUG
+  _ss(new llvm::raw_string_ostream(_s)),
+  _os(&*_ss),
+#else
+  _os(&llvm::nulls()),
+#endif
+  _builder(new Builder(_ctx))
+{
+}
+
+
+Instruction::~Instruction()
+{
+}
+
+
 llvm::Error Instruction::translate()
 {
-  llvm::MCInst inst;
+  namespace RISCV = llvm::RISCVMaster;
+
+  // disasm
   size_t size;
-  if (auto err = _ctx->disasm->disasm(_addr, _rawInst, inst, size))
+  if (auto err = _ctx->disasm->disasm(_addr, _rawInst, _inst, size))
     return err;
 
-  return llvm::Error::success();
-}
+  // print address
+  *_os << llvm::formatv("{0:X-4}:   ", _addr);
 
-}
+  llvm::Error err = noError();
 
-#if 0
-
-
-llvm::Error Translator::translate(const llvm::MCInst &Inst)
-{
-  namespace RISCV = RISCVMaster;
-
-  SBTError SE;
-  First = nullptr;
-
-#if SBT_DEBUG
-  std::string SSS;
-  raw_string_ostream SS(SSS);
-#else
-  raw_ostream &SS = nulls();
-#endif
-  SS << formatv("{0:X-4}:   ", CurAddr);
-
-  if (NextBB && CurAddr == NextBB) {
-    BasicBlock **BB = BBMap[CurAddr];
-    assert(BB && "BasicBlock not found!");
-    if (!BrWasLast)
-      Builder->CreateBr(*BB);
-    Builder->SetInsertPoint(*BB);
-
-    auto Iter = BBMap.lower_bound(CurAddr + 4);
-    if (Iter != BBMap.end())
-      updateNextBB(Iter->key);
-  }
-
-  Error E = noError();
-  BrWasLast = false;
-
-  switch (Inst.getOpcode())
-  {
+  switch (_inst.getOpcode()) {
     // ALU Ops
     case RISCV::ADD:
-      E = translateALUOp(Inst, ADD, AF_NONE, SS);
+      err = translateALUOp(ADD, AF_NONE);
       break;
     case RISCV::ADDI:
-      E = translateALUOp(Inst, ADD, AF_IMM, SS);
+      err = translateALUOp(ADD, AF_IMM);
       break;
     case RISCV::AND:
-      E = translateALUOp(Inst, AND, AF_NONE, SS);
+      err = translateALUOp(AND, AF_NONE);
       break;
     case RISCV::ANDI:
-      E = translateALUOp(Inst, AND, AF_IMM, SS);
+      err = translateALUOp(AND, AF_IMM);
       break;
     case RISCV::MUL:
-      E = translateALUOp(Inst, MUL, AF_NONE, SS);
+      err = translateALUOp(MUL, AF_NONE);
       break;
     case RISCV::OR:
-      E = translateALUOp(Inst, OR, AF_NONE, SS);
+      err = translateALUOp(OR, AF_NONE);
       break;
     case RISCV::ORI:
-      E = translateALUOp(Inst, OR, AF_IMM, SS);
+      err = translateALUOp(OR, AF_IMM);
       break;
     case RISCV::SLL:
-      E = translateALUOp(Inst, SLL, AF_NONE, SS);
+      err = translateALUOp(SLL, AF_NONE);
       break;
     case RISCV::SLLI:
-      E = translateALUOp(Inst, SLL, AF_IMM, SS);
+      err = translateALUOp(SLL, AF_IMM);
       break;
     case RISCV::SLT:
-      E = translateALUOp(Inst, SLT, AF_NONE, SS);
+      err = translateALUOp(SLT, AF_NONE);
       break;
     case RISCV::SLTU:
-      E = translateALUOp(Inst, SLT, AF_UNSIGNED, SS);
+      err = translateALUOp(SLT, AF_UNSIGNED);
       break;
     case RISCV::SLTI:
-      E = translateALUOp(Inst, SLT, AF_IMM, SS);
+      err = translateALUOp(SLT, AF_IMM);
       break;
     case RISCV::SLTIU:
-      E = translateALUOp(Inst, SLT, AF_IMM | AF_UNSIGNED, SS);
+      err = translateALUOp(SLT, AF_IMM | AF_UNSIGNED);
       break;
     case RISCV::SRA:
-      E = translateALUOp(Inst, SRA, AF_NONE, SS);
+      err = translateALUOp(SRA, AF_NONE);
       break;
     case RISCV::SRAI:
-      E = translateALUOp(Inst, SRA, AF_IMM, SS);
+      err = translateALUOp(SRA, AF_IMM);
       break;
     case RISCV::SRL:
-      E = translateALUOp(Inst, SRL, AF_NONE, SS);
+      err = translateALUOp(SRL, AF_NONE);
       break;
     case RISCV::SRLI:
-      E = translateALUOp(Inst, SRL, AF_IMM, SS);
+      err = translateALUOp(SRL, AF_IMM);
       break;
     case RISCV::SUB:
-      E = translateALUOp(Inst, SUB, AF_NONE, SS);
+      err = translateALUOp(SUB, AF_NONE);
       break;
     case RISCV::XOR:
-      E = translateALUOp(Inst, XOR, AF_NONE, SS);
+      err = translateALUOp(XOR, AF_NONE);
       break;
     case RISCV::XORI:
-      E = translateALUOp(Inst, XOR, AF_IMM, SS);
+      err = translateALUOp(XOR, AF_IMM);
       break;
 
     // UI
     case RISCV::AUIPC:
-      E = translateUI(Inst, AUIPC, SS);
+      err = translateUI(AUIPC);
       break;
     case RISCV::LUI:
-      E = translateUI(Inst, LUI, SS);
+      err = translateUI(LUI);
       break;
 
     // Branch
     case RISCV::BEQ:
-      E = translateBranch(Inst, BEQ, SS);
+      err = translateBranch(BEQ);
       break;
     case RISCV::BNE:
-      E = translateBranch(Inst, BNE, SS);
+      err = translateBranch(BNE);
       break;
     case RISCV::BGE:
-      E = translateBranch(Inst, BGE, SS);
+      err = translateBranch(BGE);
       break;
     case RISCV::BGEU:
-      E = translateBranch(Inst, BGEU, SS);
+      err = translateBranch(BGEU);
       break;
     case RISCV::BLT:
-      E = translateBranch(Inst, BLT, SS);
+      err = translateBranch(BLT);
       break;
     case RISCV::BLTU:
-      E = translateBranch(Inst, BLTU, SS);
+      err = translateBranch(BLTU);
       break;
     // Jump
     case RISCV::JAL:
-      E = translateBranch(Inst, JAL, SS);
+      err = translateBranch(JAL);
       break;
     case RISCV::JALR:
-      E = translateBranch(Inst, JALR, SS);
+      err = translateBranch(JALR);
       break;
 
     // ecall
     case RISCV::ECALL:
-      SS << "ecall";
-      E = handleSyscall();
+      *_os << "ecall";
+      err = handleSyscall();
       break;
 
     // ebreak
     case RISCV::EBREAK:
-      SS << "ebreak";
-      nop();
+      *_os << "ebreak";
+      _builder->nop();
       break;
 
     // Load
     case RISCV::LB:
-      E = translateLoad(Inst, S8, SS);
+      err = translateLoad(S8);
       break;
     case RISCV::LBU:
-      E = translateLoad(Inst, U8, SS);
+      err = translateLoad(U8);
       break;
     case RISCV::LH:
-      E = translateLoad(Inst, S16, SS);
+      err = translateLoad(S16);
       break;
     case RISCV::LHU:
-      E = translateLoad(Inst, U16, SS);
+      err = translateLoad(U16);
       break;
     case RISCV::LW:
-      E = translateLoad(Inst, U32, SS);
+      err = translateLoad(U32);
       break;
 
     // Store
     case RISCV::SB:
-      E = translateStore(Inst, U8, SS);
+      err = translateStore(U8);
       break;
     case RISCV::SH:
-      E = translateStore(Inst, U16, SS);
+      err = translateStore(U16);
       break;
     case RISCV::SW:
-      E = translateStore(Inst, U32, SS);
+      err = translateStore(U32);
       break;
 
     // fence
     case RISCV::FENCE:
-      E = translateFence(Inst, false, SS);
+      err = translateFence(false);
       break;
     case RISCV::FENCEI:
-      E = translateFence(Inst, true, SS);
+      err = translateFence(true);
       break;
 
     // system
     case RISCV::CSRRW:
-      E = translateCSR(Inst, RW, false, SS);
+      err = translateCSR(RW, false);
       break;
     case RISCV::CSRRWI:
-      E = translateCSR(Inst, RW, true, SS);
+      err = translateCSR(RW, true);
       break;
     case RISCV::CSRRS:
-      E = translateCSR(Inst, RS, false, SS);
+      err = translateCSR(RS, false);
       break;
     case RISCV::CSRRSI:
-      E = translateCSR(Inst, RS, true, SS);
+      err = translateCSR(RS, true);
       break;
     case RISCV::CSRRC:
-      E = translateCSR(Inst, RC, false, SS);
+      err = translateCSR(RC, false);
       break;
     case RISCV::CSRRCI:
-      E = translateCSR(Inst, RC, true, SS);
+      err = translateCSR(RC, true);
       break;
 
-    default:
-      SE << "Unknown instruction opcode: " << Inst.getOpcode();
-      return error(SE);
+    default: {
+      SBTError serr;
+      serr << "Unknown instruction opcode: " << _inst.getOpcode();
+      return error(serr);
+    }
   }
 
-  if (E)
-    return E;
+  if (err)
+    return err;
 
-  if (!First)
-    First = load(RV_A0);
-
-  dbgprint(SS);
-  InstrMap(CurAddr, std::move(First));
-  return Error::success();
+  dbgprint();
+  return llvm::Error::success();
 }
+
+
+llvm::Error Instruction::translateALUOp(ALUOp op, uint32_t flags)
+{
+  return llvm::Error::success();
+}
+
+
+llvm::Error Instruction::translateUI(UIOp op)
+{
+  return llvm::Error::success();
+}
+
+
+llvm::Error Instruction::translateLoad(IntType it)
+{
+  return llvm::Error::success();
+}
+
+
+llvm::Error Instruction::translateStore(IntType it)
+{
+  return llvm::Error::success();
+}
+
+
+llvm::Error Instruction::translateBranch(BranchType bt)
+{
+  return llvm::Error::success();
+}
+
+
+llvm::Error Instruction::handleSyscall()
+{
+  return llvm::Error::success();
+}
+
+
+llvm::Error Instruction::translateFence(bool fi)
+{
+  return llvm::Error::success();
+}
+
+
+llvm::Error Instruction::translateCSR(CSROp op, bool imm)
+{
+  return llvm::Error::success();
+}
+
+
+#if 0
 
 Error Translator::handleSyscall()
 {
@@ -263,33 +301,33 @@ llvm::Error Translator::translateALUOp(
   bool IsUnsigned = Flags & AF_UNSIGNED;
 
   switch (Op) {
-    case ADD: SS << "add";  break;
-    case AND: SS << "and";  break;
-    case MUL: SS << "mul";  break;
-    case OR:  SS << "or";   break;
-    case SLL: SS << "sll";  break;
-    case SLT: SS << "slt";  break;
-    case SRA: SS << "sra";  break;
-    case SRL: SS << "srl";  break;
-    case SUB: SS << "sub";  break;
-    case XOR: SS << "xor";  break;
+    case ADD: ss << "add";  break;
+    case AND: ss << "and";  break;
+    case MUL: ss << "mul";  break;
+    case OR:  ss << "or";   break;
+    case SLL: ss << "sll";  break;
+    case SLT: ss << "slt";  break;
+    case SRA: ss << "sra";  break;
+    case SRL: ss << "srl";  break;
+    case SUB: ss << "sub";  break;
+    case XOR: ss << "xor";  break;
   }
   if (HasImm)
-    SS << "i";
+    ss << "i";
   if (IsUnsigned)
-    SS << "u";
-  SS << '\t';
+    ss << "u";
+  ss << '\t';
 
-  unsigned O = getRD(Inst, SS);
-  Value *O1 = getReg(Inst, 1, SS);
+  unsigned O = getRD(Inst, ss);
+  Value *O1 = getReg(Inst, 1, ss);
   Value *O2;
   if (HasImm) {
-    auto ExpImm = getImm(Inst, 2, SS);
+    auto ExpImm = getImm(Inst, 2, ss);
     if (!ExpImm)
       return ExpImm.takeError();
     O2 = ExpImm.get();
   } else
-    O2 = getReg(Inst, 2, SS);
+    O2 = getReg(Inst, 2, ss);
 
   Value *V;
 
@@ -354,30 +392,30 @@ Error Translator::translateLoad(
 {
   switch (IT) {
     case S8:
-      SS << "lb";
+      ss << "lb";
       break;
 
     case U8:
-      SS << "lbu";
+      ss << "lbu";
       break;
 
     case S16:
-      SS << "lh";
+      ss << "lh";
       break;
 
     case U16:
-      SS << "lhu";
+      ss << "lhu";
       break;
 
     case U32:
-      SS << "lw";
+      ss << "lw";
       break;
   }
-  SS << '\t';
+  ss << '\t';
 
-  unsigned O = getRD(Inst, SS);
-  Value *RS1 = getReg(Inst, 1, SS);
-  auto ExpImm = getImm(Inst, 2, SS);
+  unsigned O = getRD(Inst, ss);
+  Value *RS1 = getReg(Inst, 1, ss);
+  auto ExpImm = getImm(Inst, 2, ss);
   if (!ExpImm)
     return ExpImm.takeError();
   Value *Imm = ExpImm.get();
@@ -438,26 +476,26 @@ Error Translator::translateStore(
 {
   switch (IT) {
     case U8:
-      SS << "sb";
+      ss << "sb";
       break;
 
     case U16:
-      SS << "sh";
+      ss << "sh";
       break;
 
     case U32:
-      SS << "sw";
+      ss << "sw";
       break;
 
     default:
       llvm_unreachable("Unknown store type!");
   }
-  SS << '\t';
+  ss << '\t';
 
 
-  Value *RS1 = getReg(Inst, 0, SS);
-  Value *RS2 = getReg(Inst, 1, SS);
-  auto ExpImm = getImm(Inst, 2, SS);
+  Value *RS1 = getReg(Inst, 0, ss);
+  Value *RS2 = getReg(Inst, 1, ss);
+  auto ExpImm = getImm(Inst, 2, ss);
   if (!ExpImm)
     return ExpImm.takeError();
   Value *Imm = ExpImm.get();
@@ -507,21 +545,21 @@ llvm::Error Translator::translateBranch(
 {
   // Inst print
   switch (BT) {
-    case JAL:   SS << "jal";  break;
-    case JALR:  SS << "jalr"; break;
-    case BEQ:   SS << "beq";  break;
-    case BNE:   SS << "bne";  break;
-    case BGE:   SS << "bge";  break;
-    case BGEU:  SS << "bgeu";  break;
-    case BLT:   SS << "blt";  break;
-    case BLTU:  SS << "bltu"; break;
+    case JAL:   ss << "jal";  break;
+    case JALR:  ss << "jalr"; break;
+    case BEQ:   ss << "beq";  break;
+    case BNE:   ss << "bne";  break;
+    case BGE:   ss << "bge";  break;
+    case BGEU:  ss << "bgeu";  break;
+    case BLT:   ss << "blt";  break;
+    case BLTU:  ss << "bltu"; break;
   }
-  SS << '\t';
+  ss << '\t';
 
   Error E = noError();
 
   // Get Operands
-  unsigned O0N = getRegNum(0, Inst, SS);
+  unsigned O0N = getRegNum(0, Inst, ss);
   Value *O0 = nullptr;
   unsigned O1N = 0;
   Value *O1 = nullptr;
@@ -532,7 +570,7 @@ llvm::Error Translator::translateBranch(
   switch (BT) {
     case JAL:
       LinkReg = O0N;
-      if (!exp(getImm(Inst, 1, SS), O1, E))
+      if (!exp(getImm(Inst, 1, ss), O1, E))
         return E;
       JImm = O1;
       break;
@@ -540,8 +578,8 @@ llvm::Error Translator::translateBranch(
     case JALR:
       LinkReg = O0N;
       O1N = getRegNum(1, Inst, nulls());
-      O1 = getReg(Inst, 1, SS);
-      if (!exp(getImm(Inst, 2, SS), O2, E))
+      O1 = getReg(Inst, 1, ss);
+      if (!exp(getImm(Inst, 2, ss), O2, E))
         return E;
       JReg = O1;
       JImm = O2;
@@ -553,9 +591,9 @@ llvm::Error Translator::translateBranch(
     case BGEU:
     case BLT:
     case BLTU:
-      O0 = getReg(Inst, 0, SS);
-      O1 = getReg(Inst, 1, SS);
-      if (!exp(getImm(Inst, 2, SS), O2, E))
+      O0 = getReg(Inst, 0, ss);
+      O1 = getReg(Inst, 1, ss);
+      if (!exp(getImm(Inst, 2, ss), O2, E))
         return E;
       JImm = O2;
       break;
@@ -935,13 +973,13 @@ llvm::Error Translator::translateUI(
   llvm::raw_string_ostream &SS)
 {
   switch (UOP) {
-    case AUIPC: SS << "auipc";  break;
-    case LUI:   SS << "lui";    break;
+    case AUIPC: ss << "auipc";  break;
+    case LUI:   ss << "lui";    break;
   }
-  SS << '\t';
+  ss << '\t';
 
-  unsigned O = getRD(Inst, SS);
-  auto ExpImm = getImm(Inst, 1, SS);
+  unsigned O = getRD(Inst, ss);
+  auto ExpImm = getImm(Inst, 1, ss);
   if (!ExpImm)
     return ExpImm.takeError();
   Value *Imm = ExpImm.get();
@@ -973,12 +1011,12 @@ llvm::Error Translator::translateFence(
   llvm::raw_string_ostream &SS)
 {
   if (FI) {
-    SS << "fence.i";
+    ss << "fence.i";
     nop();
     return Error::success();
   }
 
-  SS << "fence";
+  ss << "fence";
   AtomicOrdering Order = llvm::AtomicOrdering::AcquireRelease;
   SynchronizationScope Scope = llvm::SynchronizationScope::CrossThread;
 
@@ -1001,52 +1039,52 @@ llvm::Error Translator::translateCSR(
       break;
 
     case RS:
-      SS << "csrrs";
+      ss << "csrrs";
       break;
 
     case RC:
-      SS << "csrrc";
+      ss << "csrrc";
       break;
   }
   if (Imm)
-    SS << "i";
-  SS << '\t';
+    ss << "i";
+  ss << '\t';
 
-  unsigned RD = getRegNum(0, Inst, SS);
+  unsigned RD = getRegNum(0, Inst, ss);
   uint64_t CSR = Inst.getOperand(1).getImm();
   uint64_t Mask;
   if (Imm)
     Mask = RV_A0; // Inst.getOperand(2).getImm();
   else
-    Mask = getRegNum(2, Inst, SS);
+    Mask = getRegNum(2, Inst, ss);
   assert(Mask == RV_ZERO && "No CSR write support for base I instructions!");
-  SS << llvm::formatv("0x{0:X-4} = ", CSR);
+  ss << llvm::formatv("0x{0:X-4} = ", CSR);
 
   Value *V = ConstantInt::get(I32, 0);
   switch (CSR) {
     case RDCYCLE:
-      SS << "RDCYCLE";
+      ss << "RDCYCLE";
       V = Builder->CreateCall(GetCycles);
       updateFirst(V);
       break;
     case RDCYCLEH:
-      SS << "RDCYCLEH";
+      ss << "RDCYCLEH";
       break;
     case RDTIME:
-      SS << "RDTIME";
+      ss << "RDTIME";
       V = Builder->CreateCall(GetTime);
       updateFirst(V);
       break;
     case RDTIMEH:
-      SS << "RDTIMEH";
+      ss << "RDTIMEH";
       break;
     case RDINSTRET:
-      SS << "RDINSTRET";
+      ss << "RDINSTRET";
       V = Builder->CreateCall(InstRet);
       updateFirst(V);
       break;
     case RDINSTRETH:
-      SS << "RDINSTRETH";
+      ss << "RDINSTRETH";
       break;
     default:
       assert(false && "Not implemented!");
@@ -1057,14 +1095,18 @@ llvm::Error Translator::translateCSR(
   return Error::success();
 }
 
+#endif
+
+
 #if SBT_DEBUG
-static std::string getMDName(const llvm::StringRef &S)
+// MD: metadata
+static std::string getMDName(const llvm::StringRef& s)
 {
-  std::string SSS;
-  raw_string_ostream SS(SSS);
-  SS << '_';
-  for (char C : S) {
-    switch (C) {
+  std::string sss;
+  llvm::raw_string_ostream ss(sss);
+  ss << '_';
+  for (char c : s) {
+    switch (c) {
       case ' ':
       case ':':
       case ',':
@@ -1072,27 +1114,28 @@ static std::string getMDName(const llvm::StringRef &S)
       case '(':
       case ')':
       case '\t':
-        SS << '_';
+        ss << '_';
         break;
 
       case '=':
-        SS << "eq";
+        ss << "eq";
         break;
 
       default:
-        SS << C;
+        ss << c;
     }
   }
-  return SS.str();
+  return ss.str();
 }
 
-void Translator::dbgprint(llvm::raw_string_ostream &SS)
+
+void Instruction::dbgprint()
 {
-  DBGS << SS.str() << "\n";
-  MDNode *N = MDNode::get(*Context,
-    MDString::get(*Context, "RISC-V Instruction"));
-  First->setMetadata(getMDName(SS.str()), N);
+  DBGS << _ss->str() << nl;
+  llvm::MDNode* n = llvm::MDNode::get(*_ctx->ctx,
+    llvm::MDString::get(*_ctx->ctx, "RISC-V Instruction"));
+  _builder->first()->setMetadata(getMDName(_ss->str()), n);
 }
 #endif
 
-#endif
+}

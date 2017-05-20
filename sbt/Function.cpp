@@ -67,7 +67,8 @@ llvm::Error Function::startMain()
   // bb
   BasicBlock bb(_ctx, _addr, _f);
   _bbMap(_addr, std::move(bb));
-  bld.setInsertPoint(*_bbMap[_addr]);
+  _bb = _bbMap[_addr];
+  bld.setInsertPoint(*_bb);
 
   // set stack pointer
   bld.store(_ctx->stack->end(), XRegister::SP);
@@ -86,23 +87,23 @@ llvm::Error Function::start()
   if (auto err = create())
     return err;
 
-  // bb
   /*
-  BasicBlock* bb = _bbMap[_addr];
-  if (!bb) {
+  // bb
+  _bb = _bbMap[_addr];
+  if (!_bb) {
     _bbMap(_addr, BasicBlock(_ctx, _addr, _f));
-    bb = _bbMap[_addr];
+    _bb = _bbMap[_addr];
   } else {
-    auto b = bb->bb();
+    auto b = _bb->bb();
     b->removeFromParent();
     b->insertInto(_f);
   }
   */
 
   _bbMap(_addr, BasicBlock(_ctx, _addr, _f));
-  BasicBlock* bb = _bbMap[_addr];
+  _bb = _bbMap[_addr];
   Builder bld(_ctx);
-  bld.setInsertPoint(*bb);
+  bld.setInsertPoint(*_bb);
 
   return llvm::Error::success();
 }
@@ -144,9 +145,27 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
       continue;
     }
 
+    /* update current bb
+     *
+    if (NextBB && CurAddr == NextBB) {
+      BasicBlock **BB = BBMap[CurAddr];
+      assert(BB && "BasicBlock not found!");
+      if (!BrWasLast)
+        Builder->CreateBr(*BB);
+      Builder->SetInsertPoint(*BB);
+
+      auto Iter = BBMap.lower_bound(CurAddr + 4);
+      if (Iter != BBMap.end())
+        updateNextBB(Iter->key);
+    }
+
+    BrWasLast = false;
+    */
+
     Instruction inst(_ctx, addr, rawInst);
     if (auto err = inst.translate())
       return err;
+    (*_bb)(addr, std::move(inst));
   }
 
   return llvm::Error::success();

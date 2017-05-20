@@ -66,6 +66,7 @@ private:
   uint64_t _end;
 
   llvm::Function* _f = nullptr;
+  BasicBlock* _bb = nullptr;
   Map<uint64_t, BasicBlock> _bbMap;
 
   enum TranslationState {

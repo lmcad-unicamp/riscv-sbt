@@ -18,6 +18,11 @@ BasicBlock::BasicBlock(
 }
 
 
+BasicBlock::~BasicBlock()
+{
+}
+
+
 BasicBlock BasicBlock::split(uint64_t addr)
 {
   auto res = _instrMap[addr];
@@ -49,6 +54,12 @@ BasicBlock BasicBlock::split(uint64_t addr)
   _ctx->builder->SetInsertPoint(bb2, bb2->end());
 
   return BasicBlock(_ctx, bb2);
+}
+
+
+void BasicBlock::operator()(uint64_t addr, Instruction&& instr)
+{
+  _instrMap(addr, std::move(instr));
 }
 
 }

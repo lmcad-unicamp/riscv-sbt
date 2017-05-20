@@ -1,16 +1,19 @@
 #ifndef SBT_INSTRUCTION_H
 #define SBT_INSTRUCTION_H
 
+#include <llvm/MC/MCInst.h>
 #include <llvm/Support/Error.h>
 
 #include <cstdint>
 
 namespace llvm {
 class Instruction;
+class MCInst;
 }
 
 namespace sbt {
 
+class Builder;
 class Context;
 
 class Instruction
@@ -18,30 +21,33 @@ class Instruction
 public:
   static const std::size_t SIZE = 4;
 
-  Instruction(Context* ctx, uint64_t addr, uint32_t rawInst) :
-    _ctx(ctx),
-    _addr(addr),
-    _rawInst(rawInst)
-  {}
+  Instruction(Context* ctx, uint64_t addr, uint32_t rawInst);
+
+  Instruction(Instruction&&) = default;
+  Instruction& operator=(Instruction&&) = default;
+
+  ~Instruction();
 
   llvm::Error translate();
 
   const llvm::Instruction* instr() const
   {
-    return _instr;
+    return nullptr;
   }
 
 private:
   Context* _ctx;
   uint64_t _addr;
   uint32_t _rawInst;
+  llvm::MCInst _inst;
+  std::string _s;
+  std::unique_ptr<llvm::raw_string_ostream> _ss;
+  llvm::raw_ostream* _os;
+  std::unique_ptr<Builder> _builder;
 
-  llvm::Instruction* _instr;
 
+  // enums
 
-  // methods
-
-/*
   enum ALUOp {
     ADD,
     AND,
@@ -91,6 +97,32 @@ private:
     RC
   };
 
+
+  // methods
+
+  // ALU op
+  llvm::Error translateALUOp(ALUOp op, uint32_t flags);
+
+  llvm::Error translateUI(UIOp op);
+
+  // load/store
+  llvm::Error translateLoad(IntType it);
+
+  llvm::Error translateStore(IntType it);
+
+  // branch/jump/call handlers
+  llvm::Error translateBranch(BranchType bt);
+
+  // syscall
+  llvm::Error handleSyscall();
+
+  // fence
+  llvm::Error translateFence(bool fi);
+
+  // CSR ops
+  llvm::Error translateCSR(CSROp op, bool imm);
+
+/*
 
   // get RD
   unsigned getRD(const llvm::MCInst &Inst, llvm::raw_ostream &SS)
@@ -164,43 +196,11 @@ private:
     return V;
   }
 
-  llvm::Error handleSyscall();
 
   // per instruction state
   llvm::Instruction* _first = nullptr;
   Imm _lastImm;
 
-  // ALU op
-
-  llvm::Error translateALUOp(
-    const llvm::MCInst &Inst,
-    ALUOp Op,
-    uint32_t Flags,
-    llvm::raw_string_ostream &SS);
-
-  llvm::Error translateUI(
-    const llvm::MCInst &Inst,
-    UIOp UOP,
-    llvm::raw_string_ostream &SS);
-
-  // load/store
-
-  llvm::Error translateLoad(
-    const llvm::MCInst &Inst,
-    IntType IT,
-    llvm::raw_string_ostream &SS);
-
-  llvm::Error translateStore(
-    const llvm::MCInst &Inst,
-    IntType IT,
-    llvm::raw_string_ostream &SS);
-
-  // branch/jump/call handlers
-
-  llvm::Error translateBranch(
-    const llvm::MCInst &Inst,
-    BranchType BT,
-    llvm::raw_string_ostream &SS);
 
   llvm::Error handleJumpToOffs(
     uint64_t Target,
@@ -215,29 +215,13 @@ private:
   llvm::Error handleICall(llvm::Value *Target);
   llvm::Error handleCallExt(llvm::Value *Target);
 
-  // fence
-  llvm::Error translateFence(const llvm::MCInst &Inst,
-      bool FI,
-      llvm::raw_string_ostream &SS);
-
-  // CSR ops
-
-  llvm::Error translateCSR(
-      const llvm::MCInst &Inst,
-      CSROp Op,
-      bool Imm,
-      llvm::raw_string_ostream &SS);
 */
+
+  // add RV instr metadata and print it in debug mode
+  void dbgprint();
 };
 
 /*
-#if SBT_DEBUG
-  // Add RV Inst metadata and print it in debug mode
-  void dbgprint(llvm::raw_string_ostream &SS);
-#else
-  void dbgprint(const llvm::raw_string_ostream &SS) {}
-#endif
-
   // host dependent ops
   llvm::Function* _getCycles = nullptr;
   llvm::Function* _getTime = nullptr;

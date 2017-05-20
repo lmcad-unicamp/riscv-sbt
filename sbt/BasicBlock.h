@@ -28,6 +28,8 @@ public:
     llvm::Function* f,
     llvm::BasicBlock* beforeBB = nullptr);
 
+  ~BasicBlock();
+
   BasicBlock(BasicBlock&&) = default;
   BasicBlock& operator=(BasicBlock&&) = default;
 
@@ -35,6 +37,8 @@ public:
   {
     return _bb;
   }
+
+  void operator()(uint64_t addr, Instruction&& instr);
 
 private:
   Context* _ctx;
