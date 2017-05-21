@@ -46,7 +46,7 @@ public:
   // translate input files
   llvm::Error translate();
 
-  llvm::Error import(const std::string& func);
+  llvm::Expected<uint64_t> import(const std::string& func);
 
   // setters
 
@@ -79,7 +79,7 @@ private:
 
   // icaller
   Function _iCaller;
-  Map<FunctionPtr, uint64_t> _funMap;
+  Map<std::string, FunctionPtr> _funMap;
 
   uint64_t _extFuncAddr = 0;
   std::unique_ptr<llvm::Module> _lcModule;

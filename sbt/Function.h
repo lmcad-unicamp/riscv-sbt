@@ -58,6 +58,11 @@ public:
     return _f;
   }
 
+  uint64_t addr() const
+  {
+    return _addr;
+  }
+
 private:
   Context* _ctx;
   std::string _name;

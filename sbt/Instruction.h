@@ -1,6 +1,7 @@
 #ifndef SBT_INSTRUCTION_H
 #define SBT_INSTRUCTION_H
 
+#include <llvm/IR/Value.h>
 #include <llvm/MC/MCInst.h>
 #include <llvm/Support/Error.h>
 
@@ -14,7 +15,9 @@ class MCInst;
 namespace sbt {
 
 class Builder;
+class Constants;
 class Context;
+class Types;
 
 class Instruction
 {
@@ -37,13 +40,15 @@ public:
 
 private:
   Context* _ctx;
+  Types* _t;
+  Constants* _c;
   uint64_t _addr;
   uint32_t _rawInst;
   llvm::MCInst _inst;
   std::string _s;
   std::unique_ptr<llvm::raw_string_ostream> _ss;
   llvm::raw_ostream* _os;
-  std::unique_ptr<Builder> _builder;
+  Builder* _bld;
 
 
   // enums
@@ -122,83 +127,19 @@ private:
   // CSR ops
   llvm::Error translateCSR(CSROp op, bool imm);
 
+
+  // helpers
+
+  unsigned getRD();
+  unsigned getRegNum(unsigned num);
+  llvm::Value* getReg(int num);
+  llvm::Expected<llvm::Value*> getImm(int op);
+  llvm::Expected<llvm::Value*> getRegOrImm(int op);
+
+
 /*
 
-  // get RD
-  unsigned getRD(const llvm::MCInst &Inst, llvm::raw_ostream &SS)
-  {
-    return getRegNum(0, Inst, SS);
-  }
-
-  // GetRegNum
-  unsigned getRegNum(
-    unsigned Num,
-    const llvm::MCInst &Inst,
-    llvm::raw_ostream &SS)
-  {
-    const llvm::MCOperand &R = Inst.getOperand(Num);
-    unsigned NR = RVReg(R.getReg());
-    SS << regName(NR) << ", ";
-    return NR;
-  }
-
-  // Get register
-  llvm::Value *getReg(
-    const llvm::MCInst &Inst,
-    int Op,
-    llvm::raw_ostream &SS)
-  {
-    const llvm::MCOperand &OR = Inst.getOperand(Op);
-    unsigned NR = RVReg(OR.getReg());
-    llvm::Value *V;
-    if (NR == 0)
-      V = ZERO;
-    else
-      V = load(NR);
-
-    SS << regName(NR);
-    if (Op < 2)
-       SS << ", ";
-    return V;
-  }
-
-  // Get register or immediate
-  llvm::Expected<llvm::Value *> getRegOrImm(
-    const llvm::MCInst &Inst,
-    int Op,
-    llvm::raw_ostream &SS)
-  {
-    const llvm::MCOperand &O = Inst.getOperand(Op);
-    if (O.isReg())
-      return getReg(Inst, Op, SS);
-    else if (O.isImm())
-      return getImm(Inst, Op, SS);
-    else
-      llvm_unreachable("Operand is neither a Reg nor Imm");
-  }
-
-  // Get immediate
-  llvm::Expected<llvm::Value *> getImm(
-    const llvm::MCInst &Inst,
-    int Op,
-    llvm::raw_ostream &SS)
-  {
-    auto ExpV = handleRelocation(SS);
-    if (!ExpV)
-      return ExpV.takeError();
-    llvm::Value *V = ExpV.get();
-    if (V)
-      return V;
-
-    int64_t Imm = Inst.getOperand(Op).getImm();
-    V = llvm::ConstantInt::get(I32, Imm);
-    SS << llvm::formatv("0x{0:X-4}", uint32_t(Imm));
-    return V;
-  }
-
-
   // per instruction state
-  llvm::Instruction* _first = nullptr;
   Imm _lastImm;
 
 

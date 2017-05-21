@@ -56,7 +56,7 @@ llvm::Error Function::startMain()
 {
   const Types& t = _ctx->t;
   auto builder = _ctx->builder;
-  Builder bld(_ctx);
+  Builder* bld = _ctx->bld;
 
   // create a function with no parameters
   llvm::FunctionType *ft =
@@ -68,10 +68,10 @@ llvm::Error Function::startMain()
   BasicBlock bb(_ctx, _addr, _f);
   _bbMap(_addr, std::move(bb));
   _bb = _bbMap[_addr];
-  bld.setInsertPoint(*_bb);
+  bld->setInsertPoint(*_bb);
 
   // set stack pointer
-  bld.store(_ctx->stack->end(), XRegister::SP);
+  bld->store(_ctx->stack->end(), XRegister::SP);
 
   // init syscall module
   llvm::Function* f = llvm::Function::Create(t.voidFunc,
@@ -102,8 +102,7 @@ llvm::Error Function::start()
 
   _bbMap(_addr, BasicBlock(_ctx, _addr, _f));
   _bb = _bbMap[_addr];
-  Builder bld(_ctx);
-  bld.setInsertPoint(*_bb);
+  _ctx->bld->setInsertPoint(*_bb);
 
   return llvm::Error::success();
 }
@@ -113,7 +112,7 @@ llvm::Error Function::finish()
 {
   auto builder = _ctx->builder;
   if (builder->GetInsertBlock()->getTerminator() == nullptr)
-    builder->CreateRetVoid();
+    _ctx->bld->retVoid();
   return llvm::Error::success();
 }
 

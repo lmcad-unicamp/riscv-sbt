@@ -101,6 +101,7 @@ llvm::Error Module::buildShadowImage()
   _shadowImage =
     new llvm::GlobalVariable(*_ctx->module, cda->getType(), !CONSTANT,
       llvm::GlobalValue::ExternalLinkage, cda, "ShadowMemory");
+  _ctx->shadowImage = _shadowImage;
 
   return llvm::Error::success();
 }

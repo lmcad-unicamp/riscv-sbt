@@ -11,9 +11,12 @@
 
 namespace sbt {
 
+class Builder;
 class Disassembler;
 class Function;
+class SBTRelocation;
 class Stack;
+class Translator;
 class XRegister;
 class XRegisters;
 
@@ -22,7 +25,6 @@ using FunctionPtr = Pointer<Function>;
 class Context
 {
 public:
-
   Context(
     llvm::LLVMContext* ctx,
     llvm::Module* mod,
@@ -44,11 +46,15 @@ public:
   Constants c;
   Types t;
   ArrayPtr<XRegisters, XRegister> x;
+  Builder* bld = nullptr;
   Stack* stack = nullptr;
+  llvm::GlobalVariable* shadowImage = nullptr;
   Disassembler* disasm = nullptr;
-  Map<FunctionPtr, uint64_t>* _func = nullptr;
+  SBTRelocation* reloc = nullptr;
+  Translator* translator = nullptr;
+  Map<std::string, FunctionPtr>* _func = nullptr;
 
-  Map<FunctionPtr, uint64_t>& func()
+  Map<std::string, FunctionPtr>& func()
   {
     return *_func;
   }

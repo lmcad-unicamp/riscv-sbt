@@ -30,15 +30,10 @@ public:
   }
 
 private:
-  using ConstRelocIter = ConstRelocationPtrVec::const_iterator;
-
   ConstSectionPtr _section;
   Context* _ctx;
 
   llvm::ArrayRef<uint8_t> _bytes;
-  ConstRelocIter _ri;
-  ConstRelocIter _re;
-  ConstRelocIter _rlast;
 };
 
 }

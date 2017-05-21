@@ -3,6 +3,7 @@
 #include "Builder.h"
 #include "Context.h"
 #include "Disassembler.h"
+#include "Relocation.h"
 #include "SBTError.h"
 
 #include <llvm/Support/FormatVariadic.h>
@@ -17,6 +18,8 @@ namespace sbt {
 Instruction::Instruction(Context* ctx, uint64_t addr, uint32_t rawInst)
   :
   _ctx(ctx),
+  _t(&_ctx->t),
+  _c(&_ctx->c),
   _addr(addr),
   _rawInst(rawInst),
 #if SBT_DEBUG
@@ -25,7 +28,7 @@ Instruction::Instruction(Context* ctx, uint64_t addr, uint32_t rawInst)
 #else
   _os(&llvm::nulls()),
 #endif
-  _builder(new Builder(_ctx))
+  _bld(_ctx->bld)
 {
 }
 
@@ -47,6 +50,7 @@ llvm::Error Instruction::translate()
   // print address
   *_os << llvm::formatv("{0:X-4}:   ", _addr);
 
+  _bld->reset();
   llvm::Error err = noError();
 
   switch (_inst.getOpcode()) {
@@ -156,7 +160,7 @@ llvm::Error Instruction::translate()
     // ebreak
     case RISCV::EBREAK:
       *_os << "ebreak";
-      _builder->nop();
+      _bld->nop();
       break;
 
     // Load
@@ -230,8 +234,148 @@ llvm::Error Instruction::translate()
 }
 
 
+unsigned Instruction::getRD()
+{
+  return getRegNum(0);
+}
+
+
+unsigned Instruction::getRegNum(unsigned num)
+{
+  const llvm::MCOperand& r = _inst.getOperand(num);
+  unsigned nr = XRegister::num(r.getReg());
+  *_os << _ctx->x[nr].name() << ", ";
+  return nr;
+}
+
+
+llvm::Value* Instruction::getReg(int num)
+{
+  const llvm::MCOperand& op = _inst.getOperand(num);
+  unsigned nr = XRegister::num(op.getReg());
+  llvm::Value* v;
+  if (nr == 0)
+    v = _ctx->c.ZERO;
+  else
+    v = _bld->load(nr);
+
+  *_os << _ctx->x[nr].name();
+  if (num < 2)
+     *_os << ", ";
+  return v;
+}
+
+
+llvm::Expected<llvm::Value*> Instruction::getRegOrImm(int op)
+{
+  const llvm::MCOperand& o = _inst.getOperand(op);
+  if (o.isReg())
+    return getReg(op);
+  else if (o.isImm())
+    return getImm(op);
+  xassert(false && "Operand is neither a Reg nor Imm");
+}
+
+
+llvm::Expected<llvm::Value*> Instruction::getImm(int op)
+{
+  auto expV = _ctx->reloc->handleRelocation(_addr, _os);
+  if (!expV)
+    return expV.takeError();
+  llvm::Value* v = expV.get();
+  if (v)
+    return v;
+
+  int64_t imm = _inst.getOperand(op).getImm();
+  v = _c->i32(imm);
+  *_os << llvm::formatv("0x{0:X-4}", uint32_t(imm));
+  return v;
+}
+
+
 llvm::Error Instruction::translateALUOp(ALUOp op, uint32_t flags)
 {
+  bool hasImm = flags & AF_IMM;
+  bool isUnsigned = flags & AF_UNSIGNED;
+
+  switch (op) {
+    case ADD: *_os << "add";  break;
+    case AND: *_os << "and";  break;
+    case MUL: *_os << "mul";  break;
+    case OR:  *_os << "or";   break;
+    case SLL: *_os << "sll";  break;
+    case SLT: *_os << "slt";  break;
+    case SRA: *_os << "sra";  break;
+    case SRL: *_os << "srl";  break;
+    case SUB: *_os << "sub";  break;
+    case XOR: *_os << "xor";  break;
+  }
+  if (hasImm)
+    *_os << "i";
+  if (isUnsigned)
+    *_os << "u";
+  *_os << '\t';
+
+  unsigned o = getRD();
+  llvm::Value* o1 = getReg(1);
+  llvm::Value* o2;
+  if (hasImm) {
+    auto ExpImm = getImm(2);
+    if (!ExpImm)
+      return ExpImm.takeError();
+    o2 = ExpImm.get();
+  } else
+    o2 = getReg(2);
+
+  llvm::Value* v;
+
+  switch (op) {
+    case ADD:
+      v = _bld->add(o1, o2);
+      break;
+
+    case AND:
+      v = _bld->_and(o1, o2);
+      break;
+
+    case MUL:
+      v = _bld->mul(o1, o2);
+      break;
+
+    case OR:
+      v = _bld->_or(o1, o2);
+      break;
+
+    case SLL:
+      v = _bld->sll(o1, o2);
+      break;
+
+    case SLT:
+      if (isUnsigned)
+        v = _bld->ult(o1, o2);
+      else
+        v = _bld->slt(o1, o2);
+      break;
+
+    case SRA:
+      v = _bld->sra(o1, o2);
+      break;
+
+    case SRL:
+      v = _bld->srl(o1, o2);
+      break;
+
+    case SUB:
+      v = _bld->sub(o1, o2);
+      break;
+
+    case XOR:
+      v = _bld->_xor(o1, o2);
+      break;
+  }
+
+  _bld->store(v, o);
+
   return llvm::Error::success();
 }
 
@@ -287,99 +431,6 @@ Error Translator::handleSyscall()
   Value *V = Builder->CreateCall(FRVSC, Args);
   updateFirst(V);
   store(V, RV_A0);
-
-  return Error::success();
-}
-
-llvm::Error Translator::translateALUOp(
-  const llvm::MCInst &Inst,
-  ALUOp Op,
-  uint32_t Flags,
-  llvm::raw_string_ostream &SS)
-{
-  bool HasImm = Flags & AF_IMM;
-  bool IsUnsigned = Flags & AF_UNSIGNED;
-
-  switch (Op) {
-    case ADD: ss << "add";  break;
-    case AND: ss << "and";  break;
-    case MUL: ss << "mul";  break;
-    case OR:  ss << "or";   break;
-    case SLL: ss << "sll";  break;
-    case SLT: ss << "slt";  break;
-    case SRA: ss << "sra";  break;
-    case SRL: ss << "srl";  break;
-    case SUB: ss << "sub";  break;
-    case XOR: ss << "xor";  break;
-  }
-  if (HasImm)
-    ss << "i";
-  if (IsUnsigned)
-    ss << "u";
-  ss << '\t';
-
-  unsigned O = getRD(Inst, ss);
-  Value *O1 = getReg(Inst, 1, ss);
-  Value *O2;
-  if (HasImm) {
-    auto ExpImm = getImm(Inst, 2, ss);
-    if (!ExpImm)
-      return ExpImm.takeError();
-    O2 = ExpImm.get();
-  } else
-    O2 = getReg(Inst, 2, ss);
-
-  Value *V;
-
-  switch (Op) {
-    case ADD:
-      V = add(O1, O2);
-      break;
-
-    case AND:
-      V = Builder->CreateAnd(O1, O2);
-      break;
-
-    case MUL:
-      V = Builder->CreateMul(O1, O2);
-      break;
-
-    case OR:
-      V = Builder->CreateOr(O1, O2);
-      break;
-
-    case SLL:
-      V = Builder->CreateShl(O1, O2);
-      break;
-
-    case SLT:
-      if (IsUnsigned)
-        V = Builder->CreateICmpULT(O1, O2);
-      else
-        V = Builder->CreateICmpSLT(O1, O2);
-      updateFirst(V);
-      V = Builder->CreateZExt(V, I32);
-      break;
-
-    case SRA:
-      V = Builder->CreateAShr(O1, O2);
-      break;
-
-    case SRL:
-      V = Builder->CreateLShr(O1, O2);
-      break;
-
-    case SUB:
-      V = Builder->CreateSub(O1, O2);
-      break;
-
-    case XOR:
-      V = Builder->CreateXor(O1, O2);
-      break;
-  }
-  updateFirst(V);
-
-  store(V, O);
 
   return Error::success();
 }
@@ -1134,8 +1185,12 @@ void Instruction::dbgprint()
   DBGS << _ss->str() << nl;
   llvm::MDNode* n = llvm::MDNode::get(*_ctx->ctx,
     llvm::MDString::get(*_ctx->ctx, "RISC-V Instruction"));
-  _builder->first()->setMetadata(getMDName(_ss->str()), n);
+  _bld->first()->setMetadata(getMDName(_ss->str()), n);
 }
+
+#else
+void Instruction::dbgprint()
+{}
 #endif
 
 }

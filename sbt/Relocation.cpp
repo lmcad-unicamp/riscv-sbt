@@ -1,29 +1,46 @@
-  using ConstRelocIter = ConstRelocationPtrVec::const_iterator;
+#include "Relocation.h"
 
+#include "Builder.h"
+#include "Object.h"
+#include "Symbol.h"
+#include "Translator.h"
 
-  llvm::Expected<llvm::Value*> handleRelocation(llvm::raw_ostream &SS);
+#include <llvm/Object/ELF.h>
 
-llvm::Expected<llvm::Value *>
-Translator::handleRelocation(llvm::raw_ostream &SS)
+namespace sbt {
+
+SBTRelocation::SBTRelocation(
+  Context* ctx,
+  ConstRelocIter ri,
+  ConstRelocIter re)
+  :
+  _ctx(ctx),
+  _ri(ri),
+  _re(re),
+  _rlast(ri)
 {
-  LastImm.IsSym = false;
+}
 
-  // No more relocations exist
-  if (RI == RE)
+
+llvm::Expected<llvm::Value*>
+SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
+{
+  // no more relocations exist
+  if (_ri == _re)
     return nullptr;
 
-  // Check if there is a relocation for current address
-  auto CurReloc = *RI;
-  if (CurReloc->offset() != CurAddr)
+  // check if there is a relocation for current address
+  auto reloc = *_ri;
+  if (reloc->offset() != addr)
     return nullptr;
 
-  ConstSymbolPtr Sym = CurReloc->symbol();
-  uint64_t Type = CurReloc->type();
-  bool IsLO = false;
-  uint64_t Mask;
-  ConstSymbolPtr RealSym = Sym;
+  ConstSymbolPtr sym = reloc->symbol();
+  uint64_t type = reloc->type();
+  bool isLO = false;
+  uint64_t mask;
+  ConstSymbolPtr realSym = sym;
 
-  switch (Type) {
+  switch (type) {
     case llvm::ELF::R_RISCV_PCREL_HI20:
     case llvm::ELF::R_RISCV_HI20:
       break;
@@ -31,89 +48,83 @@ Translator::handleRelocation(llvm::raw_ostream &SS)
     // This rellocation has PC info only
     // Symbol info is present on the PCREL_HI20 Reloc
     case llvm::ELF::R_RISCV_PCREL_LO12_I:
-      IsLO = true;
-      RealSym = (**RLast).symbol();
+      isLO = true;
+      realSym = (**_rlast).symbol();
       break;
 
     case llvm::ELF::R_RISCV_LO12_I:
-      IsLO = true;
+      isLO = true;
       break;
 
     default:
-      DBGS << "Relocation Type: " << Type << '\n';
-      llvm_unreachable("unknown relocation");
+      DBGS << "Relocation Type: " << type << nl;
+      xassert(false && "unknown relocation");
   }
 
-  // Set Symbol Relocation info
-  SymbolReloc SR;
-  SR.IsValid = true;
-  SR.Name = RealSym->name();
-  SR.Addr = RealSym->address();
-  SR.Val = SR.Addr;
-  SR.Sec = RealSym->section();
+  // set Symbol Relocation info
+  SBTSymbol ssym(realSym->address(), realSym->address(),
+    realSym->name(), realSym->section());
 
   // Note: !SR.Sec && SR.Addr == External Symbol
-  assert((SR.Sec || !SR.Addr) && "No section found for relocation");
-  if (SR.Sec) {
-    assert(SR.Addr < SR.Sec->size() && "Out of bounds relocation");
-    SR.Val += SR.Sec->shadowOffs();
+  xassert((ssym.sec || !ssym.addr) && "No section found for relocation");
+  if (ssym.sec) {
+    xassert(ssym.addr < ssym.sec->size() && "Out of bounds relocation");
+    ssym.val += ssym.sec->shadowOffs();
   }
 
-  // Increment relocation iterator
-  RLast = RI;
+  // increment relocation iterator
+  _rlast = _ri;
   do {
-    ++RI;
-  } while (RI != RE && (**RI).offset() == CurAddr);
+    ++_ri;
+  } while (_ri != _re && (**_ri).offset() == addr);
 
-  // Write relocation string
-  if (IsLO) {
-    Mask = 0xFFF;
-    SS << "%lo(";
+  // write relocation string
+  if (isLO) {
+    mask = 0xFFF;
+    *os << "%lo(";
   } else {
-    Mask = 0xFFFFF000;
-    SS << "%hi(";
+    mask = 0xFFFFF000;
+    *os << "%hi(";
   }
-  SS << SR.Name << ") = " << SR.Addr;
+  *os << ssym.name << ") = " << ssym.addr;
 
-  Value *V = nullptr;
-  bool IsFunction =
-    SR.Sec && SR.Sec->isText() &&
-    RealSym->type() == llvm::object::SymbolRef::ST_Function;
+  llvm::Value* v = nullptr;
+  bool isFunction =
+    ssym.sec && ssym.sec->isText() &&
+    realSym->type() == llvm::object::SymbolRef::ST_Function;
 
   // special case: external functions: return our handler instead
-  if (SR.isExternal()) {
-    auto ExpF = import(SR.Name);
-    if (!ExpF)
-      return ExpF.takeError();
-    uint64_t Addr = ExpF.get();
-    Addr &= Mask;
-    V = ConstantInt::get(I32, Addr);
+  if (ssym.isExternal()) {
+    auto expAddr =_ctx->translator->import(ssym.name);
+    if (!expAddr)
+      return expAddr.takeError();
+    uint64_t addr = expAddr.get();
+    addr &= mask;
+    v = _ctx->c.i32(addr);
 
   // special case: internal function
-  } else if (IsFunction) {
-    uint64_t Addr = SR.Addr;
-    Addr &= Mask;
-    V = ConstantInt::get(I32, Addr);
+  } else if (isFunction) {
+    uint64_t addr = ssym.addr;
+    addr &= mask;
+    v = _ctx->c.i32(addr);
 
   // add the relocation offset to ShadowImage to get the final address
-  } else if (SR.Sec) {
-    // get char * to memory
-    std::vector<llvm::Value *> Idx = { ZERO,
-      llvm::ConstantInt::get(I32, SR.Val) };
-    V = Builder->CreateGEP(ShadowImage, Idx);
-    updateFirst(V);
+  } else if (ssym.sec) {
+    Builder* bld = _ctx->bld;
 
-    V = i8PtrToI32(V);
+    // get char* to memory
+    std::vector<llvm::Value*> idx = { _ctx->c.ZERO, _ctx->c.i32(ssym.val) };
+    v = bld->gep(_ctx->shadowImage, idx);
+
+    v = bld->i8PtrToI32(v);
 
     // Finally, get only the upper or lower part of the result
-    V = Builder->CreateAnd(V, llvm::ConstantInt::get(I32, Mask));
-    updateFirst(V);
+    v = bld->_and(v, _ctx->c.i32(mask));
 
   } else
-    llvm_unreachable("Failed to resolve relocation");
+    xassert(false && "Failed to resolve relocation");
 
-  LastImm.IsSym = true;
-  LastImm.SymRel = std::move(SR);
-  return V;
+  return v;
 }
 
+}

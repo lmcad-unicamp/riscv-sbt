@@ -1,6 +1,8 @@
 #include "Section.h"
 
+#include "Builder.h"
 #include "Function.h"
+#include "Relocation.h"
 #include "SBTError.h"
 
 #include <llvm/Support/FormatVariadic.h>
@@ -27,9 +29,11 @@ llvm::Error SBTSection::translate()
 
   // get relocations
   const ConstRelocationPtrVec relocs = _section->object()->relocs();
-  _ri = relocs.cbegin();
-  _re = relocs.cend();
-  _rlast = _ri;
+  SBTRelocation reloc(_ctx, relocs.cbegin(), relocs.cend());
+  _ctx->reloc = &reloc;
+
+  Builder bld(_ctx);
+  _ctx->bld = &bld;
 
   // get section bytes
   llvm::StringRef bytesStr;
@@ -70,10 +74,6 @@ llvm::Error SBTSection::translate()
     } else
       continue;
   }
-
-  // finish any pending function
-  // if (auto err = finishFunction())
-  // return err;
 
   return llvm::Error::success();
 }

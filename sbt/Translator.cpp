@@ -37,6 +37,7 @@ Translator::Translator(Context* ctx)
   _ctx(ctx),
   _iCaller(_ctx, "rv32_icaller")
 {
+  _ctx->translator = this;
 }
 
 
@@ -172,7 +173,7 @@ llvm::Error Translator::translate()
 }
 
 
-llvm::Error Translator::import(const std::string& func)
+llvm::Expected<uint64_t> Translator::import(const std::string& func)
 {
   std::string rv32Func = "rv32_" + func;
 
@@ -183,8 +184,8 @@ llvm::Error Translator::import(const std::string& func)
   auto& t = _ctx->t;
 
   // check if the function was already processed
-  if (module->getFunction(rv32Func))
-    return llvm::Error::success();
+  if (auto f = _funMap[rv32Func])
+    return (*f)->addr();
 
   // load libc module
   if (!_lcModule) {
@@ -221,13 +222,14 @@ llvm::Error Translator::import(const std::string& func)
         llvm::GlobalValue::ExternalLinkage, func, module);
 
   // create our caller to the external function
-  FunctionPtr f(new Function(_ctx, rv32Func));
-  if (auto err = f->create(t.voidFunc, llvm::Function::PrivateLinkage))
-    return err;
   if (!_extFuncAddr)
     _extFuncAddr = 0xFFFF0000;
+  uint64_t addr = _extFuncAddr;
+  FunctionPtr f(new Function(_ctx, rv32Func, nullptr, addr));
+  if (auto err = f->create(t.voidFunc, llvm::Function::PrivateLinkage))
+    return std::move(err);
   // XXX need to always add to map?
-  _funMap(std::move(f), std::move(_extFuncAddr));
+  _funMap(f->name(), std::move(f));
   _extFuncAddr += Instruction::SIZE;
 
   llvm::BasicBlock* bb = llvm::BasicBlock::Create(ctx, "entry", f->func());
@@ -276,7 +278,7 @@ llvm::Error Translator::import(const std::string& func)
 
   v = builder->CreateRetVoid();
 
-  return llvm::Error::success();
+  return addr;
 }
 
 
@@ -319,8 +321,9 @@ llvm::Error Translator::genICaller()
   // cases
   // case fun: t1 = realFunAddress;
   for (const auto& p : _funMap) {
-    const FunctionPtr& f = p.key;
-    uint64_t addr = p.val;
+    const FunctionPtr& f = p.val;
+    uint64_t addr = f->addr();
+    xassert(addr && "invalid function address");
 
     std::string caseStr = "case_" + f->name();
     llvm::Value* sym = _ctx->module->getValueSymbolTable().lookup(f->name());
