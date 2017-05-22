@@ -33,12 +33,28 @@ public:
     _first = nullptr;
   }
 
+  // load
+  llvm::LoadInst* load(llvm::Value* ptr)
+  {
+    llvm::LoadInst* v = _builder->CreateLoad(ptr);
+    updateFirst(v);
+    return v;
+  }
+
   // load register
   llvm::LoadInst* load(unsigned reg)
   {
     const XRegister& x = _ctx->x[reg];
     llvm::LoadInst* i = _builder->CreateLoad(
         x.var(), x.name() + "_");
+    updateFirst(i);
+    return i;
+  }
+
+  // store
+  llvm::StoreInst* store(llvm::Value* v, llvm::Value* ptr)
+  {
+    llvm::StoreInst* i = _builder->CreateStore(v, ptr);
     updateFirst(i);
     return i;
   }
@@ -54,6 +70,22 @@ public:
         x.var(), !VOLATILE);
     updateFirst(i);
     return i;
+  }
+
+  // sign extend
+  llvm::Value* sext(llvm::Value* v)
+  {
+    llvm::Value* v2 = _builder->CreateSExt(v, _t->i32);
+    updateFirst(v2);
+    return v2;
+  }
+
+  // zero extend
+  llvm::Value* zext(llvm::Value* v)
+  {
+    llvm::Value* v2 = _builder->CreateZExt(v, _t->i32);
+    updateFirst(v2);
+    return v2;
   }
 
   // ALU ops
@@ -134,8 +166,10 @@ public:
     load(XRegister::ZERO);
   }
 
+  // cast
+
   // i8* to i32
-  llvm::Value *i8PtrToI32(llvm::Value* v8)
+  llvm::Value* i8PtrToI32(llvm::Value* v8)
   {
     // cast to int32_t *
     llvm::Value* v =
@@ -148,6 +182,49 @@ public:
     return v;
   }
 
+  // i32 to i8*
+  llvm::Value* i32ToI8Ptr(llvm::Value* i32)
+  {
+    llvm::Value* v = _builder->CreateCast(
+      llvm::Instruction::CastOps::IntToPtr, i32, _t->i8ptr);
+    updateFirst(v);
+    return v;
+  }
+
+  // i32 to i16*
+  llvm::Value* i32ToI16Ptr(llvm::Value* i32)
+  {
+    llvm::Value* v = _builder->CreateCast(
+      llvm::Instruction::CastOps::IntToPtr, i32, _t->i16ptr);
+    updateFirst(v);
+    return v;
+  }
+
+  // i32 to i32*
+  llvm::Value* i32ToI32Ptr(llvm::Value* i32)
+  {
+    llvm::Value* v = _builder->CreateCast(
+      llvm::Instruction::CastOps::IntToPtr, i32, _t->i32ptr);
+    updateFirst(v);
+    return v;
+  }
+
+  // trunc or cast to i8
+  llvm::Value* truncOrBitCastI8(llvm::Value* i32)
+  {
+    llvm::Value* v = _builder->CreateTruncOrBitCast(i32, _t->i8);
+    updateFirst(v);
+    return v;
+  }
+
+  // trunc or cast to i16
+  llvm::Value* truncOrBitCastI16(llvm::Value* i32)
+  {
+    llvm::Value* v = _builder->CreateTruncOrBitCast(i32, _t->i16);
+    updateFirst(v);
+    return v;
+  }
+
   // gep
   llvm::Value* gep(llvm::Value* ptr, std::vector<llvm::Value*> idx)
   {
@@ -156,11 +233,28 @@ public:
     return v;
   }
 
+  llvm::Value* call(
+    llvm::Function* f,
+    llvm::ArrayRef<llvm::Value*> args = llvm::None)
+  {
+    llvm::Value* v = _builder->CreateCall(f, args);
+    updateFirst(v);
+    return v;
+  }
+
+  // ret void
   llvm::Instruction* retVoid()
   {
     auto v = _builder->CreateRetVoid();
     updateFirst(v);
     return v;
+  }
+
+  // fence
+  void fence(llvm::AtomicOrdering order, llvm::SynchronizationScope scope)
+  {
+    llvm::Value* v = _builder->CreateFence(order, scope);
+    updateFirst(v);
   }
 
   void setInsertPoint(BasicBlock& bb)

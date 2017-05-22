@@ -132,6 +132,9 @@ llvm::Error Translator::start()
   if (auto err = _getInstRet->create(ft))
     return err;
 
+  _sc.reset(new Syscall(_ctx));
+  _ctx->syscall = &*_sc;
+
   return llvm::Error::success();
 }
 
@@ -158,7 +161,7 @@ llvm::Error Translator::translate()
   if (auto err = start())
     return err;
 
-  Syscall(_ctx).declHandler();
+  _sc->declHandler();
 
   for (const auto& f : _inputFiles) {
     Module mod(_ctx);

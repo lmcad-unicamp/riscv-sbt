@@ -16,6 +16,7 @@ class Disassembler;
 class Function;
 class SBTRelocation;
 class Stack;
+class Syscall;
 class Translator;
 class XRegister;
 class XRegisters;
@@ -46,6 +47,7 @@ public:
   Constants c;
   Types t;
   ArrayPtr<XRegisters, XRegister> x;
+  Syscall* syscall = nullptr;
   Builder* bld = nullptr;
   Stack* stack = nullptr;
   llvm::GlobalVariable* shadowImage = nullptr;

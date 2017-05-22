@@ -155,4 +155,15 @@ llvm::Error Syscall::genHandler()
   return llvm::Error::success();
 }
 
+
+void Syscall::call()
+{
+  Builder* bld = _ctx->bld;
+
+  llvm::Value* sc = bld->load(XRegister::A7);
+  std::vector<llvm::Value*> args = { sc };
+  llvm::Value* v = bld->call(_fRVSC, args);
+  bld->store(v, XRegister::A0);
+}
+
 }

@@ -5,6 +5,8 @@
 #include "Disassembler.h"
 #include "Relocation.h"
 #include "SBTError.h"
+#include "Syscall.h"
+#include "Translator.h"
 
 #include <llvm/Support/FormatVariadic.h>
 
@@ -154,7 +156,7 @@ llvm::Error Instruction::translate()
     // ecall
     case RISCV::ECALL:
       *_os << "ecall";
-      err = handleSyscall();
+      _ctx->syscall->call();
       break;
 
     // ebreak
@@ -382,18 +384,163 @@ llvm::Error Instruction::translateALUOp(ALUOp op, uint32_t flags)
 
 llvm::Error Instruction::translateUI(UIOp op)
 {
+  switch (op) {
+    case AUIPC: *_os << "auipc";  break;
+    case LUI:   *_os << "lui";    break;
+  }
+  *_os << '\t';
+
+  unsigned o = getRD();
+  auto expImm = getImm(1);
+  if (!expImm)
+    return expImm.takeError();
+  llvm::Value* imm = expImm.get();
+  llvm::Value* v;
+
+  if (_ctx->reloc->isSymbol(_addr))
+    v = imm;
+  else {
+    // get upper immediate
+    v = _bld->sll(imm, _c->i32(12));
+
+    // add PC (CurAddr)
+    if (op == AUIPC)
+      v = _bld->add(v, _c->i32(_addr));
+  }
+
+  _bld->store(v, o);
+
   return llvm::Error::success();
 }
 
 
 llvm::Error Instruction::translateLoad(IntType it)
 {
+  switch (it) {
+    case S8:
+      *_os << "lb";
+      break;
+
+    case U8:
+      *_os << "lbu";
+      break;
+
+    case S16:
+      *_os << "lh";
+      break;
+
+    case U16:
+      *_os << "lhu";
+      break;
+
+    case U32:
+      *_os << "lw";
+      break;
+  }
+  *_os << '\t';
+
+  unsigned o = getRD();
+  llvm::Value* rs1 = getReg(1);
+  auto expImm = getImm(2);
+  if (!expImm)
+    return expImm.takeError();
+  llvm::Value* imm = expImm.get();
+
+  llvm::Value* v = _bld->add(rs1, imm);
+
+  llvm::Value* ptr;
+  switch (it) {
+    case S8:
+    case U8:
+      ptr = _bld->i32ToI8Ptr(v);
+      break;
+
+    case S16:
+    case U16:
+      ptr = _bld->i32ToI16Ptr(v);
+      break;
+
+    case U32:
+      ptr = _bld->i32ToI32Ptr(v);
+      break;
+  }
+
+  v = _bld->load(ptr);
+
+  // to int32
+  switch (it) {
+    case S8:
+    case S16:
+      v = _bld->sext(v);
+      break;
+
+    case U8:
+    case U16:
+      v = _bld->zext(v);
+      break;
+
+    case U32:
+      break;
+  }
+  _bld->store(v, o);
+
   return llvm::Error::success();
 }
 
 
 llvm::Error Instruction::translateStore(IntType it)
 {
+  switch (it) {
+    case U8:
+      *_os << "sb";
+      break;
+
+    case U16:
+      *_os << "sh";
+      break;
+
+    case U32:
+      *_os << "sw";
+      break;
+
+    default:
+      xassert(false && "Unknown store type!");
+  }
+  *_os << '\t';
+
+
+  llvm::Value* rs1 = getReg(0);
+  llvm::Value* rs2 = getReg(1);
+  auto expImm = getImm(2);
+  if (!expImm)
+    return expImm.takeError();
+  llvm::Value* imm = expImm.get();
+
+  llvm::Value* v = _bld->add(rs1, imm);
+
+  llvm::Value* ptr;
+  switch (it) {
+    case U8:
+      ptr = _bld->i32ToI8Ptr(v);
+      v = _bld->truncOrBitCastI8(rs2);
+      break;
+
+    case U16:
+      ptr = _bld->i32ToI16Ptr(v);
+      v = _bld->truncOrBitCastI16(rs2);
+      break;
+
+    case U32:
+      ptr = _bld->i32ToI32Ptr(v);
+      v = rs2;
+      break;
+
+    default:
+      xassert(false && "Unknown store type!");
+  }
+
+  _bld->store(v, ptr);
+
   return llvm::Error::success();
 }
 
@@ -404,190 +551,87 @@ llvm::Error Instruction::translateBranch(BranchType bt)
 }
 
 
-llvm::Error Instruction::handleSyscall()
-{
-  return llvm::Error::success();
-}
-
-
 llvm::Error Instruction::translateFence(bool fi)
 {
+  if (fi) {
+    *_os << "fence.i";
+    _bld->nop();
+    return llvm::Error::success();
+  }
+
+  *_os << "fence";
+
+  _bld->fence(llvm::AtomicOrdering::AcquireRelease,
+    llvm::SynchronizationScope::CrossThread);
   return llvm::Error::success();
 }
 
 
 llvm::Error Instruction::translateCSR(CSROp op, bool imm)
 {
+  switch (op) {
+    case RW:
+      xassert(false && "No CSR write support for base I instructions!");
+      break;
+
+    case RS:
+      *_os << "csrrs";
+      break;
+
+    case RC:
+      *_os << "csrrc";
+      break;
+  }
+  if (imm)
+    *_os << "i";
+  *_os << '\t';
+
+  unsigned rd = getRegNum(0);
+  uint64_t csr = _inst.getOperand(1).getImm();
+  uint64_t mask;
+  if (imm)
+    mask = XRegister::A0; // Inst.getOperand(2).getImm();
+  else
+    mask = getRegNum(2);
+  xassert(mask == XRegister::ZERO &&
+    "No CSR write support for base I instructions!");
+  *_os << llvm::formatv("0x{0:X-4} = ", csr);
+
+  llvm::Value* v = _c->ZERO;
+  switch (csr) {
+    case CSR::RDCYCLE:
+      *_os << "RDCYCLE";
+      v = _bld->call(_ctx->translator->getCycles().func());
+      break;
+    case CSR::RDCYCLEH:
+      *_os << "RDCYCLEH";
+      break;
+    case CSR::RDTIME:
+      *_os << "RDTIME";
+      v = _bld->call(_ctx->translator->getTime().func());
+      break;
+    case CSR::RDTIMEH:
+      *_os << "RDTIMEH";
+      break;
+    case CSR::RDINSTRET:
+      *_os << "RDINSTRET";
+      v = _bld->call(_ctx->translator->getInstRet().func());
+      break;
+    case CSR::RDINSTRETH:
+      *_os << "RDINSTRETH";
+      break;
+    default:
+      xassert(false && "Not implemented!");
+      break;
+  }
+
+  _bld->store(v, rd);
+
   return llvm::Error::success();
 }
 
 
 #if 0
-
-Error Translator::handleSyscall()
-{
-  Value *SC = load(RV_A7);
-  std::vector<Value *> Args = { SC };
-  Value *V = Builder->CreateCall(FRVSC, Args);
-  updateFirst(V);
-  store(V, RV_A0);
-
-  return Error::success();
-}
-
-
-Error Translator::translateLoad(
-  const llvm::MCInst &Inst,
-  IntType IT,
-  llvm::raw_string_ostream &SS)
-{
-  switch (IT) {
-    case S8:
-      ss << "lb";
-      break;
-
-    case U8:
-      ss << "lbu";
-      break;
-
-    case S16:
-      ss << "lh";
-      break;
-
-    case U16:
-      ss << "lhu";
-      break;
-
-    case U32:
-      ss << "lw";
-      break;
-  }
-  ss << '\t';
-
-  unsigned O = getRD(Inst, ss);
-  Value *RS1 = getReg(Inst, 1, ss);
-  auto ExpImm = getImm(Inst, 2, ss);
-  if (!ExpImm)
-    return ExpImm.takeError();
-  Value *Imm = ExpImm.get();
-
-  Value *V = add(RS1, Imm);
-
-  Value *Ptr;
-  switch (IT) {
-    case S8:
-    case U8:
-      Ptr = Builder->CreateCast(
-        llvm::Instruction::CastOps::IntToPtr, V, I8Ptr);
-      break;
-
-    case S16:
-    case U16:
-      Ptr = Builder->CreateCast(
-        llvm::Instruction::CastOps::IntToPtr, V, I16Ptr);
-      break;
-
-    case U32:
-      Ptr = Builder->CreateCast(
-        llvm::Instruction::CastOps::IntToPtr, V, I32Ptr);
-      break;
-  }
-  updateFirst(Ptr);
-
-  V = Builder->CreateLoad(Ptr);
-  updateFirst(V);
-
-  // to int32
-  switch (IT) {
-    case S8:
-    case S16:
-      V = Builder->CreateSExt(V, I32);
-      updateFirst(V);
-      break;
-
-    case U8:
-    case U16:
-      V = Builder->CreateZExt(V, I32);
-      updateFirst(V);
-      break;
-
-    case U32:
-      break;
-  }
-  store(V, O);
-
-  return Error::success();
-}
-
-
-Error Translator::translateStore(
-  const llvm::MCInst &Inst,
-  IntType IT,
-  llvm::raw_string_ostream &SS)
-{
-  switch (IT) {
-    case U8:
-      ss << "sb";
-      break;
-
-    case U16:
-      ss << "sh";
-      break;
-
-    case U32:
-      ss << "sw";
-      break;
-
-    default:
-      llvm_unreachable("Unknown store type!");
-  }
-  ss << '\t';
-
-
-  Value *RS1 = getReg(Inst, 0, ss);
-  Value *RS2 = getReg(Inst, 1, ss);
-  auto ExpImm = getImm(Inst, 2, ss);
-  if (!ExpImm)
-    return ExpImm.takeError();
-  Value *Imm = ExpImm.get();
-
-  Value *V = add(RS1, Imm);
-
-  Value *Ptr;
-  switch (IT) {
-    case U8:
-      Ptr = Builder->CreateCast(
-        llvm::Instruction::CastOps::IntToPtr, V, I8Ptr);
-      updateFirst(Ptr);
-      V = Builder->CreateTruncOrBitCast(RS2, I8);
-      updateFirst(V);
-      break;
-
-    case U16:
-      Ptr = Builder->CreateCast(
-        llvm::Instruction::CastOps::IntToPtr, V, I16Ptr);
-      updateFirst(Ptr);
-      V = Builder->CreateTruncOrBitCast(RS2, I16);
-      updateFirst(V);
-      break;
-
-    case U32:
-      Ptr = Builder->CreateCast(
-        llvm::Instruction::CastOps::IntToPtr, V, I32Ptr);
-      updateFirst(Ptr);
-      V = RS2;
-      break;
-
-    default:
-      llvm_unreachable("Unknown store type!");
-  }
-
-  V = Builder->CreateStore(V, Ptr);
-  updateFirst(V);
-
-  return Error::success();
-}
-
 
 llvm::Error Translator::translateBranch(
   const llvm::MCInst &Inst,
@@ -1016,134 +1060,6 @@ llvm::Error Translator::handleIJump(
   unsigned LinkReg)
 {
   llvm_unreachable("IJump support not implemented yet!");
-}
-
-llvm::Error Translator::translateUI(
-  const llvm::MCInst &Inst,
-  UIOp UOP,
-  llvm::raw_string_ostream &SS)
-{
-  switch (UOP) {
-    case AUIPC: ss << "auipc";  break;
-    case LUI:   ss << "lui";    break;
-  }
-  ss << '\t';
-
-  unsigned O = getRD(Inst, ss);
-  auto ExpImm = getImm(Inst, 1, ss);
-  if (!ExpImm)
-    return ExpImm.takeError();
-  Value *Imm = ExpImm.get();
-  Value *V;
-
-  if (LastImm.IsSym)
-    V = Imm;
-  else {
-    // get upper immediate
-    V = Builder->CreateShl(Imm, ConstantInt::get(I32, 12));
-    updateFirst(V);
-
-    // Add PC (CurAddr)
-    if (UOP == AUIPC) {
-      V = add(V, ConstantInt::get(I32, CurAddr));
-      updateFirst(V);
-    }
-  }
-
-  store(V, O);
-
-  return Error::success();
-}
-
-
-llvm::Error Translator::translateFence(
-  const llvm::MCInst &Inst,
-  bool FI,
-  llvm::raw_string_ostream &SS)
-{
-  if (FI) {
-    ss << "fence.i";
-    nop();
-    return Error::success();
-  }
-
-  ss << "fence";
-  AtomicOrdering Order = llvm::AtomicOrdering::AcquireRelease;
-  SynchronizationScope Scope = llvm::SynchronizationScope::CrossThread;
-
-  Value *V;
-  V = Builder->CreateFence(Order, Scope);
-  updateFirst(V);
-
-  return Error::success();
-}
-
-llvm::Error Translator::translateCSR(
-  const llvm::MCInst &Inst,
-  CSROp Op,
-  bool Imm,
-  llvm::raw_string_ostream &SS)
-{
-  switch (Op) {
-    case RW:
-      assert(false && "No CSR write support for base I instructions!");
-      break;
-
-    case RS:
-      ss << "csrrs";
-      break;
-
-    case RC:
-      ss << "csrrc";
-      break;
-  }
-  if (Imm)
-    ss << "i";
-  ss << '\t';
-
-  unsigned RD = getRegNum(0, Inst, ss);
-  uint64_t CSR = Inst.getOperand(1).getImm();
-  uint64_t Mask;
-  if (Imm)
-    Mask = RV_A0; // Inst.getOperand(2).getImm();
-  else
-    Mask = getRegNum(2, Inst, ss);
-  assert(Mask == RV_ZERO && "No CSR write support for base I instructions!");
-  ss << llvm::formatv("0x{0:X-4} = ", CSR);
-
-  Value *V = ConstantInt::get(I32, 0);
-  switch (CSR) {
-    case RDCYCLE:
-      ss << "RDCYCLE";
-      V = Builder->CreateCall(GetCycles);
-      updateFirst(V);
-      break;
-    case RDCYCLEH:
-      ss << "RDCYCLEH";
-      break;
-    case RDTIME:
-      ss << "RDTIME";
-      V = Builder->CreateCall(GetTime);
-      updateFirst(V);
-      break;
-    case RDTIMEH:
-      ss << "RDTIMEH";
-      break;
-    case RDINSTRET:
-      ss << "RDINSTRET";
-      V = Builder->CreateCall(InstRet);
-      updateFirst(V);
-      break;
-    case RDINSTRETH:
-      ss << "RDINSTRETH";
-      break;
-    default:
-      assert(false && "Not implemented!");
-      break;
-  }
-
-  store(V, RD);
-  return Error::success();
 }
 
 #endif

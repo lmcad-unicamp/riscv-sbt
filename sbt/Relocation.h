@@ -3,6 +3,7 @@
 
 #include "Context.h"
 #include "Object.h"
+#include "Symbol.h"
 
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Error.h>
@@ -23,11 +24,18 @@ public:
   llvm::Expected<llvm::Value*>
   handleRelocation(uint64_t addr, llvm::raw_ostream* os);
 
+  bool isSymbol(uint64_t addr) const
+  {
+    return _hasSymbol && _last.addr == addr;
+  }
+
 private:
   Context* _ctx;
   ConstRelocIter _ri;
   ConstRelocIter _re;
   ConstRelocIter _rlast;
+  SBTSymbol _last;
+  bool _hasSymbol = false;
 };
 
 }

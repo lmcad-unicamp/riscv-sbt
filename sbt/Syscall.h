@@ -19,6 +19,8 @@ public:
     _ctx(ctx)
   {}
 
+  void call();
+
   void declHandler();
 
   llvm::Error genHandler();

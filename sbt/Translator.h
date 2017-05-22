@@ -22,6 +22,8 @@ class Target;
 
 namespace sbt {
 
+class Syscall;
+
 class Translator
 {
 public:
@@ -55,6 +57,21 @@ public:
     _outputFile = file;
   }
 
+  const Function& getCycles() const
+  {
+    return *_getCycles;
+  }
+
+  const Function& getTime() const
+  {
+    return *_getTime;
+  }
+
+  const Function& getInstRet() const
+  {
+    return *_getInstRet;
+  }
+
 private:
   // data
 
@@ -83,6 +100,8 @@ private:
 
   uint64_t _extFuncAddr = 0;
   std::unique_ptr<llvm::Module> _lcModule;
+
+  std::unique_ptr<Syscall> _sc;
 
   // host functions
 

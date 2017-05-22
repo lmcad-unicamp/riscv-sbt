@@ -2,7 +2,6 @@
 
 #include "Builder.h"
 #include "Object.h"
-#include "Symbol.h"
 #include "Translator.h"
 
 #include <llvm/Object/ELF.h>
@@ -17,7 +16,8 @@ SBTRelocation::SBTRelocation(
   _ctx(ctx),
   _ri(ri),
   _re(re),
-  _rlast(ri)
+  _rlast(ri),
+  _last(0, 0, "", nullptr)
 {
 }
 
@@ -124,6 +124,8 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
   } else
     xassert(false && "Failed to resolve relocation");
 
+  _last = std::move(ssym);
+  _hasSymbol = true;
   return v;
 }
 
