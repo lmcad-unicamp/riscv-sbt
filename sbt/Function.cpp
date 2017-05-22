@@ -13,20 +13,18 @@
 
 namespace sbt {
 
-llvm::Error Function::create(
+void Function::create(
   llvm::FunctionType* ft,
   llvm::Function::LinkageTypes linkage)
 {
   _f = _ctx->module->getFunction(_name);
   if (_f)
-    return llvm::Error::success();
+    return;
 
   // create a function with no parameters
   if (!ft)
     ft = llvm::FunctionType::get(_ctx->t.voidT, !VAR_ARG);
   _f = llvm::Function::Create(ft, linkage, _name, _ctx->module);
-
-  return llvm::Error::success();
 }
 
 
@@ -78,14 +76,14 @@ llvm::Error Function::startMain()
     llvm::Function::ExternalLinkage, "syscall_init", _ctx->module);
   builder->CreateCall(f);
 
+  _ctx->inMain = true;
   return llvm::Error::success();
 }
 
 
 llvm::Error Function::start()
 {
-  if (auto err = create())
-    return err;
+  create();
 
   /*
   // bb
@@ -113,6 +111,7 @@ llvm::Error Function::finish()
   auto builder = _ctx->builder;
   if (builder->GetInsertBlock()->getTerminator() == nullptr)
     _ctx->bld->retVoid();
+  _ctx->inMain = false;
   return llvm::Error::success();
 }
 
@@ -168,6 +167,28 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
   }
 
   return llvm::Error::success();
+}
+
+
+Function* Function::getByAddr(Context* ctx, uint64_t addr)
+{
+  if (auto fp = ctx->funcByAddr()[addr])
+    return *fp;
+
+  // get symbol by offset
+  // FIXME need to change this to be able to find functions in other modules
+  ConstSymbolPtr sym = ctx->sec->section()->lookup(addr);
+  xassert(sym &&
+      (sym->type() == llvm::object::SymbolRef::ST_Function ||
+        (sym->flags() & llvm::object::SymbolRef::SF_Global)) &&
+    "Target function not found!");
+
+  FunctionPtr f(new Function(ctx, sym->name(), ctx->sec, addr));
+  f->create();
+  ctx->funcByAddr()(f->addr(), &*f);
+  std::string name = f->name();
+  ctx->func()(name, std::move(f));
+  return &**ctx->func()[name];
 }
 
 }

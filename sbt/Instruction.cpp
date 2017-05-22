@@ -357,6 +357,7 @@ llvm::Error Instruction::translateALUOp(ALUOp op, uint32_t flags)
         v = _bld->ult(o1, o2);
       else
         v = _bld->slt(o1, o2);
+      v = _bld->zext(v);
       break;
 
     case SRA:
@@ -545,12 +546,6 @@ llvm::Error Instruction::translateStore(IntType it)
 }
 
 
-llvm::Error Instruction::translateBranch(BranchType bt)
-{
-  return llvm::Error::success();
-}
-
-
 llvm::Error Instruction::translateFence(bool fi)
 {
   if (fi) {
@@ -631,54 +626,53 @@ llvm::Error Instruction::translateCSR(CSROp op, bool imm)
 }
 
 
-#if 0
-
-llvm::Error Translator::translateBranch(
-  const llvm::MCInst &Inst,
-  BranchType BT,
-  llvm::raw_string_ostream &SS)
+llvm::Error Instruction::translateBranch(BranchType bt)
 {
   // Inst print
-  switch (BT) {
-    case JAL:   ss << "jal";  break;
-    case JALR:  ss << "jalr"; break;
-    case BEQ:   ss << "beq";  break;
-    case BNE:   ss << "bne";  break;
-    case BGE:   ss << "bge";  break;
-    case BGEU:  ss << "bgeu";  break;
-    case BLT:   ss << "blt";  break;
-    case BLTU:  ss << "bltu"; break;
+  switch (bt) {
+    case JAL:   *_os << "jal";  break;
+    case JALR:  *_os << "jalr"; break;
+    case BEQ:   *_os << "beq";  break;
+    case BNE:   *_os << "bne";  break;
+    case BGE:   *_os << "bge";  break;
+    case BGEU:  *_os << "bgeu";  break;
+    case BLT:   *_os << "blt";  break;
+    case BLTU:  *_os << "bltu"; break;
   }
-  ss << '\t';
+  *_os << '\t';
 
-  Error E = noError();
+  llvm::Error err = noError();
 
   // Get Operands
-  unsigned O0N = getRegNum(0, Inst, ss);
-  Value *O0 = nullptr;
-  unsigned O1N = 0;
-  Value *O1 = nullptr;
-  Value *O2 = nullptr;
-  Value *JReg = nullptr;
-  Value *JImm = nullptr;
-  unsigned LinkReg = 0;
-  switch (BT) {
+  unsigned o0n = getRegNum(0);
+  llvm::Value* o0 = nullptr;
+  unsigned o1n = 0;
+  llvm::Value* o1 = nullptr;
+  llvm::Value* o2 = nullptr;
+  llvm::Value* jreg = nullptr;
+  llvm::Value* jimm = nullptr;
+  unsigned linkReg = 0;
+  switch (bt) {
     case JAL:
-      LinkReg = O0N;
-      if (!exp(getImm(Inst, 1, ss), O1, E))
-        return E;
-      JImm = O1;
+      linkReg = o0n;
+      if (!exp(getImm(1), o1, err))
+        return err;
+      jimm = o1;
       break;
 
-    case JALR:
-      LinkReg = O0N;
-      O1N = getRegNum(1, Inst, nulls());
-      O1 = getReg(Inst, 1, ss);
-      if (!exp(getImm(Inst, 2, ss), O2, E))
-        return E;
-      JReg = O1;
-      JImm = O2;
+    case JALR: {
+      linkReg = o0n;
+      auto sos = _os;
+      _os = &llvm::nulls();
+      o1n = getRegNum(1);
+      _os = sos;
+      o1 = getReg(1);
+      if (!exp(getImm(2), o2, err))
+        return err;
+      jreg = o1;
+      jimm = o2;
       break;
+    }
 
     case BEQ:
     case BNE:
@@ -686,40 +680,38 @@ llvm::Error Translator::translateBranch(
     case BGEU:
     case BLT:
     case BLTU:
-      O0 = getReg(Inst, 0, ss);
-      O1 = getReg(Inst, 1, ss);
-      if (!exp(getImm(Inst, 2, ss), O2, E))
-        return E;
-      JImm = O2;
+      o0 = getReg(0);
+      o1 = getReg(1);
+      if (!exp(getImm(2), o2, err))
+        return err;
+      jimm = o2;
       break;
   }
 
-  int64_t JImmI = 0;
-  bool JImmIsZeroImm = false;
-  if (isa<ConstantInt>(JImm)) {
-    JImmI = cast<ConstantInt>(JImm)->getValue().getSExtValue();
-    JImmIsZeroImm = JImmI == 0 && !LastImm.IsSym;
+  int64_t jimmi = 0;
+  bool jimmIsZeroImm = false;
+  bool isSymbol = _ctx->reloc->isSymbol(_addr);
+  if (llvm::isa<llvm::ConstantInt>(jimm)) {
+    jimmi = llvm::cast<llvm::ConstantInt>(jimm)->getValue().getSExtValue();
+    jimmIsZeroImm = jimmi == 0 && !isSymbol;
   }
-  Value *V = nullptr;
+  llvm::Value* v = nullptr;
 
-  // Return?
-  if (BT == JALR &&
-      O0N == RV_ZERO &&
-      O1N == RV_RA &&
-      JImmIsZeroImm)
+  // return?
+  if (bt == JALR &&
+      o0n == XRegister::ZERO &&
+      o1n == XRegister::RA &&
+      jimmIsZeroImm)
   {
-    if (InMain)
-      V = Builder->CreateRet(load(RV_A0));
+    if (_ctx->inMain)
+      v = _bld->ret(_bld->load(XRegister::A0));
     else
-      V = Builder->CreateRetVoid();
-    updateFirst(V);
-    return Error::success();
+      v = _bld->retVoid();
+    return llvm::Error::success();
   }
 
   // Get target
-  uint64_t Target = 0;
-  bool IsSymbol = LastImm.IsSym;
-  SymbolReloc SR;
+  uint64_t target = 0;
 
   enum Action {
     JUMP_TO_SYMBOL,
@@ -730,191 +722,176 @@ llvm::Error Translator::translateBranch(
     CALL_EXT,
     ICALL
   };
-  Action Act;
+  Action act;
 
-  bool IsCall = (BT == JAL || BT == JALR) &&
-    LinkReg == RV_RA;
-  BrWasLast = !IsCall;
+  bool isCall = (bt == JAL || bt == JALR) &&
+    linkReg == XRegister::RA;
+  _ctx->brWasLast = !isCall;
+  const SBTSymbol& sym = _ctx->reloc->last();
 
   // JALR
   //
   // TODO Set Target LSB to zero
-  if (BT == JALR) {
+  if (bt == JALR) {
     // No base reg
-    if (O1N == RV_ZERO) {
-      llvm_unreachable("Unexpected JALR with base register equal to zero!");
+    if (o1n == XRegister::ZERO) {
+      xassert(false && "Unexpected JALR with base register equal to zero!");
 
     // No immediate
-    } else if (JImmIsZeroImm) {
-      V = JReg;
-      if (IsCall)
-        Act = ICALL;
+    } else if (jimmIsZeroImm) {
+      v = jreg;
+      if (isCall)
+        act = ICALL;
       else
-        Act = IJUMP;
+        act = IJUMP;
 
     // Base + Offset
     } else {
-      V = Builder->CreateAdd(JReg, JImm);
-      updateFirst(V);
-      if (IsCall)
-        Act = ICALL;
+      v = _bld->add(jreg, jimm);
+      if (isCall)
+        act = ICALL;
       else
-        Act = IJUMP;
+        act = IJUMP;
     }
 
   // JAL to Symbol
-  } else if (BT == JAL && IsSymbol) {
-    SR = LastImm.SymRel;
-    if (IsCall)
-      Act = CALL_SYMBOL;
+  } else if (bt == JAL && isSymbol) {
+    if (isCall)
+      act = CALL_SYMBOL;
     else
-      Act = JUMP_TO_SYMBOL;
+      act = JUMP_TO_SYMBOL;
 
   // JAL/Branches to PC offsets
   //
   // Add PC
   } else {
-    Target = JImmI + CurAddr;
-    if (IsCall)
-      Act = CALL_OFFS;
+    target = jimmi + _addr;
+    if (isCall)
+      act = CALL_OFFS;
     else
-      Act = JUMP_TO_OFFS;
+      act = JUMP_TO_OFFS;
   }
 
-  if (Act == CALL_SYMBOL || Act == JUMP_TO_SYMBOL) {
-    if (SR.isExternal()) {
-      V = JImm;
-      assert(IsCall && "Jump to external module!");
-      Act = CALL_EXT;
+  if (act == CALL_SYMBOL || act == JUMP_TO_SYMBOL) {
+    if (sym.isExternal()) {
+      v = jimm;
+      xassert(isCall && "Jump to external module!");
+      act = CALL_EXT;
     } else {
-      assert(SR.Sec && SR.Sec->isText() && "Jump to non Text Section!");
-      Target = SR.Addr;
-      if (IsCall)
-        Act = CALL_OFFS;
+      xassert(sym.sec && sym.sec->isText() && "Jump to non Text Section!");
+      target = sym.addr;
+      if (isCall)
+        act = CALL_OFFS;
       else
-        Act = JUMP_TO_OFFS;
+        act = JUMP_TO_OFFS;
     }
   }
 
-  // Evaluate condition
-  Value *Cond = nullptr;
-  switch (BT) {
+  // evaluate condition
+  llvm::Value* cond = nullptr;
+  switch (bt) {
     case BEQ:
-      Cond = Builder->CreateICmpEQ(O0, O1);
+      cond = _bld->eq(o0, o1);
       break;
 
     case BNE:
-      Cond = Builder->CreateICmpNE(O0, O1);
+      cond = _bld->ne(o0, o1);
       break;
 
     case BGE:
-      Cond = Builder->CreateICmpSGE(O0, O1);
+      cond = _bld->sge(o0, o1);
       break;
 
     case BGEU:
-      Cond = Builder->CreateICmpUGE(O0, O1);
+      cond = _bld->uge(o0, o1);
       break;
 
     case BLT:
-      Cond = Builder->CreateICmpSLT(O0, O1);
+      cond = _bld->slt(o0, o1);
       break;
 
     case BLTU:
-      Cond = Builder->CreateICmpULT(O0, O1);
+      cond = _bld->ult(o0, o1);
       break;
 
     case JAL:
     case JALR:
       break;
   }
-  if (Cond)
-    updateFirst(Cond);
 
-  switch (Act) {
+  switch (act) {
     case JUMP_TO_SYMBOL:
-      llvm_unreachable("JUMP_TO_SYMBOL should become JUMP_TO_OFFS");
+      xassert(false && "JUMP_TO_SYMBOL should become JUMP_TO_OFFS");
     case CALL_SYMBOL:
-      llvm_unreachable("CALL_SYMBOL should become CALL_OFFS");
+      xassert(false && "CALL_SYMBOL should become CALL_OFFS");
 
     case CALL_OFFS:
-      if (auto E = handleCall(Target))
-        return E;
+      if (auto err = handleCall(target))
+        return err;
       break;
 
     case JUMP_TO_OFFS:
-      if (auto E = handleJumpToOffs(Target, Cond, LinkReg))
-        return E;
+      if (auto err = handleJumpToOffs(target, cond, linkReg))
+        return err;
       break;
 
     case ICALL:
-      if (auto E = handleICall(V))
-        return E;
+      if (auto err = handleICall(v))
+        return err;
       break;
 
     case CALL_EXT:
-      if (auto E = handleCallExt(V))
-        return E;
+      if (auto err = handleCallExt(v))
+        return err;
       break;
 
     case IJUMP:
-      if (auto E = handleIJump(V, LinkReg))
-        return E;
+      if (auto err = handleIJump(v, linkReg))
+        return err;
       break;
   }
 
-  return Error::success();
+  return llvm::Error::success();
 }
 
 
-llvm::Error Translator::handleCall(uint64_t Target)
+llvm::Error Instruction::handleCall(uint64_t target)
 {
-  // Find function
-  // Get symbol by offset
-  ConstSectionPtr Sec = CurObj->lookupSection(".text");
-  assert(Sec && ".text section not found!");
-  ConstSymbolPtr Sym = Sec->lookup(Target);
-  assert(Sym &&
-      (Sym->type() == llvm::object::SymbolRef::ST_Function ||
-        (Sym->flags() & llvm::object::SymbolRef::SF_Global)) &&
-    "Target function not found!");
-
-  auto ExpF = createFunction(Sym->name());
-  if (!ExpF)
-    return ExpF.takeError();
-  Function *F = ExpF.get();
-  Value *V = Builder->CreateCall(F);
-  updateFirst(V);
-  return Error::success();
+  // find function
+  Function* f = Function::getByAddr(_ctx, target);
+  _bld->call(f->func());
+  return llvm::Error::success();
 }
 
 
-llvm::Error Translator::handleICall(llvm::Value *Target)
+llvm::Error Instruction::handleICall(llvm::Value* target)
 {
-  store(Target, RV_T1);
-  Value *V = Builder->CreateCall(ICaller);
-  updateFirst(V);
-
-  return Error::success();
+  _bld->store(target, XRegister::T1);
+  _bld->call(_ctx->translator->icaller().func());
+  return llvm::Error::success();
 }
 
 
-llvm::Error Translator::handleCallExt(llvm::Value *Target)
+llvm::Error Instruction::handleCallExt(llvm::Value* target)
 {
+  /*
   FunctionType *FT = FunctionType::get(Builder->getVoidTy(), !VAR_ARG);
   Value *V = Builder->CreateIntToPtr(Target, FT->getPointerTo());
   updateFirst(V);
   V = Builder->CreateCall(V);
   updateFirst(V);
+  */
 
-  return Error::success();
+  return llvm::Error::success();
 }
 
 
-llvm::Error Translator::handleJumpToOffs(
-  uint64_t Target,
-  llvm::Value *Cond,
-  unsigned LinkReg)
+llvm::Error Instruction::handleJumpToOffs(
+  uint64_t target,
+  llvm::Value* cond,
+  unsigned linkReg)
 {
+  /*
   // Get current function
   const Function *CF = Builder->GetInsertBlock()->getParent();
   Function *F = Module->getFunction(CF->getName());
@@ -1052,17 +1029,15 @@ llvm::Error Translator::handleJumpToOffs(
   }
 
   DBGS << "BB=" << Builder->GetInsertBlock()->getName() << nl;
-  return Error::success();
+  */
+  return llvm::Error::success();
 }
 
-llvm::Error Translator::handleIJump(
-  llvm::Value *Target,
-  unsigned LinkReg)
+
+llvm::Error Instruction::handleIJump(llvm::Value* target, unsigned linkReg)
 {
-  llvm_unreachable("IJump support not implemented yet!");
+  xassert(false && "IJump support not implemented yet!");
 }
-
-#endif
 
 
 #if SBT_DEBUG

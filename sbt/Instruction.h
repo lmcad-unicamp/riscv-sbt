@@ -117,6 +117,13 @@ private:
 
   // branch/jump/call handlers
   llvm::Error translateBranch(BranchType bt);
+  llvm::Error handleCall(uint64_t target);
+  llvm::Error handleICall(llvm::Value* target);
+  llvm::Error handleCallExt(llvm::Value* target);
+  llvm::Error handleJumpToOffs(uint64_t target,
+    llvm::Value* cond, unsigned linkReg);
+  llvm::Error handleIJump(llvm::Value* target, unsigned linkReg);
+
 
   // syscall
   llvm::Error handleSyscall();
@@ -136,38 +143,10 @@ private:
   llvm::Expected<llvm::Value*> getImm(int op);
   llvm::Expected<llvm::Value*> getRegOrImm(int op);
 
-
-/*
-
-  // per instruction state
-  Imm _lastImm;
-
-
-  llvm::Error handleJumpToOffs(
-    uint64_t Target,
-    llvm::Value *Cond,
-    unsigned LinkReg);
-
-  llvm::Error handleIJump(
-    llvm::Value *Target,
-    unsigned LinkReg);
-
-  llvm::Error handleCall(uint64_t Target);
-  llvm::Error handleICall(llvm::Value *Target);
-  llvm::Error handleCallExt(llvm::Value *Target);
-
-*/
-
   // add RV instr metadata and print it in debug mode
   void dbgprint();
 };
 
-/*
-  // host dependent ops
-  llvm::Function* _getCycles = nullptr;
-  llvm::Function* _getTime = nullptr;
-  llvm::Function* _instRet = nullptr;
-*/
 }
 
 #endif

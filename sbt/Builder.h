@@ -121,20 +121,6 @@ public:
     return v;
   }
 
-  llvm::Value* ult(llvm::Value* a, llvm::Value* b) {
-    llvm::Value* v = _builder->CreateICmpULT(a, b);
-    updateFirst(v);
-    _builder->CreateZExt(v, _t->i32);
-    return v;
-  }
-
-  llvm::Value* slt(llvm::Value* a, llvm::Value* b) {
-    llvm::Value* v = _builder->CreateICmpSLT(a, b);
-    updateFirst(v);
-    _builder->CreateZExt(v, _t->i32);
-    return v;
-  }
-
   llvm::Value* sra(llvm::Value* a, llvm::Value* b) {
     llvm::Value* v = _builder->CreateAShr(a, b);
     updateFirst(v);
@@ -155,6 +141,44 @@ public:
 
   llvm::Value* _xor(llvm::Value* a, llvm::Value* b) {
     llvm::Value* v = _builder->CreateXor(a, b);
+    updateFirst(v);
+    return v;
+  }
+
+  // comparisons
+
+  llvm::Value* eq(llvm::Value* a, llvm::Value* b) {
+    llvm::Value* v = _builder->CreateICmpEQ(a, b);
+    updateFirst(v);
+    return v;
+  }
+
+  llvm::Value* ne(llvm::Value* a, llvm::Value* b) {
+    llvm::Value* v = _builder->CreateICmpNE(a, b);
+    updateFirst(v);
+    return v;
+  }
+
+  llvm::Value* ult(llvm::Value* a, llvm::Value* b) {
+    llvm::Value* v = _builder->CreateICmpULT(a, b);
+    updateFirst(v);
+    return v;
+  }
+
+  llvm::Value* slt(llvm::Value* a, llvm::Value* b) {
+    llvm::Value* v = _builder->CreateICmpSLT(a, b);
+    updateFirst(v);
+    return v;
+  }
+
+  llvm::Value* sge(llvm::Value* a, llvm::Value* b) {
+    llvm::Value* v = _builder->CreateICmpSGE(a, b);
+    updateFirst(v);
+    return v;
+  }
+
+  llvm::Value* uge(llvm::Value* a, llvm::Value* b) {
+    llvm::Value* v = _builder->CreateICmpUGE(a, b);
     updateFirst(v);
     return v;
   }
@@ -246,6 +270,14 @@ public:
   llvm::Instruction* retVoid()
   {
     auto v = _builder->CreateRetVoid();
+    updateFirst(v);
+    return v;
+  }
+
+  // ret
+  llvm::Value* ret(llvm::Value* r)
+  {
+    auto v = _builder->CreateRet(r);
     updateFirst(v);
     return v;
   }

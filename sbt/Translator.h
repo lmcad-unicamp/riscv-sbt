@@ -72,6 +72,11 @@ public:
     return *_getInstRet;
   }
 
+  const Function& icaller() const
+  {
+    return _iCaller;
+  }
+
 private:
   // data
 
@@ -97,6 +102,7 @@ private:
   // icaller
   Function _iCaller;
   Map<std::string, FunctionPtr> _funMap;
+  Map<uint64_t, Function*> _funcByAddr;
 
   uint64_t _extFuncAddr = 0;
   std::unique_ptr<llvm::Module> _lcModule;

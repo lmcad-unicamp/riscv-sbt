@@ -41,7 +41,7 @@ public:
     _end(end)
   {}
 
-  llvm::Error create(
+  void create(
     llvm::FunctionType* ft = nullptr,
     llvm::Function::LinkageTypes linkage = llvm::Function::ExternalLinkage);
 
@@ -62,6 +62,8 @@ public:
   {
     return _addr;
   }
+
+  static Function* getByAddr(Context* ctx, uint64_t addr);
 
 private:
   Context* _ctx;

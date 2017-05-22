@@ -34,6 +34,7 @@ llvm::Error SBTSection::translate()
 
   Builder bld(_ctx);
   _ctx->bld = &bld;
+  _ctx->sec = this;
 
   // get section bytes
   llvm::StringRef bytesStr;

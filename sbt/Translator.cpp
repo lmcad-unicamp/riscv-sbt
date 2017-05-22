@@ -111,9 +111,9 @@ llvm::Error Translator::start()
   _ctx->stack = new Stack(_ctx);
   _ctx->disasm = new Disassembler(&*_disAsm, &*_instPrinter, &*_sti);
   _ctx->_func = &_funMap;
+  _ctx->_funcByAddr = &_funcByAddr;
 
-  if (auto err = _iCaller.create())
-    return err;
+  _iCaller.create();
 
   // host functions
 
@@ -123,14 +123,9 @@ llvm::Error Translator::start()
   _getTime.reset(new Function(_ctx, "get_time"));
   _getInstRet.reset(new Function(_ctx, "get_instret"));
 
-  if (auto err = _getCycles->create(ft))
-    return err;
-
-  if (auto err = _getTime->create(ft))
-    return err;
-
-  if (auto err = _getInstRet->create(ft))
-    return err;
+  _getCycles->create(ft);
+  _getTime->create(ft);
+  _getInstRet->create(ft);
 
   _sc.reset(new Syscall(_ctx));
   _ctx->syscall = &*_sc;
@@ -229,9 +224,9 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
     _extFuncAddr = 0xFFFF0000;
   uint64_t addr = _extFuncAddr;
   FunctionPtr f(new Function(_ctx, rv32Func, nullptr, addr));
-  if (auto err = f->create(t.voidFunc, llvm::Function::PrivateLinkage))
-    return std::move(err);
-  // XXX need to always add to map?
+  f->create(t.voidFunc, llvm::Function::PrivateLinkage);
+  // add to maps
+  _funcByAddr(_extFuncAddr, &*f);
   _funMap(f->name(), std::move(f));
   _extFuncAddr += Instruction::SIZE;
 

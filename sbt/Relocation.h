@@ -24,6 +24,11 @@ public:
   llvm::Expected<llvm::Value*>
   handleRelocation(uint64_t addr, llvm::raw_ostream* os);
 
+  const SBTSymbol& last() const
+  {
+    return _last;
+  }
+
   bool isSymbol(uint64_t addr) const
   {
     return _hasSymbol && _last.addr == addr;
