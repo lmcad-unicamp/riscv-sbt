@@ -1,9 +1,20 @@
 #include "BasicBlock.h"
 
 #include "Builder.h"
+#include "Function.h"
 #include "Utils.h"
 
 namespace sbt {
+
+BasicBlock::BasicBlock(
+  Context* ctx,
+  uint64_t addr,
+  Function* f,
+  BasicBlock* beforeBB)
+  :
+  BasicBlock(ctx, addr, f->func(), beforeBB->bb())
+{}
+
 
 BasicBlock::BasicBlock(
   Context* ctx,
@@ -40,7 +51,6 @@ BasicBlock BasicBlock::split(uint64_t addr)
   llvm::BasicBlock *bb2;
   if (_bb->getTerminator()) {
     bb2 = _bb->splitBasicBlock(i, getBBName(addr));
-    // XXX BBMap(addr, std::move(bb2));
     return BasicBlock(_ctx, bb2);
   }
 
@@ -49,7 +59,6 @@ BasicBlock BasicBlock::split(uint64_t addr)
   Builder bld(_ctx);
   llvm::Instruction* instr = bld.retVoid();
   bb2 = _bb->splitBasicBlock(i, getBBName(addr));
-  // XXX BBMap(Addr, std::move(BB2));
   instr->eraseFromParent();
   _ctx->builder->SetInsertPoint(bb2, bb2->end());
 

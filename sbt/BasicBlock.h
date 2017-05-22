@@ -16,6 +16,12 @@ public:
   BasicBlock(
     Context* ctx,
     uint64_t addr,
+    Function* f,
+    BasicBlock* beforeBB = nullptr);
+
+  BasicBlock(
+    Context* ctx,
+    uint64_t addr,
     llvm::Function* f,
     llvm::BasicBlock* beforeBB = nullptr)
     :
@@ -28,6 +34,11 @@ public:
     llvm::Function* f,
     llvm::BasicBlock* beforeBB = nullptr);
 
+  BasicBlock(Context* ctx, llvm::BasicBlock* bb) :
+    _ctx(ctx),
+    _bb(bb)
+  {}
+
   ~BasicBlock();
 
   BasicBlock(BasicBlock&&) = default;
@@ -38,7 +49,14 @@ public:
     return _bb;
   }
 
+  llvm::StringRef name() const
+  {
+    return _bb->getName();
+  }
+
   void operator()(uint64_t addr, Instruction&& instr);
+
+  BasicBlock split(uint64_t addr);
 
 private:
   Context* _ctx;
@@ -54,22 +72,6 @@ private:
     ss.flush();
     return name;
   }
-
-
-  BasicBlock(Context* ctx, llvm::BasicBlock* bb) :
-    _ctx(ctx),
-    _bb(bb)
-  {}
-
-  BasicBlock split(uint64_t addr);
-
-  /*
-  void updateNextBB(uint64_t Addr)
-  {
-    if (NextBB <= CurAddr || Addr < NextBB)
-      NextBB = Addr;
-  }
-  */
 };
 
 }

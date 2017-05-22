@@ -93,6 +93,8 @@ public:
   SBTRelocation* reloc = nullptr;
   // builder
   Builder* bld = nullptr;
+  // function
+  Function* f = nullptr;
 
   // function scope
 

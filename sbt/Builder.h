@@ -233,6 +233,14 @@ public:
     return v;
   }
 
+  // int to ptr
+  llvm::Value* intToPtr(llvm::Value* i, llvm::Type* t)
+  {
+    llvm::Value* v = _builder->CreateIntToPtr(i, t);
+    updateFirst(v);
+    return v;
+  }
+
   // trunc or cast to i8
   llvm::Value* truncOrBitCastI8(llvm::Value* i32)
   {
@@ -266,6 +274,15 @@ public:
     return v;
   }
 
+  llvm::Value* call(
+    llvm::Value* ptr,
+    llvm::ArrayRef<llvm::Value*> args = llvm::None)
+  {
+    llvm::Value* v = _builder->CreateCall(ptr, args);
+    updateFirst(v);
+    return v;
+  }
+
   // ret void
   llvm::Instruction* retVoid()
   {
@@ -282,11 +299,32 @@ public:
     return v;
   }
 
+  // br
+  llvm::Value* br(BasicBlock* bb)
+  {
+    llvm::Value* v = _builder->CreateBr(bb->bb());
+    updateFirst(v);
+    return v;
+  }
+
+  // condBr
+  llvm::Value* condBr(llvm::Value* cond, BasicBlock* t, BasicBlock* f)
+  {
+    llvm::Value* v = _builder->CreateCondBr(cond, t->bb(), f->bb());
+    updateFirst(v);
+    return v;
+  }
+
   // fence
   void fence(llvm::AtomicOrdering order, llvm::SynchronizationScope scope)
   {
     llvm::Value* v = _builder->CreateFence(order, scope);
     updateFirst(v);
+  }
+
+  BasicBlock getInsertBlock()
+  {
+    return BasicBlock(_ctx, _builder->GetInsertBlock());
   }
 
   void setInsertPoint(BasicBlock& bb)

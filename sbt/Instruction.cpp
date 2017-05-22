@@ -1,5 +1,6 @@
 #include "Instruction.h"
 
+#include "BasicBlock.h"
 #include "Builder.h"
 #include "Context.h"
 #include "Disassembler.h"
@@ -874,14 +875,9 @@ llvm::Error Instruction::handleICall(llvm::Value* target)
 
 llvm::Error Instruction::handleCallExt(llvm::Value* target)
 {
-  /*
-  FunctionType *FT = FunctionType::get(Builder->getVoidTy(), !VAR_ARG);
-  Value *V = Builder->CreateIntToPtr(Target, FT->getPointerTo());
-  updateFirst(V);
-  V = Builder->CreateCall(V);
-  updateFirst(V);
-  */
-
+  llvm::FunctionType* ft = _t->voidFunc;
+  llvm::Value* v = _bld->intToPtr(target, ft->getPointerTo());
+  v = _bld->call(v);
   return llvm::Error::success();
 }
 
@@ -891,145 +887,143 @@ llvm::Error Instruction::handleJumpToOffs(
   llvm::Value* cond,
   unsigned linkReg)
 {
-  /*
-  // Get current function
-  const Function *CF = Builder->GetInsertBlock()->getParent();
-  Function *F = Module->getFunction(CF->getName());
+  // get current function
+  Function* f = _ctx->f;
 
-  // Next BB
-  uint64_t NextInstrAddr = CurAddr + 4;
+  // next BB
+  uint64_t nextInstrAddr = _addr + Instruction::SIZE;
 
-  // Link
-  bool IsCall = LinkReg != RV_ZERO;
-  if (!Cond && IsCall)
-    store(ConstantInt::get(I32, NextInstrAddr), LinkReg);
+  // link
+  bool isCall = linkReg != XRegister::ZERO;
+  if (!cond && isCall)
+    _bld->store(_c->i32(nextInstrAddr), linkReg);
 
-  // Target BB
-  assert(Target != CurAddr && "Unexpected jump to self instruction!");
+  // target BB
+  xassert(target != _addr && "Unexpected jump to self instruction!");
 
-  BasicBlock *BB = nullptr;
-  auto Iter = BBMap.lower_bound(Target);
-  bool NeedToTranslateBB = false;
-  BasicBlock* entryBB = &F->getEntryBlock();
-  BasicBlock* PredBB = nullptr;
-  uint64_t BBEnd = 0;
+  BasicBlock* bb = nullptr;
+  auto& bbmap = f->bbmap();
+  auto it = bbmap.lower_bound(target);
+  bool needToTranslateBB = false;
+  BasicBlock* entryBB = &bbmap.begin()->val;
+  BasicBlock* predBB = nullptr;
+  uint64_t bbEnd = 0;
 
-  // Jump forward
-  if (Target > CurAddr) {
-    BasicBlock *BeforeBB = nullptr;
-    if (Iter != BBMap.end())
-      BeforeBB = Iter->val;
+  // jump forward
+  if (target > _addr) {
+    BasicBlock* beforeBB = nullptr;
+    if (it != bbmap.end())
+      beforeBB = &it->val;
 
     // BB already exists
-    if (Target == Iter->key)
-      BB = Iter->val;
-    // Need to create new BB
+    if (target == it->key)
+      bb = &it->val;
+    // need to create new BB
     else {
-      BB = SBTBasicBlock::create(*Context, Target, F, BeforeBB);
-      BBMap(Target, std::move(BB));
-
-      updateNextBB(Target);
+      bbmap(target, BasicBlock(_ctx, target, f, beforeBB));
+      f->updateNextBB(target);
+      bb = bbmap[target];
     }
 
   // jump backward
   } else {
-    if (Iter == BBMap.end()) {
-      assert(!BBMap.empty() && "BBMap is empty!");
-      BB = (--Iter)->val;
+    if (it == bbmap.end()) {
+      xassert(!bbmap.empty() && "BBMap is empty!");
+      bb = &(--it)->val;
     // BB entry matches target address
-    } else if (Target == Iter->key)
-      BB = Iter->val;
+    } else if (target == it->key)
+      bb = &it->val;
     // target BB is probably the previous one
-    else if (Iter != BBMap.begin())
-      BB = (--Iter)->val;
+    else if (it != bbmap.begin())
+      bb = &(--it)->val;
     // target BB is the first one
     else
-      BB = Iter->val;
+      bb = &it->val;
 
     // check bounds
-    uint64_t Begin = Iter->key;
-    uint64_t End = Iter->key + BB->size() * InstrSize;
-    bool InBound = Target >= Begin && Target < End;
+    uint64_t begin = it->key;
+    uint64_t end = it->key + bb->bb()->size() * Instruction::SIZE;
+    bool inBound = target >= begin && target < end;
 
     // need to translate target
-    if (!InBound) {
-      BBEnd = Iter->key;
-      PredBB = Iter->val;
-      BB = SBTBasicBlock::create(*Context, Target, F, BB);
-      BBMap(Target, std::move(BB));
-      NeedToTranslateBB = true;
+    if (!inBound) {
+      bbEnd = it->key;
+      predBB = &it->val;
+      bbmap(target, BasicBlock(_ctx, target, f, bb));
+      bb = bbmap[target];
+      needToTranslateBB = true;
     // need to split BB?
-    } else if (Iter->key != Target)
-      BB = splitBB(BB, Target);
+    } else if (it->key != target) {
+      bbmap(target, bb->split(target));
+      bb = bbmap[target];
+    }
   }
 
   // need NextBB?
-  bool NeedNextBB = !IsCall;
+  bool needNextBB = !isCall;
 
-  BasicBlock *BeforeBB = nullptr;
-  BasicBlock *Next = nullptr;
-  if (NeedNextBB) {
-    auto P = BBMap[NextInstrAddr];
-    if (P)
-      Next = *P;
+  BasicBlock* beforeBB = nullptr;
+  BasicBlock* next = nullptr;
+  if (needNextBB) {
+    auto p = bbmap[nextInstrAddr];
+    if (p)
+      next = p;
     else {
-      Iter = BBMap.lower_bound(NextInstrAddr);
-      if (Iter != BBMap.end())
-        BeforeBB = Iter->val;
+      it = bbmap.lower_bound(nextInstrAddr);
+      if (it != bbmap.end())
+        beforeBB = &it->val;
 
-      Next = SBTBasicBlock::create(*Context, NextInstrAddr, F, BeforeBB);
-      BBMap(NextInstrAddr, std::move(Next));
+      bbmap(nextInstrAddr, BasicBlock(_ctx, nextInstrAddr, f, beforeBB));
+      next = bbmap[nextInstrAddr];
     }
 
-    updateNextBB(NextInstrAddr);
+    f->updateNextBB(nextInstrAddr);
   }
 
-  // Branch
-  Value *V;
-  if (Cond)
-    V = Builder->CreateCondBr(Cond, BB, Next);
+  // branch
+  if (cond)
+    _bld->condBr(cond, bb, next);
   else
-    V = Builder->CreateBr(BB);
-  updateFirst(V);
+    _bld->br(bb);
 
-  // Use next BB
-  if (NeedNextBB)
-    Builder->SetInsertPoint(Next);
+  // use next BB
+  if (needNextBB)
+    _bld->setInsertPoint(*next);
 
   // need to translate target BB?
-  if (NeedToTranslateBB) {
+  if (needToTranslateBB) {
     DBGS << "NeedToTranslateBB\n";
 
     // save insert point
-    BasicBlock* PrevBB = Builder->GetInsertBlock();
+    BasicBlock tempBB = _bld->getInsertBlock();
+    BasicBlock* prevBB = &tempBB;
 
     // add branch to correct function entry BB
-    if (entryBB->getName() != "entry") {
-      BasicBlock* newEntryBB =
-        SBTBasicBlock::create(*Context, "entry", F, BB);
-      Builder->SetInsertPoint(newEntryBB);
-      Builder->CreateBr(entryBB);
+    if (entryBB->name() != "entry") {
+      bbmap(0, BasicBlock(_ctx, "entry", f->func(), bb->bb()));
+      BasicBlock* newEntryBB = bbmap[0];
+      _bld->setInsertPoint(*newEntryBB);
+      _bld->br(entryBB);
     }
 
     // translate BB
-    Builder->SetInsertPoint(BB);
+    _bld->setInsertPoint(*bb);
     // translate up to the next BB
-    if (auto E = translateInstrs(Target, BBEnd))
-      return E;
+    if (auto err = f->translateInstrs(target, bbEnd))
+      return err;
 
     // link to the next BB if there is no terminator
-    DBGS << "XBB=" << Builder->GetInsertBlock()->getName() << nl;
-    DBGS << "TBB=" << PredBB->getName() << nl;
-    if (Builder->GetInsertBlock()->getTerminator() == nullptr)
-      Builder->CreateBr(PredBB);
-    BrWasLast = true;
+    DBGS << "XBB=" << _bld->getInsertBlock().name() << nl;
+    DBGS << "TBB=" << predBB->name() << nl;
+    if (_bld->getInsertBlock().bb()->getTerminator() == nullptr)
+      _bld->br(predBB);
+    _ctx->brWasLast = true;
 
     // restore insert point
-    Builder->SetInsertPoint(PrevBB);
+    _bld->setInsertPoint(*prevBB);
   }
 
-  DBGS << "BB=" << Builder->GetInsertBlock()->getName() << nl;
-  */
+  DBGS << "BB=" << _bld->getInsertBlock().name() << nl;
   return llvm::Error::success();
 }
 

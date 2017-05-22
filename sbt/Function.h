@@ -65,6 +65,19 @@ public:
 
   static Function* getByAddr(Context* ctx, uint64_t addr);
 
+  Map<uint64_t, BasicBlock>& bbmap()
+  {
+    return _bbMap;
+  }
+
+  void updateNextBB(uint64_t addr)
+  {
+    if (_nextBB <= addr || addr < _nextBB)
+      _nextBB = addr;
+  }
+
+  llvm::Error translateInstrs(uint64_t st, uint64_t end);
+
 private:
   Context* _ctx;
   std::string _name;
@@ -74,6 +87,7 @@ private:
 
   llvm::Function* _f = nullptr;
   BasicBlock* _bb = nullptr;
+  uint64_t _nextBB = 0;
   Map<uint64_t, BasicBlock> _bbMap;
 
   enum TranslationState {
@@ -83,21 +97,11 @@ private:
 
   TranslationState _state = ST_DFL;
 
+  // methods
 
   llvm::Error startMain();
   llvm::Error start();
   llvm::Error finish();
-
-  llvm::Error translateInstrs(uint64_t st, uint64_t end);
-
-  /*
-  llvm::Expected<uint64_t> import(llvm::StringRef func);
-
-
-private:
-  uint64_t _nextBB = 0;
-  bool _brWasLast = false;
-  */
 };
 
 using FunctionPtr = Pointer<Function>;

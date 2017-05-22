@@ -68,6 +68,7 @@ llvm::Error SBTSection::translate()
       // if (symname == "main")
       Function* f = new Function(_ctx, symname, this, symaddr, end);
       FunctionPtr func(f);
+      _ctx->f = f;
       // _ctx->func()(std::move(func), std::move(symaddr));
       if (auto err = f->translate())
         return err;
