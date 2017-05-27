@@ -9,6 +9,7 @@
 
 namespace sbt {
 
+// get libc.bc path, from binary name
 static std::string getLibCBC(const std::string& binName)
 {
   std::string path = getenv("PATH");

@@ -27,6 +27,18 @@ class SBTSection;
 class Function
 {
 public:
+  /**
+   * Construct instruction.
+   *
+   * @param ctx
+   * @param name
+   * @param sec section of translated binary that contains the function
+   * @param addr function address
+   * @param end guest memory address of first byte after function's last byte
+   *
+   * Note: section/end may be null/0 when the function does not correspond
+   *       to a guest one.
+   */
   Function(
     Context* ctx,
     const std::string& name,
@@ -41,18 +53,28 @@ public:
     _end(end)
   {}
 
+  /**
+   * Create the function.
+   *
+   * @param ft function type
+   * @param linkage function linkage
+   */
   void create(
     llvm::FunctionType* ft = nullptr,
     llvm::Function::LinkageTypes linkage = llvm::Function::ExternalLinkage);
 
+  // translate function
   llvm::Error translate();
 
+
+  // getters
 
   const std::string& name() const
   {
     return _name;
   }
 
+  // llvm function pointer
   llvm::Function* func() const
   {
     return _f;
@@ -63,20 +85,31 @@ public:
     return _addr;
   }
 
-  static Function* getByAddr(Context* ctx, uint64_t addr);
-
+  // basic block map
   Map<uint64_t, BasicBlock>& bbmap()
   {
     return _bbMap;
   }
 
+  //
+
+  // update next basic block address
   void updateNextBB(uint64_t addr)
   {
     if (_nextBB <= addr || addr < _nextBB)
       _nextBB = addr;
   }
 
+  /**
+   * Translate instructions at given address range.
+   *
+   * @param st starting address
+   * @param end end address (after last instruction)
+   */
   llvm::Error translateInstrs(uint64_t st, uint64_t end);
+
+  // look up function by address
+  static Function* getByAddr(Context* ctx, uint64_t addr);
 
 private:
   Context* _ctx;
@@ -86,13 +119,15 @@ private:
   uint64_t _end;
 
   llvm::Function* _f = nullptr;
+  // current basic block pointer
   BasicBlock* _bb = nullptr;
+  // address of next basic block
   uint64_t _nextBB = 0;
   Map<uint64_t, BasicBlock> _bbMap;
 
   enum TranslationState {
-    ST_DFL,
-    ST_PADDING
+    ST_DFL,     // default
+    ST_PADDING  // processing padding bytes
   };
 
   TranslationState _state = ST_DFL;

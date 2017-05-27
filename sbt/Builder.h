@@ -12,8 +12,8 @@ class Builder
 {
   Context* _ctx;
   llvm::IRBuilder<>* _builder;
-  llvm::Instruction* _first = nullptr;
   Types* _t;
+  llvm::Instruction* _first = nullptr;
 
 public:
   Builder(Context* ctx) :
@@ -22,12 +22,16 @@ public:
     _t(&_ctx->t)
   {}
 
+  // dtor
   ~Builder()
   {
     if (!_first)
-      _first = load(XRegister::A0);
+      nop();
   }
 
+  /**
+   * Reset builder, to start translating a new guest instruction.
+   */
   void reset()
   {
     _first = nullptr;
@@ -59,7 +63,7 @@ public:
     return i;
   }
 
-  // store value to register
+  // store value in register
   llvm::StoreInst* store(llvm::Value* v, unsigned reg)
   {
     if (reg == 0)
@@ -70,6 +74,12 @@ public:
         x.var(), !VOLATILE);
     updateFirst(i);
     return i;
+  }
+
+  // nop
+  void nop()
+  {
+    load(XRegister::ZERO);
   }
 
   // sign extend
@@ -87,6 +97,7 @@ public:
     updateFirst(v2);
     return v2;
   }
+
 
   // ALU ops
 
@@ -145,6 +156,7 @@ public:
     return v;
   }
 
+
   // comparisons
 
   llvm::Value* eq(llvm::Value* a, llvm::Value* b) {
@@ -184,22 +196,17 @@ public:
   }
 
 
-  // nop
-  void nop()
-  {
-    load(XRegister::ZERO);
-  }
-
-  // cast
+  // casts
 
   // i8* to i32
   llvm::Value* i8PtrToI32(llvm::Value* v8)
   {
-    // cast to int32_t *
+    // cast to int32*
     llvm::Value* v =
-      _builder->CreateCast(llvm::Instruction::CastOps::BitCast, v8, _ctx->t.i32ptr);
+      _builder->CreateCast(llvm::Instruction::CastOps::BitCast,
+        v8, _ctx->t.i32ptr);
     updateFirst(v);
-    // Cast to int32_t
+    // cast to int32
     v = _builder->CreateCast(llvm::Instruction::CastOps::PtrToInt,
       v, _ctx->t.i32);
     updateFirst(v);
@@ -257,7 +264,7 @@ public:
     return v;
   }
 
-  // gep
+  // gep (get element pointer)
   llvm::Value* gep(llvm::Value* ptr, std::vector<llvm::Value*> idx)
   {
     llvm::Value* v = _builder->CreateGEP(ptr, idx);
@@ -265,6 +272,7 @@ public:
     return v;
   }
 
+  // call function
   llvm::Value* call(
     llvm::Function* f,
     llvm::ArrayRef<llvm::Value*> args = llvm::None)
@@ -274,6 +282,7 @@ public:
     return v;
   }
 
+  // call function from pointer
   llvm::Value* call(
     llvm::Value* ptr,
     llvm::ArrayRef<llvm::Value*> args = llvm::None)
@@ -322,22 +331,27 @@ public:
     updateFirst(v);
   }
 
+  // get insert basic block
   BasicBlock getInsertBlock()
   {
     return BasicBlock(_ctx, _builder->GetInsertBlock());
   }
 
+  // set insert basic block
   void setInsertPoint(BasicBlock& bb)
   {
     _builder->SetInsertPoint(bb.bb());
   }
 
+  // get first instruction produced by the builder since last reset
   llvm::Instruction* first()
   {
     return _first;
   }
 
 private:
+
+  // update first instruction pointer
   void updateFirst(llvm::Value* v)
   {
     if (!_first)

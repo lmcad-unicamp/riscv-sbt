@@ -53,11 +53,13 @@ llvm::Error Instruction::translate()
   // print address
   *_os << llvm::formatv("{0:X-4}:   ", _addr);
 
+  // reset builder
   _bld->reset();
+
   llvm::Error err = noError();
 
   switch (_inst.getOpcode()) {
-    // ALU Ops
+    // ALU ops
     case RISCV::ADD:
       err = translateALUOp(ADD, AF_NONE);
       break;
@@ -70,6 +72,7 @@ llvm::Error Instruction::translate()
     case RISCV::ANDI:
       err = translateALUOp(AND, AF_IMM);
       break;
+    // TODO group M instructions
     case RISCV::MUL:
       err = translateALUOp(MUL, AF_NONE);
       break;
@@ -119,7 +122,7 @@ llvm::Error Instruction::translate()
       err = translateALUOp(XOR, AF_IMM);
       break;
 
-    // UI
+    // UI (upper immediate)
     case RISCV::AUIPC:
       err = translateUI(AUIPC);
       break;
@@ -127,7 +130,7 @@ llvm::Error Instruction::translate()
       err = translateUI(LUI);
       break;
 
-    // Branch
+    // branch
     case RISCV::BEQ:
       err = translateBranch(BEQ);
       break;
@@ -146,7 +149,7 @@ llvm::Error Instruction::translate()
     case RISCV::BLTU:
       err = translateBranch(BLTU);
       break;
-    // Jump
+    // jump
     case RISCV::JAL:
       err = translateBranch(JAL);
       break;
@@ -166,7 +169,7 @@ llvm::Error Instruction::translate()
       _bld->nop();
       break;
 
-    // Load
+    // load
     case RISCV::LB:
       err = translateLoad(S8);
       break;
@@ -183,7 +186,7 @@ llvm::Error Instruction::translate()
       err = translateLoad(U32);
       break;
 
-    // Store
+    // store
     case RISCV::SB:
       err = translateStore(U8);
       break;
@@ -202,7 +205,7 @@ llvm::Error Instruction::translate()
       err = translateFence(true);
       break;
 
-    // system
+    // CSR ops
     case RISCV::CSRRW:
       err = translateCSR(RW, false);
       break;
@@ -222,9 +225,10 @@ llvm::Error Instruction::translate()
       err = translateCSR(RC, true);
       break;
 
+    // unknown
     default: {
       SBTError serr;
-      serr << "Unknown instruction opcode: " << _inst.getOpcode();
+      serr << "unknown instruction opcode: " << _inst.getOpcode();
       return error(serr);
     }
   }
@@ -243,19 +247,19 @@ unsigned Instruction::getRD()
 }
 
 
-unsigned Instruction::getRegNum(unsigned num)
+unsigned Instruction::getRegNum(unsigned op)
 {
-  const llvm::MCOperand& r = _inst.getOperand(num);
+  const llvm::MCOperand& r = _inst.getOperand(op);
   unsigned nr = XRegister::num(r.getReg());
   *_os << _ctx->x[nr].name() << ", ";
   return nr;
 }
 
 
-llvm::Value* Instruction::getReg(int num)
+llvm::Value* Instruction::getReg(int op)
 {
-  const llvm::MCOperand& op = _inst.getOperand(num);
-  unsigned nr = XRegister::num(op.getReg());
+  const llvm::MCOperand& mcop = _inst.getOperand(op);
+  unsigned nr = XRegister::num(mcop.getReg());
   llvm::Value* v;
   if (nr == 0)
     v = _ctx->c.ZERO;
@@ -263,7 +267,7 @@ llvm::Value* Instruction::getReg(int num)
     v = _bld->load(nr);
 
   *_os << _ctx->x[nr].name();
-  if (num < 2)
+  if (op < 2)
      *_os << ", ";
   return v;
 }
@@ -276,7 +280,7 @@ llvm::Expected<llvm::Value*> Instruction::getRegOrImm(int op)
     return getReg(op);
   else if (o.isImm())
     return getImm(op);
-  xassert(false && "Operand is neither a Reg nor Imm");
+  xassert(false && "operand is neither a register nor immediate");
 }
 
 
@@ -285,10 +289,13 @@ llvm::Expected<llvm::Value*> Instruction::getImm(int op)
   auto expV = _ctx->reloc->handleRelocation(_addr, _os);
   if (!expV)
     return expV.takeError();
+
+  // case 1: symbol
   llvm::Value* v = expV.get();
   if (v)
     return v;
 
+  // case 2: absolute immediate value
   int64_t imm = _inst.getOperand(op).getImm();
   v = _c->i32(imm);
   *_os << llvm::formatv("0x{0:X-4}", uint32_t(imm));
@@ -323,10 +330,10 @@ llvm::Error Instruction::translateALUOp(ALUOp op, uint32_t flags)
   llvm::Value* o1 = getReg(1);
   llvm::Value* o2;
   if (hasImm) {
-    auto ExpImm = getImm(2);
-    if (!ExpImm)
-      return ExpImm.takeError();
-    o2 = ExpImm.get();
+    auto expImm = getImm(2);
+    if (!expImm)
+      return expImm.takeError();
+    o2 = expImm.get();
   } else
     o2 = getReg(2);
 
@@ -341,6 +348,7 @@ llvm::Error Instruction::translateALUOp(ALUOp op, uint32_t flags)
       v = _bld->_and(o1, o2);
       break;
 
+    // TODO group M instructions
     case MUL:
       v = _bld->mul(o1, o2);
       break;
@@ -405,7 +413,7 @@ llvm::Error Instruction::translateUI(UIOp op)
     // get upper immediate
     v = _bld->sll(imm, _c->i32(12));
 
-    // add PC (CurAddr)
+    // add PC (current address)
     if (op == AUIPC)
       v = _bld->add(v, _c->i32(_addr));
   }
@@ -506,7 +514,7 @@ llvm::Error Instruction::translateStore(IntType it)
       break;
 
     default:
-      xassert(false && "Unknown store type!");
+      xassert(false && "unknown store type!");
   }
   *_os << '\t';
 
@@ -538,7 +546,7 @@ llvm::Error Instruction::translateStore(IntType it)
       break;
 
     default:
-      xassert(false && "Unknown store type!");
+      xassert(false && "unknown store type!");
   }
 
   _bld->store(v, ptr);
@@ -565,9 +573,12 @@ llvm::Error Instruction::translateFence(bool fi)
 
 llvm::Error Instruction::translateCSR(CSROp op, bool imm)
 {
+# define assert_nowr(cond) \
+    xassert(cond && "no CSR write support for base I instructions!")
+
   switch (op) {
     case RW:
-      xassert(false && "No CSR write support for base I instructions!");
+      assert_nowr(false);
       break;
 
     case RS:
@@ -584,13 +595,14 @@ llvm::Error Instruction::translateCSR(CSROp op, bool imm)
 
   unsigned rd = getRegNum(0);
   uint64_t csr = _inst.getOperand(1).getImm();
-  uint64_t mask;
-  if (imm)
-    mask = XRegister::A0; // Inst.getOperand(2).getImm();
-  else
-    mask = getRegNum(2);
-  xassert(mask == XRegister::ZERO &&
-    "No CSR write support for base I instructions!");
+  uint64_t src;
+  if (imm) {
+    src = _inst.getOperand(2).getImm();
+    assert_nowr(src == 0);
+  } else {
+    src = getRegNum(2);
+    assert_nowr(src == XRegister::ZERO);
+  }
   *_os << llvm::formatv("0x{0:X-4} = ", csr);
 
   llvm::Value* v = _c->ZERO;
@@ -617,19 +629,20 @@ llvm::Error Instruction::translateCSR(CSROp op, bool imm)
       *_os << "RDINSTRETH";
       break;
     default:
-      xassert(false && "Not implemented!");
+      xassert(false && "not implemented!");
       break;
   }
 
   _bld->store(v, rd);
 
   return llvm::Error::success();
+# undef assert_nowr
 }
 
 
 llvm::Error Instruction::translateBranch(BranchType bt)
 {
-  // Inst print
+  // inst print
   switch (bt) {
     case JAL:   *_os << "jal";  break;
     case JALR:  *_os << "jalr"; break;
@@ -644,13 +657,15 @@ llvm::Error Instruction::translateBranch(BranchType bt)
 
   llvm::Error err = noError();
 
-  // Get Operands
+  // get operands
   unsigned o0n = getRegNum(0);
   llvm::Value* o0 = nullptr;
   unsigned o1n = 0;
   llvm::Value* o1 = nullptr;
   llvm::Value* o2 = nullptr;
+  // jump register
   llvm::Value* jreg = nullptr;
+  // jump immediate
   llvm::Value* jimm = nullptr;
   unsigned linkReg = 0;
   switch (bt) {
@@ -663,10 +678,15 @@ llvm::Error Instruction::translateBranch(BranchType bt)
 
     case JALR: {
       linkReg = o0n;
+      // save os
       auto sos = _os;
+      // set _os to nulls(), just to avoid producing incorrect debug output
       _os = &llvm::nulls();
+      // get reg num
       o1n = getRegNum(1);
+      // restore os
       _os = sos;
+      // then get register value (this will produce correct debug output)
       o1 = getReg(1);
       if (!exp(getImm(2), o2, err))
         return err;
@@ -689,16 +709,19 @@ llvm::Error Instruction::translateBranch(BranchType bt)
       break;
   }
 
+  // jump immediate integer value
   int64_t jimmi = 0;
+  // is jimm an immediate equal to zero?
   bool jimmIsZeroImm = false;
   bool isSymbol = _ctx->reloc->isSymbol(_addr);
-  if (llvm::isa<llvm::ConstantInt>(jimm)) {
+  if (!isSymbol) {
     jimmi = llvm::cast<llvm::ConstantInt>(jimm)->getValue().getSExtValue();
     jimmIsZeroImm = jimmi == 0 && !isSymbol;
   }
   llvm::Value* v = nullptr;
 
   // return?
+  // XXX using ABI info
   if (bt == JALR &&
       o0n == XRegister::ZERO &&
       o1n == XRegister::RA &&
@@ -711,7 +734,7 @@ llvm::Error Instruction::translateBranch(BranchType bt)
     return llvm::Error::success();
   }
 
-  // Get target
+  // get target
   uint64_t target = 0;
 
   enum Action {
@@ -725,6 +748,7 @@ llvm::Error Instruction::translateBranch(BranchType bt)
   };
   Action act;
 
+  // XXX using ABI info
   bool isCall = (bt == JAL || bt == JALR) &&
     linkReg == XRegister::RA;
   _ctx->brWasLast = !isCall;
@@ -732,13 +756,13 @@ llvm::Error Instruction::translateBranch(BranchType bt)
 
   // JALR
   //
-  // TODO Set Target LSB to zero
+  // TODO set target LSB to zero
   if (bt == JALR) {
-    // No base reg
+    // no base reg
     if (o1n == XRegister::ZERO) {
-      xassert(false && "Unexpected JALR with base register equal to zero!");
+      xassert(false && "unexpected JALR with base register equal to zero!");
 
-    // No immediate
+    // no immediate
     } else if (jimmIsZeroImm) {
       v = jreg;
       if (isCall)
@@ -746,7 +770,7 @@ llvm::Error Instruction::translateBranch(BranchType bt)
       else
         act = IJUMP;
 
-    // Base + Offset
+    // base + offset
     } else {
       v = _bld->add(jreg, jimm);
       if (isCall)
@@ -755,16 +779,16 @@ llvm::Error Instruction::translateBranch(BranchType bt)
         act = IJUMP;
     }
 
-  // JAL to Symbol
+  // JAL to symbol
   } else if (bt == JAL && isSymbol) {
     if (isCall)
       act = CALL_SYMBOL;
     else
       act = JUMP_TO_SYMBOL;
 
-  // JAL/Branches to PC offsets
+  // JAL/branches to PC offsets
   //
-  // Add PC
+  // add PC
   } else {
     target = jimmi + _addr;
     if (isCall)
@@ -773,13 +797,14 @@ llvm::Error Instruction::translateBranch(BranchType bt)
       act = JUMP_TO_OFFS;
   }
 
+  // process symbols
   if (act == CALL_SYMBOL || act == JUMP_TO_SYMBOL) {
     if (sym.isExternal()) {
       v = jimm;
-      xassert(isCall && "Jump to external module!");
+      xassert(isCall && "jump to external module!");
       act = CALL_EXT;
     } else {
-      xassert(sym.sec && sym.sec->isText() && "Jump to non Text Section!");
+      xassert(sym.sec && sym.sec->isText() && "jump to non-text section!");
       target = sym.addr;
       if (isCall)
         act = CALL_OFFS;
@@ -820,6 +845,7 @@ llvm::Error Instruction::translateBranch(BranchType bt)
       break;
   }
 
+  // dispatch to appropriated handler
   switch (act) {
     case JUMP_TO_SYMBOL:
       xassert(false && "JUMP_TO_SYMBOL should become JUMP_TO_OFFS");
@@ -827,32 +853,27 @@ llvm::Error Instruction::translateBranch(BranchType bt)
       xassert(false && "CALL_SYMBOL should become CALL_OFFS");
 
     case CALL_OFFS:
-      if (auto err = handleCall(target))
-        return err;
+      err = handleCall(target);
       break;
 
     case JUMP_TO_OFFS:
-      if (auto err = handleJumpToOffs(target, cond, linkReg))
-        return err;
+      err = handleJumpToOffs(target, cond, linkReg);
       break;
 
     case ICALL:
-      if (auto err = handleICall(v))
-        return err;
+      err = handleICall(v);
       break;
 
     case CALL_EXT:
-      if (auto err = handleCallExt(v))
-        return err;
+      err = handleCallExt(v);
       break;
 
     case IJUMP:
-      if (auto err = handleIJump(v, linkReg))
-        return err;
+      err = handleIJump(v, linkReg);
       break;
   }
 
-  return llvm::Error::success();
+  return err;
 }
 
 
@@ -867,6 +888,7 @@ llvm::Error Instruction::handleCall(uint64_t target)
 
 llvm::Error Instruction::handleICall(llvm::Value* target)
 {
+  // icaller expects the call target in register T1
   _bld->store(target, XRegister::T1);
   _bld->call(_ctx->translator->icaller().func());
   return llvm::Error::success();
@@ -875,6 +897,8 @@ llvm::Error Instruction::handleICall(llvm::Value* target)
 
 llvm::Error Instruction::handleCallExt(llvm::Value* target)
 {
+  // at this point, 'target' will be the address of our external
+  // call handler, set by Relocator previously
   llvm::FunctionType* ft = _t->voidFunc;
   llvm::Value* v = _bld->intToPtr(target, ft->getPointerTo());
   v = _bld->call(v);
@@ -890,7 +914,7 @@ llvm::Error Instruction::handleJumpToOffs(
   // get current function
   Function* f = _ctx->f;
 
-  // next BB
+  // next instruction
   uint64_t nextInstrAddr = _addr + Instruction::SIZE;
 
   // link
@@ -899,14 +923,18 @@ llvm::Error Instruction::handleJumpToOffs(
     _bld->store(_c->i32(nextInstrAddr), linkReg);
 
   // target BB
-  xassert(target != _addr && "Unexpected jump to self instruction!");
+  xassert(target != _addr && "unexpected jump to self instruction!");
 
+  // target basic block
   BasicBlock* bb = nullptr;
   auto& bbmap = f->bbmap();
+  // get basic block with start address >= target
   auto it = bbmap.lower_bound(target);
   bool needToTranslateBB = false;
+  // function entry basic block
   BasicBlock* entryBB = &bbmap.begin()->val;
-  BasicBlock* predBB = nullptr;
+  BasicBlock* nextBB = nullptr;
+  // end address of target basic block
   uint64_t bbEnd = 0;
 
   // jump forward
@@ -927,8 +955,9 @@ llvm::Error Instruction::handleJumpToOffs(
 
   // jump backward
   } else {
+    // target BB is the last
     if (it == bbmap.end()) {
-      xassert(!bbmap.empty() && "BBMap is empty!");
+      xassert(!bbmap.empty() && "empty bbmap on jump backward!");
       bb = &(--it)->val;
     // BB entry matches target address
     } else if (target == it->key)
@@ -945,10 +974,11 @@ llvm::Error Instruction::handleJumpToOffs(
     uint64_t end = it->key + bb->bb()->size() * Instruction::SIZE;
     bool inBound = target >= begin && target < end;
 
-    // need to translate target
+    // need to translate target?
     if (!inBound) {
       bbEnd = it->key;
-      predBB = &it->val;
+      nextBB = &it->val;
+      // create the target BB
       bbmap(target, BasicBlock(_ctx, target, f, bb));
       bb = bbmap[target];
       needToTranslateBB = true;
@@ -959,7 +989,7 @@ llvm::Error Instruction::handleJumpToOffs(
     }
   }
 
-  // need NextBB?
+  // need a next BB?
   bool needNextBB = !isCall;
 
   BasicBlock* beforeBB = nullptr;
@@ -986,7 +1016,7 @@ llvm::Error Instruction::handleJumpToOffs(
   else
     _bld->br(bb);
 
-  // use next BB
+  // switch to next BB
   if (needNextBB)
     _bld->setInsertPoint(*next);
 
@@ -998,13 +1028,16 @@ llvm::Error Instruction::handleJumpToOffs(
     BasicBlock tempBB = _bld->getInsertBlock();
     BasicBlock* prevBB = &tempBB;
 
-    // add branch to correct function entry BB
-    if (entryBB->name() != "entry") {
-      bbmap(0, BasicBlock(_ctx, "entry", f->func(), bb->bb()));
-      BasicBlock* newEntryBB = bbmap[0];
-      _bld->setInsertPoint(*newEntryBB);
-      _bld->br(entryBB);
-    }
+    // add branch to new function entry BB
+    // (this code path is only reached by jump backward, when
+    //  the target is before the current function entry)
+    // TODO support more than one entry "patch"
+    xassert(entryBB->name() != "entry" &&
+      "only one function entry point patch is supported for now");
+    bbmap(0, BasicBlock(_ctx, "entry", f->func(), bb->bb()));
+    BasicBlock* newEntryBB = bbmap[0];
+    _bld->setInsertPoint(*newEntryBB);
+    _bld->br(entryBB);
 
     // translate BB
     _bld->setInsertPoint(*bb);
@@ -1013,10 +1046,10 @@ llvm::Error Instruction::handleJumpToOffs(
       return err;
 
     // link to the next BB if there is no terminator
-    DBGS << "XBB=" << _bld->getInsertBlock().name() << nl;
-    DBGS << "TBB=" << predBB->name() << nl;
+    DBGS << "IBB=" << _bld->getInsertBlock().name() << nl;
+    DBGS << "NBB=" << nextBB->name() << nl;
     if (_bld->getInsertBlock().bb()->getTerminator() == nullptr)
-      _bld->br(predBB);
+      _bld->br(nextBB);
     _ctx->brWasLast = true;
 
     // restore insert point
@@ -1030,12 +1063,13 @@ llvm::Error Instruction::handleJumpToOffs(
 
 llvm::Error Instruction::handleIJump(llvm::Value* target, unsigned linkReg)
 {
-  xassert(false && "IJump support not implemented yet!");
+  xassert(false && "indirect jump translation not implemented!");
 }
 
 
 #if SBT_DEBUG
 // MD: metadata
+// convert non-printable metadata chars
 static std::string getMDName(const llvm::StringRef& s)
 {
   std::string sss;

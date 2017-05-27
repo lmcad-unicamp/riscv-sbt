@@ -2,6 +2,7 @@
 
 #include "Builder.h"
 #include "Disassembler.h"
+#include "Instruction.h"
 #include "Module.h"
 #include "XRegisters.h"
 #include "SBTError.h"

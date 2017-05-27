@@ -23,6 +23,7 @@ llvm::Error Disassembler::disasm(
       addr, DBGS, llvm::nulls());
   if (sts == llvm::MCDisassembler::DecodeStatus::Success) {
 #if SBT_DEBUG
+    // print instruction
     DBGS << llvm::formatv("{0:X-4}: ", addr);
     _printer->printInst(&inst, DBGS, "", *_sti);
     DBGS << "\n";
@@ -30,7 +31,7 @@ llvm::Error Disassembler::disasm(
   // failed to disasm
   } else {
     SBTError serr;
-    serr << "Invalid instruction encoding at address ";
+    serr << "invalid instruction encoding at address ";
     serr << llvm::formatv("{0:X-4}", addr);
     serr << llvm::formatv(": {0:X-8}", rawInst);
     return error(serr);

@@ -1,8 +1,8 @@
 #include "Function.h"
 
-#include "BasicBlock.h"
 #include "Builder.h"
 #include "Constants.h"
+#include "Instruction.h"
 #include "SBTError.h"
 #include "Section.h"
 #include "Stack.h"
@@ -17,13 +17,14 @@ void Function::create(
   llvm::FunctionType* ft,
   llvm::Function::LinkageTypes linkage)
 {
+  // if function already exists in LLVM module, do nothing
   _f = _ctx->module->getFunction(_name);
   if (_f)
     return;
 
-  // create a function with no parameters
+  // create a function with no parameters if no function type was specified
   if (!ft)
-    ft = llvm::FunctionType::get(_ctx->t.voidT, !VAR_ARG);
+    ft = _ctx->t.voidFunc;
   _f = llvm::Function::Create(ft, linkage, _name, _ctx->module);
 }
 
@@ -32,6 +33,7 @@ llvm::Error Function::translate()
 {
   DBGS << _name << ":\n";
 
+  // start
   if (_name == "main") {
     if (auto err = startMain())
       return err;
@@ -40,9 +42,13 @@ llvm::Error Function::translate()
       return err;
   }
 
+  // translate instructions
+  xassert(_sec && "null section pointer");
+  xassert(_end && "no end address specified");
   if (auto err = translateInstrs(_addr, _end))
     return err;
 
+  // finish
   if (auto err = finish())
     return err;
 
@@ -53,16 +59,14 @@ llvm::Error Function::translate()
 llvm::Error Function::startMain()
 {
   const Types& t = _ctx->t;
-  auto builder = _ctx->builder;
   Builder* bld = _ctx->bld;
 
   // create a function with no parameters
-  llvm::FunctionType *ft =
-    llvm::FunctionType::get(t.i32, !VAR_ARG);
-  _f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage,
+  _f = llvm::Function::Create(t.voidFunc,
+    llvm::Function::ExternalLinkage,
     _name, _ctx->module);
 
-  // bb
+  // first bb
   BasicBlock bb(_ctx, _addr, _f);
   _bbMap(_addr, std::move(bb));
   _bb = _bbMap[_addr];
@@ -74,7 +78,7 @@ llvm::Error Function::startMain()
   // init syscall module
   llvm::Function* f = llvm::Function::Create(t.voidFunc,
     llvm::Function::ExternalLinkage, "syscall_init", _ctx->module);
-  builder->CreateCall(f);
+  bld->call(f);
 
   _ctx->inMain = true;
   return llvm::Error::success();
@@ -85,19 +89,7 @@ llvm::Error Function::start()
 {
   create();
 
-  /*
-  // bb
-  _bb = _bbMap[_addr];
-  if (!_bb) {
-    _bbMap(_addr, BasicBlock(_ctx, _addr, _f));
-    _bb = _bbMap[_addr];
-  } else {
-    auto b = _bb->bb();
-    b->removeFromParent();
-    b->insertInto(_f);
-  }
-  */
-
+  // create first bb
   _bbMap(_addr, BasicBlock(_ctx, _addr, _f));
   _bb = _bbMap[_addr];
   _ctx->bld->setInsertPoint(*_bb);
@@ -108,9 +100,10 @@ llvm::Error Function::start()
 
 llvm::Error Function::finish()
 {
-  auto builder = _ctx->builder;
-  if (builder->GetInsertBlock()->getTerminator() == nullptr)
-    _ctx->bld->retVoid();
+  auto bld = _ctx->bld;
+  // add a return if there is no terminator in current block
+  if (bld->getInsertBlock().bb()->getTerminator() == nullptr)
+    bld->retVoid();
   _ctx->inMain = false;
   return llvm::Error::success();
 }
@@ -124,6 +117,7 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
   const llvm::ArrayRef<uint8_t> bytes = _sec->bytes();
 
   // for each instruction
+  // XXX assuming fixed size instructions
   uint64_t size = Instruction::SIZE;
   for (uint64_t addr = st; addr < end; addr += size) {
     // disasm
@@ -132,9 +126,10 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
 
     // consider 0 bytes as end-of-section padding
     if (_state == ST_PADDING) {
+      // when in padding state, all remaining function bytes should be 0
       if (rawInst != 0) {
         SBTError serr;
-        serr << "Found non-zero byte in zero-padding area";
+        serr << "found non-zero byte in zero-padding area";
         return error(serr);
       }
       continue;
@@ -143,27 +138,31 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
       continue;
     }
 
-    /* update current bb
-     *
-    if (NextBB && CurAddr == NextBB) {
-      BasicBlock **BB = BBMap[CurAddr];
-      assert(BB && "BasicBlock not found!");
-      if (!BrWasLast)
-        Builder->CreateBr(*BB);
-      Builder->SetInsertPoint(*BB);
+    // update current bb
+    if (_nextBB && addr == _nextBB) {
+      _bb = _bbMap[addr];
+      xassert(_bb && "BasicBlock not found!");
 
-      auto Iter = BBMap.lower_bound(CurAddr + 4);
-      if (Iter != BBMap.end())
-        updateNextBB(Iter->key);
+      // if last instruction was not a branch, then branch
+      // from previous BB to current one
+      if (!_ctx->brWasLast)
+        _ctx->bld->br(_bb);
+      _ctx->bld->setInsertPoint(*_bb);
+
+      // set next BB pointer
+      auto it = _bbMap.lower_bound(addr + size);
+      if (it != _bbMap.end())
+        updateNextBB(it->key);
     }
+    // reset last instruction was branch flag
+    _ctx->brWasLast = false;
 
-    BrWasLast = false;
-    */
-
+    // translate instruction
     Instruction inst(_ctx, addr, rawInst);
     if (auto err = inst.translate())
       return err;
-    (*_bb)(addr, std::move(inst));
+    // add translated instruction to BB's instruction map
+    (*_bb)(addr, std::move(_ctx->bld->first()));
   }
 
   return llvm::Error::success();
@@ -178,13 +177,13 @@ Function* Function::getByAddr(Context* ctx, uint64_t addr)
   // get symbol by offset
   // FIXME need to change this to be able to find functions in other modules
   ConstSymbolPtr sym = ctx->sec->section()->lookup(addr);
-  xassert(sym &&
-      (sym->type() == llvm::object::SymbolRef::ST_Function ||
-        (sym->flags() & llvm::object::SymbolRef::SF_Global)) &&
-    "Target function not found!");
+  // XXX lookup by symbol name
+  xassert(sym && "symbol not found!");
 
+  // create a new function
   FunctionPtr f(new Function(ctx, sym->name(), ctx->sec, addr));
   f->create();
+  // insert function in maps, possibly overwriting an old one
   ctx->funcByAddr()(f->addr(), &*f);
   std::string name = f->name();
   ctx->func()(name, std::move(f));

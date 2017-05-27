@@ -25,6 +25,14 @@ public:
     _sti(sti)
   {}
 
+  /**
+   * Disassemble one instruction.
+   *
+   * @param addr instruction address
+   * @param rawInst instruction in binary format
+   * @param inst [output] disassembled instruction
+   * @param size [output] instruction size
+   */
   llvm::Error disasm(
     uint64_t addr,
     uint32_t rawInst,

@@ -8,7 +8,6 @@
 #include <cstdint>
 
 namespace llvm {
-class Instruction;
 class MCInst;
 }
 
@@ -24,19 +23,24 @@ class Instruction
 public:
   static const std::size_t SIZE = 4;
 
+  /**
+   * ctor.
+   *
+   * @param ctx
+   * @param addr instruction address
+   * @param rawInst raw instruction bytes
+   */
   Instruction(Context* ctx, uint64_t addr, uint32_t rawInst);
 
+  // allow move only
   Instruction(Instruction&&) = default;
   Instruction& operator=(Instruction&&) = default;
 
+  // dtor
   ~Instruction();
 
+  // translate instruction
   llvm::Error translate();
-
-  const llvm::Instruction* instr() const
-  {
-    return nullptr;
-  }
 
 private:
   Context* _ctx;
@@ -45,9 +49,11 @@ private:
   uint64_t _addr;
   uint32_t _rawInst;
   llvm::MCInst _inst;
+  // debug output
   std::string _s;
   std::unique_ptr<llvm::raw_string_ostream> _ss;
   llvm::raw_ostream* _os;
+  //
   Builder* _bld;
 
 
@@ -107,23 +113,27 @@ private:
 
   // ALU op
   llvm::Error translateALUOp(ALUOp op, uint32_t flags);
-
   llvm::Error translateUI(UIOp op);
 
   // load/store
   llvm::Error translateLoad(IntType it);
-
   llvm::Error translateStore(IntType it);
 
   // branch/jump/call handlers
+
+  // branch translation entrypoint
   llvm::Error translateBranch(BranchType bt);
+  // call
   llvm::Error handleCall(uint64_t target);
+  // indirect call
   llvm::Error handleICall(llvm::Value* target);
+  // call to "external" function (for now, to libc functions)
   llvm::Error handleCallExt(llvm::Value* target);
+  // jump to offset
   llvm::Error handleJumpToOffs(uint64_t target,
     llvm::Value* cond, unsigned linkReg);
+  // indirect jump
   llvm::Error handleIJump(llvm::Value* target, unsigned linkReg);
-
 
   // syscall
   llvm::Error handleSyscall();
@@ -134,16 +144,21 @@ private:
   // CSR ops
   llvm::Error translateCSR(CSROp op, bool imm);
 
-
   // helpers
 
+  // get RISCV destination register number
   unsigned getRD();
-  unsigned getRegNum(unsigned num);
-  llvm::Value* getReg(int num);
+  // get RISCV register number (input is operand index)
+  unsigned getRegNum(unsigned op);
+  // get register value (input is operand index)
+  llvm::Value* getReg(int op);
+  // get immediate value
   llvm::Expected<llvm::Value*> getImm(int op);
+  // get register or immediate
   llvm::Expected<llvm::Value*> getRegOrImm(int op);
 
   // add RV instr metadata and print it in debug mode
+  // (no-op in release mode)
   void dbgprint();
 };
 
