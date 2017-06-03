@@ -16,11 +16,15 @@ class Builder
   llvm::Instruction* _first = nullptr;
 
 public:
-  Builder(Context* ctx) :
+  Builder(Context* ctx, bool noFirst = false)
+    :
     _ctx(ctx),
     _builder(ctx->builder),
     _t(&_ctx->t)
-  {}
+  {
+    if (noFirst)
+      _first = reinterpret_cast<llvm::Instruction*>(1);
+  }
 
   // dtor
   ~Builder()

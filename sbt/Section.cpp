@@ -24,11 +24,13 @@ llvm::Error SBTSection::translate()
     elfOffset = _section->getELFOffset();
 
   // print section info
-  DBGS << llvm::formatv("section {0}: addr={1:X+4}, elfOffs={2:X+4}, size={3:X+4}\n",
-      _section->name(), addr, elfOffset, size);
+  DBGS << llvm::formatv("section {0}: addr={1:X+4}, elfOffs={2:X+4}, "
+    "size={3:X+4}\n",
+    _section->name(), addr, elfOffset, size);
 
   // get relocations
-  const ConstRelocationPtrVec relocs = _section->object()->relocs();
+  ConstObjectPtr obj = _section->object();
+  const ConstRelocationPtrVec& relocs = obj->relocs();
   SBTRelocation reloc(_ctx, relocs.cbegin(), relocs.cend());
   _ctx->reloc = &reloc;
 
@@ -46,14 +48,21 @@ llvm::Error SBTSection::translate()
   _bytes = llvm::ArrayRef<uint8_t>(
     reinterpret_cast<const uint8_t *>(bytesStr.data()), bytesStr.size());
 
-  // for each symbol
   const ConstSymbolPtrVec& symbols = _section->symbols();
   size_t n = symbols.size();
+  Func func;
+
+  enum State {
+    INSIDE_FUNC,
+    OUTSIDE_FUNC
+  } state = OUTSIDE_FUNC;
+
+  // for each symbol
+  volatile uint64_t end;  // XXX gcc bug: need to make it volatile
   for (size_t i = 0; i < n; ++i) {
     ConstSymbolPtr sym = symbols[i];
 
     uint64_t symaddr = sym->address();
-    volatile uint64_t end;  // XXX gcc bug: need to make it volatile
     if (i == n - 1)
       end = size;
     else
@@ -65,18 +74,56 @@ llvm::Error SBTSection::translate()
     if (sym->type() == llvm::object::SymbolRef::ST_Function ||
         sym->flags() & llvm::object::SymbolRef::SF_Global)
     {
-      Function* f = new Function(_ctx, symname, this, symaddr, end);
-      FunctionPtr func(f);
-      _ctx->f = f;
-      if (auto err = f->translate())
-        return err;
+      // function start
+      if (state == OUTSIDE_FUNC) {
+        func.name = symname;
+        func.start = symaddr;
+        state = INSIDE_FUNC;
+      // function end
+      } else {
+        func.end = symaddr;
+        // translate
+        if (auto err = translate(func))
+          return err;
+        // last symbol? get out
+        if (i == n - 1)
+          state = OUTSIDE_FUNC;
+        // start next functio
+        else {
+          func.name = symname;
+          func.start = symaddr;
+          state = INSIDE_FUNC;
+        }
+      }
 
     // skip section bytes until a function like symbol is found
-    } else
+    } else if (state == OUTSIDE_FUNC) {
+      DBGS << "skipping " << symname
+        << llvm::formatv(": 0x{0:X+4}, 0x{1:X+4}", symaddr, uint64_t(end))
+        << nl;
       continue;
+    }
   }
 
+  // finish last function
+  if (state == INSIDE_FUNC) {
+    func.end = end;
+    if (auto err = translate(func))
+      return err;
+  }
+
+  _ctx->bld = nullptr;
+  _ctx->sec = nullptr;
   return llvm::Error::success();
+}
+
+
+llvm::Error SBTSection::translate(const Func& func)
+{
+  Function* f = new Function(_ctx, func.name, this, func.start, func.end);
+  FunctionPtr fp(f);
+  _ctx->f = f;
+  return f->translate();
 }
 
 }

@@ -5,6 +5,11 @@
 #include "Translator.h"
 
 #include <llvm/Object/ELF.h>
+#include <llvm/Support/FormatVariadic.h>
+
+#undef ENABLE_DBGS
+#define ENABLE_DBGS 0
+#include "Debug.h"
 
 namespace sbt {
 
@@ -33,6 +38,8 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
   auto reloc = *_ri;
   if (reloc->offset() != addr)
     return nullptr;
+
+  DBGS << __FUNCTION__ << llvm::formatv("({0:X+4})\n", addr);
 
   ConstSymbolPtr sym = reloc->symbol();
   uint64_t type = reloc->type();
@@ -64,6 +71,9 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
   // set symbol relocation info
   SBTSymbol ssym(realSym->address(), realSym->address(),
     realSym->name(), realSym->section());
+  DBGS << __FUNCTION__
+    << llvm::formatv(": addr={0:X+4}, val={1:X+4}, name={2}\n",
+          ssym.addr, ssym.val, ssym.name);
 
   xassert((ssym.sec || !ssym.addr) && "no section found for relocation");
   if (ssym.sec) {
@@ -114,6 +124,8 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     Builder* bld = _ctx->bld;
 
     // get char* to memory
+    DBGS << __FUNCTION__ << llvm::formatv(": reloc={0:X+4}\n", ssym.val);
+    // abort();
     std::vector<llvm::Value*> idx = { _ctx->c.ZERO, _ctx->c.i32(ssym.val) };
     v = bld->gep(_ctx->shadowImage, idx);
 

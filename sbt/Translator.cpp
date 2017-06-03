@@ -153,6 +153,11 @@ llvm::Error Translator::genSCHandler()
 
 llvm::Error Translator::translate()
 {
+  DBGS << "input files:";
+  for (const auto& f : _inputFiles)
+    DBGS << ' ' << f;
+  DBGS << nl << "output file: " << _outputFile << nl;
+
   if (auto err = start())
     return err;
 
@@ -283,11 +288,14 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
 
 llvm::Error Translator::genICaller()
 {
+  // DBGS << __FUNCTION__ << nl;
+
   const Constants& c = _ctx->c;
   const Types& t = _ctx->t;
-  Builder* bld = _ctx->bld;
-  xassert(bld && "bld is null");
+  Builder bldi(_ctx, NO_FIRST);
+  Builder* bld = &bldi;
   llvm::Function* ic = _iCaller.func();
+  xassert(ic);
 
   llvm::PointerType* ty = t.voidFunc->getPointerTo();
   llvm::Value* target = nullptr;

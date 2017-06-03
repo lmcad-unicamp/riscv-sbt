@@ -269,31 +269,38 @@ Object::Object(
   SBTError serr(filePath);
 
   // atempt to open the binary
-  auto expObj = object::createBinary(filePath);
+  auto expObj = llvm::object::createBinary(filePath);
   if (!expObj) {
     serr << expObj.takeError() << "failed to open binary file";
     err = error(serr);
     return;
   }
-  _ownBin = std::move(expObj.get());
-  object::Binary *bin = _ownBin.getBinary();
+  _bin = expObj.get().takeBinary();
+  llvm::object::Binary* bin = &*_bin.first;
 
   if (!ELFObj::classof(bin)) {
     serr << "unsupported file type";
     err = error(serr);
     return;
   }
-
-  _obj = dyn_cast<object::ObjectFile>(bin);
-  _fileName = _obj->getFileName();
-
-  // object::ObjectFile created, now process its symbols
-  err = readSymbols();
 }
 
 
-Error Object::readSymbols()
+Object::Object(Object&& o) :
+  _bin(std::move(o._bin)),
+  _obj(nullptr)
+{}
+
+
+llvm::Error Object::readSymbols()
 {
+  xassert(!_obj && "readSymbols() was called twice or "
+    "Object was moved after readSymbols() was called!");
+
+  llvm::object::Binary* bin = &*_bin.first;
+  _obj = llvm::dyn_cast<llvm::object::ObjectFile>(bin);
+  _fileName = _obj->getFileName();
+
   SBTError serr(_fileName);
   SectionPtrVec sections;
 
@@ -380,7 +387,7 @@ Error Object::readSymbols()
       auto expRel = create<Relocation*>(this, r);
       if (!expRel)
         return expRel.takeError();
-      Relocation *rel = expRel.get();
+      Relocation* rel = expRel.get();
       ConstRelocationPtr ptr(rel);
       _relocs.push_back(ptr);
     }

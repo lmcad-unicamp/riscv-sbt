@@ -19,8 +19,8 @@ void Syscall::declHandler()
 
 llvm::Error Syscall::genHandler()
 {
-  // llvm::LLVMContext* ctx = _ctx->ctx;
   llvm::Module* module = _ctx->module;
+  const auto& c = _ctx->c;
 
   // declare X86 syscall functions
   const size_t n = 5;
@@ -65,7 +65,7 @@ llvm::Error Syscall::genHandler()
 
   declHandler();
 
-  Builder bldi(_ctx);
+  Builder bldi(_ctx, NO_FIRST);
   Builder* bld = &bldi;
 
   // entry
@@ -90,9 +90,9 @@ llvm::Error Syscall::genHandler()
   // default case: call exit(99)
   BasicBlock bbSW1Dfl(_ctx, bbPrefix + "sw1_default", _fRVSC, bbSW2.bb());
   bld->setInsertPoint(bbSW1Dfl);
-  bld->store(llvm::ConstantInt::get(_t.i32, 1), XRegister::T0);
-  bld->store(llvm::ConstantInt::get(_t.i32, X86_SYS_EXIT), XRegister::A7);
-  bld->store(llvm::ConstantInt::get(_t.i32, 99), XRegister::A0);
+  bld->store(c.i32(1), XRegister::T0);
+  bld->store(c.i32(X86_SYS_EXIT), XRegister::A7);
+  bld->store(c.i32(99), XRegister::A0);
   bld->br(bbSW2);
 
   bld->setInsertPoint(bbEntry);
@@ -141,6 +141,7 @@ llvm::Error Syscall::genHandler()
 
   BasicBlock sw2Case0 = getSW2CaseBB(0);
 
+  // switch 2
   bld->setInsertPoint(bbSW2);
   llvm::SwitchInst* sw2 = bld->sw(bld->load(XRegister::T0), sw2Case0);
   sw2->addCase(_ctx->c.ZERO, sw2Case0.bb());

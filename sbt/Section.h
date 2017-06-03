@@ -34,6 +34,14 @@ private:
   ConstSectionPtr _section;
 
   llvm::ArrayRef<uint8_t> _bytes;
+
+  struct Func {
+    std::string name;
+    uint64_t start;
+    uint64_t end;
+  };
+
+  llvm::Error translate(const Func& func);
 };
 
 }

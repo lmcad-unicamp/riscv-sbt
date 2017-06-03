@@ -8,8 +8,13 @@
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Module.h>
+#include <llvm/Support/FormatVariadic.h>
 
 #include <algorithm>
+
+#undef ENABLE_DBGS
+#define ENABLE_DBGS 1
+#include "Debug.h"
 
 namespace sbt {
 
@@ -40,6 +45,8 @@ llvm::Error Module::translate(const std::string& file)
   auto expObj = create<Object>(file);
   if (!expObj)
     return expObj.takeError();
+  if (auto err = expObj.get().readSymbols())
+    return err;
   _obj = &expObj.get();
 
   if (auto err = start())
@@ -89,13 +96,16 @@ llvm::Error Module::buildShadowImage()
     // align
     while (vec.size() % 4 != 0)
       vec.push_back(0);
+    size_t addr = vec.size();
+    DBGS << llvm::formatv("{0}(): {1}@{2:X+4}\n",
+      __FUNCTION__, sec->name(), addr);
 
     // set shadow offset of section
-    sec->shadowOffs(vec.size());
+    sec->shadowOffs(addr);
 
     // append to vector
-    vec.resize(bytes.size());
-    std::copy(bytes.begin(), bytes.end(), vec.begin());
+    vec.resize(addr + bytes.size());
+    std::copy(bytes.begin(), bytes.end(), vec.begin() + addr);
   }
 
   // create the ShadowImage

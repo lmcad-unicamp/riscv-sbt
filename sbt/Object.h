@@ -300,6 +300,12 @@ public:
     _address = addr;
   }
 
+  // value
+  uint64_t value() const
+  {
+    return _sym.getValue();
+  }
+
   // flags
   uint32_t flags() const
   {
@@ -395,14 +401,16 @@ public:
   // ctor
   Object(const llvm::StringRef& filePath, llvm::Error& err);
 
-  // disallow copies
+  // disallow copy
   Object(const Object&) = delete;
   Object& operator=(const Object&) = delete;
 
-  // but allow move construction
-  // Note: _obj points inside _ownBin, that doesn't change on move,
-  //       so it's ok to use the default move constructor
-  Object(Object&&) = default;
+  // allow move construction only
+  Object(Object&&);
+  Object& operator=(Object&&) = delete;
+
+  // initialize everything
+  llvm::Error readSymbols();
 
   // get sections
   const PtrToSectionMap& sections() const
@@ -485,7 +493,7 @@ public:
   }
 
   // relocations
-  const ConstRelocationPtrVec relocs() const
+  const ConstRelocationPtrVec& relocs() const
   {
     return _relocs;
   }
@@ -494,8 +502,10 @@ public:
   void dump() const;
 
 private:
-  llvm::object::OwningBinary<llvm::object::Binary> _ownBin;
-  llvm::object::ObjectFile* _obj;
+  std::pair<
+    std::unique_ptr<llvm::object::Binary>,
+    std::unique_ptr<llvm::MemoryBuffer>>    _bin;
+  llvm::object::ObjectFile* _obj = nullptr;
   llvm::StringRef _fileName;
 
   // maps
@@ -505,9 +515,6 @@ private:
   PtrToSectionMap _ptrToSection;
 
   ConstRelocationPtrVec _relocs;
-
-  // initialize everything
-  llvm::Error readSymbols();
 };
 
 } // sbt

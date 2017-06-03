@@ -25,7 +25,6 @@ BasicBlock::BasicBlock(
   :
   _ctx(ctx)
 {
-  DBGS << name << ":\n";
   _bb = llvm::BasicBlock::Create(*_ctx->ctx, name, f, beforeBB);
 }
 

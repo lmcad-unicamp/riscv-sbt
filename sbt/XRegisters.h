@@ -111,6 +111,7 @@ public:
   // get register by its number
   const XRegister& operator[](size_t p) const
   {
+    xassert(p < _regs.size() && "register index is out of bounds");
     return _regs[p];
   }
 

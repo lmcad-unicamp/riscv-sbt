@@ -159,8 +159,8 @@ static void test()
 
   // ExitOnError ExitOnErr;
   SBT::init();
-  SBTFinish finish;
-  llvm::StringRef filePath = "sbt/test/rv32-main.o";
+  SBTFinish fini;
+  llvm::StringRef filePath = "sbt/test/rv32-hello.o";
   auto expObj = create<Object>(filePath);
   if (!expObj)
     handleError(expObj.takeError());
@@ -242,7 +242,7 @@ int main(int argc, char* argv[])
     sbt::handleError(sbt.run());
 
   // dump resulting IR
-  sbt.dump();
+  // sbt.dump();
 
   // write IR to output file
   sbt.write();

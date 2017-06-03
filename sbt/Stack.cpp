@@ -28,7 +28,9 @@ Stack::Stack(Context* ctx, size_t sz)
   // set stack end pointer
 
   const Constants& c = ctx->c;
-  Builder* bld = ctx->bld;
+  Builder bldi(ctx, NO_FIRST);
+  Builder* bld(&bldi);
+
   std::vector<llvm::Value*> idx = { c.ZERO, c.i32(_size) };
   llvm::Value *v = bld->gep(_stack, idx);
   _end = bld->i8PtrToI32(v);

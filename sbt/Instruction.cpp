@@ -51,7 +51,7 @@ llvm::Error Instruction::translate()
     return err;
 
   // print address
-  *_os << llvm::formatv("{0:X-4}:   ", _addr);
+  *_os << llvm::formatv("{0:X-4}:  ", _addr);
 
   // reset builder
   _bld->reset();

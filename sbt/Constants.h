@@ -1,7 +1,7 @@
 #ifndef SBT_CONSTANTS_H
 #define SBT_CONSTANTS_H
 
-#define SBT_DEBUG 1
+#include "Debug.h"
 
 #include <llvm/IR/Constants.h>
 
@@ -19,6 +19,7 @@ static const bool ALLOW_INTERNAL = true;
 static const bool CONSTANT = true;
 static const bool DECL = true;
 static const bool ERROR = true;
+static const bool NO_FIRST = true;
 static const bool SIGNED = true;
 static const bool VAR_ARG = true;
 static const bool VOLATILE = true;

@@ -11,6 +11,10 @@
 #include <llvm/IR/Module.h>
 #include <llvm/Support/FormatVariadic.h>
 
+#undef ENABLE_DBGS
+#define ENABLE_DBGS 0
+#include "Debug.h"
+
 namespace sbt {
 
 void Function::create(

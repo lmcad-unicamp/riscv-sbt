@@ -96,18 +96,11 @@ public:
     return *this;
   }
 
-  /*
-  E& operator[](size_t p)
-  {
-    return (*_ptr)[p];
-  }
-  */
-
   const E& operator[](size_t p) const
   {
+    xassert(_ptr);
     return (*_ptr)[p];
   }
-
 
   A* get()
   {

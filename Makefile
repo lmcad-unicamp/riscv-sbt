@@ -787,8 +787,14 @@ lc:
 
 .PHONY: test
 test:
-	$(MAKE) $(SBT)-build1 $(SBT)-install
-	$(MAKE) -C $(TOPDIR)/sbt/test tests run-tests
+	$(MAKE) $(SBT)-build $(SBT)-install
+	$(MAKE) -C $(TOPDIR)/sbt/test clean rv32-x86-hello
+	cd $(TOPDIR)/sbt/test && ./rv32-x86-hello
+
+.PHONY: dbg
+dbg:
+	$(MAKE) $(SBT)-build $(SBT)-install
+	cd $(TOPDIR)/sbt/test && gdb --args riscv-sbt -o rv32-x86-hello.bc rv32-hello.o
 
 .PHONY: tests
 tests:
