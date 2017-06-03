@@ -9,6 +9,9 @@ namespace sbt {
 
 #define NULL_CHECK xassert(_ptr && "null pointer")
 
+/**
+ * std::unique_ptr with more features.
+ */
 template <typename T>
 class Pointer
 {
@@ -71,6 +74,48 @@ public:
 
 private:
   std::unique_ptr<T> _ptr;
+};
+
+
+/**
+ * Wrapper to pointer to array, to be able to use []s without having to first
+ * derreference the pointer.
+ * ((*ptr)[i] -> aptr[i])
+ */
+template <typename A, typename E>
+class ArrayPtr
+{
+public:
+  ArrayPtr(A* ptr = nullptr) :
+    _ptr(ptr)
+  {}
+
+  ArrayPtr& operator=(A* ptr)
+  {
+    _ptr = ptr;
+    return *this;
+  }
+
+  /*
+  E& operator[](size_t p)
+  {
+    return (*_ptr)[p];
+  }
+  */
+
+  const E& operator[](size_t p) const
+  {
+    return (*_ptr)[p];
+  }
+
+
+  A* get()
+  {
+    return _ptr;
+  }
+
+private:
+  A* _ptr = nullptr;
 };
 
 }

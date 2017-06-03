@@ -12,7 +12,7 @@ namespace sbt {
 
 // for now, only ELF 32 LE object files are supported
 using ELFObj = object::ELFObjectFile<
-  object::ELFType<support::little, false>>;
+  object::ELFType<support::little, false /*is64*/>>;
 
 // symbol flags
 class Flags
@@ -36,24 +36,27 @@ private:
   // all flags vector
   using BSR = object::BasicSymbolRef;
   std::vector<std::pair<uint32_t, StringRef>> _allFlags = {
-    { BSR::SF_Undefined,  "Undefined" },      // Symbol is defined in another object file
-    { BSR::SF_Global,     "Global" },         // Global symbol
-    { BSR::SF_Weak,       "Weak" },           // Weak symbol
-    { BSR::SF_Absolute,   "Absolute" },       // Absolute symbol
-    { BSR::SF_Common,     "Common" },         // Symbol has common linkage
-    { BSR::SF_Indirect,   "Indirect" },       // Symbol is an alias to another symbol
-    { BSR::SF_Exported,   "Exported" },       // Symbol is visible to other DSOs
-    { BSR::SF_FormatSpecific, "FormatSpecific" }, // Specific to the object file format
+    { BSR::SF_Undefined,  "undefined" },      // Symbol is defined in another object file
+    { BSR::SF_Global,     "global" },         // Global symbol
+    { BSR::SF_Weak,       "weak" },           // Weak symbol
+    { BSR::SF_Absolute,   "absolute" },       // Absolute symbol
+    { BSR::SF_Common,     "common" },         // Symbol has common linkage
+    { BSR::SF_Indirect,   "indirect" },       // Symbol is an alias to another symbol
+    { BSR::SF_Exported,   "exported" },       // Symbol is visible to other DSOs
+    { BSR::SF_FormatSpecific, "formatSpecific" }, // Specific to the object file format
                                               // (e.g. section symbols)
-    { BSR::SF_Thumb,      "Thumb" },          // Thumb symbol in a 32-bit ARM binary
-    { BSR::SF_Hidden,     "Hidden" },         // Symbol has hidden visibility
-    { BSR::SF_Const,      "Const" },          // Symbol value is constant
-    { BSR::SF_Executable, "Executable" },     // Symbol points to an executable section
+    { BSR::SF_Thumb,      "thumb" },          // Thumb symbol in a 32-bit ARM binary
+    { BSR::SF_Hidden,     "hidden" },         // Symbol has hidden visibility
+    { BSR::SF_Const,      "const" },          // Symbol value is constant
+    { BSR::SF_Executable, "executable" },     // Symbol points to an executable section
                                               // (IR only)
   };
 };
 
+
+// global Flags instance
 static Flags* g_flags;
+
 
 // symbol type to string
 static std::string getTypeStr(Symbol::Type type)
@@ -62,12 +65,12 @@ static std::string getTypeStr(Symbol::Type type)
   std::string typeStr;
   switch (type) {
     default:
-    case SR::ST_Unknown:   typeStr = "Unk";  break;
-    case SR::ST_Data:      typeStr = "Data"; break;
-    case SR::ST_Debug:     typeStr = "Dbg";  break;
-    case SR::ST_File:      typeStr = "File"; break;
-    case SR::ST_Function:  typeStr = "Func"; break;
-    case SR::ST_Other:     typeStr = "Oth";  break;
+    case SR::ST_Unknown:   typeStr = "unk";  break;
+    case SR::ST_Data:      typeStr = "data"; break;
+    case SR::ST_Debug:     typeStr = "dbg";  break;
+    case SR::ST_File:      typeStr = "file"; break;
+    case SR::ST_Function:  typeStr = "func"; break;
+    case SR::ST_Other:     typeStr = "oth";  break;
   }
   return typeStr;
 }
@@ -81,14 +84,15 @@ std::string Section::str() const
 {
   std::string s;
   llvm::raw_string_ostream ss(s);
-  ss  << "Section{"
-      << " Name=[" << name() << "]";
+  ss  << "section{"
+      << " name=[" << name() << "]";
   // dump symbols
   for (ConstSymbolPtr sym : symbols())
     ss << "\n    " << sym->str();
   ss << " }";
   return s;
 }
+
 
 void CommonSection::symbols(ConstSymbolPtrVec&& s)
 {
@@ -98,6 +102,7 @@ void CommonSection::symbols(ConstSymbolPtrVec&& s)
     _size += s->commonSize();
 }
 
+
 LLVMSection::LLVMSection(
   ConstObjectPtr obj,
   object::SectionRef sec,
@@ -106,23 +111,25 @@ LLVMSection::LLVMSection(
   Section(obj, ""),
   _sec(sec)
 {
-  // get SectionName
+  // get section name
   StringRef nameRef;
   if (_sec.getName(nameRef)) {
     SBTError serr;
-    serr << "Failed to get SectionName";
+    serr << "failed to get section name";
     err = error(serr);
     return;
   } else
     _name = nameRef;
 }
 
+
 uint64_t LLVMSection::getELFOffset() const
 {
   object::DataRefImpl Impl = _sec.getRawDataRefImpl();
-  auto ei = reinterpret_cast<ELFObj::Elf_Shdr *>(Impl.p);
+  auto ei = reinterpret_cast<ELFObj::Elf_Shdr*>(Impl.p);
   return ei->sh_offset;
 }
+
 
 ConstSymbolPtr Section::lookup(uint64_t addr) const
 {
@@ -150,14 +157,14 @@ Symbol::Symbol(
   auto expSymName = _sym.getName();
   if (!expSymName) {
     SBTError serr;
-    serr << "Failed to get SymbolName";
+    serr << "failed to get symbol name";
     err = error(serr);
     return;
   }
   _name = std::move(expSymName.get());
 
   // serr
-  std::string prefix("Symbol(");
+  std::string prefix("symbol(");
   prefix += _name;
   prefix += ")";
   SBTError serr(prefix);
@@ -165,7 +172,7 @@ Symbol::Symbol(
   // get section
   auto expSecI = sym.getSection();
   if (!expSecI) {
-    serr << "Could not get Section";
+    serr << "could not get section";
     err = error(serr);
     return;
   }
@@ -176,7 +183,7 @@ Symbol::Symbol(
   // address
   auto expAddr = _sym.getAddress();
   if (!expAddr) {
-    serr << "Could not get Address";
+    serr << "could not get address";
     err = error(serr);
     return;
   }
@@ -185,7 +192,7 @@ Symbol::Symbol(
   // type
   auto expType = _sym.getType();
   if (!expType) {
-    serr << "Could not get Type";
+    serr << "could not get type";
     err = error(serr);
     return;
   }
@@ -196,11 +203,11 @@ std::string Symbol::str() const
 {
   std::string s;
   llvm::raw_string_ostream ss(s);
-  ss  << "Symbol{"
-      << " Addr=[" << _address
-      << "], Type=[" << getTypeStr(type())
-      << "], Name=[" << name()
-      << "], Flags=[" << g_flags->str(flags())
+  ss  << "symbol{"
+      << " addr=[" << _address
+      << "], type=[" << getTypeStr(type())
+      << "], name=[" << name()
+      << "], flags=[" << g_flags->str(flags())
       << "] }";
   return s;
 }
@@ -223,17 +230,18 @@ Relocation::Relocation(
     _sym = _obj->lookupSymbol(*it);
 }
 
+
 std::string Relocation::str() const
 {
   std::string s;
   raw_string_ostream ss(s);
-  ss  << "Reloc{"
-      << " Offs=[" << offset()
-      << "], Type=[" << typeName();
+  ss  << "reloc{"
+      << " offs=[" << offset()
+      << "], type=[" << typeName();
   if (section())
-    ss << "], Section=[" << section()->name();
+    ss << "], section=[" << section()->name();
   if (symbol())
-    ss  << "], Symbol=[" << symbol()->name();
+    ss  << "], symbol=[" << symbol()->name();
   ss << "] }";
   return s;
 }
@@ -247,10 +255,12 @@ void Object::init()
   g_flags = new Flags;
 }
 
+
 void Object::finish()
 {
   delete g_flags;
 }
+
 
 Object::Object(
   const StringRef& filePath,
@@ -261,7 +271,7 @@ Object::Object(
   // atempt to open the binary
   auto expObj = object::createBinary(filePath);
   if (!expObj) {
-    serr << expObj.takeError() << "Failed to open binary file";
+    serr << expObj.takeError() << "failed to open binary file";
     err = error(serr);
     return;
   }
@@ -269,7 +279,7 @@ Object::Object(
   object::Binary *bin = _ownBin.getBinary();
 
   if (!ELFObj::classof(bin)) {
-    serr << "Unsupported file type";
+    serr << "unsupported file type";
     err = error(serr);
     return;
   }
@@ -280,6 +290,7 @@ Object::Object(
   // object::ObjectFile created, now process its symbols
   err = readSymbols();
 }
+
 
 Error Object::readSymbols()
 {
@@ -294,15 +305,15 @@ Error Object::readSymbols()
     Section *sec = expSec.get();
     SectionPtr ptr(sec);
     // add to maps
-    _nameToSection(sec->name(), ConstSectionPtr(ptr));
+    // _nameToSection(sec->name(), ConstSectionPtr(ptr));
     _ptrToSection(s.getRawDataRefImpl().p, ConstSectionPtr(ptr));
     // add to sections vector
     sections.push_back(ptr);
   }
 
-  // add common Section
+  // add common section
   SectionPtr commonSec(new CommonSection(this));
-  _nameToSection(commonSec->name(), ConstSectionPtr(commonSec));
+  // _nameToSection(commonSec->name(), ConstSectionPtr(commonSec));
   sections.push_back(commonSec);
   uint64_t commonOffs = 0;
 
@@ -318,7 +329,7 @@ Error Object::readSymbols()
     if (sym->type() == object::SymbolRef::ST_Debug)
       continue;
     // add to maps
-    _nameToSymbol(sym->name(), ConstSymbolPtr(ptr));
+    // _nameToSymbol(sym->name(), ConstSymbolPtr(ptr));
     _ptrToSymbol(s.getRawDataRefImpl().p, ConstSymbolPtr(ptr));
 
     // add symbol to corresponding section vector
@@ -378,21 +389,22 @@ Error Object::readSymbols()
   return Error::success();
 }
 
+
 void Object::dump() const
 {
   raw_ostream &os = outs();
 
   // basic info
-  os << "FileName: " << fileName() << "\n";
-  os << "FileFormat: " << fileFormatName() << "\n";
+  os << "fileName: " << fileName() << "\n";
+  os << "fileFormat: " << fileFormatName() << "\n";
 
-  // Sections
-  os << "Sections:\n";
+  // sections
+  os << "sections:\n";
   for (ConstSectionPtr Sec : sections())
     os << Sec->str() << "\n";
 
-  // Relocations
-  os << "Relocations:\n";
+  // relocations
+  os << "relocations:\n";
   for (ConstRelocationPtr rel : _relocs)
     os << rel->str() << "\n";
 }

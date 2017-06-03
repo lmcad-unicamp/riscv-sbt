@@ -24,7 +24,7 @@ llvm::Error SBTSection::translate()
     elfOffset = _section->getELFOffset();
 
   // print section info
-  DBGS << llvm::formatv("Section {0}: Addr={1:X+4}, ELFOffs={2:X+4}, Size={3:X+4}\n",
+  DBGS << llvm::formatv("section {0}: addr={1:X+4}, elfOffs={2:X+4}, size={3:X+4}\n",
       _section->name(), addr, elfOffset, size);
 
   // get relocations
@@ -40,14 +40,14 @@ llvm::Error SBTSection::translate()
   llvm::StringRef bytesStr;
   if (_section->contents(bytesStr)) {
     SBTError serr;
-    serr << "Failed to get Section Contents";
+    serr << "failed to get section contents";
     return error(serr);
   }
   _bytes = llvm::ArrayRef<uint8_t>(
     reinterpret_cast<const uint8_t *>(bytesStr.data()), bytesStr.size());
 
   // for each symbol
-  const ConstSymbolPtrVec &symbols = _section->symbols();
+  const ConstSymbolPtrVec& symbols = _section->symbols();
   size_t n = symbols.size();
   for (size_t i = 0; i < n; ++i) {
     ConstSymbolPtr sym = symbols[i];
@@ -65,13 +65,12 @@ llvm::Error SBTSection::translate()
     if (sym->type() == llvm::object::SymbolRef::ST_Function ||
         sym->flags() & llvm::object::SymbolRef::SF_Global)
     {
-      // if (symname == "main")
       Function* f = new Function(_ctx, symname, this, symaddr, end);
       FunctionPtr func(f);
       _ctx->f = f;
-      // _ctx->func()(std::move(func), std::move(symaddr));
       if (auto err = f->translate())
         return err;
+
     // skip section bytes until a function like symbol is found
     } else
       continue;

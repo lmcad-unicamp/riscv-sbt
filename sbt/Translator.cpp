@@ -54,25 +54,24 @@ llvm::Error Translator::start()
   // get target
   llvm::Triple triple("riscv32-unknown-elf");
   std::string tripleName = triple.getTriple();
-  // logs() << "Triple: " << TripleName << "\n";
 
   _target = &llvm::getTheRISCVMaster32Target();
-  // Target = TargetRegistry::lookupTarget(TripleName, StrError);
+  // _target = TargetRegistry::lookupTarget(tripleName, strError);
   if (!_target) {
-    serr << "Target not found: " << tripleName;
+    serr << "target not found: " << tripleName;
     return error(serr);
   }
 
   _mri.reset(_target->createMCRegInfo(tripleName));
   if (!_mri) {
-    serr << "No register info for target " << tripleName;
+    serr << "no register info for target " << tripleName;
     return error(serr);
   }
 
-  // Set up disassembler.
+  // set up disassembler.
   _asmInfo.reset(_target->createMCAsmInfo(*_mri, tripleName));
   if (!_asmInfo) {
-    serr << "No assembly info for target " << tripleName;
+    serr << "no assembly info for target " << tripleName;
     return error(serr);
   }
 
@@ -80,7 +79,7 @@ llvm::Error Translator::start()
   _sti.reset(
       _target->createMCSubtargetInfo(tripleName, "", features.getString()));
   if (!_sti) {
-    serr << "No subtarget info for target " << tripleName;
+    serr << "no subtarget info for target " << tripleName;
     return error(serr);
   }
 
@@ -88,26 +87,25 @@ llvm::Error Translator::start()
   _mc.reset(new llvm::MCContext(_asmInfo.get(), _mri.get(), _mofi.get()));
   _disAsm.reset(_target->createMCDisassembler(*_sti, *_mc));
   if (!_disAsm) {
-    serr << "No disassembler for target " << tripleName;
+    serr << "no disassembler for target " << tripleName;
     return error(serr);
   }
 
   _mii.reset(_target->createMCInstrInfo());
   if (!_mii) {
-    serr << "No instruction info for target " << tripleName;
+    serr << "no instruction info for target " << tripleName;
     return error(serr);
   }
 
   _instPrinter.reset(
     _target->createMCInstPrinter(triple, 0, *_asmInfo, *_mii, *_mri));
   if (!_instPrinter) {
-    serr << "No instruction printer for target " << tripleName;
+    serr << "no instruction printer for target " << tripleName;
     return error(serr);
   }
 
-  //
-  //
-  //
+  // setup context
+
   _ctx->x = new XRegisters(_ctx, DECL);
   _ctx->stack = new Stack(_ctx);
   _ctx->disasm = new Disassembler(&*_disAsm, &*_instPrinter, &*_sti);
@@ -128,6 +126,7 @@ llvm::Error Translator::start()
   _getTime->create(ft);
   _getInstRet->create(ft);
 
+  // syscall handler
   _sc.reset(new Syscall(_ctx));
   _ctx->syscall = &*_sc;
 
@@ -176,11 +175,7 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
 {
   std::string rv32Func = "rv32_" + func;
 
-  auto builder = _ctx->builder;
-  Builder bld(_ctx);
   auto& ctx = *_ctx->ctx;
-  auto module = _ctx->module;
-  auto& t = _ctx->t;
 
   // check if the function was already processed
   if (auto f = _funMap[rv32Func])
@@ -215,6 +210,11 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
   }
   llvm::FunctionType* ft = lf->getFunctionType();
 
+  Builder* bld = _ctx->bld;
+  xassert(bld && "bld is null");
+  auto module = _ctx->module;
+  auto& t = _ctx->t;
+
   // declare imported function in our module
   llvm::Function* impf =
     llvm::Function::Create(ft,
@@ -231,30 +231,30 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
   _funMap(f->name(), std::move(f));
   _extFuncAddr += Instruction::SIZE;
 
-  llvm::BasicBlock* bb = llvm::BasicBlock::Create(ctx, "entry", f->func());
-  llvm::BasicBlock* prevBB = builder->GetInsertBlock();
-  builder->SetInsertPoint(bb);
+  BasicBlock bb(_ctx, "entry", f->func());
+  BasicBlock prevBB = bld->getInsertBlock();
+  bld->setInsertPoint(bb);
 
-  OnScopeExit RestoreInsertPoint(
-    [builder, prevBB]() {
-      builder->SetInsertPoint(prevBB);
+  OnScopeExit restoreInsertPoint(
+    [&bld, &prevBB]() {
+      bld->setInsertPoint(prevBB);
     });
 
   unsigned numParams = ft->getNumParams();
   xassert(numParams < 9 &&
-      "External functions with more than 8 arguments are not supported!");
+      "external functions with more than 8 arguments are not supported");
 
   // build args
   std::vector<llvm::Value*> args;
   unsigned reg = XRegister::A0;
   unsigned i = 0;
   for (; i < numParams; i++) {
-    llvm::Value* v = bld.load(reg++);
+    llvm::Value* v = bld->load(reg++);
     llvm::Type* ty = ft->getParamType(i);
 
     // need to cast?
     if (ty != t.i32)
-      v = builder->CreateBitOrPointerCast(v, ty);
+      v = bld->bitOrPointerCast(v, ty);
 
     args.push_back(v);
   }
@@ -263,19 +263,19 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
   if (ft->isVarArg()) {
     unsigned n = MIN(i + 4, 8);
     for (; i < n; i++)
-      args.push_back(bld.load(reg++));
+      args.push_back(bld->load(reg++));
   }
 
-  // call the Function
+  // call the function
   llvm::Value* v;
   if (ft->getReturnType()->isVoidTy()) {
-    v = builder->CreateCall(impf, args);
+    v = bld->call(impf, args);
   } else {
-    v = builder->CreateCall(impf, args, impf->getName());
-    bld.store(v, XRegister::A0);
+    v = bld->call(impf, args, impf->getName());
+    bld->store(v, XRegister::A0);
   }
 
-  v = builder->CreateRetVoid();
+  v = bld->retVoid();
 
   return addr;
 }
@@ -283,39 +283,38 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
 
 llvm::Error Translator::genICaller()
 {
-  llvm::LLVMContext& ctx = *_ctx->ctx;
   const Constants& c = _ctx->c;
   const Types& t = _ctx->t;
-  auto builder = _ctx->builder;
-  Builder bld(_ctx);
+  Builder* bld = _ctx->bld;
+  xassert(bld && "bld is null");
   llvm::Function* ic = _iCaller.func();
 
   llvm::PointerType* ty = t.voidFunc->getPointerTo();
   llvm::Value* target = nullptr;
 
   // basic blocks
-  llvm::BasicBlock* bbPrev = builder->GetInsertBlock();
-  llvm::BasicBlock* bbBeg = llvm::BasicBlock::Create(ctx, "begin", ic);
-  llvm::BasicBlock* bbDfl = llvm::BasicBlock::Create(ctx, "default", ic);
-  llvm::BasicBlock* bbEnd = llvm::BasicBlock::Create(ctx, "end", ic);
+  BasicBlock bbPrev = bld->getInsertBlock();
+  BasicBlock bbBeg(_ctx, "begin", ic);
+  BasicBlock bbDfl(_ctx, "default", ic);
+  BasicBlock bbEnd(_ctx, "end", ic);
 
   // default:
   // t1 = nullptr;
-  builder->SetInsertPoint(bbDfl);
-  bld.store(c.ZERO, XRegister::T1);
-  builder->CreateBr(bbEnd);
+  bld->setInsertPoint(bbDfl);
+  bld->store(c.ZERO, XRegister::T1);
+  bld->br(bbEnd);
 
   // end: call t1
-  builder->SetInsertPoint(bbEnd);
-  target = bld.load(XRegister::T1);
-  target = builder->CreateIntToPtr(target, ty);
-  builder->CreateCall(target);
-  bld.retVoid();
+  bld->setInsertPoint(bbEnd);
+  target = bld->load(XRegister::T1);
+  target = bld->intToPtr(target, ty);
+  bld->call(target);
+  bld->retVoid();
 
   // switch
-  builder->SetInsertPoint(bbBeg);
-  target = bld.load(XRegister::T1);
-  llvm::SwitchInst* sw = builder->CreateSwitch(target, bbDfl, _funMap.size());
+  bld->setInsertPoint(bbBeg);
+  target = bld->load(XRegister::T1);
+  llvm::SwitchInst* sw = bld->sw(target, bbDfl, _funMap.size());
 
   // cases
   // case fun: t1 = realFunAddress;
@@ -327,18 +326,17 @@ llvm::Error Translator::genICaller()
     std::string caseStr = "case_" + f->name();
     llvm::Value* sym = _ctx->module->getValueSymbolTable().lookup(f->name());
 
-    llvm::BasicBlock* dest =
-      llvm::BasicBlock::Create(ctx, caseStr, ic, bbDfl);
-    builder->SetInsertPoint(dest);
-    sym = builder->CreatePtrToInt(sym, t.i32);
-    bld.store(sym, XRegister::T1);
-    builder->CreateBr(bbEnd);
+    BasicBlock dest(_ctx, caseStr, ic, bbDfl.bb());
+    bld->setInsertPoint(dest);
+    sym = bld->ptrToInt(sym, t.i32);
+    bld->store(sym, XRegister::T1);
+    bld->br(bbEnd);
 
-    builder->SetInsertPoint(bbBeg);
-    sw->addCase(llvm::ConstantInt::get(t.i32, addr), dest);
+    bld->setInsertPoint(bbBeg);
+    sw->addCase(llvm::ConstantInt::get(t.i32, addr), dest.bb());
   }
 
-  builder->SetInsertPoint(bbPrev);
+  bld->setInsertPoint(bbPrev);
   return llvm::Error::success();
 }
 

@@ -110,7 +110,7 @@ XRegister::XRegister(Context* ctx, unsigned num, bool decl)
   llvm::raw_string_ostream ss(s);
   ss << getIRName() << _num;
   _x = new llvm::GlobalVariable(*ctx->module, ctx->t.i32, !CONSTANT,
-      llvm::GlobalValue::ExternalLinkage, decl? nullptr : ctx->c.ZERO, ss.str());
+    llvm::GlobalValue::ExternalLinkage, decl? nullptr : ctx->c.ZERO, ss.str());
 }
 
 

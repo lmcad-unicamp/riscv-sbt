@@ -10,11 +10,11 @@ class SBTSection
 {
 public:
   SBTSection(
-    ConstSectionPtr sec,
-    Context* ctx)
+    Context* ctx,
+    ConstSectionPtr sec)
     :
-    _section(sec),
-    _ctx(ctx)
+    _ctx(ctx),
+    _section(sec)
   {}
 
   llvm::Error translate();
@@ -30,8 +30,8 @@ public:
   }
 
 private:
-  ConstSectionPtr _section;
   Context* _ctx;
+  ConstSectionPtr _section;
 
   llvm::ArrayRef<uint8_t> _bytes;
 };

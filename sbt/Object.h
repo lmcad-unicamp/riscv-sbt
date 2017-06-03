@@ -1,6 +1,12 @@
 #ifndef SBT_OBJECT_H
 #define SBT_OBJECT_H
 
+/*
+ * This module represents an object file, on top of LLVM object classes,
+ * but with extra functionality, specially to lookup symbols and 'navigate'
+ * through objects, sections, symbols and relocations.
+ */
+
 #include "Map.h"
 #include "Utils.h"
 
@@ -20,8 +26,8 @@ class Section;
 class Symbol;
 
 // pointers
-using ObjectPtr = Object *;
-using ConstObjectPtr = const Object *;
+using ObjectPtr = Object*;
+using ConstObjectPtr = const Object*;
 using RelocationPtr = std::shared_ptr<Relocation>;
 using ConstRelocationPtr = std::shared_ptr<const Relocation>;
 using SymbolPtr = std::shared_ptr<Symbol>;
@@ -121,24 +127,25 @@ public:
   // lookup symbol by address
   ConstSymbolPtr lookup(uint64_t addr) const;
 
-  // ELFOffset
+  // ELF offset
   virtual uint64_t getELFOffset() const
   {
     return 0;
   }
 
-  // offset in Shadow Image
+  // offset in shadow image
   uint64_t shadowOffs() const
   {
     return _shadowOffs;
   }
 
-  // this needs to be set later...
+  // XXX this needs to be set later...
   void shadowOffs(uint64_t offs) const
   {
     _shadowOffs = offs;
   }
 
+  // get section object
   ConstObjectPtr object() const
   {
     return _obj;
@@ -156,6 +163,7 @@ protected:
 
 
 /// CommonSection
+//  This class represents the 'common' ELF section
 
 class CommonSection : public Section
 {
@@ -237,7 +245,7 @@ public:
     return llvm::errorCodeToError(_sec.getContents(s));
   }
 
-  // ELFOffset
+  // ELF offset
   uint64_t getELFOffset() const override;
 
 private:
@@ -392,21 +400,24 @@ public:
   Object& operator=(const Object&) = delete;
 
   // but allow move construction
+  // Note: _obj points inside _ownBin, that doesn't change on move,
+  //       so it's ok to use the default move constructor
   Object(Object&&) = default;
 
   // get sections
-  const NameToSectionMap& sections() const
+  const PtrToSectionMap& sections() const
   {
-    return _nameToSection;
+    return _ptrToSection;
   }
 
   // get symbols
-  const NameToSymbolMap& symbols() const
+  const PtrToSymbolMap& symbols() const
   {
-    return _nameToSymbol;
+    return _ptrToSymbol;
   }
 
-  // get section by Name
+  /*
+  // get section by name
   ConstSectionPtr lookupSection(const llvm::StringRef& name) const
   {
     const ConstSectionPtr *p = _nameToSection[name];
@@ -415,8 +426,9 @@ public:
     else
       return *p;
   }
+  */
 
-  // get section by SectionRef
+  // get section by llvm SectionRef
   ConstSectionPtr lookupSection(const llvm::object::SectionRef& s) const
   {
     const ConstSectionPtr* p = _ptrToSection[s.getRawDataRefImpl().p];
@@ -426,7 +438,8 @@ public:
       return *p;
   }
 
-  // get symbol by Name
+  /*
+  // get symbol by name
   ConstSymbolPtr lookupSymbol(const llvm::StringRef& name) const
   {
     const ConstSymbolPtr *p = _nameToSymbol[name];
@@ -435,8 +448,9 @@ public:
     else
       return *p;
   }
+  */
 
-  // get symbol by SymbolRef
+  // get symbol by llvm SymbolRef
   ConstSymbolPtr lookupSymbol(const llvm::object::SymbolRef& s) const
   {
     const ConstSymbolPtr *p = _ptrToSymbol[s.getRawDataRefImpl().p];
@@ -459,7 +473,7 @@ public:
   }
 
   // name of the object file
-  const llvm::StringRef &fileName() const
+  const llvm::StringRef& fileName() const
   {
     return _fileName;
   }
@@ -470,7 +484,7 @@ public:
     return _obj->getFileFormatName();
   }
 
-  // relocs
+  // relocations
   const ConstRelocationPtrVec relocs() const
   {
     return _relocs;
@@ -481,12 +495,12 @@ public:
 
 private:
   llvm::object::OwningBinary<llvm::object::Binary> _ownBin;
-  llvm::object::ObjectFile *_obj;
+  llvm::object::ObjectFile* _obj;
   llvm::StringRef _fileName;
 
   // maps
-  NameToSymbolMap _nameToSymbol;
-  NameToSectionMap _nameToSection;
+  // NameToSymbolMap _nameToSymbol;
+  // NameToSectionMap _nameToSection;
   PtrToSymbolMap _ptrToSymbol;
   PtrToSectionMap _ptrToSection;
 

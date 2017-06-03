@@ -55,19 +55,27 @@ public:
   };
 
 
+  /**
+   * ctor.
+   * @param ctx
+   * @param num register number
+   * @param decl declare or define?
+   */
   XRegister(Context* ctx, unsigned num, bool decl);
 
+  // reg name
   const std::string& name() const
   {
     return _name;
   }
 
+  // llvm variable
   llvm::GlobalVariable* var() const
   {
     return _x;
   }
 
-  // get RISC-V register number
+  // get RISC-V register number from llvm MCInst reg number
   static unsigned num(unsigned reg);
 
 private:
@@ -76,20 +84,31 @@ private:
   llvm::GlobalVariable* _x;
 
 
+  // register name on generated llvm IR
   static std::string getIRName()
   {
     return "rv_x";
   }
 
+  /**
+   * Get register name.
+   *
+   * @param reg register number
+   * @param abi abi or x?? name?
+   */
   static std::string getName(unsigned reg, bool abi = true);
 };
 
 
+/**
+ * Register file.
+ */
 class XRegisters
 {
 public:
   XRegisters(Context* ctx, bool decl);
 
+  // get register by its number
   const XRegister& operator[](size_t p) const
   {
     return _regs[p];

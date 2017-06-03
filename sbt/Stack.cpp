@@ -17,10 +17,9 @@ Stack::Stack(Context* ctx, size_t sz)
   std::string bytes(_size, 'S');
 
   llvm::ArrayRef<uint8_t> byteArray(
-    reinterpret_cast<const uint8_t *>(bytes.data()),
-    _size);
+    reinterpret_cast<const uint8_t*>(bytes.data()), _size);
 
-  llvm::Constant *cda = llvm::ConstantDataArray::get(*ctx->ctx, byteArray);
+  llvm::Constant* cda = llvm::ConstantDataArray::get(*ctx->ctx, byteArray);
 
   _stack = new llvm::GlobalVariable(
     *ctx->module, cda->getType(), !CONSTANT,
@@ -29,10 +28,10 @@ Stack::Stack(Context* ctx, size_t sz)
   // set stack end pointer
 
   const Constants& c = ctx->c;
-  Builder bld(ctx);
+  Builder* bld = ctx->bld;
   std::vector<llvm::Value*> idx = { c.ZERO, c.i32(_size) };
-  llvm::Value *v = ctx->builder->CreateGEP(_stack, idx);
-  _end = bld.i8PtrToI32(v);
+  llvm::Value *v = bld->gep(_stack, idx);
+  _end = bld->i8PtrToI32(v);
 }
 
 }

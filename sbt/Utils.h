@@ -10,6 +10,9 @@
 #include <type_traits>
 #include <vector>
 
+// define xassert: like assert, but enabled by SBT_DEBUG instead of NDEBUG,
+// in order to make it possible to enable asserts only in SBT, but not in
+// LLVM
 #if SBT_DEBUG
 # ifdef NDEBUG
 #   define DEF_NDEBUG
@@ -39,52 +42,14 @@ namespace sbt {
 
 // get log stream
 // error: true -> errs() : false -> outs()
-llvm::raw_ostream &logs(bool error = false);
+llvm::raw_ostream& logs(bool error = false);
 
 // debug stream
 #if DBGS_ON
-static llvm::raw_ostream &DBGS = llvm::outs();
+static llvm::raw_ostream& DBGS = llvm::outs();
 #else
-static llvm::raw_ostream &DBGS = llvm::nulls();
+static llvm::raw_ostream& DBGS = llvm::nulls();
 #endif
-
-
-template <typename A, typename E>
-class ArrayPtr
-{
-public:
-  ArrayPtr(A* ptr = nullptr) :
-    _ptr(ptr)
-  {}
-
-  ArrayPtr& operator=(A* ptr)
-  {
-    _ptr = ptr;
-    return *this;
-  }
-
-  /*
-  E& operator[](size_t p)
-  {
-    return (*_ptr)[p];
-  }
-  */
-
-  const E& operator[](size_t p) const
-  {
-    return (*_ptr)[p];
-  }
-
-
-  A* get()
-  {
-    return _ptr;
-  }
-
-private:
-  A* _ptr = nullptr;
-};
-
 
 // object creation functions
 

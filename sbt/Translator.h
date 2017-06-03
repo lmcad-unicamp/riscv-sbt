@@ -48,9 +48,8 @@ public:
   // translate input files
   llvm::Error translate();
 
+  // import external function
   llvm::Expected<uint64_t> import(const std::string& func);
-
-  // setters
 
   void setOutputFile(const std::string& file)
   {
@@ -86,7 +85,6 @@ private:
   // set by sbt
   std::vector<std::string> _inputFiles;
   std::string _outputFile;
-
 
   // target info
   const llvm::Target* _target;

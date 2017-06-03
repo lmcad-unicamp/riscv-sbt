@@ -9,6 +9,8 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Module.h>
 
+#include <algorithm>
+
 namespace sbt {
 
 Module::Module(Context* ctx)
@@ -45,7 +47,7 @@ llvm::Error Module::translate(const std::string& file)
 
   // translate each section
   for (ConstSectionPtr sec : _obj->sections()) {
-    SBTSection ssec(sec, _ctx);
+    SBTSection ssec(_ctx, sec);
     if (auto err = ssec.translate())
       return err;
   }
@@ -84,16 +86,16 @@ llvm::Error Module::buildShadowImage()
       }
     }
 
-    // align all sections
+    // align
     while (vec.size() % 4 != 0)
       vec.push_back(0);
 
-    // set Shadow Offset of Section
+    // set shadow offset of section
     sec->shadowOffs(vec.size());
 
     // append to vector
-    for (size_t i = 0; i < bytes.size(); i++)
-      vec.push_back(bytes[i]);
+    vec.resize(bytes.size());
+    std::copy(bytes.begin(), bytes.end(), vec.begin());
   }
 
   // create the ShadowImage

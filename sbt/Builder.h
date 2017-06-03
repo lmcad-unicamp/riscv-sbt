@@ -48,6 +48,7 @@ public:
   // load register
   llvm::LoadInst* load(unsigned reg)
   {
+    xassert(_ctx->x.get() && "XRegisters pointer is null!");
     const XRegister& x = _ctx->x[reg];
     llvm::LoadInst* i = _builder->CreateLoad(
         x.var(), x.name() + "_");
@@ -248,6 +249,15 @@ public:
     return v;
   }
 
+  // ptr to int
+  llvm::Value* ptrToInt(llvm::Value* p, llvm::Type* t)
+  {
+    llvm::Value* v = _builder->CreatePtrToInt(p, t);
+    updateFirst(v);
+    return v;
+  }
+
+
   // trunc or cast to i8
   llvm::Value* truncOrBitCastI8(llvm::Value* i32)
   {
@@ -264,6 +274,14 @@ public:
     return v;
   }
 
+  // bit or pointer cast
+  llvm::Value* bitOrPointerCast(llvm::Value* v, llvm::Type* ty)
+  {
+    llvm::Value* v2 = _builder->CreateBitOrPointerCast(v, ty);
+    updateFirst(v2);
+    return v2;
+  }
+
   // gep (get element pointer)
   llvm::Value* gep(llvm::Value* ptr, std::vector<llvm::Value*> idx)
   {
@@ -275,9 +293,10 @@ public:
   // call function
   llvm::Value* call(
     llvm::Function* f,
-    llvm::ArrayRef<llvm::Value*> args = llvm::None)
+    llvm::ArrayRef<llvm::Value*> args = llvm::None,
+    llvm::StringRef vname = "")
   {
-    llvm::Value* v = _builder->CreateCall(f, args);
+    llvm::Value* v = _builder->CreateCall(f, args, vname);
     updateFirst(v);
     return v;
   }
@@ -309,11 +328,16 @@ public:
   }
 
   // br
-  llvm::Value* br(BasicBlock* bb)
+  llvm::Value* br(const BasicBlock& bb)
   {
-    llvm::Value* v = _builder->CreateBr(bb->bb());
+    llvm::Value* v = _builder->CreateBr(bb.bb());
     updateFirst(v);
     return v;
+  }
+
+  llvm::Value* br(BasicBlock* bb)
+  {
+    return br(*bb);
   }
 
   // condBr
@@ -338,9 +362,18 @@ public:
   }
 
   // set insert basic block
-  void setInsertPoint(BasicBlock& bb)
+  void setInsertPoint(const BasicBlock& bb)
   {
     _builder->SetInsertPoint(bb.bb());
+  }
+
+  // switch
+  llvm::SwitchInst* sw(llvm::Value* v, const BasicBlock& bb,
+    unsigned numCases = 10)
+  {
+    llvm::SwitchInst* i = _builder->CreateSwitch(v, bb.bb(), numCases);
+    updateFirst(i);
+    return i;
   }
 
   // get first instruction produced by the builder since last reset

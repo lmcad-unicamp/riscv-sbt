@@ -36,13 +36,13 @@ public:
   // stream insertion overloads to make it easy
   // to build the error message
   template <typename T>
-  llvm::raw_string_ostream &operator<<(const T&& val)
+  llvm::raw_string_ostream& operator<<(const T&& val)
   {
     *_ss << val;
     return *_ss;
   }
 
-  llvm::raw_string_ostream &operator<<(const char *val)
+  llvm::raw_string_ostream& operator<<(const char* val)
   {
     *_ss << val;
     return *_ss;
@@ -54,7 +54,7 @@ public:
     return *this;
   }
 
-  // Used by ErrorInfo::classID.
+  // used by ErrorInfo::classID.
   static char ID;
 
 private:
@@ -62,6 +62,8 @@ private:
   std::unique_ptr<llvm::raw_string_ostream> _ss;  // string stream
   mutable llvm::Error _cause;
 };
+
+// convert SBTError to llvm::Error
 
 static inline llvm::Error error(SBTError&& err)
 {

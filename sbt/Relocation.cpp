@@ -17,7 +17,7 @@ SBTRelocation::SBTRelocation(
   _ri(ri),
   _re(re),
   _rlast(ri),
-  _last(0, 0, "", nullptr)
+  _last(0, 0, "", nullptr)  // dummy last symbol
 {
 }
 
@@ -45,8 +45,8 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     case llvm::ELF::R_RISCV_HI20:
       break;
 
-    // This rellocation has PC info only
-    // Symbol info is present on the PCREL_HI20 Reloc
+    // this rellocation has PC info only
+    // symbol info is present on the PCREL_HI20 reloc
     case llvm::ELF::R_RISCV_PCREL_LO12_I:
       isLO = true;
       realSym = (**_rlast).symbol();
@@ -57,22 +57,21 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
       break;
 
     default:
-      DBGS << "Relocation Type: " << type << nl;
+      DBGS << "relocation type: " << type << nl;
       xassert(false && "unknown relocation");
   }
 
-  // set Symbol Relocation info
+  // set symbol relocation info
   SBTSymbol ssym(realSym->address(), realSym->address(),
     realSym->name(), realSym->section());
 
-  // Note: !SR.Sec && SR.Addr == External Symbol
-  xassert((ssym.sec || !ssym.addr) && "No section found for relocation");
+  xassert((ssym.sec || !ssym.addr) && "no section found for relocation");
   if (ssym.sec) {
-    xassert(ssym.addr < ssym.sec->size() && "Out of bounds relocation");
+    xassert(ssym.addr < ssym.sec->size() && "out of bounds relocation");
     ssym.val += ssym.sec->shadowOffs();
   }
 
-  // increment relocation iterator
+  // increment relocation iterator until it reaches a different address
   _rlast = _ri;
   do {
     ++_ri;
@@ -89,11 +88,12 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
   *os << ssym.name << ") = " << ssym.addr;
 
   llvm::Value* v = nullptr;
+  // XXX using symbol info
   bool isFunction =
     ssym.sec && ssym.sec->isText() &&
     realSym->type() == llvm::object::SymbolRef::ST_Function;
 
-  // special case: external functions: return our handler instead
+  // external function case: return our handler instead
   if (ssym.isExternal()) {
     auto expAddr =_ctx->translator->import(ssym.name);
     if (!expAddr)
@@ -102,12 +102,13 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     addr &= mask;
     v = _ctx->c.i32(addr);
 
-  // special case: internal function
+  // internal function case
   } else if (isFunction) {
     uint64_t addr = ssym.addr;
     addr &= mask;
     v = _ctx->c.i32(addr);
 
+  // other relocation types:
   // add the relocation offset to ShadowImage to get the final address
   } else if (ssym.sec) {
     Builder* bld = _ctx->bld;
@@ -118,11 +119,11 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
 
     v = bld->i8PtrToI32(v);
 
-    // Finally, get only the upper or lower part of the result
+    // get only the upper or lower part of the result
     v = bld->_and(v, _ctx->c.i32(mask));
 
   } else
-    xassert(false && "Failed to resolve relocation");
+    xassert(false && "failed to resolve relocation");
 
   _last = std::move(ssym);
   _hasSymbol = true;

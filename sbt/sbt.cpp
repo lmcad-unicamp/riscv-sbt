@@ -29,13 +29,13 @@ void SBT::init()
   // print stack trace if we signal out
   llvm::sys::PrintStackTraceOnErrorSignal("");
 
-  // Init LLVM targets
+  // init LLVM targets
   llvm::InitializeAllTargetInfos();
   llvm::InitializeAllTargetMCs();
   llvm::InitializeAllAsmParsers();
   llvm::InitializeAllDisassemblers();
 
-  // Init RISCVMaster 'target'
+  // init RISCVMaster 'target'
   LLVMInitializeRISCVMasterTargetInfo();
   LLVMInitializeRISCVMasterTargetMC();
   LLVMInitializeRISCVMasterAsmParser();
@@ -69,7 +69,7 @@ SBT::SBT(
   for (const auto& file : inputFilesList) {
     if (!llvm::sys::fs::exists(file)) {
       SBTError serr(file);
-      serr << "No such file.";
+      serr << "no such file.";
       err = error(serr);
       return;
     }
@@ -83,9 +83,11 @@ llvm::Error SBT::run()
   if (auto err = _translator->translate())
     return err;
 
+  // check if generated bitcode is valid
+  // (this outputs very helpful messages about the invalid bitcode parts)
   if (llvm::verifyModule(*_module, &DBGS)) {
     SBTError serr;
-    serr << "Translation produced invalid bitcode!";
+    serr << "translation produced invalid bitcode!";
     dump();
     return error(serr);
   }
@@ -118,8 +120,7 @@ llvm::Error SBT::genSCHandler()
 }
 
 
-///
-
+// scoped SBT 'finisher'
 struct SBTFinish
 {
   ~SBTFinish()
@@ -129,14 +130,17 @@ struct SBTFinish
 };
 
 
+// top level error handling function
 static void handleError(llvm::Error&& err)
 {
+  // handle SBTErrors
   llvm::Error err2 = llvm::handleErrors(std::move(err),
     [](const SBTError& serr) {
       serr.log(llvm::errs());
       std::exit(EXIT_FAILURE);
     });
 
+  // handle remaining errors
   if (err2) {
     logAllUnhandledErrors(std::move(err2), llvm::errs(),
       Constants::global().BIN_NAME + ": error: ");
@@ -147,6 +151,7 @@ static void handleError(llvm::Error&& err)
 } // sbt
 
 
+// debug/test function
 static void test()
 {
 #if 1
@@ -166,7 +171,8 @@ static void test()
 }
 
 
-int main(int argc, char *argv[])
+// main
+int main(int argc, char* argv[])
 {
   // options
   namespace cl = llvm::cl;
@@ -194,7 +200,7 @@ int main(int argc, char *argv[])
   if (genSCHandlerOpt) {
     if (outputFileOpt.empty()) {
       llvm::errs() << c.BIN_NAME
-        << ": output file not specified.\n";
+        << ": output file not specified\n";
       return 1;
     }
   // debug test
@@ -203,7 +209,7 @@ int main(int argc, char *argv[])
   // translate
   } else {
     if (inputFiles.empty()) {
-      llvm::errs() << c.BIN_NAME << ": no input files.\n";
+      llvm::errs() << c.BIN_NAME << ": no input files\n";
       return 1;
     }
   }
@@ -227,10 +233,11 @@ int main(int argc, char *argv[])
     sbt::handleError(exp.takeError());
   sbt::SBT& sbt = exp.get();
 
-  // translate files
+  // generate syscall handler
   if (genSCHandlerOpt) {
     sbt::handleError(sbt.genSCHandler());
     return EXIT_SUCCESS;
+  // translate files
   } else
     sbt::handleError(sbt.run());
 

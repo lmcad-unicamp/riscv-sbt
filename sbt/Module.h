@@ -5,21 +5,22 @@
 #include "Function.h"
 #include "Object.h"
 
-#include <llvm/IR/IRBuilder.h>
 #include <llvm/Support/Error.h>
 
 namespace llvm {
 class GlobalVariable;
-class Module;
 }
 
 namespace sbt {
 
+// this class represents a program module
+// (right now, corresponds to one object file)
 class Module
 {
 public:
   Module(Context* ctx);
 
+  // translate object file
   llvm::Error translate(const std::string& file);
 
 private:

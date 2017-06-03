@@ -39,7 +39,7 @@ public:
   // write generated IR to output file
   void write();
 
-  // generate Syscall handler
+  // generate syscall handler
   llvm::Error genSCHandler();
 
 private:
