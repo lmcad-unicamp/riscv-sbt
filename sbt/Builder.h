@@ -29,8 +29,6 @@ public:
   // dtor
   ~Builder()
   {
-    if (!_first)
-      nop();
   }
 
   /**
@@ -383,6 +381,8 @@ public:
   // get first instruction produced by the builder since last reset
   llvm::Instruction* first()
   {
+    if (!_first)
+      nop();
     return _first;
   }
 

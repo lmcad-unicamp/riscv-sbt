@@ -35,8 +35,15 @@
 
 // debug stream
 #undef DBGS
+#undef DBGF
 #if ENABLE_DBGS
 # define DBGS llvm::outs()
+# define DBGF(...) \
+  do { \
+    DBGS << __FUNCTION__ << "(): " << llvm::formatv(__VA_ARGS__) << '\n'; \
+    DBGS.flush(); \
+  } while (0)
 #else
 # define DBGS llvm::nulls()
+# define DBGF(...)
 #endif

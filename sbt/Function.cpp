@@ -65,10 +65,10 @@ llvm::Error Function::startMain()
   const Types& t = _ctx->t;
   Builder* bld = _ctx->bld;
 
-  // create a function with no parameters
-  _f = llvm::Function::Create(t.voidFunc,
-    llvm::Function::ExternalLinkage,
-    _name, _ctx->module);
+  // int main();
+  llvm::FunctionType* ft = llvm::FunctionType::get(t.i32, !VAR_ARG);
+  _f = llvm::Function::Create(ft,
+    llvm::Function::ExternalLinkage, _name, _ctx->module);
 
   // first bb
   BasicBlock bb(_ctx, _addr, _f);

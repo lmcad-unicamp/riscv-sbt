@@ -785,26 +785,37 @@ update_files:
 lc:
 	cat $(TOPDIR)/sbt/*.h $(TOPDIR)/sbt/*.cpp $(TOPDIR)/sbt/*.s | wc -l
 
-.PHONY: test
-test:
-	$(MAKE) $(SBT)-build $(SBT)-install
-	$(MAKE) -C $(TOPDIR)/sbt/test clean rv32-x86-hello
-	cd $(TOPDIR)/sbt/test && ./rv32-x86-hello
-
-.PHONY: dbg
-dbg:
-	$(MAKE) $(SBT)-build $(SBT)-install
-	cd $(TOPDIR)/sbt/test && gdb --args riscv-sbt -o rv32-x86-hello.bc rv32-hello.o
-
 .PHONY: tests
 tests:
 	$(MAKE) -C $(TOPDIR)/test clean all run
 	$(MAKE) -C $(TOPDIR)/sbt/test clean all run tests run-tests
 
 
+###
+### BEGIN debugging targets ###
+###
+
+TESTBIN := rv32-x86-alu-ops
+.PHONY: test-prep
+test-prep:
+	$(MAKE) $(SBT)-build $(SBT)-install
+	$(MAKE) -C $(TOPDIR)/sbt/test clean $(TESTBIN)
+
+.PHONY: test
+test: test-prep
+	cd $(TOPDIR)/sbt/test && ./$(TESTBIN)
+
+.PHONY: dbg
+dbg: test-prep
+	cd $(TOPDIR)/sbt/test && gdb --args ./$(TESTBIN)
+
+###
+### END debugging targets ###
+###
+
+
 MAKE_DIR := $(dir $(X86_DUMMY_O))
 $(eval $(call AS,X86,$(basename $(notdir $(X86_DUMMY_O)))))
-
 
 MAKE_DIR := $(QEMU_TESTS_BUILD)/rv32i/
 RV32_TESTS := add addi and andi beq bge bgeu blt bltu bne lui or ori \

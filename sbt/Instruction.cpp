@@ -51,7 +51,7 @@ llvm::Error Instruction::translate()
     return err;
 
   // print address
-  *_os << llvm::formatv("{0:X-4}:  ", _addr);
+  *_os << llvm::formatv("{0:X-4}:   ", _addr);
 
   // reset builder
   _bld->reset();
@@ -1104,7 +1104,9 @@ void Instruction::dbgprint()
   DBGS << _ss->str() << nl;
   llvm::MDNode* n = llvm::MDNode::get(*_ctx->ctx,
     llvm::MDString::get(*_ctx->ctx, "RISC-V Instruction"));
-  _bld->first()->setMetadata(getMDName(_ss->str()), n);
+  std::string mdname = getMDName(_ss->str());
+  // DBGF("mdname={0}, n={1:X+8}, first={2:X+8}", mdname, n, _bld->first());
+  _bld->first()->setMetadata(mdname, n);
 }
 
 #else

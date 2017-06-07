@@ -54,7 +54,7 @@ public:
    */
   bool isSymbol(uint64_t addr) const
   {
-    return _hasSymbol && _last.addr == addr;
+    return _hasSymbol && _last.instrAddr == addr;
   }
 
 private:

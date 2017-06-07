@@ -23,8 +23,13 @@
 #include <llvm/MC/MCInstPrinter.h>
 #include <llvm/MC/MCObjectFileInfo.h>
 #include <llvm/MC/MCRegisterInfo.h>
+#include <llvm/Support/FormatVariadic.h>
 #include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
+
+#undef ENABLE_DBGS
+#define ENABLE_DBGS 0
+#include "Debug.h"
 
 namespace llvm {
 Target& getTheRISCVMaster32Target();
@@ -178,6 +183,7 @@ llvm::Error Translator::translate()
 
 llvm::Expected<uint64_t> Translator::import(const std::string& func)
 {
+  DBGF("enter");
   std::string rv32Func = "rv32_" + func;
 
   auto& ctx = *_ctx->ctx;
@@ -226,14 +232,16 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
         llvm::GlobalValue::ExternalLinkage, func, module);
 
   // create our caller to the external function
+  DBGF("create caller");
   if (!_extFuncAddr)
     _extFuncAddr = 0xFFFF0000;
   uint64_t addr = _extFuncAddr;
-  FunctionPtr f(new Function(_ctx, rv32Func, nullptr, addr));
+  Function* f = new Function(_ctx, rv32Func, nullptr, addr);
+  FunctionPtr fp(f);
   f->create(t.voidFunc, llvm::Function::PrivateLinkage);
   // add to maps
-  _funcByAddr(_extFuncAddr, &*f);
-  _funMap(f->name(), std::move(f));
+  _funcByAddr(_extFuncAddr, std::move(f));
+  _funMap(f->name(), std::move(fp));
   _extFuncAddr += Instruction::SIZE;
 
   BasicBlock bb(_ctx, "entry", f->func());
@@ -250,6 +258,7 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
       "external functions with more than 8 arguments are not supported");
 
   // build args
+  DBGF("build args");
   std::vector<llvm::Value*> args;
   unsigned reg = XRegister::A0;
   unsigned i = 0;

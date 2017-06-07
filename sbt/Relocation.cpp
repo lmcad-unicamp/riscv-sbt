@@ -22,7 +22,7 @@ SBTRelocation::SBTRelocation(
   _ri(ri),
   _re(re),
   _rlast(ri),
-  _last(0, 0, "", nullptr)  // dummy last symbol
+  _last(0, 0, "", nullptr, 0)  // dummy last symbol
 {
 }
 
@@ -70,7 +70,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
 
   // set symbol relocation info
   SBTSymbol ssym(realSym->address(), realSym->address(),
-    realSym->name(), realSym->section());
+    realSym->name(), realSym->section(), addr);
   DBGS << __FUNCTION__
     << llvm::formatv(": addr={0:X+4}, val={1:X+4}, name={2}\n",
           ssym.addr, ssym.val, ssym.name);
@@ -109,6 +109,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     if (!expAddr)
       return expAddr.takeError();
     uint64_t addr = expAddr.get();
+    DBGF("external: addr={0:X+8}, mask={1:X+8}", addr, mask);
     addr &= mask;
     v = _ctx->c.i32(addr);
 
