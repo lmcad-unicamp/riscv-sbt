@@ -12,7 +12,7 @@ BasicBlock::BasicBlock(
   Function* f,
   BasicBlock* beforeBB)
   :
-  BasicBlock(ctx, addr, f->func(), beforeBB->bb())
+  BasicBlock(ctx, addr, f->func(), beforeBB? beforeBB->bb() : nullptr)
 {}
 
 

@@ -12,7 +12,7 @@
 #include <llvm/Support/FormatVariadic.h>
 
 #undef ENABLE_DBGS
-#define ENABLE_DBGS 0
+#define ENABLE_DBGS 1
 #include "Debug.h"
 
 namespace sbt {
@@ -165,6 +165,7 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
     Instruction inst(_ctx, addr, rawInst);
     if (auto err = inst.translate())
       return err;
+    DBGF("addr={0:X+8}", addr);
     // add translated instruction to BB's instruction map
     (*_bb)(addr, std::move(_ctx->bld->first()));
   }
@@ -175,8 +176,8 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
 
 Function* Function::getByAddr(Context* ctx, uint64_t addr)
 {
-  if (auto fp = ctx->funcByAddr()[addr])
-    return *fp;
+  if (auto fp = ctx->funcByAddr(addr, !ASSERT_NOT_NULL))
+    return fp;
 
   // get symbol by offset
   // FIXME need to change this to be able to find functions in other modules
@@ -185,13 +186,12 @@ Function* Function::getByAddr(Context* ctx, uint64_t addr)
   xassert(sym && "symbol not found!");
 
   // create a new function
-  FunctionPtr f(new Function(ctx, sym->name(), ctx->sec, addr));
+  std::string name = sym->name();
+  FunctionPtr f(new Function(ctx, name, ctx->sec, addr));
   f->create();
-  // insert function in maps, possibly overwriting an old one
-  ctx->funcByAddr()(f->addr(), &*f);
-  std::string name = f->name();
-  ctx->func()(name, std::move(f));
-  return &**ctx->func()[name];
+  // insert in maps
+  ctx->addFunc(std::move(f));
+  return ctx->func(name);
 }
 
 }

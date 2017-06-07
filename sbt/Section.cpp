@@ -123,7 +123,12 @@ llvm::Error SBTSection::translate(const Func& func)
   Function* f = new Function(_ctx, func.name, this, func.start, func.end);
   FunctionPtr fp(f);
   _ctx->f = f;
-  return f->translate();
+  if (auto err = f->translate())
+    return err;
+  _ctx->f = nullptr;
+  _ctx->addFunc(std::move(fp));
+
+  return llvm::Error::success();
 }
 
 }

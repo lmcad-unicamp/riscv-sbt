@@ -911,6 +911,8 @@ llvm::Error Instruction::handleJumpToOffs(
   llvm::Value* cond,
   unsigned linkReg)
 {
+  DBGF("target={0:X+8}, cond, linkReg={1:X+8}", target, linkReg);
+
   // get current function
   Function* f = _ctx->f;
 

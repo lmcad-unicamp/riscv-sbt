@@ -88,16 +88,29 @@ public:
   Map<uint64_t, Function*>* _funcByAddr = nullptr;
 
   // get function by name
-  Map<std::string, FunctionPtr>& func()
+  Function* func(const std::string& name, bool assertNotNull = true) const
   {
-    return *_func;
+    FunctionPtr* f = (*_func)[name];
+    if (assertNotNull)
+      xassert(f);
+    else if (!f)
+      return nullptr;
+    return &**f;
   }
 
   // get function by guest address
-  Map<uint64_t, Function*>& funcByAddr()
+  Function* funcByAddr(uint64_t addr, bool assertNotNull = true) const
   {
-    return *_funcByAddr;
+    Function** f = (*_funcByAddr)[addr];
+    if (assertNotNull)
+      xassert(f);
+    else if (!f)
+      return nullptr;
+    return *f;
   }
+
+  // add function to maps
+  void addFunc(FunctionPtr&& f);
 
   // module scope
   // (module == object file)

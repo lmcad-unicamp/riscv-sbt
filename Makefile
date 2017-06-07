@@ -795,7 +795,7 @@ tests:
 ### BEGIN debugging targets ###
 ###
 
-TESTBIN := rv32-x86-alu-ops
+TESTBIN := rv32-branch.o
 .PHONY: test-prep
 test-prep:
 	$(MAKE) $(SBT)-build $(SBT)-install
@@ -803,11 +803,11 @@ test-prep:
 
 .PHONY: test
 test: test-prep
-	cd $(TOPDIR)/sbt/test && ./$(TESTBIN)
+	#cd $(TOPDIR)/sbt/test && ./$(TESTBIN)
 
 .PHONY: dbg
 dbg: test-prep
-	cd $(TOPDIR)/sbt/test && gdb --args ./$(TESTBIN)
+	cd $(TOPDIR)/sbt/test && gdb --args riscv-sbt -o rv32-x86-branch.bc rv32-branch.o
 
 ###
 ### END debugging targets ###
