@@ -64,6 +64,7 @@ private:
   ConstRelocIter _rlast;
   SBTSymbol _last;
   bool _hasSymbol = false;
+  uint64_t _next = Constants::INVALID_ADDR;
 };
 
 }

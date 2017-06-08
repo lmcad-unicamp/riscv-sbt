@@ -14,6 +14,7 @@ class Builder
   llvm::IRBuilder<>* _builder;
   Types* _t;
   llvm::Instruction* _first = nullptr;
+  BasicBlock* _bb = nullptr;
 
 public:
   Builder(Context* ctx, bool noFirst = false)
@@ -358,15 +359,22 @@ public:
   }
 
   // get insert basic block
-  BasicBlock getInsertBlock()
+  BasicBlock* getInsertBlock()
   {
-    return BasicBlock(_ctx, _builder->GetInsertBlock());
+    xassert(_bb && "insert block not set!");
+    return _bb;
   }
 
   // set insert basic block
-  void setInsertPoint(const BasicBlock& bb)
+  void setInsertPoint(BasicBlock* bb)
   {
-    _builder->SetInsertPoint(bb.bb());
+    _bb = bb;
+    _builder->SetInsertPoint(_bb->bb());
+  }
+
+  void setInsertPoint(BasicBlock& bb)
+  {
+    setInsertPoint(&bb);
   }
 
   // switch

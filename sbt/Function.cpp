@@ -12,7 +12,7 @@
 #include <llvm/Support/FormatVariadic.h>
 
 #undef ENABLE_DBGS
-#define ENABLE_DBGS 1
+#define ENABLE_DBGS 0
 #include "Debug.h"
 
 namespace sbt {
@@ -37,6 +37,10 @@ llvm::Error Function::translate()
 {
   DBGS << _name << ":\n";
 
+  xassert(_sec && "null section pointer!");
+  xassert(_addr != Constants::INVALID_ADDR);
+  xassert(_end != Constants::INVALID_ADDR);
+
   // start
   if (_name == "main") {
     if (auto err = startMain())
@@ -47,8 +51,6 @@ llvm::Error Function::translate()
   }
 
   // translate instructions
-  xassert(_sec && "null section pointer");
-  xassert(_end && "no end address specified");
   if (auto err = translateInstrs(_addr, _end))
     return err;
 
@@ -71,10 +73,10 @@ llvm::Error Function::startMain()
     llvm::Function::ExternalLinkage, _name, _ctx->module);
 
   // first bb
-  BasicBlock bb(_ctx, _addr, _f);
+  BasicBlockPtr bb(new BasicBlock(_ctx, _addr, _f));
   _bbMap(_addr, std::move(bb));
-  _bb = _bbMap[_addr];
-  bld->setInsertPoint(*_bb);
+  BasicBlock* bbptr = &**_bbMap[_addr];
+  bld->setInsertPoint(bbptr);
 
   // set stack pointer
   bld->store(_ctx->stack->end(), XRegister::SP);
@@ -94,9 +96,9 @@ llvm::Error Function::start()
   create();
 
   // create first bb
-  _bbMap(_addr, BasicBlock(_ctx, _addr, _f));
-  _bb = _bbMap[_addr];
-  _ctx->bld->setInsertPoint(*_bb);
+  _bbMap(_addr, BasicBlockPtr(new BasicBlock(_ctx, _addr, _f)));
+  BasicBlock* bbptr = &**_bbMap[_addr];
+  _ctx->bld->setInsertPoint(bbptr);
 
   return llvm::Error::success();
 }
@@ -106,7 +108,7 @@ llvm::Error Function::finish()
 {
   auto bld = _ctx->bld;
   // add a return if there is no terminator in current block
-  if (bld->getInsertBlock().bb()->getTerminator() == nullptr)
+  if (bld->getInsertBlock()->bb()->getTerminator() == nullptr)
     bld->retVoid();
   _ctx->inMain = false;
   return llvm::Error::success();
@@ -143,15 +145,17 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
     }
 
     // update current bb
+    DBGF("addr={0:X+8}, _nextBB={1:X+8}", addr, _nextBB);
     if (_nextBB && addr == _nextBB) {
-      _bb = _bbMap[addr];
-      xassert(_bb && "BasicBlock not found!");
+      BasicBlock* bbptr = &**_bbMap[addr];
+      xassert(bbptr && "BasicBlock not found!");
+      DBGF("{0}:", bbptr->name());
 
       // if last instruction was not a branch, then branch
       // from previous BB to current one
       if (!_ctx->brWasLast)
-        _ctx->bld->br(_bb);
-      _ctx->bld->setInsertPoint(*_bb);
+        _ctx->bld->br(bbptr);
+      _ctx->bld->setInsertPoint(*bbptr);
 
       // set next BB pointer
       auto it = _bbMap.lower_bound(addr + size);
@@ -163,11 +167,13 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
 
     // translate instruction
     Instruction inst(_ctx, addr, rawInst);
+    // note: Instruction::translate() may change _bbMap,
+    // possibly invalidating bbptr
     if (auto err = inst.translate())
       return err;
     DBGF("addr={0:X+8}", addr);
     // add translated instruction to BB's instruction map
-    (*_bb)(addr, std::move(_ctx->bld->first()));
+    (*curBB())(addr, std::move(_ctx->bld->first()));
   }
 
   return llvm::Error::success();
@@ -192,6 +198,15 @@ Function* Function::getByAddr(Context* ctx, uint64_t addr)
   // insert in maps
   ctx->addFunc(std::move(f));
   return ctx->func(name);
+}
+
+
+BasicBlock* Function::curBB()
+{
+  uint64_t addr = _ctx->bld->getInsertBlock()->addr();
+  BasicBlock* bb = &**_bbMap[addr];
+  xassert(bb && "couldn't find current basic block!");
+  return bb;
 }
 
 }

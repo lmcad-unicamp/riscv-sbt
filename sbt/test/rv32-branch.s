@@ -14,135 +14,127 @@ jalr_test:
   mv s5, ra
 
   la a0, jalr_test_str
-  jalr ra, s2, 0
+  call printf
 
   # jalr with offset
-  mv t1, s2
+  la t1, printf
   addi t1, t1, -0x10
   la a0, jalr_test_str
   jalr ra, t1, 0x10
 
   mv ra, s5
-  jalr zero, ra, 0
+  ret
 
 
 .global main
 main:
-  # s4: pc
-  auipc s4, 0
-
-  # s1: original ra
-  add s1, zero, ra
-
-  # s2: printf
-  lui s2, %hi(printf)
-  addi s2, s2, %lo(printf)
-
-  # s3: printf's fmt
-  lui s3, %hi(w_fmt)
-  addi s3, s3, %lo(w_fmt)
+  # s2: original ra
+  mv s2, ra
 
   # print test
-  lui a0, %hi(str)
-  addi a0, a0, %lo(str)
-  jalr ra, s2, 0
+  la a0, str
+  call printf
 
   # jal
   la a0, jal_str
-  jalr ra, s2, 0
-  jal ra, jal_test
+  call printf
+  jal jal_test
 
   # jalr
   la t1, jalr_test
-  jalr ra, t1, 0
+  jalr t1
 
   # beq
   la a0, beq_str
-  jalr ra, s2, 0
+  call printf
   li t1, 5
   li t2, 5
   beq t1, t2, beq_l
-  la a0, error_str
-  jalr ra, s2, 0
+  call test_error
 beq_l:
 
   # bne
   la a0, bne_str
-  jalr ra, s2, 0
+  call printf
   li t1, 5
   li t2, 5
-  bne t1, t2, bne_l
-  la a0, blt_str
+  bne t1, t2, bne_err
   li t2, 6
   bne t1, t2, bne_l
-  la a0, error_str
-  jalr ra, s2, 0
+bne_err:
+  call test_error
 bne_l:
 
   # blt
-  jalr ra, s2, 0
+  la a0, blt_str
+  call printf
   li t1, -5
   li t2, -10
   blt t2, t1, blt_l
-  la a0, error_str
-  jalr ra, s2, 0
+  call test_error
 blt_l:
 
   # bltu
   la a0, bltu_str
-  jalr ra, s2, 0
+  call printf
   li t1, -5
   li t2, -10
   bltu t2, t1, bltu_l
-  la a0, error_str
-  jalr ra, s2, 0
+  call test_error
 bltu_l:
 
   # bge
   li s5, 2
 bge_l:
   la a0, bge_str
-  jalr ra, s2, 0
+  call printf
   addi s5, s5, -1
   bge s5, zero, bge_l
 
   # bgeu
   la a0, bgeu_str
-  jalr ra, s2, 0
+  call printf
   li t1, -1
   bgeu t1, zero, bgeu_l
-  la a0, error_str
-  jalr ra, s2, 0
+  call test_error
 bgeu_l:
 
   # restore ra
-  add ra, zero, s1
+  add ra, zero, s2
 
   # return 0
-  add a0, zero, zero
-  jalr zero, ra, 0
+  mv a0, zero
+  ret
 
 .type jal_test,@function
 jal_test:
   mv s4, ra
 
   la a0, jal_test_str
-  jalr ra, s2, 0
+  call printf
 
-  jal zero, jal_test_1
+  j jal_test_1
 jal_test_2:
   la a0, jal_test2_str
-  jalr ra, s2, 0
-  jal zero, jal_test_3
+  call printf
+  j jal_test_3
 
 jal_test_1:
   la a0, jal_test1_str
-  jalr ra, s2, 0
-  jal zero, jal_test_2
+  call printf
+  j jal_test_2
 
 jal_test_3:
   mv ra, s4
-  jalr zero, ra, 0
+  ret
+
+
+.type test_error,@function
+test_error:
+  la a0, error_str
+  call printf
+  call abort
+
 
 .data
 .p2align 2
@@ -167,3 +159,4 @@ bge_str:  .asciz "bge\n"
 bgeu_str: .asciz "bgeu\n"
 
 error_str:  .asciz "error\n"
+dbg_str:    .asciz "dbg\n"

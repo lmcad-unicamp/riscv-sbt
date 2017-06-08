@@ -245,7 +245,7 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
   _extFuncAddr += Instruction::SIZE;
 
   BasicBlock bb(_ctx, "entry", f->func());
-  BasicBlock prevBB = bld->getInsertBlock();
+  BasicBlock* prevBB = bld->getInsertBlock();
   bld->setInsertPoint(bb);
 
   OnScopeExit restoreInsertPoint(
@@ -310,7 +310,6 @@ llvm::Error Translator::genICaller()
   llvm::Value* target = nullptr;
 
   // basic blocks
-  BasicBlock bbPrev = bld->getInsertBlock();
   BasicBlock bbBeg(_ctx, "begin", ic);
   BasicBlock bbDfl(_ctx, "default", ic);
   BasicBlock bbEnd(_ctx, "end", ic);
@@ -335,10 +334,11 @@ llvm::Error Translator::genICaller()
 
   // cases
   // case fun: t1 = realFunAddress;
-  for (const auto& p : _funMap) {
-    const FunctionPtr& f = p.val;
+  for (const auto& p : _funcByAddr) {
+    Function* f = p.val;
     uint64_t addr = f->addr();
-    xassert(addr && "invalid function address");
+    DBGF("function={0}, addr={1:X+8}", f->name(), addr);
+    xassert(addr != Constants::INVALID_ADDR);
 
     std::string caseStr = "case_" + f->name();
     llvm::Value* sym = _ctx->module->getValueSymbolTable().lookup(f->name());
@@ -353,7 +353,6 @@ llvm::Error Translator::genICaller()
     sw->addCase(llvm::ConstantInt::get(t.i32, addr), dest.bb());
   }
 
-  bld->setInsertPoint(bbPrev);
   return llvm::Error::success();
 }
 

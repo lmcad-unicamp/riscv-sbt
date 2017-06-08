@@ -1,6 +1,7 @@
 #include "Relocation.h"
 
 #include "Builder.h"
+#include "Instruction.h"
 #include "Object.h"
 #include "Translator.h"
 
@@ -30,14 +31,24 @@ SBTRelocation::SBTRelocation(
 llvm::Expected<llvm::Value*>
 SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
 {
-  // no more relocations exist
-  if (_ri == _re)
-    return nullptr;
+  // note: some relocations are used by two consecutive instructions
+  bool hasNext = _next != Constants::INVALID_ADDR;
+  ConstRelocationPtr reloc = nullptr;
 
-  // check if there is a relocation for current address
-  auto reloc = *_ri;
-  if (reloc->offset() != addr)
-    return nullptr;
+  if (hasNext) {
+    xassert(addr == _next && "unexpected relocation!");
+    _next = Constants::INVALID_ADDR;
+    reloc = *_ri;
+  } else {
+    // no more relocations exist
+    if (_ri == _re)
+      return nullptr;
+
+    // check if there is a relocation for current address
+    reloc = *_ri;
+    if (reloc->offset() != addr)
+      return nullptr;
+  }
 
   DBGS << __FUNCTION__ << llvm::formatv("({0:X+4})\n", addr);
 
@@ -46,20 +57,38 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
   bool isLO = false;
   uint64_t mask;
   ConstSymbolPtr realSym = sym;
+  // note: some relocations are used by two consecutive instructions
+  bool isNextToo = false;
 
   switch (type) {
-    case llvm::ELF::R_RISCV_PCREL_HI20:
     case llvm::ELF::R_RISCV_HI20:
+      DBGF("HI20");
+      break;
+
+    case llvm::ELF::R_RISCV_CALL:
+      if (hasNext) {
+        DBGF("CALL(LO)");
+        isLO = true;
+      } else {
+        DBGF("CALL(HI)");
+        isNextToo = true;
+      }
+      break;
+
+    case llvm::ELF::R_RISCV_PCREL_HI20:
+      DBGF("PCREL_HI20");
       break;
 
     // this rellocation has PC info only
     // symbol info is present on the PCREL_HI20 reloc
     case llvm::ELF::R_RISCV_PCREL_LO12_I:
+      DBGF("PCREL_LO12_I");
       isLO = true;
       realSym = (**_rlast).symbol();
       break;
 
     case llvm::ELF::R_RISCV_LO12_I:
+      DBGF("LO12_I");
       isLO = true;
       break;
 
@@ -81,11 +110,16 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     ssym.val += ssym.sec->shadowOffs();
   }
 
-  // increment relocation iterator until it reaches a different address
-  _rlast = _ri;
-  do {
-    ++_ri;
-  } while (_ri != _re && (**_ri).offset() == addr);
+  if (isNextToo)
+    _next = addr + Instruction::SIZE;
+  else {
+    // increment relocation iterator until it reaches a different address
+    _rlast = _ri;
+    uint64_t reladdr = hasNext? addr - Instruction::SIZE : addr;
+    do {
+      ++_ri;
+    } while (_ri != _re && (**_ri).offset() == reladdr);
+  }
 
   // write relocation string
   if (isLO) {

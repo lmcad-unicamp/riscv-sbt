@@ -32,6 +32,8 @@ static const char nl = '\n';
 class Constants
 {
 public:
+  static const uint64_t INVALID_ADDR = ~0ULL;
+
   // name of the SBT binary/executable
   const std::string BIN_NAME = "riscv-sbt";
   // int32 zero

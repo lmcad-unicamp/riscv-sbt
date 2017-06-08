@@ -34,7 +34,7 @@ BasicBlock::~BasicBlock()
 }
 
 
-BasicBlock BasicBlock::split(uint64_t addr)
+BasicBlockPtr BasicBlock::split(uint64_t addr)
 {
   auto res = _instrMap[addr];
   xassert(res && "instruction not found!");
@@ -55,21 +55,19 @@ BasicBlock BasicBlock::split(uint64_t addr)
   //     no need to update insert point?
   if (_bb->getTerminator()) {
     bb2 = _bb->splitBasicBlock(i, getBBName(addr));
-    return BasicBlock(_ctx, bb2);
+    return BasicBlockPtr(new BasicBlock(_ctx, bb2, addr));
   }
 
   // case 2: need to insert dummy terminator
   Builder* bld = _ctx->bld;
-  xassert(bld->getInsertBlock().bb() == _bb);
+  xassert(bld->getInsertBlock()->bb() == _bb);
   llvm::Instruction* instr = bld->retVoid();
   // split
   bb2 = _bb->splitBasicBlock(i, getBBName(addr));
   // remove dummy terminator
   instr->eraseFromParent();
-  // update insert point
-  _ctx->builder->SetInsertPoint(bb2, bb2->end());
 
-  return BasicBlock(_ctx, bb2);
+  return BasicBlockPtr(new BasicBlock(_ctx, bb2, addr));
 }
 
 }

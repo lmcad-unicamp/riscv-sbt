@@ -43,8 +43,8 @@ public:
     Context* ctx,
     const std::string& name,
     SBTSection* sec = nullptr,
-    uint64_t addr = 0,
-    uint64_t end = 0)
+    uint64_t addr = Constants::INVALID_ADDR,
+    uint64_t end = Constants::INVALID_ADDR)
     :
     _ctx(ctx),
     _name(name),
@@ -86,7 +86,7 @@ public:
   }
 
   // basic block map
-  Map<uint64_t, BasicBlock>& bbmap()
+  Map<uint64_t, BasicBlockPtr>& bbmap()
   {
     return _bbMap;
   }
@@ -119,11 +119,9 @@ private:
   uint64_t _end;
 
   llvm::Function* _f = nullptr;
-  // current basic block pointer
-  BasicBlock* _bb = nullptr;
   // address of next basic block
   uint64_t _nextBB = 0;
-  Map<uint64_t, BasicBlock> _bbMap;
+  Map<uint64_t, BasicBlockPtr> _bbMap;
 
   enum TranslationState {
     ST_DFL,     // default
@@ -137,6 +135,9 @@ private:
   llvm::Error startMain();
   llvm::Error start();
   llvm::Error finish();
+
+  // current basic block pointer
+  BasicBlock* curBB();
 };
 
 using FunctionPtr = Pointer<Function>;

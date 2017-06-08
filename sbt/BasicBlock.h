@@ -9,6 +9,9 @@
 
 namespace sbt {
 
+class BasicBlock;
+using BasicBlockPtr = Pointer<BasicBlock>;
+
 class BasicBlock
 {
 public:
@@ -34,7 +37,9 @@ public:
     llvm::BasicBlock* beforeBB = nullptr)
     :
     BasicBlock(ctx, getBBName(addr), f, beforeBB)
-  {}
+  {
+    _addr = addr;
+  }
 
   /**
    * Construct basic block with a name not related to an address.
@@ -46,13 +51,19 @@ public:
     llvm::BasicBlock* beforeBB = nullptr);
 
   /**
-   * Construct from llvm::BasicBlock
+   * Construct from existing llvm::BasicBlock
    */
-  BasicBlock(Context* ctx, llvm::BasicBlock* bb) :
+  BasicBlock(
+    Context* ctx,
+    llvm::BasicBlock* bb,
+    uint64_t addr)
+    :
     _ctx(ctx),
-    _bb(bb)
+    _bb(bb),
+    _addr(addr)
   {}
 
+public:
   ~BasicBlock();
 
   // allow move only
@@ -69,6 +80,12 @@ public:
   llvm::StringRef name() const
   {
     return _bb->getName();
+  }
+
+  uint64_t addr() const
+  {
+    xassert(_addr != ~0ULL && "basic block has invalid address!");
+    return _addr;
   }
 
   /**
@@ -89,11 +106,12 @@ public:
    *
    * @return BasicBlock part that comes after the specified address.
    */
-  BasicBlock split(uint64_t addr);
+  BasicBlockPtr split(uint64_t addr);
 
 private:
   Context* _ctx;
   llvm::BasicBlock* _bb;
+  uint64_t _addr = ~0ULL;
   Map<uint64_t, llvm::Instruction*> _instrMap;
 
 
