@@ -84,6 +84,7 @@ endef
 # 2: output module
 # 3: [opt] GCC/CLANG
 # 4: [opt] source .c file
+# 5: save run output?
 define BUILD
 $(eval BUILD_FILE = $(MAKE_DIR)$(2))
 
@@ -102,7 +103,7 @@ else
 $(call LINK,$(1),$(2))
 endif
 
-$(call RUN,$(1),$(2))
+$(call RUN,$(1),$(2),$(5))
 $(call CLEAN,$(2),$(4))
 endef
 

@@ -312,7 +312,6 @@ llvm::Error Object::readSymbols()
     Section *sec = expSec.get();
     SectionPtr ptr(sec);
     // add to maps
-    // _nameToSection(sec->name(), ConstSectionPtr(ptr));
     _ptrToSection(s.getRawDataRefImpl().p, ConstSectionPtr(ptr));
     // add to sections vector
     sections.push_back(ptr);
@@ -320,7 +319,7 @@ llvm::Error Object::readSymbols()
 
   // add common section
   SectionPtr commonSec(new CommonSection(this));
-  // _nameToSection(commonSec->name(), ConstSectionPtr(commonSec));
+  _ptrToSection(~0ULL, ConstSectionPtr(commonSec));
   sections.push_back(commonSec);
   uint64_t commonOffs = 0;
 
@@ -336,7 +335,6 @@ llvm::Error Object::readSymbols()
     if (sym->type() == object::SymbolRef::ST_Debug)
       continue;
     // add to maps
-    // _nameToSymbol(sym->name(), ConstSymbolPtr(ptr));
     _ptrToSymbol(s.getRawDataRefImpl().p, ConstSymbolPtr(ptr));
 
     // add symbol to corresponding section vector

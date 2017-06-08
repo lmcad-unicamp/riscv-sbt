@@ -34,12 +34,11 @@ static void test()
 
 int main()
 {
-  assert(A_COLS == B_ROWS);
-
   int i;
   int j;
   int k;
 
+  assert(A_COLS == B_ROWS);
   test();
 
   for (i = 0; i < C_ROWS; i++)

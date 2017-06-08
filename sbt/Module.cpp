@@ -97,8 +97,8 @@ llvm::Error Module::buildShadowImage()
     while (vec.size() % 4 != 0)
       vec.push_back(0);
     size_t addr = vec.size();
-    DBGS << llvm::formatv("{0}(): {1}@{2:X+4}\n",
-      __FUNCTION__, sec->name(), addr);
+    DBGS << llvm::formatv("{0}(): {1}@{2:X+8}-{3:X+8}\n",
+      __FUNCTION__, sec->name(), addr, addr + bytes.size());
 
     // set shadow offset of section
     sec->shadowOffs(addr);

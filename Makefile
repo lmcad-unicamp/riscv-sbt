@@ -788,14 +788,14 @@ lc:
 .PHONY: tests
 tests:
 	$(MAKE) -C $(TOPDIR)/test clean all run
-	$(MAKE) -C $(TOPDIR)/sbt/test clean all run tests run-tests
+	$(MAKE) -C $(TOPDIR)/sbt/test clean run-alltests
 
 
 ###
 ### BEGIN debugging targets ###
 ###
 
-TESTBIN := rv32-x86-branch
+TESTBIN := rv32-x86-main
 .PHONY: test-prep
 test-prep:
 	$(MAKE) $(SBT)-build $(SBT)-install
@@ -803,9 +803,7 @@ test-prep:
 
 .PHONY: test
 test: test-prep
-	#cd $(TOPDIR)/sbt/test && riscv-sbt -o rv32-x86-branch.bc rv32-branch.o
-	$(MAKE) -C $(TOPDIR)/sbt/test run-rv32-branch
-	$(MAKE) -C $(TOPDIR)/sbt/test run-rv32-x86-branch
+	cd $(TOPDIR)/sbt/test && ./$(TESTBIN)
 
 .PHONY: dbg
 dbg: test-prep

@@ -9,11 +9,9 @@ BINS := elf \
 	rv32-hello x86-hello \
 	x86-test-syscall \
 	rv32-x86-hello \
-	x86-main rv32-main rv32-x86-main
+	x86-mm rv32-mm rv32-x86-mm
 
-RUN_BINS := $(filter-out elf,$(BINS))
-
-all: $(BINS)
+all: elf x86-test-syscall
 
 include $(TOPDIR)/make/rules.mk
 
@@ -23,8 +21,8 @@ $(eval $(call NBUILD,elf))
 
 ### hello ###
 
-$(eval $(call BUILD,RV32,rv32-hello))
-$(eval $(call BUILD,X86,x86-hello))
+$(eval $(call BUILD,RV32,rv32-hello,,,save-run.out))
+$(eval $(call BUILD,X86,x86-hello,,,save-run.out))
 $(eval $(call AS,X86,x86-dummy))
 
 rv32-x86-hello.bc: rv32-hello.o x86-dummy.o
@@ -35,9 +33,12 @@ rv32-x86-hello.s: rv32-x86-hello.bc
 
 X86_LIBS = $(X86_SYSCALL_O) $(X86_RVSC_O) x86-dummy.o
 CLEAN_EXTRA = rv32-x86-hello.s
-$(eval $(call BUILD,X86,rv32-x86-hello))
+$(eval $(call BUILD,X86,rv32-x86-hello,,,save-run.out))
 X86_LIBS =
 CLEAN_EXTRA =
+
+test-hello: run-rv32-hello run-rv32-x86-hello
+	diff rv32-hello.out rv32-x86-hello.out
 
 ### x86-test-syscall ###
 
@@ -45,38 +46,54 @@ X86_LIBS = $(X86_SYSCALL_O)
 $(eval $(call ASNCLINK,X86,x86-test-syscall))
 X86_LIBS =
 
-### main ###
+### mm (matrix multiply) ###
 
 CFLAGS = -Wall -Werror -O0
-$(eval $(call BUILD,X86,x86-main,CLANG,main))
-$(eval $(call BUILD,RV32,rv32-main,CLANG,main))
-$(eval $(call TRANSLATE_C,RV32,X86,main))
+$(eval $(call BUILD,X86,x86-mm,CLANG,mm,save-run.out))
+$(eval $(call BUILD,RV32,rv32-mm,CLANG,mm,save-run.out))
+$(eval $(call TRANSLATE_C,RV32,X86,mm))
 
-### RV32 Translator unit tests ###
-
-TESTS := load-store alu-ops branch fence system m
+TESTS := hello mm
 RV32_TESTS := $(foreach test,$(TESTS),rv32-$(test))
 RV32_X86_TESTS := $(foreach test,$(TESTS),rv32-x86-$(test))
-
-$(eval $(foreach test,$(RV32_TESTS),\
-  $(call ASNCLINK,RV32,$(test),,save-run.out)))
-
-$(eval $(foreach test,$(TESTS),\
-  $(call TRANSLATE_C,RV32,X86,$(test))))
 
 tests: $(RV32_TESTS) $(RV32_X86_TESTS)
 
 run-tests: tests $(foreach test,$(TESTS),test-$(test))
 	@echo "All tests passed!"
 
+#clean-tests:
+#	rm -f $(foreach test,$(RV32_TESTS),rv32-$(test).out)
 
-#$(warning clean-rv32-x86: $(foreach test,$(RV32_X86_TESTS),clean-$(test)))
+### RV32 Translator unit tests ###
 
-clean-tests: $(foreach test,$(RV32_TESTS),clean-$(test)) \
-  $(foreach test,$(RV32_X86_TESTS),clean-$(test))
+UTESTS := load-store alu-ops branch fence system m
+RV32_UTESTS := $(foreach test,$(UTESTS),rv32-$(test))
+RV32_X86_UTESTS := $(foreach test,$(UTESTS),rv32-x86-$(test))
+
+$(eval $(foreach test,$(RV32_UTESTS),\
+  $(call ASNCLINK,RV32,$(test),,save-run.out)))
+
+$(eval $(foreach test,$(UTESTS),\
+  $(call TRANSLATE_C,RV32,X86,$(test))))
+
+utests: $(RV32_UTESTS) $(RV32_X86_UTESTS)
+
+run-utests: utests $(foreach test,$(UTESTS),test-$(test))
+	@echo "All unit tests passed!"
+
+
+#$(warning clean-rv32-x86: $(foreach test,$(RV32_X86_UTESTS),clean-$(test)))
+
+clean-utests: $(foreach test,$(RV32_UTESTS),clean-$(test)) \
+  $(foreach test,$(RV32_X86_UTESTS),clean-$(test))
 
 ###
 
-run: $(foreach prog,$(RUN_BINS),run-$(prog))
+alltests: utests tests x86-test-syscall
 
-clean: $(foreach prog,$(BINS),clean-$(prog)) clean-tests
+run-alltests: alltests run-utests run-tests
+	./x86-test-syscall
+
+clean: $(foreach prog,$(BINS),clean-$(prog)) clean-utests
+	rm -f x86-dummy.o

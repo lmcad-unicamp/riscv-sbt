@@ -41,8 +41,6 @@ using ConstSymbolPtrVec = std::vector<ConstSymbolPtr>;
 using ConstRelocationPtrVec = std::vector<ConstRelocationPtr>;
 
 // maps
-using NameToSymbolMap = Map<llvm::StringRef, ConstSymbolPtr>;
-using NameToSectionMap = Map<llvm::StringRef, ConstSectionPtr>;
 using PtrToSymbolMap = Map<uintptr_t, ConstSymbolPtr>;
 using PtrToSectionMap = Map<uintptr_t, ConstSectionPtr>;
 
@@ -424,18 +422,6 @@ public:
     return _ptrToSymbol;
   }
 
-  /*
-  // get section by name
-  ConstSectionPtr lookupSection(const llvm::StringRef& name) const
-  {
-    const ConstSectionPtr *p = _nameToSection[name];
-    if (!p)
-      return ConstSectionPtr(nullptr);
-    else
-      return *p;
-  }
-  */
-
   // get section by llvm SectionRef
   ConstSectionPtr lookupSection(const llvm::object::SectionRef& s) const
   {
@@ -445,18 +431,6 @@ public:
     else
       return *p;
   }
-
-  /*
-  // get symbol by name
-  ConstSymbolPtr lookupSymbol(const llvm::StringRef& name) const
-  {
-    const ConstSymbolPtr *p = _nameToSymbol[name];
-    if (!p)
-      return ConstSymbolPtr(nullptr);
-    else
-      return *p;
-  }
-  */
 
   // get symbol by llvm SymbolRef
   ConstSymbolPtr lookupSymbol(const llvm::object::SymbolRef& s) const
@@ -509,8 +483,6 @@ private:
   llvm::StringRef _fileName;
 
   // maps
-  // NameToSymbolMap _nameToSymbol;
-  // NameToSectionMap _nameToSection;
   PtrToSymbolMap _ptrToSymbol;
   PtrToSectionMap _ptrToSection;
 
