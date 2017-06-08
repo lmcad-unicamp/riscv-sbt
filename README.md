@@ -6,12 +6,12 @@ How to Build
 
 Release:
 ```bash
-source scripts/setenv.sh release
+. scripts/setenv.sh release
 make
 ```
 Debug:
 ```bash
-source scripts/setenv.sh
+. scripts/setenv.sh
 make
 ```
 
@@ -33,7 +33,7 @@ sudo scripts/setmsr.sh
 
 Running the unit tests:
 ```bash
-make -C sbt/tests run-tests
+make -C sbt/tests run-utests
 ```
 
 Running all tests:
