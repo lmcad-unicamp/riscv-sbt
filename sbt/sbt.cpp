@@ -12,13 +12,6 @@
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 
-// RISCVMaster initializers
-extern "C" void LLVMInitializeRISCVMasterAsmParser();
-extern "C" void LLVMInitializeRISCVMasterDisassembler();
-extern "C" void LLVMInitializeRISCVMasterTargetMC();
-extern "C" void LLVMInitializeRISCVMasterTarget();
-extern "C" void LLVMInitializeRISCVMasterTargetInfo();
-
 
 namespace sbt {
 
@@ -34,15 +27,6 @@ void SBT::init()
   llvm::InitializeAllTargetMCs();
   llvm::InitializeAllAsmParsers();
   llvm::InitializeAllDisassemblers();
-
-  // init RISCVMaster 'target'
-  LLVMInitializeRISCVMasterTargetInfo();
-  LLVMInitializeRISCVMasterTargetMC();
-  LLVMInitializeRISCVMasterAsmParser();
-  LLVMInitializeRISCVMasterDisassembler();
-  // skip registration of RISCVMaster target to avoid
-  // conflicts with RISCV target
-  // LLVMInitializeRISCVMasterTarget();
 }
 
 

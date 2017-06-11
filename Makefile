@@ -23,6 +23,8 @@ ALL := \
 	PK64 \
 	LLVM_DEBUG \
 	LLVM_RELEASE \
+	RISCV_LLVM_DEBUG \
+	RISCV_LLVM_RELEASE \
 	SBT_DEBUG \
 	SBT_RELEASE \
 	BINUTILS_X86 \
@@ -34,6 +36,7 @@ ALL := \
 	BINUTILS_LINUX \
 	LINUX_GCC \
 	LINUX
+
 
 all: \
 	$(SBT) \
@@ -587,50 +590,92 @@ cmake: $(CMAKE)
 ### llvm
 ###
 
-# debug
+# common
+
+LLVM_COMMON_CMAKE_OPTS := \
+    -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86"
+
+# riscv-llvm debug
+
+RISCV_LLVM_DEBUG_BUILD := $(BUILD_DIR)/riscv-llvm/debug
+RISCV_LLVM_DEBUG_MAKEFILE := $(RISCV_LLVM_DEBUG_BUILD)/Makefile
+RISCV_LLVM_DEBUG_OUT := $(RISCV_LLVM_DEBUG_BUILD)/bin/clang
+RISCV_LLVM_DEBUG_TOOLCHAIN := $(TOOLCHAIN_DEBUG)/bin/clang
+RISCV_LLVM_DEBUG_CONFIGURE := \
+    $(CMAKE) $(LLVM_COMMON_CMAKE_OPTS) \
+             -DCMAKE_BUILD_TYPE=Debug \
+             -DBUILD_SHARED_LIBS=ON \
+             -DCMAKE_INSTALL_PREFIX=$(TOOLCHAIN_DEBUG) \
+             $(SUBMODULES_DIR)/riscv-llvm
+RISCV_LLVM_DEBUG_ALIAS := riscv-llvm-debug
+RISCV_CLANG_LINK := $(SUBMODULES_DIR)/riscv-llvm/tools/clang
+RISCV_LLVM_DEBUG_DEPS := $(NEWLIB_GCC32_TOOLCHAIN) $(CMAKE) $(RISCV_CLANG_LINK)
+
+$(RISCV_CLANG_LINK):
+	ln -sf $(SUBMODULES_DIR)/riscv-clang $@
+
+# llvm debug
 
 LLVM_DEBUG_BUILD := $(BUILD_DIR)/llvm/debug
 LLVM_DEBUG_MAKEFILE := $(LLVM_DEBUG_BUILD)/Makefile
 LLVM_DEBUG_OUT := $(LLVM_DEBUG_BUILD)/bin/clang
-LLVM_DEBUG_TOOLCHAIN := $(TOOLCHAIN_DEBUG)/bin/clang
+LLVM_DEBUG_INSTALL_DIR := $(TOOLCHAIN_DEBUG)/llvm
+LLVM_DEBUG_TOOLCHAIN := $(LLVM_DEBUG_INSTALL_DIR)/bin/clang
 LLVM_DEBUG_CONFIGURE := \
-    $(CMAKE) -DCMAKE_BUILD_TYPE=Debug \
-             -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86" \
+    $(CMAKE) $(LLVM_COMMON_CMAKE_OPTS) \
+             -DCMAKE_BUILD_TYPE=Debug \
              -DBUILD_SHARED_LIBS=ON \
-             -DCMAKE_INSTALL_PREFIX=$(TOOLCHAIN_DEBUG) $(SUBMODULES_DIR)/llvm
+             -DCMAKE_INSTALL_PREFIX=$(LLVM_DEBUG_INSTALL_DIR) \
+             $(SUBMODULES_DIR)/llvm
 LLVM_DEBUG_ALIAS := llvm-debug
 CLANG_LINK := $(SUBMODULES_DIR)/llvm/tools/clang
 LLVM_DEBUG_DEPS := $(NEWLIB_GCC32_TOOLCHAIN) $(CMAKE) $(CLANG_LINK)
 
 LLVM_DEBUG_POSTINSTALL := \
-  SRC=$(LLVM_DEBUG_BUILD)/lib/Target/RISCVMaster && \
-  DST=$(TOOLCHAIN_DEBUG)/include/llvm/Target/RISCVMaster && \
+  SRC=$(LLVM_DEBUG_BUILD)/lib/Target/RISCV && \
+  DST=$(LLVM_DEBUG_INSTALL_DIR)/include/llvm/Target/RISCV && \
   mkdir -p $$DST && \
-  (for f in RISCVMasterGenInstrInfo.inc RISCVMasterGenRegisterInfo.inc; do \
+  (for f in RISCVGenInstrInfo.inc RISCVGenRegisterInfo.inc; do \
     cp $$SRC/$$f $$DST/$$f || exit 1; \
   done)
 
 $(CLANG_LINK):
 	ln -sf $(SUBMODULES_DIR)/clang $@
 
-# release
+# riscv-llvm release
+
+RISCV_LLVM_RELEASE_BUILD := $(BUILD_DIR)/riscv-llvm/release
+RISCV_LLVM_RELEASE_MAKEFILE := $(RISCV_LLVM_RELEASE_BUILD)/Makefile
+RISCV_LLVM_RELEASE_OUT := $(RISCV_LLVM_RELEASE_BUILD)/bin/clang
+RISCV_LLVM_RELEASE_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/clang
+RISCV_LLVM_RELEASE_CONFIGURE := \
+    $(CMAKE) $(LLVM_COMMON_CMAKE_OPTS) \
+             -DCMAKE_BUILD_TYPE=Release \
+             -DCMAKE_INSTALL_PREFIX=$(TOOLCHAIN_RELEASE) \
+             $(SUBMODULES_DIR)/riscv-llvm
+RISCV_LLVM_RELEASE_ALIAS := riscv-llvm-release
+RISCV_LLVM_RELEASE_DEPS := $(NEWLIB_GCC32_TOOLCHAIN) $(CMAKE) $(RISCV_CLANG_LINK)
+
+# llvm debug
 
 LLVM_RELEASE_BUILD := $(BUILD_DIR)/llvm/release
 LLVM_RELEASE_MAKEFILE := $(LLVM_RELEASE_BUILD)/Makefile
 LLVM_RELEASE_OUT := $(LLVM_RELEASE_BUILD)/bin/clang
-LLVM_RELEASE_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/clang
+LLVM_RELEASE_INSTALL_DIR := $(TOOLCHAIN_RELEASE)/llvm
+LLVM_RELEASE_TOOLCHAIN := $(LLVM_RELEASE_INSTALL_DIR)/bin/clang
 LLVM_RELEASE_CONFIGURE := \
-    $(CMAKE) -DCMAKE_BUILD_TYPE=Release \
-             -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86" \
-             -DCMAKE_INSTALL_PREFIX=$(TOOLCHAIN_RELEASE) $(SUBMODULES_DIR)/llvm
+    $(CMAKE) $(LLVM_COMMON_CMAKE_OPTS) \
+             -DCMAKE_BUILD_TYPE=Release \
+             -DCMAKE_INSTALL_PREFIX=$(LLVM_RELEASE_INSTALL_DIR) \
+             $(SUBMODULES_DIR)/llvm
 LLVM_RELEASE_ALIAS := llvm-release
 LLVM_RELEASE_DEPS := $(NEWLIB_GCC32_TOOLCHAIN) $(CMAKE) $(CLANG_LINK)
 
 LLVM_RELEASE_POSTINSTALL := \
-  SRC=$(LLVM_RELEASE_BUILD)/lib/Target/RISCVMaster && \
-  DST=$(TOOLCHAIN_RELEASE)/include/llvm/Target/RISCVMaster && \
+  SRC=$(LLVM_RELEASE_BUILD)/lib/Target/RISCV && \
+  DST=$(LLVM_RELEASE_INSTALL_DIR)/include/llvm/Target/RISCV && \
   mkdir -p $$DST && \
-  (for f in RISCVMasterGenInstrInfo.inc RISCVMasterGenRegisterInfo.inc; do \
+  (for f in RISCVGenInstrInfo.inc RISCVGenRegisterInfo.inc; do \
     cp $$SRC/$$f $$DST/$$f || exit 1; \
   done)
 
@@ -646,9 +691,10 @@ SBT_DEBUG_OUT := $(SBT_DEBUG_BUILD)/riscv-sbt
 SBT_DEBUG_TOOLCHAIN := $(TOOLCHAIN_DEBUG)/bin/riscv-sbt
 SBT_DEBUG_CONFIGURE := \
     $(CMAKE) -DCMAKE_BUILD_TYPE=Debug \
-             -DCMAKE_INSTALL_PREFIX=$(TOOLCHAIN_DEBUG) $(TOPDIR)/sbt
+             -DCMAKE_INSTALL_PREFIX=$(TOOLCHAIN_DEBUG) \
+             $(TOPDIR)/sbt
 SBT_DEBUG_ALIAS := sbt-debug
-SBT_DEBUG_DEPS := $(LLVM_DEBUG_TOOLCHAIN)
+SBT_DEBUG_DEPS := $(RISCV_LLVM_DEBUG_TOOLCHAIN) $(LLVM_DEBUG_TOOLCHAIN)
 
 # release
 
@@ -658,9 +704,10 @@ SBT_RELEASE_OUT := $(SBT_RELEASE_BUILD)/riscv-sbt
 SBT_RELEASE_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/riscv-sbt
 SBT_RELEASE_CONFIGURE := \
     $(CMAKE) -DCMAKE_BUILD_TYPE=Release \
-             -DCMAKE_INSTALL_PREFIX=$(TOOLCHAIN_RELEASE) $(TOPDIR)/sbt
+             -DCMAKE_INSTALL_PREFIX=$(TOOLCHAIN_RELEASE) \
+             $(TOPDIR)/sbt
 SBT_RELEASE_ALIAS := sbt-release
-SBT_RELEASE_DEPS := $(LLVM_RELEASE_TOOLCHAIN)
+SBT_RELEASE_DEPS := $(RISCV_LLVM_RELEASE_TOOLCHAIN) $(LLVM_RELEASE_TOOLCHAIN)
 
 ###
 ### riscvemu
@@ -757,7 +804,7 @@ QEMU_TESTS_ALIAS := qemu-tests
 $(foreach prog,$(ALL),$(eval $(call RULE_ALL,$(prog))))
 
 # clean all
-clean: $(foreach prog,$(ALL),$($(prog)_ALIAS)-clean)
+clean: $(foreach prog,$(ALL),$($(prog)_ALIAS)-clean) riscv-pk-unpatch
 	rm -rf $(BUILD_DIR)
 	rm -rf $(TOOLCHAIN)/*
 

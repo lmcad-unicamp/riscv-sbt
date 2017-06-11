@@ -31,10 +31,6 @@
 #define ENABLE_DBGS 0
 #include "Debug.h"
 
-namespace llvm {
-Target& getTheRISCVMaster32Target();
-}
-
 
 namespace sbt {
 
@@ -60,8 +56,8 @@ llvm::Error Translator::start()
   llvm::Triple triple("riscv32-unknown-elf");
   std::string tripleName = triple.getTriple();
 
-  _target = &llvm::getTheRISCVMaster32Target();
-  // _target = TargetRegistry::lookupTarget(tripleName, strError);
+  std::string strError;
+  _target = llvm::TargetRegistry::lookupTarget(tripleName, strError);
   if (!_target) {
     serr << "target not found: " << tripleName;
     return error(serr);

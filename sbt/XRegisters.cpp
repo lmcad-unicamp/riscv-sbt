@@ -1,7 +1,7 @@
 #include "XRegisters.h"
 
 #define GET_REGINFO_ENUM
-#include <llvm/Target/RISCVMaster/RISCVMasterGenRegisterInfo.inc>
+#include <llvm/Target/RISCV/RISCVGenRegisterInfo.inc>
 
 namespace sbt {
 
@@ -54,7 +54,7 @@ std::string XRegister::getName(unsigned reg, bool abi)
 // MCInst register number to RISCV register number
 unsigned XRegister::num(unsigned reg)
 {
-  namespace RISCV = llvm::RISCVMaster;
+  namespace RISCV = llvm::RISCV;
 
   switch (reg) {
     case RISCV::X0_32:  return 0;

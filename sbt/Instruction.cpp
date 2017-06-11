@@ -13,10 +13,10 @@
 
 // LLVM internal instruction info
 #define GET_INSTRINFO_ENUM
-#include <llvm/Target/RISCVMaster/RISCVMasterGenInstrInfo.inc>
+#include <llvm/Target/RISCV/RISCVGenInstrInfo.inc>
 
 #undef ENABLE_DBGS
-#define ENABLE_DBGS 0
+#define ENABLE_DBGS 1
 #include "Debug.h"
 
 namespace sbt {
@@ -46,7 +46,7 @@ Instruction::~Instruction()
 
 llvm::Error Instruction::translate()
 {
-  namespace RISCV = llvm::RISCVMaster;
+  namespace RISCV = llvm::RISCV;
 
   // disasm
   size_t size;
@@ -522,8 +522,8 @@ llvm::Error Instruction::translateStore(IntType it)
   *_os << '\t';
 
 
-  llvm::Value* rs1 = getReg(0);
-  llvm::Value* rs2 = getReg(1);
+  llvm::Value* rs2 = getReg(0);
+  llvm::Value* rs1 = getReg(1);
   auto expImm = getImm(2);
   if (!expImm)
     return expImm.takeError();

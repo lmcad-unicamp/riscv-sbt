@@ -65,7 +65,7 @@ RV32_CLANG        := $(CLANG)
 RV32_SYSROOT      := $(TOOLCHAIN_RELEASE)/$(RV32_TRIPLE)
 RV32_SYSROOT_FLAG := -isysroot $(RV32_SYSROOT) \
                      -isystem $(RV32_SYSROOT)/include
-RV32_CLANG_FLAGS  := --target=riscv32 -mriscv=RV32IAMFD \
+RV32_CLANG_FLAGS  := --target=riscv -mriscv=RV32IAMFD \
                      $(RV32_SYSROOT_FLAG)
 RV32_LIB      := $(TOOLCHAIN_RELEASE)/$(RV32_TRIPLE)/lib
 RV32_LIB_GCC  := $(TOOLCHAIN_RELEASE)/lib/gcc/$(RV32_TRIPLE)/7.0.0

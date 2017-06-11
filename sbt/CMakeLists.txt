@@ -53,15 +53,6 @@ if (RC1 OR RC2 OR RC3 OR RC4 OR RC5 OR RC6)
   message(FATAL_ERROR "Failed to execute llvm-config.sh")
 endif()
 
-set (SBT_RISCV_MASTER_LIBS
-  LLVMRISCVMasterDisassembler
-  LLVMRISCVMasterCodeGen
-  LLVMRISCVMasterAsmParser
-  LLVMRISCVMasterDesc
-  LLVMRISCVMasterInfo
-  LLVMRISCVMasterAsmPrinter
-  )
-
 # set debug options
 message(STATUS "This is a ${CMAKE_BUILD_TYPE} build")
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
@@ -88,7 +79,7 @@ target_compile_options (x86-syscall PRIVATE --32)
 
 # SBT
 
-set (CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+set (CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/llvm/lib")
 include_directories (${SBT_INCLUDE_DIRS})
 link_directories (${SBT_LINK_DIRS})
 add_executable (riscv-sbt
@@ -114,7 +105,6 @@ add_executable (riscv-sbt
 target_compile_options (riscv-sbt PRIVATE ${SBT_COMPILE_OPTIONS})
 target_compile_definitions(riscv-sbt PRIVATE ${SBT_COMPILE_DEFINITIONS})
 target_link_libraries (riscv-sbt
-  ${SBT_RISCV_MASTER_LIBS}
   ${SBT_LIBS}
   ${SBT_SYS_LIBS}
 )

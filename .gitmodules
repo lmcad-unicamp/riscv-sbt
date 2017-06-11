@@ -34,3 +34,10 @@
 [submodule "submodules/riscv-qemu-tests"]
 	path = submodules/riscv-qemu-tests
 	url = https://github.com/arsv/riscv-qemu-tests
+[submodule "submodules/riscv-llvm"]
+	path = submodules/riscv-llvm
+	url = https://github.com/riscv/riscv-llvm.git
+[submodule "submodules/riscv-clang"]
+	path = submodules/riscv-clang
+	url = https://github.com/riscv/riscv-clang
+	branch = riscv-trunk

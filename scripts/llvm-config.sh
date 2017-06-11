@@ -32,7 +32,7 @@ FormatLibs="s/${CStOrSp}-l${CNSp1}/\\1\\2/g; ${Trim}; ${Sep}"
 
 # get BUILD_TYPE_DIR
 BUILD_TYPE_DIR=$(echo $BUILD_TYPE | sed "s/.*/\\l&/")
-LLVM_CONFIG=$TOPDIR/toolchain/$BUILD_TYPE_DIR/bin/llvm-config
+LLVM_CONFIG=$TOPDIR/toolchain/$BUILD_TYPE_DIR/llvm/bin/llvm-config
 
 
 case $1 in
