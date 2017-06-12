@@ -68,7 +68,7 @@ RV32_SYSROOT_FLAG := -isysroot $(RV32_SYSROOT) \
 RV32_CLANG_FLAGS  := --target=riscv -mriscv=RV32IAMFD \
                      $(RV32_SYSROOT_FLAG)
 RV32_LIB      := $(TOOLCHAIN_RELEASE)/$(RV32_TRIPLE)/lib
-RV32_LIB_GCC  := $(TOOLCHAIN_RELEASE)/lib/gcc/$(RV32_TRIPLE)/7.0.0
+RV32_LIB_GCC  := $(TOOLCHAIN_RELEASE)/lib/gcc/$(RV32_TRIPLE)/7.1.1
 RV32_CRT0     := $(RV32_LIB)/crt0.o
 RV32_LD_FLAGS0 := -L$(RV32_LIB) -L$(RV32_LIB_GCC) \
                   -dT ldscripts/elf32lriscv.x $(RV32_CRT0)
@@ -84,7 +84,7 @@ RV64_SYSROOT_FLAG := -isysroot $(RV64_SYSROOT) \
 RV64_CLANG_FLAGS  := --target=riscv64 -mriscv=RV64IAMFD \
                      $(RV64_SYSROOT_FLAG)
 RV64_LIB      := $(TOOLCHAIN_RELEASE)/$(RV64_TRIPLE)/lib
-RV64_LIB_GCC  := $(TOOLCHAIN_RELEASE)/lib/gcc/$(RV64_TRIPLE)/7.0.0
+RV64_LIB_GCC  := $(TOOLCHAIN_RELEASE)/lib/gcc/$(RV64_TRIPLE)/7.1.1
 RV64_CRT0     := $(RV64_LIB)/crt0.o
 RV64_LD_FLAGS0 := -L$(RV64_LIB) -L$(RV64_LIB_GCC) \
                   -dT ldscripts/elf64lriscv.x $(RV64_CRT0)
@@ -96,7 +96,7 @@ RV64_PREFIX    := rv64
 X86_CLANG       := $(CLANG)
 X86_CLANG_FLAGS := --target=i386 -fno-exceptions -fno-rtti
 X86_LIB         := /usr/lib32
-X86_LIB_GCC     := $(TOOLCHAIN_X86)/lib/gcc/$(X86_TRIPLE)/7.0.0
+X86_LIB_GCC     := $(TOOLCHAIN_X86)/lib/gcc/$(X86_TRIPLE)/7.1.1
 X86_CRT1        := $(X86_LIB)/crt1.o
 X86_CRTI        := $(X86_LIB)/crti.o
 X86_CRTBEGIN    := $(X86_LIB_GCC)/crtbegin.o

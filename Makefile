@@ -12,31 +12,57 @@ else
   SBT := sbt-release
 endif
 
-ALL := \
+TC32 := \
 	BINUTILS32 \
-	NEWLIB_GCC32 \
-	FESVR \
-	SIM \
-	PK32 \
-	BINUTILS64 \
-	NEWLIB_GCC64 \
-	PK64 \
+	NEWLIB_GCC32
+
+TCX86 := \
+	BINUTILS_X86 \
+	NEWLIB_GCC_X86
+
+LLVM := \
 	LLVM_DEBUG \
 	LLVM_RELEASE \
 	RISCV_LLVM_DEBUG \
-	RISCV_LLVM_RELEASE \
+	RISCV_LLVM_RELEASE
+
+NEEDED := \
+	$(TC32) \
+	$(TCX86) \
+	$(LLVM) \
 	SBT_DEBUG \
-	SBT_RELEASE \
-	BINUTILS_X86 \
-	NEWLIB_GCC_X86 \
-	RVEMU \
-	QEMU \
-	QEMU_USER \
-	QEMU_TESTS \
+	SBT_RELEASE
+
+TEST32 := \
+	FESVR \
+	SIM \
+	PK32
+
+TC64 := \
+	BINUTILS64 \
+	NEWLIB_GCC64
+
+TEST64 := \
+	PK64
+
+LINUX := \
 	BINUTILS_LINUX \
 	LINUX_GCC \
 	LINUX
 
+QEMU := \
+	QEMU \
+	QEMU_USER \
+	QEMU_TESTS
+
+ALL := \
+	$(NEEDED) \
+	$(TEST32) \
+	$(TC64) \
+	$(TEST64) \
+	$(LINUX) \
+	$(QEMU) \
+	RVEMU
 
 all: \
 	$(SBT) \
@@ -54,7 +80,8 @@ extra: \
 	riscv-linux \
 	riscv-pk-64 \
 	qemu \
-	qemu-user
+	qemu-user \
+	qemu-tests
 
 ###
 ### rules
@@ -397,7 +424,7 @@ $(LINUX_GCC_STAMPS)/build-gcc-linux-stage1: $(BINUTILS_LINUX_TOOLCHAIN)
 	$(MAKE) $(MAKE_OPTS) -C $(LINUX_GCC_STAGE1) inhibit-libc=true all-target-libgcc
 	$(MAKE) -C $(LINUX_GCC_STAGE1) inhibit-libc=true install-target-libgcc
 	ln -sf $(TOOLCHAIN_RELEASE)/bin/$(RV64_LINUX_TRIPLE)-as \
-		$(LINUX_GCC_STAGE1_OUT)/libexec/gcc/$(RV64_LINUX_TRIPLE)/7.0.0/as
+		$(LINUX_GCC_STAGE1_OUT)/libexec/gcc/$(RV64_LINUX_TRIPLE)/7.1.1/as
 	mkdir -p $(dir $@) && touch $@
 
 #
@@ -796,6 +823,7 @@ QEMU_TESTS_OUT := $(QEMU_TESTS_BUILD)/test1
 QEMU_TESTS_TOOLCHAIN := $(QEMU_TESTS_BUILD)/rv32i/add.o
 QEMU_TESTS_INSTALL := true
 QEMU_TESTS_ALIAS := qemu-tests
+QEMU_TESTS_DEPS := $(BINUTILS_LINUX)
 
 ###
 ### generate all rules
@@ -865,11 +893,10 @@ MAKE_DIR := $(dir $(X86_DUMMY_O))
 $(eval $(call AS,X86,$(basename $(notdir $(X86_DUMMY_O)))))
 
 MAKE_DIR := $(QEMU_TESTS_BUILD)/rv32i/
-RV32_TESTS := add addi and andi beq bge bgeu blt bltu bne lui or ori \
-  sll slli slt slti sltiu sltu sra srai srl srli sub xor xori
-RV32_TESTS_FAILING := aiupc jal jalr lb lbu lhu lw sb sw
-RV32_TESTS_MISSING := \
-  csrrw csrrs csrrc csrrwi csrrsi csrrci \
+RV32_TESTS := add addi and andi beq lui lb lbu lhu lw sb sw or ori \
+    sll slli slt slti sltiu sltu sra srai srl srli sub xor xori
+RV32_TESTS_FAILING := aiupc bge bgeu blt bltu bne jal jalr
+RV32_TESTS_MISSING := csrrw csrrs csrrc csrrwi csrrsi csrrci \
   ecall ebreak fence fence.i lh sh
 RV32_TESTS_TARGETS := $(addprefix $(MAKE_DIR)rv32-x86-,$(RV32_TESTS))
 RV32_TESTS_CLEAN := $(addprefix clean-rv32-x86-,$(RV32_TESTS))

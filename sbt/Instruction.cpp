@@ -1059,10 +1059,10 @@ llvm::Error Instruction::handleJumpToOffs(
     xassert(entryBB->name() != "entry" &&
       "only one function entry point patch is supported for now");
     bbmap(0, BasicBlockPtr(
-      new BasicBlock(_ctx, "entry", f->func(), entryBB->bb())));
+      new BasicBlock(_ctx, "entry", f->func(), bb->bb())));
     BasicBlock* newEntryBB = &**bbmap[0];
     _bld->setInsertPoint(newEntryBB);
-    _bld->br(entryBB);
+    _bld->br(bb);
 
     // translate BB
     _bld->setInsertPoint(bb);
@@ -1071,8 +1071,8 @@ llvm::Error Instruction::handleJumpToOffs(
       return err;
 
     // link to the next BB if there is no terminator
-    DBGS << "IBB=" << _bld->getInsertBlock()->name() << nl;
-    DBGS << "NBB=" << nextBB->name() << nl;
+    DBGS << "curBB=" << _bld->getInsertBlock()->name() << nl;
+    DBGS << "nextBB=" << nextBB->name() << nl;
     if (_bld->getInsertBlock()->bb()->getTerminator() == nullptr)
       _bld->br(nextBB);
     _ctx->brWasLast = true;
