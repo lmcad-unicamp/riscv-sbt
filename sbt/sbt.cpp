@@ -82,7 +82,7 @@ llvm::Error SBT::run()
 
 void SBT::dump() const
 {
-  _module->dump();
+  // _module->dump();
 }
 
 

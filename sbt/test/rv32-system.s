@@ -26,14 +26,9 @@ main:
   # save ra
   add s1, zero, ra
 
-  # s2: printf
-  lui s2, %hi(printf)
-  addi s2, s2, %lo(printf)
-
   # print test
-  lui a0, %hi(str)
-  addi a0, a0, %lo(str)
-  jalr ra, s2, 0
+  la a0, str
+  call printf
 
   # rdcycle
   # rdtime
@@ -51,25 +46,40 @@ loop:
 
   sub a1, t4, t3
   bge a1, t5, time_l
+
+  # error
   la a0, error_str
-  jalr ra, s2, 0
+  call printf
   j time_l2
 
 time_l:
   la a0, time
-  jalr ra, s2, 0
+  call printf
 time_l2:
 
   sub a1, s4, s3
-  li t1, 2000
+  li t1, 1000
   bge a1, t1, cycles_l
+
+  # error
+  mv s5, t1
   la a0, error_str
-  jalr ra, s2, 0
+  call printf
+
+  la a0, fmtX
+  mv a1, s3
+  call printf
+  la a0, fmtX
+  mv a1, s4
+  call printf
+  la a0, fmtX
+  mv a1, s5
+  call printf
   j cycles_l2
 
 cycles_l:
   la a0, cycles
-  jalr ra, s2, 0
+  call printf
 cycles_l2:
 
   # rdinstret
@@ -79,30 +89,22 @@ cycles_l2:
   nop
   nop
   nop
-#  la t3, test
-#  li t4, 123
-#  sw t4, 0(t3)
-#  li t4, 456
-#  sw t4, 0(t3)
-#  li t4, 789
-#  sw t4, 0(t3)
   csrrs t2, RDINSTRET, zero
   sub a1, t2, t1
   li t1, 5
   bge a1, t1, instret_l
   la a0, error_str
-  jalr ra, s2, 0
+  call printf
   j instret_l2
 
 instret_l:
   la a0, insts
-  jalr ra, s2, 0
+  call printf
 instret_l2:
 
   # ecall
   li a0, 0
-  la t1, fflush
-  jalr ra, t1, 0
+  call fflush
 
   li a0, 1
   la a1, ecall
@@ -112,15 +114,15 @@ instret_l2:
 
   # ebreak
   la a0, ebreak
-  jalr ra, s2, 0
+  call printf
   #ebreak
 
   # restore ra
   add ra, zero, s1
 
   # return 0
-  add a0, zero, zero
-  jalr zero, ra, 0
+  mv a0, zero
+  ret
 
 .data
 .p2align 2
@@ -132,3 +134,4 @@ time:   .asciz "time OK\n"
 insts:  .asciz "instret OK\n"
 error_str:  .asciz "ERROR\n"
 ebreak: .asciz "ebreak\n"
+fmtX:   .asciz "%08X\n"
