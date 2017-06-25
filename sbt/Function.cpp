@@ -12,7 +12,7 @@
 #include <llvm/Support/FormatVariadic.h>
 
 #undef ENABLE_DBGS
-#define ENABLE_DBGS 0
+#define ENABLE_DBGS 1
 #include "Debug.h"
 
 namespace sbt {
@@ -149,7 +149,7 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
     if (_nextBB && addr == _nextBB) {
       BasicBlock* bbptr = &**_bbMap[addr];
       xassert(bbptr && "BasicBlock not found!");
-      DBGF("{0}:", bbptr->name());
+      DBGF("insertPoint={0}:", bbptr->name());
 
       // if last instruction was not a branch, then branch
       // from previous BB to current one
@@ -171,7 +171,7 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
     // possibly invalidating bbptr
     if (auto err = inst.translate())
       return err;
-    DBGF("addr={0:X+8}", addr);
+    // DBGF("addr={0:X+8}", addr);
     // add translated instruction to BB's instruction map
     (*curBB())(addr, std::move(_ctx->bld->first()));
   }

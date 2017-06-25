@@ -865,29 +865,9 @@ tests:
 	$(MAKE) -C $(TOPDIR)/test clean all run
 	$(MAKE) -C $(TOPDIR)/sbt/test clean run-alltests
 
-
 ###
-### BEGIN debugging targets ###
+### QEMU tests
 ###
-
-TESTBIN := rv32-x86-main
-.PHONY: test-prep
-test-prep:
-	$(MAKE) $(SBT)-build $(SBT)-install
-	$(MAKE) -C $(TOPDIR)/sbt/test clean $(TESTBIN)
-
-.PHONY: test
-test: test-prep
-	cd $(TOPDIR)/sbt/test && ./$(TESTBIN)
-
-.PHONY: dbg
-dbg: test-prep
-	cd $(TOPDIR)/sbt/test && gdb --args ./$(TESTBIN)
-
-###
-### END debugging targets ###
-###
-
 
 MAKE_DIR := $(dir $(X86_DUMMY_O))
 $(eval $(call AS,X86,$(basename $(notdir $(X86_DUMMY_O)))))
@@ -920,3 +900,29 @@ rv32tests: $(QEMU_TESTS_TOOLCHAIN)
 	$(MAKE) -C $(QEMU_TESTS_BUILD)/rv32i clean all
 	$(MAKE) $(X86_DUMMY_O) $(RV32_TESTS_CLEAN) $(RV32_TESTS_TARGETS) \
 		$(RV32_TESTS_RUN)
+
+###
+### BEGIN debugging targets ###
+###
+
+TESTBIN := rv32-x86-beq
+.PHONY: test-prep
+test-prep:
+	$(MAKE) $(SBT)-build $(SBT)-install
+	$(MAKE) clean-$(TESTBIN)
+
+.PHONY: test
+test: test-prep
+	$(MAKE) $(MAKE_DIR)$(TESTBIN) 2>&1 | tee log.txt; true
+	cd $(MAKE_DIR) && \
+		$(LLVM_RELEASE_INSTALL_DIR)/bin/llvm-dis $(TESTBIN).bc; \
+		false
+
+.PHONY: dbg
+dbg: test-prep
+	@echo nop
+
+###
+### END debugging targets ###
+###
+
