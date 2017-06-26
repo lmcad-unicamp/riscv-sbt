@@ -337,7 +337,7 @@ public:
     // br
     llvm::Value* br(const BasicBlock& bb)
     {
-        DBGF("{0}", bb.name());
+        DBGF("@{0}: {1}", _bb->name(), bb.name());
         llvm::Value* v = _builder->CreateBr(bb.bb());
         updateFirst(v);
         return v;

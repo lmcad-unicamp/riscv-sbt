@@ -174,6 +174,11 @@ public:
     return _data.size();
   }
 
+  void erase(Iter it)
+  {
+      _data.erase(it, end());
+  }
+
 private:
   Vec _data;
 

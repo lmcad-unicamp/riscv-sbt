@@ -27,117 +27,124 @@ class SBTSection;
 class Function
 {
 public:
-  /**
-   * Construct instruction.
-   *
-   * @param ctx
-   * @param name
-   * @param sec section of translated binary that contains the function
-   * @param addr function address
-   * @param end guest memory address of first byte after function's last byte
-   *
-   * Note: section/end may be null/0 when the function does not correspond
-   *       to a guest one.
-   */
-  Function(
-    Context* ctx,
-    const std::string& name,
-    SBTSection* sec = nullptr,
-    uint64_t addr = Constants::INVALID_ADDR,
-    uint64_t end = Constants::INVALID_ADDR)
-    :
-    _ctx(ctx),
-    _name(name),
-    _sec(sec),
-    _addr(addr),
-    _end(end)
-  {}
+    /**
+     * Construct instruction.
+     *
+     * @param ctx
+     * @param name
+     * @param sec section of translated binary that contains the function
+     * @param addr function address
+     * @param end guest memory address of first byte after function's last byte
+     *
+     * Note: section/end may be null/0 when the function does not correspond
+     *             to a guest one.
+     */
+    Function(
+        Context* ctx,
+        const std::string& name,
+        SBTSection* sec = nullptr,
+        uint64_t addr = Constants::INVALID_ADDR,
+        uint64_t end = Constants::INVALID_ADDR)
+        :
+        _ctx(ctx),
+        _name(name),
+        _sec(sec),
+        _addr(addr),
+        _end(end)
+    {}
 
-  /**
-   * Create the function.
-   *
-   * @param ft function type
-   * @param linkage function linkage
-   */
-  void create(
-    llvm::FunctionType* ft = nullptr,
-    llvm::Function::LinkageTypes linkage = llvm::Function::ExternalLinkage);
+    /**
+     * Create the function.
+     *
+     * @param ft function type
+     * @param linkage function linkage
+     */
+    void create(
+        llvm::FunctionType* ft = nullptr,
+        llvm::Function::LinkageTypes linkage = llvm::Function::ExternalLinkage);
 
-  // translate function
-  llvm::Error translate();
+    // translate function
+    llvm::Error translate();
 
 
-  // getters
+    // getters
 
-  const std::string& name() const
-  {
-    return _name;
-  }
+    const std::string& name() const
+    {
+        return _name;
+    }
 
-  // llvm function pointer
-  llvm::Function* func() const
-  {
-    return _f;
-  }
+    // llvm function pointer
+    llvm::Function* func() const
+    {
+        return _f;
+    }
 
-  uint64_t addr() const
-  {
-    return _addr;
-  }
+    uint64_t addr() const
+    {
+        return _addr;
+    }
 
-  // basic block map
-  Map<uint64_t, BasicBlockPtr>& bbmap()
-  {
-    return _bbMap;
-  }
+    // basic block map
+    Map<uint64_t, BasicBlockPtr>& bbmap()
+    {
+        return _bbMap;
+    }
 
-  //
+    //
 
-  // update next basic block address
-  void updateNextBB(uint64_t addr)
-  {
-    if (_nextBB <= addr || addr < _nextBB)
-      _nextBB = addr;
-  }
+    // update next basic block address
+    void updateNextBB(uint64_t addr)
+    {
+        if (_nextBB <= addr || addr < _nextBB)
+            _nextBB = addr;
+    }
 
-  /**
-   * Translate instructions at given address range.
-   *
-   * @param st starting address
-   * @param end end address (after last instruction)
-   */
-  llvm::Error translateInstrs(uint64_t st, uint64_t end);
+    void setEnd(uint64_t end)
+    {
+        _end = end;
+    }
 
-  // look up function by address
-  static Function* getByAddr(Context* ctx, uint64_t addr);
+    void transferBBs(uint64_t from, Function* to);
+
+    /**
+     * Translate instructions at given address range.
+     *
+     * @param st starting address
+     * @param end end address (after last instruction)
+     */
+    llvm::Error translateInstrs(uint64_t st, uint64_t end);
+
+    // look up function by address
+    static Function* getByAddr(Context* ctx, uint64_t addr);
 
 private:
-  Context* _ctx;
-  std::string _name;
-  SBTSection* _sec;
-  uint64_t _addr;
-  uint64_t _end;
+    Context* _ctx;
+    std::string _name;
+    SBTSection* _sec;
+    uint64_t _addr;
+    uint64_t _end;
 
-  llvm::Function* _f = nullptr;
-  // address of next basic block
-  uint64_t _nextBB = 0;
-  Map<uint64_t, BasicBlockPtr> _bbMap;
+    llvm::Function* _f = nullptr;
+    // address of next basic block
+    uint64_t _nextBB = 0;
+    Map<uint64_t, BasicBlockPtr> _bbMap;
 
-  enum TranslationState {
-    ST_DFL,     // default
-    ST_PADDING  // processing padding bytes
-  };
+    enum TranslationState {
+        ST_DFL,         // default
+        ST_PADDING    // processing padding bytes
+    };
 
-  TranslationState _state = ST_DFL;
+    TranslationState _state = ST_DFL;
 
-  // methods
+    // methods
 
-  llvm::Error startMain();
-  llvm::Error start();
-  llvm::Error finish();
+    llvm::Error startMain();
+    llvm::Error start();
+    llvm::Error finish();
 
-  // current basic block pointer
-  BasicBlock* curBB();
+    // current basic block pointer
+    BasicBlock* curBB();
 };
 
 using FunctionPtr = Pointer<Function>;

@@ -16,64 +16,81 @@ template <typename T>
 class Pointer
 {
 public:
-  explicit Pointer(T* ptr = nullptr) :
-    _ptr(ptr)
-  {}
+    explicit Pointer(T* ptr = nullptr) :
+        _ptr(ptr)
+    {}
 
-  Pointer(Pointer&&) = default;
-  Pointer& operator=(Pointer&&) = default;
+    Pointer(Pointer&& other) :
+        _ptr(std::move(other._ptr))
+    {
+        other._ptr.reset();
+        NULL_CHECK;
+    }
 
-  T* get()
-  {
-    return _ptr.get();
-  }
+    Pointer& operator=(Pointer&& other)
+    {
+        _ptr = std::move(other._ptr);
+        other._ptr.reset();
+        NULL_CHECK;
+        return *this;
+    }
 
-  const T* get() const
-  {
-    return _ptr.get();
-  }
+    T* get()
+    {
+        return _ptr.get();
+    }
 
-  void reset(T* ptr)
-  {
-    _ptr.reset(ptr);
-  }
+    const T* get() const
+    {
+        return _ptr.get();
+    }
 
-  T* operator->()
-  {
-    NULL_CHECK;
-    return get();
-  }
+    void reset(T* ptr)
+    {
+        _ptr.reset(ptr);
+    }
 
-  const T* operator->() const
-  {
-    NULL_CHECK;
-    return get();
-  }
+    T* operator->()
+    {
+        NULL_CHECK;
+        return get();
+    }
 
-  T& operator*()
-  {
-    NULL_CHECK;
-    return *get();
-  }
+    const T* operator->() const
+    {
+        NULL_CHECK;
+        return get();
+    }
 
-  const T& operator*() const
-  {
-    NULL_CHECK;
-    return *get();
-  }
+    T& operator*()
+    {
+        NULL_CHECK;
+        return *get();
+    }
 
-  bool operator==(const Pointer& other) const
-  {
-    return get() == other.get();
-  }
+    const T& operator*() const
+    {
+        NULL_CHECK;
+        return *get();
+    }
 
-  bool operator<(const Pointer& other) const
-  {
-    return get() < other.get();
-  }
+    bool operator==(const Pointer& other) const
+    {
+        return get() == other.get();
+    }
+
+    bool operator<(const Pointer& other) const
+    {
+        return get() < other.get();
+    }
+
+    operator bool() const
+    {
+        return get();
+    }
 
 private:
-  std::unique_ptr<T> _ptr;
+    std::unique_ptr<T> _ptr;
 };
 
 
@@ -86,29 +103,29 @@ template <typename A, typename E>
 class ArrayPtr
 {
 public:
-  ArrayPtr(A* ptr = nullptr) :
-    _ptr(ptr)
-  {}
+    ArrayPtr(A* ptr = nullptr) :
+        _ptr(ptr)
+    {}
 
-  ArrayPtr& operator=(A* ptr)
-  {
-    _ptr = ptr;
-    return *this;
-  }
+    ArrayPtr& operator=(A* ptr)
+    {
+        _ptr = ptr;
+        return *this;
+    }
 
-  const E& operator[](size_t p) const
-  {
-    xassert(_ptr);
-    return (*_ptr)[p];
-  }
+    const E& operator[](size_t p) const
+    {
+        xassert(_ptr);
+        return (*_ptr)[p];
+    }
 
-  A* get()
-  {
-    return _ptr;
-  }
+    A* get()
+    {
+        return _ptr;
+    }
 
 private:
-  A* _ptr = nullptr;
+    A* _ptr = nullptr;
 };
 
 }

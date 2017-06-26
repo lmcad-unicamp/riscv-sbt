@@ -6,6 +6,7 @@
 #include "Disassembler.h"
 #include "Relocation.h"
 #include "SBTError.h"
+#include "Section.h"
 #include "Syscall.h"
 #include "Translator.h"
 
@@ -760,9 +761,8 @@ llvm::Error Instruction::translateBranch(BranchType bt)
     };
     Action act;
 
-    // XXX using ABI info
     bool isCall = (bt == JAL || bt == JALR) &&
-        linkReg == XRegister::RA;
+        linkReg != XRegister::ZERO;
     _ctx->brWasLast = !isCall;
     const SBTSymbol& sym = _ctx->reloc->last();
 
@@ -891,6 +891,8 @@ llvm::Error Instruction::translateBranch(BranchType bt)
 
 llvm::Error Instruction::handleCall(uint64_t target)
 {
+    DBGF("target={0:X+8}", target);
+
     // find function
     Function* f = Function::getByAddr(_ctx, target);
     _bld->call(f->func());
@@ -946,10 +948,10 @@ llvm::Error Instruction::handleJumpToOffs(
     auto it = bbmap.lower_bound(target);
     bool needToTranslateBB = false;
     // function entry basic block
-    BasicBlock* entryBB = &*bbmap.begin()->val;
-    BasicBlock* nextBB = nullptr;
+    // BasicBlock* entryBB = &*bbmap.begin()->val;
+    // BasicBlock* nextBB = nullptr;
     // end address of target basic block
-    uint64_t bbEnd = 0;
+    // uint64_t bbEnd = 0;
 
     // jump forward
     if (target > _addr) {
@@ -991,11 +993,11 @@ llvm::Error Instruction::handleJumpToOffs(
 
         // need to translate target?
         if (!inBound) {
-            bbEnd = it->key;
-            nextBB = &*it->val;
+            // bbEnd = it->key;
+            // nextBB = &*it->val;
             // create the target BB
-            bbmap(target, BasicBlockPtr(new BasicBlock(_ctx, target, f, bb)));
-            bb = &**bbmap[target];
+            // bbmap(target, BasicBlockPtr(new BasicBlock(_ctx, target, f, bb)));
+            // bb = &**bbmap[target];
             needToTranslateBB = true;
         // need to split BB?
         } else if (it->key != target) {
@@ -1014,72 +1016,80 @@ llvm::Error Instruction::handleJumpToOffs(
     BasicBlock* next = nullptr;
     if (needNextBB) {
         auto p = bbmap[nextInstrAddr];
-        if (p)
-            next = &**p;
-        else {
+        // nextBB already exists?
+        if (!p) {
             it = bbmap.lower_bound(nextInstrAddr);
             if (it != bbmap.end())
                 beforeBB = &*it->val;
 
             bbmap(nextInstrAddr, BasicBlockPtr(
                 new BasicBlock(_ctx, nextInstrAddr, f, beforeBB)));
-            next = &**bbmap[nextInstrAddr];
         }
 
         f->updateNextBB(nextInstrAddr);
     }
 
+    // need to translate target BB?
+    if (needToTranslateBB) {
+        DBGF("NeedToTranslateBB");
+
+        Function* f = Function::getByAddr(_ctx, target);
+        if (!f) {
+            // save insert point
+            BasicBlock* curBB = _bld->getInsertBlock();
+
+            // translate BB as a function
+            auto nd = bbmap.lower_bound(target);
+            xassert(nd != bbmap.end());
+            uint64_t bbEnd = nd->val->addr();
+            f->setEnd(bbEnd);
+            if (auto err = _ctx->sec->translate(f))
+                return err;
+
+            // restore insert point
+            _bld->setInsertPoint(curBB);
+            _ctx->addr = _addr;
+            _ctx->sec->updateNextFuncAddr(_addr);
+        }
+
+        if (cond) {
+            BasicBlock* beforeBB = nullptr;
+            auto nextBB = bbmap.lower_bound(nextInstrAddr);
+            if (nextBB != bbmap.end())
+                beforeBB = &*nextBB->val;
+
+            uint64_t fakeAddr = _addr + 2;
+            bbmap(fakeAddr, BasicBlockPtr(
+                new BasicBlock(_ctx, fakeAddr, f, beforeBB)));
+
+            // save insert point
+            BasicBlock* curBB = _bld->getInsertBlock();
+
+            _bld->setInsertPoint(bb);
+            if (auto err = handleCall(target))
+                return err;
+
+            // restore insert point
+            _bld->setInsertPoint(curBB);
+
+            bb = &**bbmap[fakeAddr];
+
+        } else {
+            _ctx->brWasLast = false;
+            return handleCall(target);
+        }
+    }
+
     // branch
     xassert(bb);
     if (cond) {
+        next = &**bbmap[nextInstrAddr];
         xassert(next);
         xassert(bb->addr() != next->addr());
         _bld->condBr(cond, bb, next);
     } else
         _bld->br(bb);
 
-    // switch to next BB
-    if (needNextBB)
-        _bld->setInsertPoint(next);
-
-    // need to translate target BB?
-    if (needToTranslateBB) {
-        DBGS << "NeedToTranslateBB\n";
-
-        // save insert point
-        BasicBlock* tempBB = _bld->getInsertBlock();
-        BasicBlock* prevBB = tempBB;
-
-        // add branch to new function entry BB
-        // (this code path is only reached by jump backward, when
-        //    the target is before the current function entry)
-        // TODO support more than one entry "patch"
-        xassert(entryBB->name() != "entry" &&
-            "only one function entry point patch is supported for now");
-        bbmap(0, BasicBlockPtr(
-            new BasicBlock(_ctx, "entry", f->func(), bb->bb())));
-        BasicBlock* newEntryBB = &**bbmap[0];
-        _bld->setInsertPoint(newEntryBB);
-        _bld->br(bb);
-
-        // translate BB
-        _bld->setInsertPoint(bb);
-        // translate up to the next BB
-        if (auto err = f->translateInstrs(target, bbEnd))
-            return err;
-
-        // link to the next BB if there is no terminator
-        DBGS << "curBB=" << _bld->getInsertBlock()->name() << nl;
-        DBGS << "nextBB=" << nextBB->name() << nl;
-        if (_bld->getInsertBlock()->bb()->getTerminator() == nullptr)
-            _bld->br(nextBB);
-        _ctx->brWasLast = true;
-
-        // restore insert point
-        _bld->setInsertPoint(prevBB);
-    }
-
-    DBGS << "BB=" << _bld->getInsertBlock()->name() << nl;
     return llvm::Error::success();
 }
 

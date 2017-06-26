@@ -108,13 +108,6 @@ public:
    */
   BasicBlockPtr split(uint64_t addr);
 
-private:
-  Context* _ctx;
-  llvm::BasicBlock* _bb;
-  uint64_t _addr = ~0ULL;
-  Map<uint64_t, llvm::Instruction*> _instrMap;
-
-
   // get basic block name from the specified address.
   static std::string getBBName(uint64_t addr)
   {
@@ -124,6 +117,12 @@ private:
     ss.flush();
     return name;
   }
+
+private:
+  Context* _ctx;
+  llvm::BasicBlock* _bb;
+  uint64_t _addr = ~0ULL;
+  Map<uint64_t, llvm::Instruction*> _instrMap;
 };
 
 }
