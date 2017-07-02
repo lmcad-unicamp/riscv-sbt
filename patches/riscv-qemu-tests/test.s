@@ -1,4 +1,4 @@
-.text
+.data
 
 FAIL:	.ascii	"FAIL\n"
 .equ FLEN, .-FAIL

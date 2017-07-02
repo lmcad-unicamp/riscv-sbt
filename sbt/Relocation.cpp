@@ -156,9 +156,10 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     // bool isFunction = _ctx->funcByAddr(ssym.addr, !ASSERT_NOT_NULL);
     // XXX using symbol info
     // if (!isFunction)
-    bool isFunction =
-            ssym.sec && ssym.sec->isText() &&
-            realSym->type() == llvm::object::SymbolRef::ST_Function;
+    //realSym->type() == llvm::object::SymbolRef::ST_Function;
+
+    // XXX assuming .text contains only code
+    bool isFunction = ssym.sec && ssym.sec->isText();
 
     // external function case: return our handler instead
     if (ssym.isExternal()) {

@@ -889,7 +889,7 @@ llvm::Error Instruction::translateBranch(BranchType bt)
             xassert(false && "CALL_SYMBOL should become CALL_OFFS");
 
         case CALL_OFFS:
-            err = handleCall(target);
+            err = handleCall(target, linkReg);
             break;
 
         case JUMP_TO_OFFS:
@@ -913,9 +913,10 @@ llvm::Error Instruction::translateBranch(BranchType bt)
 }
 
 
-llvm::Error Instruction::handleCall(uint64_t target)
+llvm::Error Instruction::handleCall(uint64_t target, unsigned linkReg)
 {
-    DBGF("target={0:X+8}", target);
+    DBGF("target={0:X+8}, linkReg={1}", target, linkReg);
+    xassert(false && "TODO link register");
 
     // find function
     Function* f = Function::getByAddr(_ctx, target);

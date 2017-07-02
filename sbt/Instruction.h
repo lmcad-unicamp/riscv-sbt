@@ -124,7 +124,7 @@ private:
   // branch translation entrypoint
   llvm::Error translateBranch(BranchType bt);
   // call
-  llvm::Error handleCall(uint64_t target);
+  llvm::Error handleCall(uint64_t target, unsigned linkReg);
   // indirect call
   llvm::Error handleICall(llvm::Value* target);
   // call to "external" function (for now, to libc functions)
