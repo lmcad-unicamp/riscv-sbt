@@ -44,6 +44,15 @@ public:
     void skipRelocation(uint64_t addr);
 
     /**
+     * Move to next relocation.
+     *
+     * @param addr current address
+     * @param hadNext was there a previous relocation
+     *        before the current one?
+     */
+    void next(uint64_t addr, bool hadNext);
+
+    /**
      * Get last "relocated" symbol.
      */
     const SBTSymbol& last() const

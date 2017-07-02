@@ -120,11 +120,20 @@ llvm::Error Function::start()
 }
 
 
+bool Function::terminated() const
+{
+    llvm::Value* v = _ctx->bld->getInsertBlock()->bb()->getTerminator();
+    if (v == nullptr)
+        return false;
+    return llvm::dyn_cast<llvm::ReturnInst>(v);
+}
+
+
 llvm::Error Function::finish()
 {
     auto bld = _ctx->bld;
     // add a return if there is no terminator in current block
-    if (bld->getInsertBlock()->bb()->getTerminator() == nullptr)
+    if (!bld->getInsertBlock()->terminated())
         bld->retVoid();
     _ctx->inMain = false;
     return llvm::Error::success();
@@ -192,6 +201,24 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
         // DBGF("addr={0:X+8}", addr);
         // add translated instruction to BB's instruction map
         (*curBB())(addr, std::move(_ctx->bld->first()));
+
+        // if last instruction terminated this function
+        // switch to a new one
+        //
+        // (ex: unconditional jump followed by alignment instrs)
+        if (terminated()) {
+            _end = addr + Instruction::SIZE;
+            if (end != _end) {
+                _nextf = Function::getByAddr(_ctx, _end);
+                _nextf->setEnd(end);
+
+                DBGF("function {0} was terminated at address {1:X+8}. "
+                        "Switching to function {2}",
+                        name(), addr, _nextf->name());
+
+                return llvm::Error::success();
+            }
+        }
     }
 
     return llvm::Error::success();
@@ -207,12 +234,15 @@ Function* Function::getByAddr(Context* ctx, uint64_t addr)
     // FIXME need to change this to be able to find functions in other modules
     ConstSymbolPtr sym = ctx->sec->section()->lookup(addr);
     // XXX lookup by symbol name
-    xassert(sym && "symbol not found!");
+    if (!sym)
+        DBGF("WARNING: symbol not found at {0:X+8}", addr);
 
     // create a new function
     std::string name;
-    if (!(sym->type() & llvm::object::SymbolRef::ST_Function) &&
-            !(sym->flags() & llvm::object::SymbolRef::SF_Global)) {
+    if (!sym ||
+        (!(sym->type() & llvm::object::SymbolRef::ST_Function) &&
+            !(sym->flags() & llvm::object::SymbolRef::SF_Global)))
+    {
         name = "f" + llvm::Twine::utohexstr(addr).str();
     } else
         name = sym->name();

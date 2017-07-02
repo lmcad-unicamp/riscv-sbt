@@ -75,4 +75,10 @@ BasicBlockPtr BasicBlock::split(uint64_t addr)
     return BasicBlockPtr(new BasicBlock(_ctx, bb2, addr));
 }
 
+
+bool BasicBlock::terminated() const
+{
+    return bb()->getTerminator();
+}
+
 }

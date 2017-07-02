@@ -115,6 +115,9 @@ public:
      */
     llvm::Error translateInstrs(uint64_t st, uint64_t end);
 
+    // was function terminated?
+    bool terminated() const;
+
     // look up function by address
     static Function* getByAddr(Context* ctx, uint64_t addr);
 

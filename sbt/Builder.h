@@ -319,17 +319,17 @@ public:
     }
 
     // ret void
-    llvm::Instruction* retVoid()
+    llvm::ReturnInst* retVoid()
     {
-        auto v = _builder->CreateRetVoid();
+        llvm::ReturnInst* v = _builder->CreateRetVoid();
         updateFirst(v);
         return v;
     }
 
     // ret
-    llvm::Value* ret(llvm::Value* r)
+    llvm::ReturnInst* ret(llvm::Value* r)
     {
-        auto v = _builder->CreateRet(r);
+        llvm::ReturnInst* v = _builder->CreateRet(r);
         updateFirst(v);
         return v;
     }

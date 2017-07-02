@@ -118,6 +118,9 @@ public:
     return name;
   }
 
+
+  bool terminated() const;
+
 private:
   Context* _ctx;
   llvm::BasicBlock* _bb;

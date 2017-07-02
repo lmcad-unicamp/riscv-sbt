@@ -31,14 +31,25 @@ SBTRelocation::SBTRelocation(
 }
 
 
+void SBTRelocation::next(uint64_t addr, bool hadNext)
+{
+    // increment relocation iterator until it reaches a different address
+    _rlast = _ri;
+    uint64_t reladdr = hadNext? addr - Instruction::SIZE : addr;
+    do {
+        ++_ri;
+    } while (_ri != _re && (**_ri).offset() == reladdr);
+}
+
+
 llvm::Expected<llvm::Value*>
 SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
 {
     // note: some relocations are used by two consecutive instructions
-    bool hasNext = _next != Constants::INVALID_ADDR;
+    bool hadNext = _next != Constants::INVALID_ADDR;
     ConstRelocationPtr reloc = nullptr;
 
-    if (hasNext) {
+    if (hadNext) {
         xassert(addr == _next && "unexpected relocation!");
         _next = Constants::INVALID_ADDR;
         reloc = *_ri;
@@ -69,7 +80,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             break;
 
         case llvm::ELF::R_RISCV_CALL:
-            if (hasNext) {
+            if (hadNext) {
                 DBGF("CALL(LO)");
                 isLO = true;
             } else {
@@ -102,9 +113,9 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             //    "ignore",
             //    nullptr,
             //    addr);
+            next(addr, hadNext);
             _hasSymbol = false;
             return nullptr;
-            break;
 
         default:
             DBGF("relocation type={0}", type);
@@ -126,14 +137,8 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
 
     if (isNextToo)
         _next = addr + Instruction::SIZE;
-    else {
-        // increment relocation iterator until it reaches a different address
-        _rlast = _ri;
-        uint64_t reladdr = hasNext? addr - Instruction::SIZE : addr;
-        do {
-            ++_ri;
-        } while (_ri != _re && (**_ri).offset() == reladdr);
-    }
+    else
+        next(addr, hadNext);
 
     // write relocation string
     if (isLO) {
@@ -146,10 +151,14 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     *os << ssym.name << ") = " << ssym.addr;
 
     llvm::Value* v = nullptr;
+
+    // FIXME
+    // bool isFunction = _ctx->funcByAddr(ssym.addr, !ASSERT_NOT_NULL);
     // XXX using symbol info
+    // if (!isFunction)
     bool isFunction =
-        ssym.sec && ssym.sec->isText() &&
-        realSym->type() == llvm::object::SymbolRef::ST_Function;
+            ssym.sec && ssym.sec->isText() &&
+            realSym->type() == llvm::object::SymbolRef::ST_Function;
 
     // external function case: return our handler instead
     if (ssym.isExternal()) {
@@ -164,6 +173,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     // internal function case
     } else if (isFunction) {
         uint64_t addr = ssym.addr;
+        DBGF("internal function at {0:X+8}", addr);
         addr &= mask;
         v = _ctx->c.i32(addr);
 
