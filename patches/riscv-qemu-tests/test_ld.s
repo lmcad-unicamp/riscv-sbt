@@ -3,7 +3,7 @@
 	\OP	s0, \off(t1)
 	li	s1, \res
 	li	gp, \T
-	bne	s0, s1, fail
+	FAILIF bne	s0, s1
 .endm
 
 .macro TEST_LD_DEST_BYPASS T n OP res off base

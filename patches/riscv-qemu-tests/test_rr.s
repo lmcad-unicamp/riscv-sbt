@@ -4,7 +4,7 @@
 	\OP	s0, t0, t1
 	li	s1, \r
 	li	gp, \T
-	bne	s0, s1, fail
+	FAILIF bne	s0, s1
 .endm
 
 .macro TEST_RR_DEST_BYPASS T n OP res a b
@@ -25,7 +25,7 @@
 	\OP	s0, s0, t1
 	li	s1, \res
 	li	gp, \T
-	bne	s0, s1, fail
+	FAILIF bne	s0, s1
 .endm
 
 .macro TEST_RR_SRC2_EQ_DEST T OP res a b
@@ -34,7 +34,7 @@
 	\OP	s0, t0, s0
 	li	s1, \res
 	li	gp, \T
-	bne	s0, s1, fail
+	FAILIF bne	s0, s1
 .endm
 
 .macro TEST_RR_SRC12_EQ_DEST T OP res a
@@ -42,7 +42,7 @@
 	\OP	s0, s0, s0
 	li	s1, \res
 	li	gp, \T
-	bne	s0, s1, fail
+	FAILIF bne	s0, s1
 .endm
 
 .macro TEST_RR_ZEROSRC1 T OP r b
@@ -50,7 +50,7 @@
 	\OP	s0, x0, t1
 	li	s1, \r
 	li	gp, \T
-	bne	s0, s1, fail
+	FAILIF bne	s0, s1
 .endm
 
 .macro TEST_RR_ZEROSRC2 T OP r a
@@ -58,14 +58,14 @@
 	\OP	s0, t0, x0
 	li	s1, \r
 	li	gp, \T
-	bne	s0, s1, fail
+	FAILIF bne	s0, s1
 .endm
 
 .macro TEST_RR_ZEROSRC12 T OP r
 	\OP	s0, x0, x0
 	li	s1, \r
 	li	gp, \T
-	bne	s0, s1, fail
+	FAILIF bne	s0, s1
 .endm
 
 .macro TEST_RR_ZERODEST T OP a b

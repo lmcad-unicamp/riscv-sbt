@@ -11,7 +11,7 @@ START
 	fsub.s    f3, f1, f2
 	fmv.x.s   a4, f3
 	li        gp, 9
-	bne       a3, a4, fail
+	FAILIF bne       a3, a4
 
 EXIT
 

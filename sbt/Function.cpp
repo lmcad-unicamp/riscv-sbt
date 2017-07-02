@@ -60,6 +60,13 @@ llvm::Error Function::translate()
     if (auto err = finish())
         return err;
 
+    // finished earlier: switch to next function
+    if (_nextf) {
+        // transfer unfinished BBs to new function
+        transferBBs(_end, _nextf);
+        return _sec->translate(_nextf);
+    }
+
     return llvm::Error::success();
 }
 
@@ -97,10 +104,16 @@ llvm::Error Function::start()
 {
     create();
 
-    // create first bb
-    if (_bbMap.empty())
+    DBGF("addr={0:X+8}", _addr);
+
+    BasicBlockPtr* ptr = _bbMap[_addr];
+
+    if (!ptr) {
         _bbMap(_addr, BasicBlockPtr(new BasicBlock(_ctx, _addr, _f)));
-    BasicBlock* bbptr = &**_bbMap[_addr];
+        ptr = _bbMap[_addr];
+        xassert(ptr);
+    }
+    BasicBlock* bbptr = &**ptr;
     _ctx->bld->setInsertPoint(bbptr);
 
     return llvm::Error::success();
@@ -140,15 +153,13 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
         //    introduces a new function)
         // (don't switch to self)
         if (addr != st && addr == _sec->getNextFuncAddr()) {
-            Function* nf = _ctx->funcByAddr(addr);
-            DBGF("switching to function {0} at address {1:X+8}", nf->name(), addr);
+            _nextf = _ctx->funcByAddr(addr);
+            DBGF("switching to function {0} at address {1:X+8}", _nextf->name(), addr);
 
-            // transfer unfinished BBs to new function
-            nf->setEnd(end);
+            _nextf->setEnd(end);
             _end = addr;
-            transferBBs(addr, nf);
 
-            return _sec->translate(nf);
+            return llvm::Error::success();
         }
 
         // update current bb
@@ -199,7 +210,12 @@ Function* Function::getByAddr(Context* ctx, uint64_t addr)
     xassert(sym && "symbol not found!");
 
     // create a new function
-    std::string name = sym->name();
+    std::string name;
+    if (!(sym->type() & llvm::object::SymbolRef::ST_Function) &&
+            !(sym->flags() & llvm::object::SymbolRef::SF_Global)) {
+        name = "f" + llvm::Twine::utohexstr(addr).str();
+    } else
+        name = sym->name();
     FunctionPtr f(new Function(ctx, name, ctx->sec, addr));
     f->create();
     // insert in maps
@@ -222,7 +238,7 @@ BasicBlock* Function::curBB()
 
 void Function::transferBBs(uint64_t from, Function* to)
 {
-    DBGF("from={0:X+8}", from);
+    DBGF("from={0:X+8}, to={1}, func={2}", from, to->name(), name());
 
     to->_nextBB = _nextBB;
     auto st = _bbMap.lower_bound(from);
@@ -238,13 +254,15 @@ void Function::transferBBs(uint64_t from, Function* to)
         to->_bbMap(key, std::move(it->val));
 
         // XXX test
-        auto val = to->_bbMap[key];
+        BasicBlockPtr* val = to->_bbMap[key];
         xassert(val);
         DBGF("{0}", (*val)->name());
 
         ++it;
     }
+    DBGF("erasing our bbMap...");
     _bbMap.erase(st);
+    DBGF("done");
 }
 
 }

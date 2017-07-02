@@ -15,13 +15,9 @@ FAIL:	.ascii	"FAIL\n"
 	_start:
 .endm
 
-.macro EXIT
-_exit:
-	li	a0, 0
-	li	a7, 93
-	ecall
-
-fail:
+.macro FAILFUNC
+.global failfunc
+failfunc:
 	li	a0, 2
 	la	a1, FAIL
 	li	a2, FLEN
@@ -30,6 +26,22 @@ fail:
 
 	mv	a0, gp
 	li	a7, 93 /* exit */
+	ecall
+.endm
+
+.macro FAILIF CBR a b
+	\CBR \a, \b, 1f
+	j 2f
+	1: call failfunc
+	2: nop
+.endm
+
+.macro EXIT
+FAILFUNC
+
+_exit:
+	li	a0, 0
+	li	a7, 93
 	ecall
 .endm
 

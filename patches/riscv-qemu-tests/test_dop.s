@@ -10,8 +10,8 @@
 	fmv.x.d a0, f3
 	fsflags	a1, x0
 	li	a2, \flags
-	bne	a0, a3, fail
-	bne	a1, a2, fail
+	FAILIF bne	a0, a3
+	FAILIF bne	a1, a2
 .endm
 
 .macro TEST_FP_OP1_D_DWORD_RESULT T OP flags res a
@@ -26,8 +26,8 @@
 	fmv.x.d a0, f3
 	fsflags	a1, x0
 	li	a2, \flags
-	bne	a0, a3, fail
-	bne	a1, a2, fail
+	FAILIF bne	a0, a3
+	FAILIF bne	a1, a2
 .endm
 
 .macro TEST_FP_OP2_D T OP flags res a b
@@ -44,8 +44,8 @@
 	fmv.x.d a0, f3
 	fsflags	a1, x0
 	li	a2, \flags
-	bne	a0, a3, fail
-	bne	a1, a2, fail
+	FAILIF bne	a0, a3
+	FAILIF bne	a1, a2
 .endm
 
 .macro TEST_FP_OP3_D T OP flags res a b c
@@ -64,8 +64,8 @@
 	fmv.x.d a0, f3
 	fsflags	a1, x0
 	li	a2, \flags
-	bne	a0, a3, fail
-	bne	a1, a2, fail
+	FAILIF bne	a0, a3
+	FAILIF bne	a1, a2
 .endm
 
 .macro TEST_INT_FP_OP_D T OP res a
@@ -78,7 +78,7 @@
 	fsflags	x0
 	fmv.x.d	a0, f0
 	li	gp, \T
-	bne	a0, a3, fail
+	FAILIF bne	a0, a3
 .endm
 
 .macro TEST_FCVT_S_D T res a
@@ -94,8 +94,8 @@
 	fsflags   a1, x0
 	li        a2, 0
 	li        gp, \T
-	bne       a0, a3, fail
-	bne       a1, a2, fail
+	FAILIF bne       a0, a3
+	FAILIF bne       a1, a2
 .endm
 
 .macro TEST_FCVT_D_S T res a
@@ -111,8 +111,8 @@
         fsflags	   a1, x0
 	li         a2, 0
 	li         gp, \T
-	bne        a0, a3, fail
-	bne        a1, a2, fail
+	FAILIF bne        a0, a3
+	FAILIF bne        a1, a2
 .endm
 
 .macro TEST_FP_INT_OP_D T OP flags res val rm
@@ -126,8 +126,8 @@
 	fsflags	a1, x0
 	li	a2, \flags
 	li	gp, \T
-	bne	a0, a3, fail
-	bne	a1, a2, fail
+	FAILIF bne	a0, a3
+	FAILIF bne	a1, a2
 .endm
 
 # vim: ft=asm

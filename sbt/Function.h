@@ -130,6 +130,8 @@ private:
     uint64_t _nextBB = 0;
     Map<uint64_t, BasicBlockPtr> _bbMap;
 
+    Function* _nextf = nullptr;
+
     // methods
 
     llvm::Error startMain();

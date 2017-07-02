@@ -119,7 +119,7 @@ $(eval TRANSLATE_GUEST = $(MAKE_DIR)$(if $(4),$(3),$($(1)_PREFIX)-$(3)))
 # .o -> .bc
 $(TRANSLATE_FILE).bc: $(TRANSLATE_GUEST).o
 	riscv-sbt -o $$@ $$<; rc=$$$$?; \
-		llvm-dis -o $(TRANSLATE_FILE).ll $$@; \
+		$(LLVM_INSTALL_DIR)/bin/llvm-dis -o $(TRANSLATE_FILE).ll $$@; \
 		if [ $$$$rc -ne 0 ]; then false; else true; fi
 
 # .bc -> .s

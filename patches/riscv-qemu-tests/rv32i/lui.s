@@ -5,7 +5,7 @@
 	sra	s0, s0, \shift
 	li	s1, \res
 	li	gp, \T
-	bne	s0, s1, fail
+	FAILIF bne	s0, s1
 .endm
 
 START

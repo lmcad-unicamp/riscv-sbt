@@ -3,7 +3,7 @@
 	\OP	s0, t0, \imm
 	li	s1, \res
 	li	gp, \T
-	bne	s0, s1, fail
+	FAILIF bne	s0, s1
 .endm
 
 .macro TEST_IMM_DEST_BYPASS T n OP res a imm
@@ -19,14 +19,14 @@
 	\OP	s0, s0, \imm
 	li	s1, \res
 	li	gp, \T
-	bne	s0, s1, fail
+	FAILIF bne	s0, s1
 .endm
 
 .macro TEST_IMM_ZEROSRC1 T OP res imm
 	\OP	s0, x0, \imm
 	li	s1, \res
 	li	gp, \T
-	bne	s0, s1, fail
+	FAILIF bne	s0, s1
 .endm
 
 .macro TEST_IMM_ZERODEST T OP a imm

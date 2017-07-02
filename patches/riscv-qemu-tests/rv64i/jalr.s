@@ -11,11 +11,11 @@ test_2:
 
   jalr t0, t1, 0
 linkaddr_2:
-  j fail
+  call failfunc
 
 target_2:
   la  t1, linkaddr_2
-  bne t0, t1, fail
+  FAILIF bne t0, t1
 
   # Bypassing tests
 

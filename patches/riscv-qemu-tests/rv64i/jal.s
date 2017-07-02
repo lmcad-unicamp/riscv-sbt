@@ -13,11 +13,11 @@ linkaddr_2:
     nop
     nop
 
-    j fail
+    call failfunc
 
 target_2:
     la x2, linkaddr_2
-    bne x2, x3, fail
+    FAILIF bne x2, x3
 
   # Test delay slot instructions not executed nor bypassed
 

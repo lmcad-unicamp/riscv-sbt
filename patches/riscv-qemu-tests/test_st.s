@@ -5,7 +5,7 @@
 	\iL	s0, \off(t0)
 	li	s1, \res
 	li	gp, \T
-	bne	s0, s1, fail
+	FAILIF bne	s0, s1
 .endm
 
 .macro TEST_ST_SRC12_BYPASS T n1 n2 iL iS res off base

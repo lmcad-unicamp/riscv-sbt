@@ -15,9 +15,12 @@ TOOLCHAIN_X86     := $(TOOLCHAIN)/x86
 BUILD_TYPE ?= Debug
 ifeq ($(BUILD_TYPE),Debug)
   BUILD_TYPE_DIR := debug
+  LLVM_INSTALL_DIR := $(TOOLCHAIN_DEBUG)/llvm
 else
   BUILD_TYPE_DIR := release
+  LLVM_INSTALL_DIR := $(TOOLCHAIN_RELEASE)/llvm
 endif
+
 
 TOOLCHAIN_DIR  := $(TOOLCHAIN)/$(BUILD_TYPE_DIR)
 REMOTE_DIR     := $(TOPDIR)/remote

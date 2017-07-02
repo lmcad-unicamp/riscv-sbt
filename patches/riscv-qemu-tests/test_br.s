@@ -3,10 +3,10 @@
 	li	t1, \a
 	li	t2, \b
 	\OP	t1, t2, 2f
-	bne	x0, gp, fail
+	FAILIF bne	x0, gp
 1:	bne	x0, gp, 3f
 2:	\OP	t1, t2, 1b
-	bne	x0, gp, fail
+	FAILIF bne	x0, gp
 3:
 .endm
 
@@ -16,7 +16,7 @@
 	li	t2, \b
 	\OP	t1, t2, 1f
 	bne	x0, gp, 2f
-1:	bne	x0, gp, fail
+1:	FAILIF bne	x0, gp
 2:	\OP	t1, t2, 1b
 3:
 .endm
@@ -28,7 +28,7 @@
 	# ...
 	li	t2, \b
 	# ...
-	\OP	t1, t2, fail
+	FAILIF \OP	t1, t2
 	addi	t4, t4, 1
 	li	t5, 2
 	bne	t4, t5, 1b
@@ -41,7 +41,7 @@
 	# ...
 	li	t1, \a
 	# ...
-	\OP	t1, t2, fail
+	FAILIF \OP	t1, t2
 	addi	t4, t4, 1
 	li	t5, 2
 	bne	t4, t5, 1b

@@ -917,18 +917,20 @@ rv32tests: $(QEMU_TESTS_TOOLCHAIN)
 ### BEGIN debugging targets ###
 ###
 
-TESTBIN := rv32-x86-add
+TESTBIN := rv32-x86-aiupc
 .PHONY: test-prep
 test-prep: sbt qemu-tests-reset qemu-tests
 	$(MAKE) clean-$(TESTBIN)
 
 .PHONY: test
 test: test-prep
-	$(MAKE) $(MAKE_DIR)$(TESTBIN) 2>&1 | tee log.txt
+	($(MAKE) $(MAKE_DIR)$(TESTBIN) && echo Running test && $(MAKE_DIR)$(TESTBIN) && echo OK) \
+		2>&1 | tee log.txt
 
 .PHONY: dbg
 dbg: test-prep
-	@echo nop
+	$(MAKE) $(MAKE_DIR)$(TESTBIN)
+	gdb $(MAKE_DIR)$(TESTBIN)
 
 ###
 ### END debugging targets ###
