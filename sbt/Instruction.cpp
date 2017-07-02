@@ -1001,6 +1001,8 @@ llvm::Error Instruction::handleJumpToOffs(
         } else if (it->key != target) {
             bbmap(target, bb->split(target));
             bb = &**bbmap[target];
+            // update insert point
+            _bld->setInsertPoint(bb);
         }
     }
 
