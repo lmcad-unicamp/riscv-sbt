@@ -1,0 +1,195 @@
+===
+OiCombinePass
+===
+- combine load large immediates
+- combine GEP+ShadowMemory
+
+
+===
+OiInstTranslate
+===
+- FinishFunction
+    - IREmitter: CleanRegs, FixEntryBB, FixBBTerminators
+- FinishModule
+    - IREmitter::ProcessIndirectJumps
+- HandleAluSrcOperand
+    - Reg: load from local, mark as read
+    - Imm: resolve relocation. Handle function address
+- HandleMemOperand
+    - resolve relocation and map to shadow memory
+- HandleAluDstOperand
+    - get reg and mark as written
+- HandleCallTarget
+    - IREmitter::HandleLocalCall
+    - OR handle libc call
+- HandleBranchTarget
+    - set target address and create BB
+- printInstruction - main method
+    - handle operands
+    - add first instruction to map
+    - JUMP: br
+    - BRANCH: cond br
+    - JAL: HandleCallTarget (IREmmiter::HandleLocalCall)
+    - JALR: IREmmiter: HandleFunctionExitPoint/AddIndirectCall/HandleFunctionEntryPoint
+    - IJMP: IREmmiter: AddIndirectJump to a dummy instruction
+
+
+===
+OiIREmitter
+===
+AbiLocals - save only those regs required by the ABI
+NoLocals - use global variables only
+OneRegion - whole program in one function
+OptimizeStack
+AggrOptimizeStack
+NoShadow - avoid adding shadow image offset to every memory access
+
+- CleanRegs - seems to remove unused loads/stores to registers that are not
+used, but that the compiler can't optimize out.
+- ProcessIndirectJumps
+    - for each relocation in .text:
+        - offset = rel.offset + PatchedSecAddr
+        - TargetAddr = rel.sym.addr + ShadowImage[offset] + TextOffset
+        - CodePtrs.insert(TargetAddr)
+        - if TargetAddr matches function addr: add patch: offset,
+                                                          BB[TargetAddr]
+        - IndDests.add(BB)
+        - IndDestsAddrs.add(TargetAddr)
+
+    - for each indirect jump:
+        - try to find a jump table:
+            - found: create a switch with possible destinations
+            - not found: indirect br to all possible BBs in function
+              (IndDests)
+
+    - for each indirect call: call through pointer
+
+- StartFunction
+    - build local reg file
+- StartMainFunction
+    - InsertStartupCode
+- HandleFunctionEntryPoint - sync local reg file with global one
+- HandleFunctionExitPoint - sync global reg file with local one
+- FixEntryBB - fix function entry point, to the one with no predecessors
+- FixBBTerminators
+    - CreateUnreachable on BBs with no terminators
+    - erase empty BBs
+- BuildReturns
+    - on function returns, create an indirect br, with call sites as
+      possible destinations
+- HandleBackEdge
+    - get back BB, possibly splitting an existing one
+
+
+===
+RelocationReader
+===
+
+Resolves relocations
+
+- ResolveAllDataRelocations
+    - for all relocations pointing to .data:
+        - replace the value pointing to data by:
+            - common symbol value, if relocation name matches the name of a
+              common symbol:
+                - BSS: symbol value = ELF symbol address
+                - common: symbol value = current TotalSize, that is
+                                         incremented next
+                - IREmitter: adjusts every common symbol:
+                    - value += CommonSectionAddress
+                    - (CommonSectionAddress = ShadowSize)
+            - other symbols: add section address to original symbol's address
+    - .text relocations are performed by ProcessIndirectJumps
+
+
+===
+SBTUtils
+===
+
+Convert register numbers from LLVM to OpenISA and vice-versa
+
+- GetELFOffset(section): get offset of section inside the ELF image
+- GetCommonSymbolsList: get all .bss and common symbols from ELF object
+
+
+===
+StringRefMemoryObject
+===
+
+Convenience class to extract bytes from a StringRef
+
+
+===
+SyscallsIface
+===
+
+Generate code to call libc functions.
+
+
+===
+staticbt
+===
+
+StackSize - default = 300B
+
+- OptimizeAndWriteBitcode
+    - createVerifierPass
+    - createPromoteMemoryToRegisterPass
+    - new OiCombinePass
+    - createInstructionCombiningPass
+    - createGVNPass
+    - createCFGSimplificationPass
+    - WriteBitcodeToFile
+
+- DisassembleObject
+    - get target, its disassembler, reg info, asm info, etc...
+    - create a new OiInstTranslate obj
+    - for each text section:
+        - read section symbols
+        - for each symbol:
+            - create a new function, beginning at symbol address and ending at
+              the next symbol
+            - for each instruction:
+                - disassemble it
+                - translate it (using OiInstTranlate)
+    - OptimizeAndWriteBitcode
+
+- DumpObject
+    - prints some stuff and calls DisassembleObject
+
+- DumpArchive
+    - iterate through each contained object calling DumpObject on each
+
+- DumpInput
+    - read file and call DumpArchive or DumpObject
+
+- main
+    - init LLVM targets
+    - parse command line
+    - for each input file:
+        - call DumpInput
+
+
+===
+openisa
+===
+
+build.sh:
+    - build binutils + LLVM OpenISA + newlib
+    - download SPEC
+    - download ARM cross-compiler
+    - install SPEC and ARM compiler
+    - build mibench (build_all_x86.sh)
+    - build SPEC (build_all_x86.sh)
+
+run.sh:
+    - source env.sh
+    - cd openisa/spec/testes-x86/measure_x86.sh
+
+mibench/build_all_x86.sh:
+    - for each selected benchmark:
+        - cd to bench dir
+        - for opts in -oneregion, -nolocals, (locals), -abi-locals:
+            - skip cjpeg and djpeg in -oneregion mode
+            - SBTOPT="-optimize $opts" make
+            - copy binaries to testes-x86/bin

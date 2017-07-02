@@ -15,56 +15,58 @@ namespace sbt {
 class SBTRelocation
 {
 public:
-  using ConstRelocIter = ConstRelocationPtrVec::const_iterator;
+    using ConstRelocIter = ConstRelocationPtrVec::const_iterator;
 
-  /**
-   * @param ctx
-   * @param ri relocation begin (iterator)
-   * @param re relocation end
-   */
-  SBTRelocation(
-    Context* ctx,
-    ConstRelocIter ri,
-    ConstRelocIter re);
+    /**
+     * @param ctx
+     * @param ri relocation begin (iterator)
+     * @param re relocation end
+     */
+    SBTRelocation(
+        Context* ctx,
+        ConstRelocIter ri,
+        ConstRelocIter re);
 
-  /**
-   * Handle relocation, by checking if there is a relocation for the
-   * given address, and if so returning an llvm::Value corresponding to
-   * the "relocated" value.
-   *
-   * @param addr address
-   * @param os output stream to print debug info
-   *
-   * @return "relocated" value if there was a relocation to 'addr',
-   *         or null otherwise.
-   */
-  llvm::Expected<llvm::Value*>
-  handleRelocation(uint64_t addr, llvm::raw_ostream* os);
+    /**
+     * Handle relocation, by checking if there is a relocation for the
+     * given address, and if so returning an llvm::Value corresponding to
+     * the "relocated" value.
+     *
+     * @param addr address
+     * @param os output stream to print debug info
+     *
+     * @return "relocated" value if there was a relocation to 'addr',
+     *                 or null otherwise.
+     */
+    llvm::Expected<llvm::Value*>
+    handleRelocation(uint64_t addr, llvm::raw_ostream* os);
 
-  /**
-   * Get last "relocated" symbol.
-   */
-  const SBTSymbol& last() const
-  {
-    return _last;
-  }
+    void skipRelocation(uint64_t addr);
 
-  /**
-   * Check if is there a symbol at 'addr'.
-   */
-  bool isSymbol(uint64_t addr) const
-  {
-    return _hasSymbol && _last.instrAddr == addr;
-  }
+    /**
+     * Get last "relocated" symbol.
+     */
+    const SBTSymbol& last() const
+    {
+        return _last;
+    }
+
+    /**
+     * Check if is there a symbol at 'addr'.
+     */
+    bool isSymbol(uint64_t addr) const
+    {
+        return _hasSymbol && _last.instrAddr == addr;
+    }
 
 private:
-  Context* _ctx;
-  ConstRelocIter _ri;
-  ConstRelocIter _re;
-  ConstRelocIter _rlast;
-  SBTSymbol _last;
-  bool _hasSymbol = false;
-  uint64_t _next = Constants::INVALID_ADDR;
+    Context* _ctx;
+    ConstRelocIter _ri;
+    ConstRelocIter _re;
+    ConstRelocIter _rlast;
+    SBTSymbol _last;
+    bool _hasSymbol = false;
+    uint64_t _next = Constants::INVALID_ADDR;
 };
 
 }

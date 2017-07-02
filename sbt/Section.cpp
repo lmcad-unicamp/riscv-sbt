@@ -69,8 +69,7 @@ llvm::Error SBTSection::translate()
         else
             end = symbols[i + 1]->address();
 
-        // XXX for now, translate only instructions that appear after a
-        // function or global symbol
+        // XXX function delimiters: global or function symbol
         const llvm::StringRef symname = sym->name();
         if (sym->type() == llvm::object::SymbolRef::ST_Function ||
                 sym->flags() & llvm::object::SymbolRef::SF_Global)
@@ -96,13 +95,6 @@ llvm::Error SBTSection::translate()
                     state = INSIDE_FUNC;
                 }
             }
-
-        // skip section bytes until a function like symbol is found
-        } else if (state == OUTSIDE_FUNC) {
-            DBGS << "skipping " << symname
-                << llvm::formatv(": 0x{0:X+4}, 0x{1:X+4}", symaddr, uint64_t(end))
-                << nl;
-            continue;
         }
     }
 

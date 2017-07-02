@@ -49,13 +49,37 @@ llvm::Error Instruction::translate()
 {
     namespace RISCV = llvm::RISCV;
 
+    // print address
+    *_os << llvm::formatv("{0:X-4}:\t", _addr);
+
     // disasm
     size_t size;
-    if (auto err = _ctx->disasm->disasm(_addr, _rawInst, _inst, size))
-        return err;
+    if (auto err = _ctx->disasm->disasm(_addr, _rawInst, _inst, size)) {
+        // handle invalid encoding
+        llvm::Error err2 = llvm::handleErrors(std::move(err),
+            [&](const InvalidInstructionEncoding& serr) {
+                *_os << llvm::formatv("invalid({0:X+8})", _rawInst);
+                // replace by nop
+                // ADDI ZERO, ZERO, 0
+                // imm[12]         rs1[5]  funct3[3]  rd[5]   opcode[7]
+                // 0000 0000 0000  0000 0  000        0000 0  001 0011
+                // _rawInst = 0x0000013;
+                // if (auto err = _ctx->disasm->
+                //        disasm(_addr, _rawInst, _inst, size))
+                //    return err;
 
-    // print address
-    *_os << llvm::formatv("{0:X-4}:     ", _addr);
+                _bld->nop();
+                _ctx->reloc->skipRelocation(_addr);
+                dbgprint();
+                // return llvm::Error::success();
+            });
+
+        if (err2)
+            return err2;
+        else
+            return llvm::Error::success();
+    }
+
 
     // reset builder
     _bld->reset();

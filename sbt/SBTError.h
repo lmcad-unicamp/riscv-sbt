@@ -83,6 +83,14 @@ public:
     using SBTError::SBTError;
 };
 
+
+class InvalidInstructionEncoding : public SBTError
+{
+public:
+    using SBTError::SBTError;
+};
+
+
 } // sbt
 
 #endif

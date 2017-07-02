@@ -30,7 +30,7 @@ llvm::Error Disassembler::disasm(
 #endif
   // failed to disasm
   } else {
-    SBTError serr;
+    InvalidInstructionEncoding serr;
     serr << "invalid instruction encoding at address ";
     serr << llvm::formatv("{0:X-4}", addr);
     serr << llvm::formatv(": {0:X-8}", rawInst);

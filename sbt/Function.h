@@ -130,13 +130,6 @@ private:
     uint64_t _nextBB = 0;
     Map<uint64_t, BasicBlockPtr> _bbMap;
 
-    enum TranslationState {
-        ST_DFL,         // default
-        ST_PADDING    // processing padding bytes
-    };
-
-    TranslationState _state = ST_DFL;
-
     // methods
 
     llvm::Error startMain();

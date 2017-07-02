@@ -736,6 +736,9 @@ SBT_RELEASE_CONFIGURE := \
 SBT_RELEASE_ALIAS := sbt-release
 SBT_RELEASE_DEPS := $(RISCV_LLVM_RELEASE_TOOLCHAIN) $(LLVM_RELEASE_TOOLCHAIN)
 
+.PHONY: sbt
+sbt: $(SBT)-build $(SBT)-install
+
 ###
 ### riscvemu
 ###
@@ -861,9 +864,9 @@ lc:
 	cat $(TOPDIR)/sbt/*.h $(TOPDIR)/sbt/*.cpp $(TOPDIR)/sbt/*.s | wc -l
 
 .PHONY: tests
-tests:
-	$(MAKE) -C $(TOPDIR)/test clean all run
-	$(MAKE) -C $(TOPDIR)/sbt/test clean run-alltests
+tests: sbt
+	$(MAKE) -C $(TOPDIR)/test clean all run 2>&1 | tee log.txt
+	$(MAKE) -C $(TOPDIR)/sbt/test clean run-alltests  2>&1 | tee log.txt
 
 ###
 ### QEMU tests
@@ -908,18 +911,14 @@ rv32tests: $(QEMU_TESTS_TOOLCHAIN)
 ### BEGIN debugging targets ###
 ###
 
-TESTBIN := rv32-x86-jal
+TESTBIN := rv32-x86-add
 .PHONY: test-prep
-test-prep:
-	$(MAKE) $(SBT)-build $(SBT)-install
+test-prep: sbt
 	$(MAKE) clean-$(TESTBIN)
 
 .PHONY: test
 test: test-prep
-	$(MAKE) $(MAKE_DIR)$(TESTBIN) 2>&1 | tee log.txt; true
-	cd $(MAKE_DIR) && \
-		$(LLVM_RELEASE_INSTALL_DIR)/bin/llvm-dis $(TESTBIN).bc; \
-		false
+	$(MAKE) $(MAKE_DIR)$(TESTBIN) 2>&1 | tee log.txt
 
 .PHONY: dbg
 dbg: test-prep

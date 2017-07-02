@@ -135,20 +135,6 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
         const uint8_t* rawBytes = &bytes[addr];
         uint32_t rawInst = *reinterpret_cast<const uint32_t*>(rawBytes);
 
-        // consider 0 bytes as end-of-section padding
-        if (_state == ST_PADDING) {
-            // when in padding state, all remaining function bytes should be 0
-            if (rawInst != 0) {
-                SBTError serr;
-                serr << "found non-zero byte in zero-padding area";
-                return error(serr);
-            }
-            continue;
-        } else if (rawInst == 0) {
-            _state = ST_PADDING;
-            continue;
-        }
-
         // check if we need to switch to a new function
         // (calling a target with no global/function symbol info
         //    introduces a new function)
