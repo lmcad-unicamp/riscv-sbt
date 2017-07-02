@@ -1,0 +1,9 @@
+tags
+*.o
+rv*/*
+!rv*/*.s
+!rv*/Makefile
+misc/*
+!misc/*.s
+!misc/Makefile
+.vimrc

@@ -1,0 +1,17 @@
+Non-priviledged RISC-V tests adapted for QEMU linux-user mode.
+See https://github.com/riscv/riscv-tests for the originals.
+
+Linux mode implies u-level instructions, so rv64i here means
+rv64ui in the original repo.
+
+Because of their minimalistic nature, the tests do not output
+much. Silent exit(0) means success, exit(N) with N > 0 means
+test tagged N failed. Tag is always the first argument for
+the test macros.
+
+
+How to use: check CROSS and QEMU in config.mk, then issue
+
+    make run
+
+It should build and run all available tests on the supplied qemu.
