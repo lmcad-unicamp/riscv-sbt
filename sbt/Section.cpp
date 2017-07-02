@@ -70,10 +70,17 @@ llvm::Error SBTSection::translate()
             end = symbols[i + 1]->address();
 
         // XXX function delimiters: global or function symbol
-        const llvm::StringRef symname = sym->name();
-        if (sym->type() == llvm::object::SymbolRef::ST_Function ||
-                sym->flags() & llvm::object::SymbolRef::SF_Global)
-        {
+        std::string symname = sym->name();
+        bool isFunc = sym->type() == llvm::object::SymbolRef::ST_Function;
+        bool isGlobal = sym->flags() & llvm::object::SymbolRef::SF_Global;
+        bool isValid = isFunc || isGlobal;
+        // first: use a fake symbol if none available
+        if (!isValid && i == 0) {
+            xassert(symaddr == 0);
+            symname = "rv32_init";
+            isValid = true;
+        }
+        if (isValid) {
             // function start
             if (state == OUTSIDE_FUNC) {
                 func.name = symname;

@@ -49,6 +49,9 @@ llvm::Error Instruction::translate()
 {
     namespace RISCV = llvm::RISCV;
 
+    // reset builder
+    _bld->reset();
+
     // print address
     *_os << llvm::formatv("{0:X-4}:\t", _addr);
 
@@ -80,9 +83,6 @@ llvm::Error Instruction::translate()
             return llvm::Error::success();
     }
 
-
-    // reset builder
-    _bld->reset();
 
     llvm::Error err = noError();
 
@@ -944,6 +944,37 @@ llvm::Error Instruction::handleCallExt(llvm::Value* target)
 }
 
 
+template <typename Key, typename Value,
+    typename Iter = typename sbt::Map<Key, Value>::Iter>
+static Iter getTarget(sbt::Map<Key, Value>& map, const Key& target)
+{
+    Iter it = map.lower_bound(target);
+
+    // target is the last entry
+    if (it == map.end()) {
+        xassert(!map.empty() && "empty map!");
+        return --it;
+    // entry matches target
+    } else if (target == it->key)
+        return it;
+    // target is probably the previous one
+    else if (it != map.begin())
+        return --it;
+    // target is the first one
+    else
+        return it;
+}
+
+
+static bool inBounds(
+    uint64_t val,
+    uint64_t begin,
+    uint64_t end)
+{
+    return val >= begin && val < end;
+}
+
+
 llvm::Error Instruction::handleJumpToOffs(
     uint64_t target,
     llvm::Value* cond,
@@ -951,170 +982,109 @@ llvm::Error Instruction::handleJumpToOffs(
 {
     DBGF("target={0:X+8}, cond, linkReg={1:X+8}", target, linkReg);
 
-    // get current function
-    Function* f = _ctx->f;
-
-    // next instruction
-    uint64_t nextInstrAddr = _addr + Instruction::SIZE;
-
-    // link
-    bool isCall = linkReg != XRegister::ZERO;
-    if (!cond && isCall)
-        _bld->store(_c->i32(nextInstrAddr), linkReg);
-
-    // target BB
     xassert(target != _addr && "unexpected jump to self instruction!");
 
-    // target basic block
-    BasicBlock* bb = nullptr;
-    auto& bbmap = f->bbmap();
-    // get basic block with start address >= target
-    auto it = bbmap.lower_bound(target);
-    bool needToTranslateBB = false;
-    // function entry basic block
-    // BasicBlock* entryBB = &*bbmap.begin()->val;
-    // BasicBlock* nextBB = nullptr;
-    // end address of target basic block
-    // uint64_t bbEnd = 0;
+    using BBMap = std::decay<decltype(((Function*)0)->bbmap())>::type;
+    using BBIter = BBMap::Iter;
+
+    const bool isCall = linkReg != XRegister::ZERO;
+    const bool needNextBB = !isCall;
+    const uint64_t nextInstrAddr = _addr + Instruction::SIZE;
+    Function* func;
+    BBMap* bbmap;
+    BBMap* targetBBMap;
+    BasicBlock* targetBB;
+
+    // init vars
+    func = _ctx->f;
+    bbmap = &func->bbmap();
+    targetBBMap = bbmap;
+
+    // link
+    if (!cond && isCall)
+        _bld->store(_c->i32(nextInstrAddr), linkReg);
 
     // jump forward
     if (target > _addr) {
         DBGF("jump forward");
 
+        // get basic block with start address >= target
+        BBIter it = bbmap->lower_bound(target);
+
         // BB already exists
         if (target == it->key) {
             DBGF("target exists");
-            bb = &*it->val;
+            targetBB = &*it->val;
         // need to create new BB
         } else {
-            BasicBlock* beforeBB = it != bbmap.end()? &*it->val : nullptr;
-            bbmap(target, BasicBlockPtr(new BasicBlock(_ctx, target, f, beforeBB)));
-            bb = &**bbmap[target];
-            f->updateNextBB(target);
+            BasicBlock* beforeBB = it != bbmap->end()? &*it->val : nullptr;
+            (*bbmap)(target, BasicBlockPtr(
+                new BasicBlock(_ctx, target, func, beforeBB)));
+            targetBB = &**(*bbmap)[target];
+            func->updateNextBB(target);
         }
 
     // jump backward
     } else {
         DBGF("jump backward");
-        // target BB is the last
-        if (it == bbmap.end()) {
-            xassert(!bbmap.empty() && "empty bbmap on jump backward!");
-            bb = &*(--it)->val;
-        // BB entry matches target address
-        } else if (target == it->key)
-            bb = &*it->val;
-        // target BB is probably the previous one
-        else if (it != bbmap.begin())
-            bb = &*(--it)->val;
-        // target BB is the first one
-        else
-            bb = &*it->val;
 
-        // check bounds
-        uint64_t begin = it->key;
-        uint64_t end = it->key + bb->bb()->size() * Instruction::SIZE;
-        bool inBound = target >= begin && target < end;
+        auto targetInBounds = [](uint64_t target, BasicBlock* bb, const BBIter& it) {
+            uint64_t begin = it->key;
+            uint64_t end = it->key + bb->bb()->size() * Instruction::SIZE;
+            return inBounds(target, begin, end);
+        };
 
-        // need to translate target?
+        BBIter it = getTarget(*bbmap, target);
+        targetBB = &*it->val;
+        bool inBound = targetInBounds(target, targetBB, it);
+
+        // targetBB not found in current function: look in other functions
         if (!inBound) {
-            // bbEnd = it->key;
-            // nextBB = &*it->val;
-            // create the target BB
-            // bbmap(target, BasicBlockPtr(new BasicBlock(_ctx, target, f, bb)));
-            // bb = &**bbmap[target];
-            needToTranslateBB = true;
-        // need to split BB?
-        } else if (it->key != target) {
-            bbmap(target, bb->split(target));
-            bb = &**bbmap[target];
+            auto fi = getTarget(*_ctx->_funcByAddr, target);
+            Function* targetFunc = fi->val;
+            targetBBMap = &targetFunc->bbmap();
+            it = getTarget(*targetBBMap, target);
+            targetBB = &*it->val;
+            inBound = targetInBounds(target, targetBB, it);
+            DBGF("target={0:X+8}, func={1}, targetFunc={2}, targetInBounds={3}",
+                    target, func->name(), targetFunc->name(), inBound);
+            xassert(false && "target basic block is in another function!");
+        }
+
+        // need to split targetBB?
+        if (it->key != target) {
+            (*targetBBMap)(target, targetBB->split(target));
+            targetBB = &**(*targetBBMap)[target];
             // update insert point
-            _bld->setInsertPoint(bb);
+            if (bbmap == targetBBMap)
+                _bld->setInsertPoint(targetBB);
         }
     }
 
-    DBGF("target={0:X+8}, nextInstrAddr={1:X+8}",
-        target, nextInstrAddr);
-
-    // need a next BB?
-    bool needNextBB = !isCall;
-
-    BasicBlock* beforeBB = nullptr;
-    BasicBlock* next = nullptr;
     if (needNextBB) {
-        auto p = bbmap[nextInstrAddr];
+        BasicBlock* beforeBB = nullptr;
+        auto p = (*bbmap)[nextInstrAddr];
         // nextBB already exists?
         if (!p) {
-            it = bbmap.lower_bound(nextInstrAddr);
-            if (it != bbmap.end())
+            auto it = bbmap->lower_bound(nextInstrAddr);
+            if (it != bbmap->end())
                 beforeBB = &*it->val;
 
-            bbmap(nextInstrAddr, BasicBlockPtr(
-                new BasicBlock(_ctx, nextInstrAddr, f, beforeBB)));
+            (*bbmap)(nextInstrAddr, BasicBlockPtr(
+                new BasicBlock(_ctx, nextInstrAddr, func, beforeBB)));
         }
 
-        f->updateNextBB(nextInstrAddr);
-    }
-
-    // need to translate target BB?
-    if (needToTranslateBB) {
-        DBGF("NeedToTranslateBB");
-
-        Function* f = Function::getByAddr(_ctx, target);
-        if (!f) {
-            // save insert point
-            BasicBlock* curBB = _bld->getInsertBlock();
-
-            // translate BB as a function
-            auto nd = bbmap.lower_bound(target);
-            xassert(nd != bbmap.end());
-            uint64_t bbEnd = nd->val->addr();
-            f->setEnd(bbEnd);
-            if (auto err = _ctx->sec->translate(f))
-                return err;
-
-            // restore insert point
-            _bld->setInsertPoint(curBB);
-            _ctx->addr = _addr;
-            _ctx->sec->updateNextFuncAddr(_addr);
-        }
-
-        if (cond) {
-            BasicBlock* beforeBB = nullptr;
-            auto nextBB = bbmap.lower_bound(nextInstrAddr);
-            if (nextBB != bbmap.end())
-                beforeBB = &*nextBB->val;
-
-            uint64_t fakeAddr = _addr + 2;
-            bbmap(fakeAddr, BasicBlockPtr(
-                new BasicBlock(_ctx, fakeAddr, f, beforeBB)));
-
-            // save insert point
-            BasicBlock* curBB = _bld->getInsertBlock();
-
-            _bld->setInsertPoint(bb);
-            if (auto err = handleCall(target))
-                return err;
-
-            // restore insert point
-            _bld->setInsertPoint(curBB);
-
-            bb = &**bbmap[fakeAddr];
-
-        } else {
-            _ctx->brWasLast = false;
-            return handleCall(target);
-        }
+        func->updateNextBB(nextInstrAddr);
     }
 
     // branch
-    xassert(bb);
     if (cond) {
-        next = &**bbmap[nextInstrAddr];
-        xassert(next);
-        xassert(bb->addr() != next->addr());
-        _bld->condBr(cond, bb, next);
+        BasicBlock* next = &**(*bbmap)[nextInstrAddr];
+        if (targetBB->addr() == next->addr())
+            DBGF("WARNING: conditional branch to next instruction");
+        _bld->condBr(cond, targetBB, next);
     } else
-        _bld->br(bb);
+        _bld->br(targetBB);
 
     return llvm::Error::success();
 }

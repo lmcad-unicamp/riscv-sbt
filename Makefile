@@ -816,17 +816,24 @@ QEMU_USER_ALIAS := qemu-user
 
 QEMU_TESTS_BUILD := $(BUILD_DIR)/riscv-qemu-tests
 QEMU_TESTS_MAKEFILE := $(QEMU_TESTS_BUILD)/Makefile
+
+.PHONY: qemu-tests-reset
+qemu-tests-reset:
+	rm -rf $(QEMU_TESTS_BUILD)
+
+.PHONY: qemu-tests-prepare
+qemu-tests-prepare: qemu-tests-reset
+	cp -a $(PATCHES_DIR)/riscv-qemu-tests $(QEMU_TESTS_BUILD)
+
 QEMU_TESTS_CONFIGURE := \
-  rm -rf $(QEMU_TESTS_BUILD) && \
-  cp -a $(SUBMODULES_DIR)/riscv-qemu-tests $(QEMU_TESTS_BUILD) && \
-  sed -i "s/^AS = \$$(CROSS)as -m32/AS = \$$(CROSS)as -march=rv32g/" \
-    $(QEMU_TESTS_BUILD)/common32.mk
+    $(MAKE) -C $(TOPDIR) qemu-tests-prepare
 QEMU_TESTS_MAKE_FLAGS := all32
 QEMU_TESTS_OUT := $(QEMU_TESTS_BUILD)/test1
 QEMU_TESTS_TOOLCHAIN := $(QEMU_TESTS_BUILD)/rv32i/add.o
 QEMU_TESTS_INSTALL := true
 QEMU_TESTS_ALIAS := qemu-tests
 QEMU_TESTS_DEPS := $(BINUTILS_LINUX)
+
 
 ###
 ### generate all rules
@@ -878,10 +885,9 @@ $(eval $(call AS,X86,$(basename $(notdir $(X86_DUMMY_O)))))
 MAKE_DIR := $(QEMU_TESTS_BUILD)/rv32i/
 RV32_TESTS := add addi and andi aiupc \
     beq bge bgeu blt bltu bne \
-    jal \
     lui lb lbu lhu lw sb sw or ori \
     sll slli slt slti sltiu sltu sra srai srl srli sub xor xori
-RV32_TESTS_FAILING := jalr
+RV32_TESTS_FAILING := jal jalr
 RV32_TESTS_MISSING := csrrw csrrs csrrc csrrwi csrrsi csrrci \
   ecall ebreak fence fence.i lh sh
 RV32_TESTS_TARGETS := $(addprefix $(MAKE_DIR)rv32-x86-,$(RV32_TESTS))
@@ -913,7 +919,7 @@ rv32tests: $(QEMU_TESTS_TOOLCHAIN)
 
 TESTBIN := rv32-x86-add
 .PHONY: test-prep
-test-prep: sbt
+test-prep: sbt qemu-tests-reset qemu-tests
 	$(MAKE) clean-$(TESTBIN)
 
 .PHONY: test

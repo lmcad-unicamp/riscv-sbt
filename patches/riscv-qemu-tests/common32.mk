@@ -1,5 +1,5 @@
 CROSS = riscv64-unknown-linux-gnu-
-AS = $(CROSS)as -m32
+AS = $(CROSS)as -march=rv32g
 LD = $(CROSS)ld -m elf32lriscv
 ASFLAGS = -g -I..
 LDFLAGS = -g
