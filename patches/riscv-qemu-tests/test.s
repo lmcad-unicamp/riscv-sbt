@@ -37,12 +37,12 @@ failfunc:
 .endm
 
 .macro EXIT
-FAILFUNC
-
 _exit:
 	li	a0, 0
 	li	a7, 93
 	ecall
+
+FAILFUNC
 .endm
 
 .include "test_case.s"

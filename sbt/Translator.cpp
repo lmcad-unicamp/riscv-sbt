@@ -316,6 +316,7 @@ llvm::Error Translator::genICaller()
     llvm::Value* v = c.ZERO;
     v = bld->intToPtr(v, t.i32ptr);
     bld->load(v);
+    bld->store(c.ZERO, XRegister::T1);
     bld->br(bbEnd);
 
     // end: call t1
