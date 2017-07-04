@@ -897,11 +897,11 @@ llvm::Error Instruction::translateBranch(BranchType bt)
             break;
 
         case ICALL:
-            err = handleICall(v);
+            err = handleICall(v, linkReg);
             break;
 
         case CALL_EXT:
-            err = handleCallExt(v);
+            err = handleCallExt(v, linkReg);
             break;
 
         case IJUMP:
@@ -913,6 +913,17 @@ llvm::Error Instruction::translateBranch(BranchType bt)
 }
 
 
+void Instruction::link(unsigned linkReg)
+{
+    if (linkReg == XRegister::ZERO)
+        return;
+
+    // link
+    const uint64_t nextInstrAddr = _addr + Instruction::SIZE;
+    _bld->store(_c->i32(nextInstrAddr), linkReg);
+}
+
+
 llvm::Error Instruction::handleCall(uint64_t target, unsigned linkReg)
 {
     DBGF("target={0:X+8}, linkReg={1}", target, linkReg);
@@ -920,9 +931,7 @@ llvm::Error Instruction::handleCall(uint64_t target, unsigned linkReg)
     // find function
     Function* f = Function::getByAddr(_ctx, target);
 
-    // link
-    const uint64_t nextInstrAddr = _addr + Instruction::SIZE;
-    _bld->store(_c->i32(nextInstrAddr), linkReg);
+    link(linkReg);
 
     // call
     _bld->call(f->func());
@@ -930,8 +939,12 @@ llvm::Error Instruction::handleCall(uint64_t target, unsigned linkReg)
 }
 
 
-llvm::Error Instruction::handleICall(llvm::Value* target)
+llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
 {
+    DBGF("linkReg={1}", linkReg);
+
+    link(linkReg);
+
     // icaller expects the call target in register T1
     _bld->store(target, XRegister::T1);
     _bld->call(_ctx->translator->icaller().func());
@@ -939,8 +952,12 @@ llvm::Error Instruction::handleICall(llvm::Value* target)
 }
 
 
-llvm::Error Instruction::handleCallExt(llvm::Value* target)
+llvm::Error Instruction::handleCallExt(llvm::Value* target, unsigned linkReg)
 {
+    DBGF("linkReg={1}", linkReg);
+
+    link(linkReg);
+
     // at this point, 'target' will be the address of our external
     // call handler, set by Relocator previously
     llvm::FunctionType* ft = _t->voidFunc;

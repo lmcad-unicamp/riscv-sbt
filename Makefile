@@ -885,9 +885,10 @@ $(eval $(call AS,X86,$(basename $(notdir $(X86_DUMMY_O)))))
 MAKE_DIR := $(QEMU_TESTS_BUILD)/rv32i/
 RV32_TESTS := add addi and andi aiupc \
     beq bge bgeu blt bltu bne \
+    jal jalr \
     lui lb lbu lhu lw sb sw or ori \
     sll slli slt slti sltiu sltu sra srai srl srli sub xor xori
-RV32_TESTS_FAILING := jal jalr
+RV32_TESTS_FAILING :=
 RV32_TESTS_MISSING := csrrw csrrs csrrc csrrwi csrrsi csrrci \
   ecall ebreak fence fence.i lh sh
 RV32_TESTS_TARGETS := $(addprefix $(MAKE_DIR)rv32-x86-,$(RV32_TESTS))
@@ -917,7 +918,7 @@ rv32tests: $(QEMU_TESTS_TOOLCHAIN)
 ### BEGIN debugging targets ###
 ###
 
-TESTBIN := rv32-x86-beq
+TESTBIN := rv32-x86-jalr
 .PHONY: test-prep
 test-prep: sbt qemu-tests-reset qemu-tests
 	$(MAKE) clean-$(TESTBIN)
