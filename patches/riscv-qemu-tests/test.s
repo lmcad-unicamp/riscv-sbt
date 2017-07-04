@@ -30,10 +30,10 @@ failfunc:
 .endm
 
 .macro FAILIF CBR a b
-	\CBR \a, \b, 1f
-	j 2f
-	1: call failfunc
-	2: nop
+	\CBR \a, \b, 8f
+	j 9f
+	8: call failfunc
+	9: nop
 .endm
 
 .macro EXIT

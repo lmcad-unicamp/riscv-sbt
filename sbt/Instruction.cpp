@@ -1059,10 +1059,16 @@ llvm::Error Instruction::handleJumpToOffs(
 
         // need to split targetBB?
         if (it->key != target) {
+            // if we're on the BB that's going to be splitted
+            // then we need to switch to the lower part
+            BasicBlock* curBB = _bld->getInsertBlock();
+            bool switchToTargetBB = curBB == targetBB;
+
             (*targetBBMap)(target, targetBB->split(target));
             targetBB = &**(*targetBBMap)[target];
-            // update insert point
-            if (bbmap == targetBBMap)
+
+            // switch
+            if (switchToTargetBB)
                 _bld->setInsertPoint(targetBB);
         }
     }

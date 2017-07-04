@@ -19,6 +19,7 @@ class Builder
     Types* _t;
     llvm::Instruction* _first = nullptr;
     BasicBlock* _bb = nullptr;
+    BasicBlock* _savedBB = nullptr;
 
 public:
     Builder(Context* ctx, bool noFirst = false)
@@ -377,6 +378,19 @@ public:
         DBGF("{0}", bb->name());
         _bb = bb;
         _builder->SetInsertPoint(_bb->bb());
+    }
+
+    void saveInsertBlock()
+    {
+        xassert(_bb);
+        _savedBB = _bb;
+    }
+
+    void restoreInsertBlock()
+    {
+        xassert(_savedBB);
+        setInsertPoint(_savedBB);
+        _savedBB = nullptr;
     }
 
     void setInsertPoint(BasicBlock& bb)
