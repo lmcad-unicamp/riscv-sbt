@@ -10,6 +10,7 @@
 #include "Map.h"
 #include "Utils.h"
 
+#include <llvm/Object/ELFObjectFile.h>
 #include <llvm/Object/ObjectFile.h>
 #include <llvm/Support/Error.h>
 
@@ -369,6 +370,8 @@ public:
     return _reloc.getType();
   }
 
+  uint64_t addend() const;
+
   // type name
   using TypeVec = llvm::SmallVector<char, 128>;
   TypeVec typeName() const
@@ -474,6 +477,11 @@ public:
 
   // dump object contents to stdout
   void dump() const;
+
+  const llvm::object::ObjectFile* obj() const
+  {
+      return _obj;
+  }
 
 private:
   std::pair<

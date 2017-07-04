@@ -74,6 +74,8 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     // note: some relocations are used by two consecutive instructions
     bool isNextToo = false;
 
+    bool useVal = false;
+    uint64_t val;
     switch (type) {
         case llvm::ELF::R_RISCV_HI20:
             DBGF("HI20");
@@ -99,6 +101,8 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             DBGF("PCREL_LO12_I");
             isLO = true;
             realSym = (**_rlast).symbol();
+            val = _last.val;
+            useVal = true;
             break;
 
         case llvm::ELF::R_RISCV_LO12_I:
@@ -125,12 +129,26 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     // set symbol relocation info
     SBTSymbol ssym(realSym->address(), realSym->address(),
         realSym->name(), realSym->section(), addr);
-    DBGS << __FUNCTION__
-        << llvm::formatv(": addr={0:X+4}, val={1:X+4}, name={2}\n",
-                    ssym.addr, ssym.val, ssym.name);
+    DBGF("addr={0:X+4}, val={1:X+4}, name={2}, addend={3:X+8}",
+        ssym.addr, ssym.val, ssym.name, reloc->addend());
 
     xassert((ssym.sec || !ssym.addr) && "no section found for relocation");
-    if (ssym.sec) {
+
+    // FIXME
+    // bool isFunction = _ctx->funcByAddr(ssym.addr, !ASSERT_NOT_NULL);
+    // XXX using symbol info
+    // if (!isFunction)
+    //realSym->type() == llvm::object::SymbolRef::ST_Function;
+    //
+    // XXX assuming .text contains only code
+    bool isFunction = ssym.sec && ssym.sec->isText();
+
+    if (isFunction) {
+        if (useVal)
+            ssym.val = val;
+        else
+            ssym.val += reloc->addend();
+    } else if (ssym.sec) {
         xassert(ssym.addr < ssym.sec->size() && "out of bounds relocation");
         ssym.val += ssym.sec->shadowOffs();
     }
@@ -152,15 +170,6 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
 
     llvm::Value* v = nullptr;
 
-    // FIXME
-    // bool isFunction = _ctx->funcByAddr(ssym.addr, !ASSERT_NOT_NULL);
-    // XXX using symbol info
-    // if (!isFunction)
-    //realSym->type() == llvm::object::SymbolRef::ST_Function;
-
-    // XXX assuming .text contains only code
-    bool isFunction = ssym.sec && ssym.sec->isText();
-
     // external function case: return our handler instead
     if (ssym.isExternal()) {
         auto expAddr =_ctx->translator->import(ssym.name);
@@ -173,7 +182,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
 
     // internal function case
     } else if (isFunction) {
-        uint64_t addr = ssym.addr;
+        uint64_t addr = ssym.val;
         DBGF("internal function at {0:X+8}", addr);
         addr &= mask;
         v = _ctx->c.i32(addr);

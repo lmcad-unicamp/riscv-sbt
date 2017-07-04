@@ -916,10 +916,15 @@ llvm::Error Instruction::translateBranch(BranchType bt)
 llvm::Error Instruction::handleCall(uint64_t target, unsigned linkReg)
 {
     DBGF("target={0:X+8}, linkReg={1}", target, linkReg);
-    xassert(false && "TODO link register");
 
     // find function
     Function* f = Function::getByAddr(_ctx, target);
+
+    // link
+    const uint64_t nextInstrAddr = _addr + Instruction::SIZE;
+    _bld->store(_c->i32(nextInstrAddr), linkReg);
+
+    // call
     _bld->call(f->func());
     return llvm::Error::success();
 }
