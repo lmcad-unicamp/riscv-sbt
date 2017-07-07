@@ -29,6 +29,10 @@
 # define xassert(expr) static_cast<void>(expr)
 #endif
 
+namespace sbt {
+extern bool g_debug;
+}
+
 #endif
 
 // "dynamic" part
@@ -38,11 +42,13 @@
 #undef DBGF
 #if ENABLE_DBGS
 #   include <llvm/Support/FormatVariadic.h>
-#   define DBGS llvm::outs()
+#   define DBGS (g_debug? llvm::outs() : llvm::nulls())
 #   define DBGF(...) \
     do { \
+        if (g_debug) { \
         DBGS << __FUNCTION__ << "(): " << llvm::formatv(__VA_ARGS__) << '\n'; \
         DBGS.flush(); \
+        } \
     } while (0)
 #else
 #   define DBGS llvm::nulls()

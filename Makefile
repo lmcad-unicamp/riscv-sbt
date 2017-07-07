@@ -918,13 +918,25 @@ rv32tests: $(QEMU_TESTS_TOOLCHAIN)
 ### matrix multiply test
 ###
 
+SCRIPTS := $(TOPDIR)/scripts
+RUN := $(SCRIPTS)/run.sh
+
+xxx:
+	$(RUN) "echo out && false"
+	true
+
 TARGETS := rv32 x86 rv32-x86
 SBT_TEST_DIR := $(TOPDIR)/sbt/test
+
+mmm:
+	$(RUN) $(TOPDIR)/scripts/measure.py $(SBT_TEST_DIR) mm
+
 .PHONY: mmtest
 mmtest: sbt
-	$(MAKE) -C $(SBT_TEST_DIR) $(foreach target,$(TARGETS),clean-$(target)-mm)
-	$(MAKE) -C $(SBT_TEST_DIR) $(foreach target,$(TARGETS),$(target)-mm)
-	$(TOPDIR)/scripts/measure.py $(SBT_TEST_DIR) mm
+	rm -f log.txt
+	$(RUN) $(MAKE) -C $(SBT_TEST_DIR) $(foreach target,$(TARGETS),clean-$(target)-mm)
+	$(RUN) $(MAKE) -C $(SBT_TEST_DIR) $(foreach target,$(TARGETS),$(target)-mm)
+	$(MAKE) mmm
 
 ###
 ### BEGIN debugging targets ###

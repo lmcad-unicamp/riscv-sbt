@@ -1,0 +1,3 @@
+# put /tmp into RAM
+systemctl enable tmp.mount
+systemctl start tmp.mount

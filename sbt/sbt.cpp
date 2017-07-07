@@ -1,6 +1,7 @@
 #include "sbt.h"
 
 #include "Constants.h"
+#include "Debug.h"
 #include "Object.h"
 #include "SBTError.h"
 #include "Translator.h"
@@ -14,6 +15,8 @@
 
 
 namespace sbt {
+
+bool g_debug = false;
 
 void SBT::init()
 {
@@ -186,8 +189,13 @@ int main(int argc, char* argv[])
 
     cl::opt<bool> testOpt("test");
 
+    // -debug is used by LLVM already
+    cl::opt<bool> debugOpt("x");
+
     // parse args
     cl::ParseCommandLineOptions(argc, argv);
+
+    sbt::g_debug = debugOpt;
 
     const sbt::Constants& c = sbt::Constants::global();
 
