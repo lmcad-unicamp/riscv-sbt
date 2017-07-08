@@ -107,7 +107,7 @@ llvm::Error Translator::start()
 
     // setup context
 
-    _ctx->x = new XRegisters(_ctx, DECL);
+    _ctx->x = new XRegisters(_ctx, !DECL);
     _ctx->stack = new Stack(_ctx);
     _ctx->disasm = new Disassembler(&*_disAsm, &*_instPrinter, &*_sti);
     _ctx->_func = &_funMap;
@@ -146,6 +146,7 @@ llvm::Error Translator::finish()
 
 llvm::Error Translator::genSCHandler()
 {
+    // FIXME merge SCHandler and translated code
     _ctx->x = new XRegisters(_ctx, !DECL);
 
     if (auto err = Syscall(_ctx).genHandler())
@@ -296,7 +297,7 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
 
 llvm::Error Translator::genICaller()
 {
-    DBGF("");
+    DBGF("entry");
 
     const Types& t = _ctx->t;
     Builder bldi(_ctx, NO_FIRST);

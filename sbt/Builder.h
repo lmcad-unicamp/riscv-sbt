@@ -56,8 +56,7 @@ public:
     // load register
     llvm::LoadInst* load(unsigned reg)
     {
-        xassert(_ctx->x.get() && "XRegisters pointer is null!");
-        const XRegister& x = _ctx->x[reg];
+        const XRegister& x = _ctx->x->getLocal(reg);
         llvm::LoadInst* i = _builder->CreateLoad(
                 x.var(), x.name() + "_");
         updateFirst(i);
@@ -75,10 +74,9 @@ public:
     // store value in register
     llvm::StoreInst* store(llvm::Value* v, unsigned reg)
     {
-        if (reg == 0)
-            return nullptr;
+        xassert(reg != XRegister::ZERO);
 
-        const XRegister& x = _ctx->x[reg];
+        const XRegister& x = _ctx->x->getLocal(reg);
         llvm::StoreInst* i = _builder->CreateStore(v,
                 x.var(), !VOLATILE);
         updateFirst(i);

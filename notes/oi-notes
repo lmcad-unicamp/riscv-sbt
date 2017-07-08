@@ -1,8 +1,8 @@
 ===
 OiCombinePass
 ===
-- combine load large immediates
-- combine GEP+ShadowMemory
+- combine load large immediates - ABSENT in RISC-V STB
+- combine GEP+ShadowMemory - ABSENT
 
 
 ===
@@ -10,20 +10,29 @@ OiInstTranslate
 ===
 - FinishFunction
     - IREmitter: CleanRegs, FixEntryBB, FixBBTerminators
+    - ABSENT
 - FinishModule
     - IREmitter::ProcessIndirectJumps
+    - ABSENT
 - HandleAluSrcOperand
     - Reg: load from local, mark as read
     - Imm: resolve relocation. Handle function address
+    SBT:
+    - MAYBE need to mark as read as well?
+    - TODO better handling of function address
 - HandleMemOperand
     - resolve relocation and map to shadow memory
+    - DONE
 - HandleAluDstOperand
     - get reg and mark as written
+    - MAYBE
 - HandleCallTarget
     - IREmitter::HandleLocalCall
     - OR handle libc call
+    - DONE
 - HandleBranchTarget
     - set target address and create BB
+    - DONE
 - printInstruction - main method
     - handle operands
     - add first instruction to map
@@ -32,6 +41,7 @@ OiInstTranslate
     - JAL: HandleCallTarget (IREmmiter::HandleLocalCall)
     - JALR: IREmmiter: HandleFunctionExitPoint/AddIndirectCall/HandleFunctionEntryPoint
     - IJMP: IREmmiter: AddIndirectJump to a dummy instruction
+    - DONE
 
 
 ===
@@ -46,6 +56,8 @@ NoShadow - avoid adding shadow image offset to every memory access
 
 - CleanRegs - seems to remove unused loads/stores to registers that are not
 used, but that the compiler can't optimize out.
+- MAYBE check if needed
+
 - ProcessIndirectJumps
     - for each relocation in .text:
         - offset = rel.offset + PatchedSecAddr
@@ -63,22 +75,31 @@ used, but that the compiler can't optimize out.
               (IndDests)
 
     - for each indirect call: call through pointer
+- TODO need to implement this on SBT
 
 - StartFunction
     - build local reg file
+    - TODO need to implement local reg file
 - StartMainFunction
     - InsertStartupCode
+    - DONE in parts
 - HandleFunctionEntryPoint - sync local reg file with global one
+    - TODO need to implement this
 - HandleFunctionExitPoint - sync global reg file with local one
+    - TODO need to implement this
 - FixEntryBB - fix function entry point, to the one with no predecessors
+    - MAYBE is this needed on SBT?
 - FixBBTerminators
     - CreateUnreachable on BBs with no terminators
     - erase empty BBs
+    - MAYBE is this needed on SBT?
 - BuildReturns
     - on function returns, create an indirect br, with call sites as
       possible destinations
+    - MAYBE is this needed? SBT uses LLVM return on most cases
 - HandleBackEdge
     - get back BB, possibly splitting an existing one
+    - DONE
 
 
 ===
@@ -101,15 +122,19 @@ Resolves relocations
             - other symbols: add section address to original symbol's address
     - .text relocations are performed by ProcessIndirectJumps
 
+    - DONE seems to be done on SBT
 
 ===
 SBTUtils
 ===
 
 Convert register numbers from LLVM to OpenISA and vice-versa
+- DONE
 
 - GetELFOffset(section): get offset of section inside the ELF image
+    - DONE
 - GetCommonSymbolsList: get all .bss and common symbols from ELF object
+    - DONE in another way
 
 
 ===
@@ -117,6 +142,7 @@ StringRefMemoryObject
 ===
 
 Convenience class to extract bytes from a StringRef
+- probably unneeded
 
 
 ===
@@ -124,6 +150,7 @@ SyscallsIface
 ===
 
 Generate code to call libc functions.
+- DONE in another way
 
 
 ===
@@ -140,6 +167,7 @@ StackSize - default = 300B
     - createGVNPass
     - createCFGSimplificationPass
     - WriteBitcodeToFile
+    - MAYBE need to optimize in SBT
 
 - DisassembleObject
     - get target, its disassembler, reg info, asm info, etc...
@@ -153,6 +181,7 @@ StackSize - default = 300B
                 - disassemble it
                 - translate it (using OiInstTranlate)
     - OptimizeAndWriteBitcode
+    - TODO translate multiple objects
 
 - DumpObject
     - prints some stuff and calls DisassembleObject

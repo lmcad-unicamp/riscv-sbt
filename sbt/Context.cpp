@@ -10,7 +10,7 @@ namespace sbt {
 Context::~Context()
 {
   // delete owned objects
-  delete x.get();
+  delete x;
   delete stack;
   delete disasm;
 }

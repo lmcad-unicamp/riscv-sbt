@@ -75,7 +75,7 @@ llvm::Error SBT::run()
     if (llvm::verifyModule(*_module, &DBGS)) {
         InvalidBitcode serr;
         serr << "translation produced invalid bitcode!";
-        _module->dump();
+        // _module->dump();
         return error(serr);
     }
 
