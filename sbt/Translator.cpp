@@ -28,7 +28,7 @@
 #include <llvm/Support/TargetSelect.h>
 
 #undef ENABLE_DBGS
-#define ENABLE_DBGS 0
+#define ENABLE_DBGS 1
 #include "Debug.h"
 
 
@@ -113,16 +113,19 @@ llvm::Error Translator::start()
     _ctx->_func = &_funMap;
     _ctx->_funcByAddr = &_funcByAddr;
 
-    _iCaller.create();
+    const auto& t = _ctx->t;
+    _iCaller.create(llvm::FunctionType::get(t.voidT, { t.i32 }, !VAR_ARG));
 
     // host functions
 
     llvm::FunctionType *ft = llvm::FunctionType::get(_ctx->t.i32, !VAR_ARG);
 
+    _sbtabort.reset(new Function(_ctx, "sbtabort"));
     _getCycles.reset(new Function(_ctx, "get_cycles"));
     _getTime.reset(new Function(_ctx, "get_time"));
     _getInstRet.reset(new Function(_ctx, "get_instret"));
 
+    _sbtabort->create();
     _getCycles->create(ft);
     _getTime->create(ft);
     _getInstRet->create(ft);
@@ -293,9 +296,8 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
 
 llvm::Error Translator::genICaller()
 {
-    // DBGS << __FUNCTION__ << nl;
+    DBGF("");
 
-    const Constants& c = _ctx->c;
     const Types& t = _ctx->t;
     Builder bldi(_ctx, NO_FIRST);
     Builder* bld = &bldi;
@@ -303,36 +305,34 @@ llvm::Error Translator::genICaller()
     xassert(ic);
 
     llvm::PointerType* ty = t.voidFunc->getPointerTo();
-    llvm::Value* target = nullptr;
+    xassert(!ic->arg_empty());
+    llvm::Argument& arg = *ic->arg_begin();
+    llvm::AllocaInst* target = nullptr;
 
     // basic blocks
     BasicBlock bbBeg(_ctx, "begin", ic);
     BasicBlock bbDfl(_ctx, "default", ic);
     BasicBlock bbEnd(_ctx, "end", ic);
 
-    // default:
-    // cause a segfault, to make debugging easier
-    bld->setInsertPoint(bbDfl);
-    llvm::Value* v = c.ZERO;
-    v = bld->intToPtr(v, t.i32ptr);
-    bld->load(v);
-    bld->store(c.ZERO, XRegister::T1);
-    bld->br(bbEnd);
-
-    // end: call t1
-    bld->setInsertPoint(bbEnd);
-    target = bld->load(XRegister::T1);
-    target = bld->intToPtr(target, ty);
-    bld->call(target);
-    bld->retVoid();
-
     // switch
     bld->setInsertPoint(bbBeg);
-    target = bld->load(XRegister::T1);
-    llvm::SwitchInst* sw = bld->sw(target, bbDfl, _funMap.size());
+    target = bld->_alloca(t.i32, _ctx->c.i32(1), "target");
+    llvm::SwitchInst* sw = bld->sw(&arg, bbDfl, _funMap.size());
+
+    // default: abort
+    bld->setInsertPoint(bbDfl);
+    bld->call(_sbtabort->func());
+    bld->br(bbEnd);
+
+    // end: call target
+    bld->setInsertPoint(bbEnd);
+    llvm::Value* v = bld->load(target);
+    v = bld->intToPtr(v, ty);
+    bld->call(v);
+    bld->retVoid();
 
     // cases
-    // case fun: t1 = realFunAddress;
+    // case fun: arg = realFunAddress;
     for (const auto& p : _funcByAddr) {
         Function* f = p.val;
         uint64_t addr = f->addr();
@@ -344,8 +344,7 @@ llvm::Error Translator::genICaller()
 
         BasicBlock dest(_ctx, caseStr, ic, bbDfl.bb());
         bld->setInsertPoint(dest);
-        sym = bld->ptrToInt(sym, t.i32);
-        bld->store(sym, XRegister::T1);
+        bld->store(bld->ptrToInt(sym, t.i32), target);
         bld->br(bbEnd);
 
         bld->setInsertPoint(bbBeg);

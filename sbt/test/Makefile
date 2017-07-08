@@ -48,7 +48,7 @@ X86_LIBS =
 
 ### mm (matrix multiply) ###
 
-CFLAGS = -Wall -Werror -O0
+# CFLAGS = -Wall -Werror -O0
 $(eval $(call BUILD,X86,x86-mm,CLANG,mm,save-run.out))
 $(eval $(call BUILD,RV32,rv32-mm,CLANG,mm,save-run.out))
 $(eval $(call TRANSLATE_C,RV32,X86,mm))

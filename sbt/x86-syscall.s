@@ -1,124 +1,135 @@
 # RISC-V syscall:
 #
 # syscall#: a7
-# arg0:     a0
-# arg1:     a1
-# arg2:     a2
-# arg3:     a3
-# arg4:     a4
-# arg5:     a5
+# arg0:         a0
+# arg1:         a1
+# arg2:         a2
+# arg3:         a3
+# arg4:         a4
+# arg5:         a5
 
 # X86 syscall:
 #
 # syscall#: eax
-# arg0:     ebx
-# arg1:     ecx
-# arg2:     edx
-# arg3:     esi
-# arg4:     edi
-# arg5:     ebp
+# arg0:         ebx
+# arg1:         ecx
+# arg2:         edx
+# arg3:         esi
+# arg4:         edi
+# arg5:         ebp
 
 .text
 
 .global syscall0
 syscall0:
-  movl 4(%esp), %eax
-  int $0x80
-  ret
+    movl 4(%esp), %eax
+    int $0x80
+    ret
 
 .global syscall1
 syscall1:
-  push %ebx
+    push %ebx
 
-  movl 8(%esp), %eax
-  movl 12(%esp), %ebx
-  int $0x80
+    movl 8(%esp), %eax
+    movl 12(%esp), %ebx
+    int $0x80
 
-  pop %ebx
-  ret
+    pop %ebx
+    ret
 
 .global syscall2
 syscall2:
-  push %ebx
+    push %ebx
 
-  movl 8(%esp), %eax
-  movl 12(%esp), %ebx
-  movl 16(%esp), %ecx
-  int $0x80
+    movl 8(%esp), %eax
+    movl 12(%esp), %ebx
+    movl 16(%esp), %ecx
+    int $0x80
 
-  pop %ebx
-  ret
+    pop %ebx
+    ret
 
 .global syscall3
 syscall3:
-  push %ebx
+    push %ebx
 
-  movl 8(%esp), %eax
-  movl 12(%esp), %ebx
-  movl 16(%esp), %ecx
-  movl 20(%esp), %edx
-  int $0x80
+    movl 8(%esp), %eax
+    movl 12(%esp), %ebx
+    movl 16(%esp), %ecx
+    movl 20(%esp), %edx
+    int $0x80
 
-  pop %ebx
-  ret
+    pop %ebx
+    ret
 
 .global syscall4
 syscall4:
-  push %ebx
-  push %esi
+    push %ebx
+    push %esi
 
-  movl 12(%esp), %eax
-  movl 16(%esp), %ebx
-  movl 20(%esp), %ecx
-  movl 24(%esp), %edx
-  movl 28(%esp), %esi
-  int $0x80
+    movl 12(%esp), %eax
+    movl 16(%esp), %ebx
+    movl 20(%esp), %ecx
+    movl 24(%esp), %edx
+    movl 28(%esp), %esi
+    int $0x80
 
-  pop %esi
-  pop %ebx
-  ret
+    pop %esi
+    pop %ebx
+    ret
 
 .global syscall5
 syscall5:
-  push %ebx
-  push %esi
-  push %edi
+    push %ebx
+    push %esi
+    push %edi
 
-  movl 16(%esp), %eax
-  movl 20(%esp), %ebx
-  movl 24(%esp), %ecx
-  movl 28(%esp), %edx
-  movl 32(%esp), %esi
-  movl 36(%esp), %edi
-  int $0x80
+    movl 16(%esp), %eax
+    movl 20(%esp), %ebx
+    movl 24(%esp), %ecx
+    movl 28(%esp), %edx
+    movl 32(%esp), %esi
+    movl 36(%esp), %edi
+    int $0x80
 
-  pop %edi
-  pop %esi
-  pop %ebx
-  ret
+    pop %edi
+    pop %esi
+    pop %ebx
+    ret
 
 .global syscall6
 syscall6:
-  push %ebx
-  push %esi
-  push %edi
-  push %ebp
+    push %ebx
+    push %esi
+    push %edi
+    push %ebp
 
-  movl 20(%esp), %eax
-  movl 24(%esp), %ebx
-  movl 28(%esp), %ecx
-  movl 32(%esp), %edx
-  movl 36(%esp), %esi
-  movl 40(%esp), %edi
-  movl 44(%esp), %ebp
-  int $0x80
+    movl 20(%esp), %eax
+    movl 24(%esp), %ebx
+    movl 28(%esp), %ecx
+    movl 32(%esp), %edx
+    movl 36(%esp), %esi
+    movl 40(%esp), %edi
+    movl 44(%esp), %ebp
+    int $0x80
 
-  pop %ebp
-  pop %edi
-  pop %esi
-  pop %ebx
-  ret
+    pop %ebp
+    pop %edi
+    pop %esi
+    pop %ebx
+    ret
 
+
+.global sbtabort
+sbtabort:
+    # getpid
+    movl $0x14, %eax
+    int $0x80
+    # kill
+    movl %eax, %ebx      # pid
+    movl $6, %ecx        # SIGABORT
+    movl $0x25, %eax
+    int $0x80
 
 
 # XXX
@@ -130,148 +141,148 @@ syscall6:
 
 .global syscall_init
 syscall_init:
-  push %ebx
+    push %ebx
 
-  ###
-  ### get CPU frequency
-  ###
+    ###
+    ### get CPU frequency
+    ###
 
-  # get CPU brand string
+    # get CPU brand string
 
-  movl $0x80000002, %esi
-  movl $brand_str, %edi
+    movl $0x80000002, %esi
+    movl $brand_str, %edi
 loop:
-  mov %esi, %eax
-  cpuid
-  movl %eax, (%edi)
-  movl %ebx, 4(%edi)
-  movl %ecx, 8(%edi)
-  movl %edx, 12(%edi)
+    mov %esi, %eax
+    cpuid
+    movl %eax, (%edi)
+    movl %ebx, 4(%edi)
+    movl %ecx, 8(%edi)
+    movl %edx, 12(%edi)
 
-  addl $1, %esi
-  addl $16, %edi
-  cmpl $0x80000005, %esi
-  jne loop
+    addl $1, %esi
+    addl $16, %edi
+    cmpl $0x80000005, %esi
+    jne loop
 
-  # point esi to first non space char of brand_str,
-  # starting from the end
-  # (brand_str len is 48 bytes)
+    # point esi to first non space char of brand_str,
+    # starting from the end
+    # (brand_str len is 48 bytes)
 
-  movl $brand_str, %esi
-  addl $47, %esi
+    movl $brand_str, %esi
+    addl $47, %esi
 
 loop2:
-  subl $1, %esi
-  movb (%esi), %al
-  cmpb $' ', %al
-  jne loop2
-  addl $1, %esi
+    subl $1, %esi
+    movb (%esi), %al
+    cmpb $' ', %al
+    jne loop2
+    addl $1, %esi
 
-  # now parse the frequency
+    # now parse the frequency
 
-  pushl $freq_u
-  pushl $freq_r
-  pushl $freq_l
-  pushl $freq_str
-  pushl %esi
-  calll sscanf
-  addl $20, %esp
+    pushl $freq_u
+    pushl $freq_r
+    pushl $freq_l
+    pushl $freq_str
+    pushl %esi
+    calll sscanf
+    addl $20, %esp
 
-  cmpl $3, %eax
-  jne error
+    cmpl $3, %eax
+    jne error
 
-  # freq_l = number to the left of the '.'
-  movl freq_l, %eax
+    # freq_l = number to the left of the '.'
+    movl freq_l, %eax
 
-  # GHz: multiply by 1000
-  movb freq_u, %dl
-  cmpb $'G', %dl
-  jne mhz
-  movl $1000, %ebx
-  mul %ebx
-  # then add freq_r: number to the right of the '.'
-  addl freq_r, %eax
-  jmp save_freq
+    # GHz: multiply by 1000
+    movb freq_u, %dl
+    cmpb $'G', %dl
+    jne mhz
+    movl $1000, %ebx
+    mul %ebx
+    # then add freq_r: number to the right of the '.'
+    addl freq_r, %eax
+    jmp save_freq
 
 mhz:
-  # MHz: not tested: should work if brand_str contains a '.'
-  cmpb $'M', %dl
-  jne error
+    # MHz: not tested: should work if brand_str contains a '.'
+    cmpb $'M', %dl
+    jne error
 
 save_freq:
-  movl %eax, freq
-  jmp end
+    movl %eax, freq
+    jmp end
 
 error:
-  pushl $error_str
-  calll puts
-  addl $4, %esp
+    pushl $error_str
+    calll puts
+    addl $4, %esp
 
-  pushl $1
-  calll exit
+    pushl $1
+    calll exit
 
 end:
-  pop %ebx
-  ret
+    pop %ebx
+    ret
 
 
 .global get_cycles
 get_cycles:
-  push %ebx
+    push %ebx
 
-  # flush pipeline
-  # XXX does this really changes ebx?
-  xor %eax, %eax
-  cpuid
-  # get cycles in edx:eax
-  rdtsc
+    # flush pipeline
+    # XXX does this really changes ebx?
+    xor %eax, %eax
+    cpuid
+    # get cycles in edx:eax
+    rdtsc
 
-  pop %ebx
-  ret
+    pop %ebx
+    ret
 
 # time in usec (10^-6) (edx:eax)
 .global get_time
 get_time:
-  push %ebx
-  mov freq, %ebx
+    push %ebx
+    mov freq, %ebx
 
-  # cycles: edx:eax
-  call get_cycles
+    # cycles: edx:eax
+    call get_cycles
 
-  # time =  cycles / freq (64-bit/32-bit div)
-  #
-  # cycles_hi (edx) = cycles >> 32
-  # cycles_lo (eax) = cycles & 0xFFFFFFFF
-  # time_hi (ecx) = cycles_hi / freq
-  # time_hi_remainder (edx) = cycles_hi % freq
-  # time_lo (eax) = ((time_hi_remainder << 32) | cycles_lo) / freq
+    # time =    cycles / freq (64-bit/32-bit div)
+    #
+    # cycles_hi (edx) = cycles >> 32
+    # cycles_lo (eax) = cycles & 0xFFFFFFFF
+    # time_hi (ecx) = cycles_hi / freq
+    # time_hi_remainder (edx) = cycles_hi % freq
+    # time_lo (eax) = ((time_hi_remainder << 32) | cycles_lo) / freq
 
-  # time_hi
-  push %eax         # cycles_lo
-  mov %edx, %eax    # eax = cycles_hi
-  xor %edx, %edx
-  div %ebx          # cycles_hi / freq
-  mov %eax, %ecx    # ecx = cicles_hi / freq (time_hi)
-  pop %eax          # eax = cycles_lo
+    # time_hi
+    push %eax             # cycles_lo
+    mov %edx, %eax        # eax = cycles_hi
+    xor %edx, %edx
+    div %ebx              # cycles_hi / freq
+    mov %eax, %ecx        # ecx = cicles_hi / freq (time_hi)
+    pop %eax              # eax = cycles_lo
 
-  # time_lo
-  div %ebx          # remainder:cycles_lo / freq (time_lo)
-  mov %ecx, %edx    # edx = time_hi
+    # time_lo
+    div %ebx              # remainder:cycles_lo / freq (time_lo)
+    mov %ecx, %edx        # edx = time_hi
 
-  pop %ebx
-  ret
+    pop %ebx
+    ret
 
 .global get_instret
 get_instret:
-  mov $0x40000000, %ecx
-  rdpmc
-  ret
+    mov $0x40000000, %ecx
+    rdpmc
+    ret
 
 .data
 .p2align 4
 
 # CPU frequency
-freq:   .int 0
+freq:     .int 0
 # number to the left of the point
 freq_l: .int 0
 # number to the right of the point
@@ -282,7 +293,7 @@ freq_u: .byte 0
 freq_str: .asciz "%d.%d%c"
 
 # error string
-error_str:  .asciz "syscall_init failed!\n"
+error_str:    .asciz "syscall_init failed!\n"
 
 # CPU brand string
-brand_str:  .zero 64
+brand_str:    .zero 64

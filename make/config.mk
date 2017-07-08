@@ -1,8 +1,10 @@
 ### config ###
 
 # flags
-CFLAGS    = -Wall -Werror -O2
+CFLAGS    = -Wall -Werror -O3
 CXXFLAGS  = $(CFLAGS) -std=c++11
+LLCFLAGS  = -O3
+SBTFLAGS  = -x
 MAKE_OPTS ?= -j9
 
 # toolchain

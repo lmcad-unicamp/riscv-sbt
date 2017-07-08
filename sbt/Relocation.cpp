@@ -77,10 +77,6 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     bool useVal = false;
     uint64_t val;
     switch (type) {
-        case llvm::ELF::R_RISCV_HI20:
-            DBGF("HI20");
-            break;
-
         case llvm::ELF::R_RISCV_CALL:
             if (hadNext) {
                 DBGF("CALL(LO)");
@@ -105,18 +101,24 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             useVal = true;
             break;
 
+        case llvm::ELF::R_RISCV_HI20:
+            DBGF("HI20");
+            break;
+
         case llvm::ELF::R_RISCV_LO12_I:
             DBGF("LO12_I");
             isLO = true;
             break;
 
+        // ignored
         case llvm::ELF::R_RISCV_ALIGN:
-            DBGF("ignored: type={0}", type);
-            //_last = SBTSymbol(addr,
-            //    _ctx->sec->section()->shadowOffs() + addr,
-            //    "ignore",
-            //    nullptr,
-            //    addr);
+            DBGF("ALIGN: ignored: type={0}", type);
+            next(addr, hadNext);
+            _hasSymbol = false;
+            return nullptr;
+
+        case llvm::ELF::R_RISCV_BRANCH:
+            DBGF("BRANCH");
             next(addr, hadNext);
             _hasSymbol = false;
             return nullptr;

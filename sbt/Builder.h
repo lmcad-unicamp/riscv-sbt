@@ -365,6 +365,17 @@ public:
         updateFirst(v);
     }
 
+    // alloca
+    llvm::AllocaInst* _alloca(
+        llvm::Type* ty,
+        llvm::Value* arrSize,
+        const llvm::Twine& name)
+    {
+        llvm::AllocaInst* a = _builder->CreateAlloca(ty, arrSize, name);
+        updateFirst(a);
+        return a;
+    }
+
     // get insert basic block
     BasicBlock* getInsertBlock()
     {

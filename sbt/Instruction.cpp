@@ -945,9 +945,7 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
 
     link(linkReg);
 
-    // icaller expects the call target in register T1
-    _bld->store(target, XRegister::T1);
-    _bld->call(_ctx->translator->icaller().func());
+    _bld->call(_ctx->translator->icaller().func(), { target });
     return llvm::Error::success();
 }
 

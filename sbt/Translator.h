@@ -109,6 +109,7 @@ private:
 
   // host functions
 
+  FunctionPtr _sbtabort;
   FunctionPtr _getCycles;
   FunctionPtr _getTime;
   FunctionPtr _getInstRet;

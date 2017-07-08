@@ -118,13 +118,13 @@ $(eval TRANSLATE_GUEST = $(MAKE_DIR)$(if $(4),$(3),$($(1)_PREFIX)-$(3)))
 
 # .o -> .bc
 $(TRANSLATE_FILE).bc: $(TRANSLATE_GUEST).o
-	riscv-sbt -o $$@ $$<; rc=$$$$?; \
+	riscv-sbt $(SBTFLAGS) -o $$@ $$<; rc=$$$$?; \
 		$(LLVM_INSTALL_DIR)/bin/llvm-dis -o $(TRANSLATE_FILE).ll $$@; \
 		if [ $$$$rc -ne 0 ]; then false; else true; fi
 
 # .bc -> .s
 $(TRANSLATE_FILE).s: $(TRANSLATE_FILE).bc $(TRANSLATE_FILE).ll
-	llc -O0 -o $$@ -march $($(2)_MARCH) $$<
+	llc $(LLCFLAGS) -o $$@ -march $($(2)_MARCH) $$<
 endef
 
 

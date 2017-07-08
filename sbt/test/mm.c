@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 
-#define ROWS    300
+#define ROWS    500
 #define COLS    ROWS
 
 #define ELEM(M, i, j) \
@@ -26,6 +26,16 @@ static void init()
     }
 }
 
+static void print(int *m)
+{
+    int i;
+    int j;
+
+    for (i = 0; i < ROWS; i++)
+        for (j = 0; j < COLS; j++)
+            printf("M[%d,%d]=%d\n", i, j, ELEM(m, i, j));
+}
+
 int main()
 {
     int i;
@@ -39,9 +49,6 @@ int main()
             for (k = 0; k < COLS; k++)
                 ELEM(C, i, j) += ELEM(A, i, k) * ELEM(B, k, j);
 
-    for (i = 0; i < ROWS; i++)
-        for (j = 0; j < COLS; j++)
-            printf("C[%d,%d]=%d\n", i, j, ELEM(C, i, j));
-
+    print(C);
     return 0;
 }

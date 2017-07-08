@@ -29,11 +29,9 @@ class Test:
         sys.stdout.flush()
         with open(td.out, 'w') as f:
             t0 = time.time()
-            rc = subprocess.call([path], stdout=f)
+            subprocess.check_call([path], stdout=f)
             t1 = time.time()
             t = t1 - t0
-        if rc:
-            sys.exit("ERROR: " + bin + " returned " + str(rc))
         print("time taken:", t)
         td.time = t
 
