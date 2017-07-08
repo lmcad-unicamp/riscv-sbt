@@ -59,7 +59,8 @@ RV32_X86_TESTS := $(foreach test,$(TESTS),rv32-x86-$(test))
 
 tests: $(RV32_TESTS) $(RV32_X86_TESTS)
 
-run-tests: tests $(foreach test,$(TESTS),test-$(test))
+# XXX removed mm from tests to run
+run-tests: tests $(foreach test,$(filter-out mm,$(TESTS)),test-$(test))
 	@echo "All tests passed!"
 
 #clean-tests:
