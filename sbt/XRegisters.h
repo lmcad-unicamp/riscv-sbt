@@ -75,19 +75,55 @@ public:
     }
 
     // llvm variable
+    /*
     llvm::Value* var() const
     {
         return _x;
     }
+    */
 
     // get RISC-V register number from llvm MCInst reg number
     static unsigned num(unsigned reg);
+
+    llvm::Value* get()
+    {
+        return _x;
+    }
+
+    llvm::Value* getForRead()
+    {
+        _read = true;
+        return _x;
+    }
+
+    bool hasRead() const
+    {
+        return _read;
+    }
+
+    llvm::Value* getForWrite()
+    {
+        _write = true;
+        return _x;
+    }
+
+    bool hasWrite() const
+    {
+        return _write;
+    }
+
+    bool hasAccess() const
+    {
+        return _read || _write;
+    }
 
 private:
     unsigned _num;
     std::string _name = getName(_num);
     llvm::Value* _x;
     bool _local;
+    bool _read = false;
+    bool _write = false;
 
 
     // register name on generated llvm IR
@@ -124,7 +160,7 @@ public:
 
     // get register by its number
 
-    const XRegister& getReg(size_t p) const
+    XRegister& getReg(size_t p)
     {
         xassert(p < NUM && "register index is out of bounds");
         return _regs[p];

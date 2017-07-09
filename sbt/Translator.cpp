@@ -116,7 +116,12 @@ llvm::Error Translator::start()
     _ctx->_funcByAddr = &_funcByAddr;
 
     const auto& t = _ctx->t;
-    _iCaller.create(llvm::FunctionType::get(t.voidT, { t.i32 }, !VAR_ARG));
+    std::vector<llvm::Type*> args;
+    const size_t n = 9;
+    args.reserve(n);
+    for (size_t i = 0; i < n; i++)
+        args.push_back(t.i32);
+    _iCaller.create(llvm::FunctionType::get(t.i32, args, !VAR_ARG));
 
     // host functions
 
@@ -185,13 +190,8 @@ llvm::Error Translator::translate()
 
 llvm::Expected<uint64_t> Translator::import(const std::string& func)
 {
-    DBGF("enter");
-    std::string rv32Func = "rv32_" + func;
-
-    auto& ctx = *_ctx->ctx;
-
     // check if the function was already processed
-    if (auto f = _funMap[rv32Func])
+    if (auto f = _funMap[func])
         return (*f)->addr();
 
     // load libc module
@@ -208,7 +208,8 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
             return llvm::errorCodeToError(res.getError());
         llvm::MemoryBufferRef buf = **res;
 
-        auto expMod = llvm::parseBitcodeFile(buf, ctx);
+        llvm::LLVMContext* ctx = _ctx->ctx;
+        auto expMod = llvm::parseBitcodeFile(buf, *ctx);
         if (!expMod)
             return expMod.takeError();
         _lcModule = std::move(*expMod);
@@ -218,80 +219,29 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
     llvm::Function* lf = _lcModule->getFunction(func);
     if (!lf) {
         SBTError serr;
-        serr << "Function not found: " << func;
+        serr << "function not found: " << func;
         return error(serr);
     }
     llvm::FunctionType* ft = lf->getFunctionType();
 
-    Builder* bld = _ctx->bld;
-    xassert(bld && "bld is null");
-    auto module = _ctx->module;
-    auto& t = _ctx->t;
+    xassert(ft->getNumParams() < 9 &&
+        "external functions with more than 8 params are not supported!");
 
-    // declare imported function in our module
-    llvm::Function* impf =
-        llvm::Function::Create(ft,
-                llvm::GlobalValue::ExternalLinkage, func, module);
-
-    // create our caller to the external function
-    DBGF("create caller");
+    // set a fake guest address for the external function
     if (!_extFuncAddr)
         _extFuncAddr = 0xFFFF0000;
     uint64_t addr = _extFuncAddr;
-    Function* f = new Function(_ctx, rv32Func, nullptr, addr);
+    DBGF("{0:X+8} -> {1}", addr, func);
+
+    // declare imported function in our module
+    Function* f = new Function(_ctx, func, nullptr, addr);
     FunctionPtr fp(f);
-    f->create(t.voidFunc, llvm::Function::PrivateLinkage);
+    f->create(ft);
+
     // add to maps
     _funcByAddr(_extFuncAddr, std::move(f));
     _funMap(f->name(), std::move(fp));
     _extFuncAddr += Instruction::SIZE;
-
-    BasicBlock bb(_ctx, "entry", f->func());
-    BasicBlock* prevBB = bld->getInsertBlock();
-    bld->setInsertPoint(bb);
-
-    OnScopeExit restoreInsertPoint(
-        [&bld, &prevBB]() {
-            bld->setInsertPoint(prevBB);
-        });
-
-    unsigned numParams = ft->getNumParams();
-    xassert(numParams < 9 &&
-            "external functions with more than 8 arguments are not supported");
-
-    // build args
-    DBGF("build args");
-    std::vector<llvm::Value*> args;
-    unsigned reg = XRegister::A0;
-    unsigned i = 0;
-    for (; i < numParams; i++) {
-        llvm::Value* v = bld->load(reg++);
-        llvm::Type* ty = ft->getParamType(i);
-
-        // need to cast?
-        if (ty != t.i32)
-            v = bld->bitOrPointerCast(v, ty);
-
-        args.push_back(v);
-    }
-
-    // varArgs: passing 4 extra args for now
-    if (ft->isVarArg()) {
-        unsigned n = MIN(i + 4, 8);
-        for (; i < n; i++)
-            args.push_back(bld->load(reg++));
-    }
-
-    // call the function
-    llvm::Value* v;
-    if (ft->getReturnType()->isVoidTy()) {
-        v = bld->call(impf, args);
-    } else {
-        v = bld->call(impf, args, impf->getName());
-        bld->store(v, XRegister::A0);
-    }
-
-    v = bld->retVoid();
 
     return addr;
 }
@@ -301,38 +251,30 @@ llvm::Error Translator::genICaller()
 {
     DBGF("entry");
 
+    // prepare
+    const Constants& c = _ctx->c;
     const Types& t = _ctx->t;
     Builder bldi(_ctx, NO_FIRST);
     Builder* bld = &bldi;
     llvm::Function* ic = _iCaller.func();
+    const size_t maxArgs = ic->arg_size() - 1;
     xassert(ic);
 
-    llvm::PointerType* ty = t.voidFunc->getPointerTo();
     xassert(!ic->arg_empty());
-    llvm::Argument& arg = *ic->arg_begin();
-    llvm::AllocaInst* target = nullptr;
+    llvm::Argument& target = *ic->arg_begin();
 
     // basic blocks
     BasicBlock bbBeg(_ctx, "begin", ic);
     BasicBlock bbDfl(_ctx, "default", ic);
-    BasicBlock bbEnd(_ctx, "end", ic);
 
-    // switch
+    // begin: switch
     bld->setInsertPoint(bbBeg);
-    target = bld->_alloca(t.i32, _ctx->c.i32(1), "target");
-    llvm::SwitchInst* sw = bld->sw(&arg, bbDfl, _funMap.size());
+    llvm::SwitchInst* sw = bld->sw(&target, bbDfl, _funMap.size());
 
     // default: abort
     bld->setInsertPoint(bbDfl);
     bld->call(_sbtabort->func());
-    bld->br(bbEnd);
-
-    // end: call target
-    bld->setInsertPoint(bbEnd);
-    llvm::Value* v = bld->load(target);
-    v = bld->intToPtr(v, ty);
-    bld->call(v);
-    bld->retVoid();
+    bld->ret(c.ZERO);
 
     // cases
     // case fun: arg = realFunAddress;
@@ -342,16 +284,84 @@ llvm::Error Translator::genICaller()
         DBGF("function={0}, addr={1:X+8}", f->name(), addr);
         xassert(addr != Constants::INVALID_ADDR);
 
+        // get function by symbol
+        // XXX this may fail for internal functions
         std::string caseStr = "case_" + f->name();
-        llvm::Value* sym = _ctx->module->getValueSymbolTable().lookup(f->name());
+        llvm::Value* sym =
+            _ctx->module->getValueSymbolTable().lookup(f->name());
+        xassert(sym);
 
+        // prepare
+        llvm::Function* llf = f->func();
+        llvm::FunctionType* llft = llf->getFunctionType();
+        size_t fixedArgs = llft->getNumParams();
+        size_t totalArgs;
+        // varArgs: passing 4 extra args for now
+        if (llft->isVarArg())
+            totalArgs = MIN(fixedArgs + 4, maxArgs);
+        else
+            totalArgs = fixedArgs;
+        std::vector<llvm::Value*> args;
+        args.reserve(totalArgs);
+
+        // BB
         BasicBlock dest(_ctx, caseStr, ic, bbDfl.bb());
         bld->setInsertPoint(dest);
-        bld->store(bld->ptrToInt(sym, t.i32), target);
-        bld->br(bbEnd);
+
+        // XXX skip main for now
+        if (f->name() == "main") {
+            bld->br(bbDfl);
+            bld->setInsertPoint(bbBeg);
+            sw->addCase(c.i32(addr), dest.bb());
+            continue;
+        }
+
+        // set args
+        auto argit = ic->arg_begin();
+        argit++;    // skip target
+        for (size_t i = 0; i < totalArgs; i++, ++argit) {
+            llvm::Value* v = &*argit;
+            llvm::Type* ty = i < fixedArgs? llft->getParamType(i) : t.i32;
+
+            // need to cast?
+            if (ty != t.i32) {
+                /*
+                DBGF("cast from: ");
+                v->getType()->dump();
+                DBGF("cast to: ");
+                ty->dump();
+                DBGS.flush();
+                */
+
+                v = bld->bitOrPointerCast(v, ty);
+            }
+
+            args.push_back(v);
+        }
+
+        // call
+        llvm::PointerType* ty = llft->getPointerTo();
+        llvm::Value* fptr = bld->bitOrPointerCast(sym, ty);
+        llvm::Value* ret;
+        /*
+        DBGF("ft:");
+        llft->dump();
+        DBGF("args:");
+        for (auto arg : args)
+            arg->dump();
+        */
+        if (llft->getReturnType()->isVoidTy()) {
+            bld->call(fptr, args);
+            ret = _ctx->c.ZERO;
+        } else {
+            ret = bld->call(fptr, args);
+            if (ret->getType() != t.i32)
+                ret = bld->bitOrPointerCast(ret, t.i32);
+        }
+        bld->ret(ret);
 
         bld->setInsertPoint(bbBeg);
-        sw->addCase(llvm::ConstantInt::get(t.i32, addr), dest.bb());
+        sw->addCase(c.i32(addr), dest.bb());
     }
 
     return llvm::Error::success();

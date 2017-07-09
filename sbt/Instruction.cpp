@@ -945,13 +945,45 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
 
     link(linkReg);
 
-    _bld->call(_ctx->translator->icaller().func(), { target });
+    // prepare
+    const Function& ic = _ctx->translator->icaller();
+    llvm::Function* llic = ic.func();
+    Function* f = _ctx->f;
+    xassert(llic);
+    xassert(f);
+
+    // set args
+    size_t n = llic->arg_size();
+    std::vector<llvm::Value*> args;
+    args.reserve(n);
+    args.push_back(target);
+    size_t i = 1;
+    unsigned reg = XRegister::A0;
+    for (; i < n; i++, reg++) {
+        XRegister& x = f->getReg(reg);
+        if (!x.hasWrite())
+            break;
+        args.push_back(_bld->load(reg));
+    }
+    for (; i < n; i++)
+        args.push_back(_ctx->c.ZERO);
+
+    // dump args
+    // for (auto arg : args)
+    //    arg->dump();
+
+    // call
+    llvm::Value* v = _bld->call(llic, args);
+    _bld->store(v, XRegister::A0);
+
     return llvm::Error::success();
 }
 
 
 llvm::Error Instruction::handleCallExt(llvm::Value* target, unsigned linkReg)
 {
+    xunreachable("handleCallExt() should not be needed");
+    /*
     DBGF("linkReg={1}", linkReg);
 
     link(linkReg);
@@ -962,6 +994,7 @@ llvm::Error Instruction::handleCallExt(llvm::Value* target, unsigned linkReg)
     llvm::Value* v = _bld->intToPtr(target, ft->getPointerTo());
     v = _bld->call(v);
     return llvm::Error::success();
+    */
 }
 
 

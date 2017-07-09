@@ -43,9 +43,6 @@ llvm::Error Function::translate()
     xassert(_addr != Constants::INVALID_ADDR);
     xassert(_end != Constants::INVALID_ADDR);
 
-    // create local register file
-    _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
-
     // start
     if (_name == "main") {
         if (auto err = startMain())
@@ -145,8 +142,57 @@ llvm::Error Function::finish()
     if (!bld->getInsertBlock()->terminated())
         bld->retVoid();
     _ctx->inMain = false;
+    cleanRegs();
     _f->dump();
+    // _f->viewCFG();
     return llvm::Error::success();
+}
+
+
+void Function::cleanRegs()
+{
+    for (size_t i = 1; i < XRegisters::NUM; i++) {
+        XRegister& x = _regs->getReg(i);
+        if (!x.hasAccess()) {
+            llvm::Value* v = x.get();
+            llvm::Instruction* inst = llvm::dyn_cast<llvm::Instruction>(v);
+            xassert(inst);
+
+            while (!inst->use_empty()) {
+                llvm::Instruction* use = inst->user_back();
+                // These are assigning a value to the local copy of the reg,
+                // but since we don't use it, we can delete the assignment.
+                if (llvm::isa<llvm::StoreInst>(use)) {
+                    use->eraseFromParent();
+                    continue;
+                }
+
+                xassert(llvm::isa<llvm::LoadInst>(use));
+                // Here we should have a false usage of the value.
+                // It is loading only in checkpoints (exit points) to
+                // save it back to the global copy.
+                // Since we do not really use it, we should delete the
+                // load and the store insruction that is using it.
+                xassert(use->hasOneUse());
+                llvm::Instruction *use2 =
+                    llvm::dyn_cast<llvm::Instruction>(use->user_back());
+                xassert(llvm::isa<llvm::StoreInst>(use2));
+                use2->eraseFromParent();
+                use->eraseFromParent();
+            }
+            inst->eraseFromParent();
+        }
+    }
+
+    // XXX test
+    DBGF("x10 users:");
+    XRegister& x = _regs->getReg(XRegister::A1);
+    llvm::Value* v = x.get();
+    llvm::Instruction* inst = llvm::dyn_cast<llvm::Instruction>(v);
+    xassert(inst);
+    for (auto u : inst->users()) {
+        u->dump();
+    }
 }
 
 

@@ -58,9 +58,10 @@ public:
     llvm::LoadInst* load(unsigned reg)
     {
         xassert(_ctx->f);
-        const XRegister& x = _ctx->f->getReg(reg);
+        XRegister& x = _ctx->f->getReg(reg);
+        DBGF("reg={0}", x.name());
         llvm::LoadInst* i = _builder->CreateLoad(
-                x.var(), x.name() + "_");
+                x.getForRead(), x.name() + "_");
         updateFirst(i);
         return i;
     }
@@ -79,9 +80,9 @@ public:
         xassert(reg != XRegister::ZERO);
         xassert(_ctx->f);
 
-        const XRegister& x = _ctx->f->getReg(reg);
+        XRegister& x = _ctx->f->getReg(reg);
         llvm::StoreInst* i = _builder->CreateStore(v,
-                x.var(), !VOLATILE);
+                x.getForWrite(), !VOLATILE);
         updateFirst(i);
         return i;
     }
@@ -89,7 +90,8 @@ public:
     // nop
     void nop()
     {
-        load(XRegister::ZERO);
+        llvm::Value* v = _builder->CreateAdd(_ctx->c.ZERO, _ctx->c.ZERO, "nop");
+        updateFirst(v);
     }
 
     // sign extend

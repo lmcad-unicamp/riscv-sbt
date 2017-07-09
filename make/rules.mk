@@ -123,7 +123,9 @@ $(TRANSLATE_FILE).bc: $(TRANSLATE_GUEST).o
 
 # .bc -> .s
 $(TRANSLATE_FILE).s: $(TRANSLATE_FILE).bc $(TRANSLATE_FILE).ll
-	llc $(LLCFLAGS) -o $$@ -march $($(2)_MARCH) $$<
+	$(LLVM_INSTALL_DIR)/bin/opt -O3 $(TRANSLATE_FILE).bc -o $(TRANLATE_FILE).opt.bc
+	$(LLVM_INSTALL_DIR)/bin/llvm-dis -o $(TRANSLATE_FILE).opt.ll $(TRANLATE_FILE).opt.bc
+	llc -o $$@ -march $($(2)_MARCH) $(TRANLATE_FILE).opt.bc
 endef
 
 

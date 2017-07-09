@@ -119,11 +119,13 @@ public:
     // was function terminated?
     bool terminated() const;
 
-    const XRegister& getReg(size_t i) const
+    XRegister& getReg(size_t i)
     {
         xassert(_regs);
         return _regs->getReg(i);
     }
+
+    void cleanRegs();
 
     // look up function by address
     static Function* getByAddr(Context* ctx, uint64_t addr);
