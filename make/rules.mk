@@ -149,7 +149,7 @@ $(eval TRANSLATE_C_FILE = $($(1)_PREFIX)-$($(2)_PREFIX)-$(3))
 
 $(call TRANSLATE,$(1),$(2),$(3),)
 
-$(eval $(2)_LIBS = $($(2)_SYSCALL_O) $($(2)_RVSC_O))
+$(eval $(2)_LIBS = $($(2)_SYSCALL_O))
 $(call ASNCLINK,$(2),$(TRANSLATE_C_FILE),clean.s,save-run.out)
 $(eval $(2)_LIBS =)
 
@@ -167,7 +167,7 @@ $(eval TRANSLATE_ASM_FILE = $($(1)_PREFIX)-$($(2)_PREFIX)-$(3))
 
 $(call TRANSLATE,$(1),$(2),$(3),$(4))
 
-$(eval $(2)_LIBS = $($(2)_SYSCALL_O) $($(2)_RVSC_O) $($(2)_DUMMY_O))
+$(eval $(2)_LIBS = $($(2)_SYSCALL_O) $($(2)_DUMMY_O))
 $(eval $(call BUILD,$(2),$(TRANSLATE_ASM_FILE)))
 $(eval $(2)_LIBS =)
 

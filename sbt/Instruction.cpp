@@ -279,7 +279,7 @@ unsigned Instruction::getRegNum(unsigned op)
 {
     const llvm::MCOperand& r = _inst.getOperand(op);
     unsigned nr = XRegister::num(r.getReg());
-    *_os << _ctx->x->getLocal(nr).name() << ", ";
+    *_os << _ctx->x->getReg(nr).name() << ", ";
     return nr;
 }
 
@@ -294,7 +294,7 @@ llvm::Value* Instruction::getReg(int op)
     else
         v = _bld->load(nr);
 
-    *_os << _ctx->x->getLocal(nr).name();
+    *_os << _ctx->x->getReg(nr).name();
     if (op < 2)
          *_os << ", ";
     return v;

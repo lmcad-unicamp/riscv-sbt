@@ -3,6 +3,7 @@
 
 #include "BasicBlock.h"
 #include "Context.h"
+#include "Function.h"
 #include "Types.h"
 #include "XRegisters.h"
 
@@ -56,7 +57,8 @@ public:
     // load register
     llvm::LoadInst* load(unsigned reg)
     {
-        const XRegister& x = _ctx->x->getLocal(reg);
+        xassert(_ctx->f);
+        const XRegister& x = _ctx->f->getReg(reg);
         llvm::LoadInst* i = _builder->CreateLoad(
                 x.var(), x.name() + "_");
         updateFirst(i);
@@ -75,8 +77,9 @@ public:
     llvm::StoreInst* store(llvm::Value* v, unsigned reg)
     {
         xassert(reg != XRegister::ZERO);
+        xassert(_ctx->f);
 
-        const XRegister& x = _ctx->x->getLocal(reg);
+        const XRegister& x = _ctx->f->getReg(reg);
         llvm::StoreInst* i = _builder->CreateStore(v,
                 x.var(), !VOLATILE);
         updateFirst(i);

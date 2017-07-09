@@ -75,7 +75,7 @@ public:
   // types
   Types t;
   // x registers
-  XRegisters* x;
+  XRegisters* x = nullptr;
   // syscall handler
   Syscall* syscall = nullptr;
   // stack

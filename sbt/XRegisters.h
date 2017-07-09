@@ -75,7 +75,7 @@ public:
     }
 
     // llvm variable
-    llvm::GlobalVariable* var() const
+    llvm::Value* var() const
     {
         return _x;
     }
@@ -86,7 +86,7 @@ public:
 private:
     unsigned _num;
     std::string _name = getName(_num);
-    llvm::GlobalVariable* _x;
+    llvm::Value* _x;
     bool _local;
 
 
@@ -114,27 +114,24 @@ class XRegisters
 public:
     static const size_t NUM = 32;
 
-    XRegisters(Context* ctx, bool decl);
+    enum Flags : uint32_t {
+        NONE  = 0,
+        DECL  = 1,
+        LOCAL = 2
+    };
+
+    XRegisters(Context* ctx, uint32_t flags);
 
     // get register by its number
 
-    const XRegister& getLocal(size_t p) const
+    const XRegister& getReg(size_t p) const
     {
-        xassert(p < NUM && "register index is out of bounds");
-        return _locals[p];
-    }
-
-    const XRegister& getGlobal(size_t p) const
-    {
-        xunreachable("TODO");
         xassert(p < NUM && "register index is out of bounds");
         return _regs[p];
     }
 
-
 private:
     std::vector<XRegister> _regs;
-    std::vector<XRegister> _locals;
 };
 
 

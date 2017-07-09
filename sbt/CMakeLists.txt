@@ -119,16 +119,16 @@ add_custom_target(libc DEPENDS libc.bc)
 add_dependencies(riscv-sbt libc)
 
 # rvsc
-add_custom_command(OUTPUT rvsc.bc
-  COMMAND ${CMAKE_BINARY_DIR}/riscv-sbt -gen-sc-handler -o rvsc.bc
-  DEPENDS riscv-sbt)
+#add_custom_command(OUTPUT rvsc.bc
+#  COMMAND ${CMAKE_BINARY_DIR}/riscv-sbt -gen-sc-handler -o rvsc.bc
+#  DEPENDS riscv-sbt)
 
-add_custom_command(OUTPUT x86-rvsc.s
-  COMMAND llc -O3 -o x86-rvsc.s -march x86 rvsc.bc
-  DEPENDS rvsc.bc)
+#add_custom_command(OUTPUT x86-rvsc.s
+#  COMMAND llc -O3 -o x86-rvsc.s -march x86 rvsc.bc
+#  DEPENDS rvsc.bc)
 
-add_library (x86-rvsc OBJECT x86-rvsc.s)
-target_compile_options (x86-rvsc PRIVATE --32)
+#add_library (x86-rvsc OBJECT x86-rvsc.s)
+#target_compile_options (x86-rvsc PRIVATE --32)
 
 # install
 
@@ -136,5 +136,5 @@ install (TARGETS riscv-sbt DESTINATION bin)
 install (FILES ${CMAKE_BINARY_DIR}/libc.bc DESTINATION share/riscv-sbt)
 install (FILES ${CMAKE_BINARY_DIR}/CMakeFiles/x86-syscall.dir/x86-syscall.s.o
   RENAME x86-syscall.o DESTINATION share/riscv-sbt)
-install (FILES ${CMAKE_BINARY_DIR}/CMakeFiles/x86-rvsc.dir/x86-rvsc.s.o
-  RENAME x86-rvsc.o DESTINATION share/riscv-sbt)
+#install (FILES ${CMAKE_BINARY_DIR}/CMakeFiles/x86-rvsc.dir/x86-rvsc.s.o
+#  RENAME x86-rvsc.o DESTINATION share/riscv-sbt)

@@ -1,5 +1,7 @@
 #include "XRegisters.h"
 
+#include "Builder.h"
+
 #define GET_REGINFO_ENUM
 #include <llvm/Target/RISCV/RISCVGenRegisterInfo.inc>
 
@@ -57,16 +59,16 @@ unsigned XRegister::num(unsigned reg)
     namespace RISCV = llvm::RISCV;
 
     switch (reg) {
-        case RISCV::X0_32:    return 0;
-        case RISCV::X1_32:    return 1;
-        case RISCV::X2_32:    return 2;
-        case RISCV::X3_32:    return 3;
-        case RISCV::X4_32:    return 4;
-        case RISCV::X5_32:    return 5;
-        case RISCV::X6_32:    return 6;
-        case RISCV::X7_32:    return 7;
-        case RISCV::X8_32:    return 8;
-        case RISCV::X9_32:    return 9;
+        case RISCV::X0_32:  return 0;
+        case RISCV::X1_32:  return 1;
+        case RISCV::X2_32:  return 2;
+        case RISCV::X3_32:  return 3;
+        case RISCV::X4_32:  return 4;
+        case RISCV::X5_32:  return 5;
+        case RISCV::X6_32:  return 6;
+        case RISCV::X7_32:  return 7;
+        case RISCV::X8_32:  return 8;
+        case RISCV::X9_32:  return 9;
         case RISCV::X10_32: return 10;
         case RISCV::X11_32: return 11;
         case RISCV::X12_32: return 12;
@@ -99,48 +101,44 @@ XRegister::XRegister(Context* ctx, unsigned num, uint32_t flags)
     _num(num),
     _local(flags & LOCAL)
 {
+    if (_num == 0) {
+        _x = nullptr;
+        return;
+    }
+
     const bool decl = flags & DECL;
 
     // get reg name and linkage type
     std::string s;
     llvm::raw_string_ostream ss(s);
-    llvm::GlobalVariable::LinkageTypes linkt;
     if (_local) {
         ss << "l" << getIRName() << _num;
-        linkt = llvm::GlobalVariable::LinkageTypes::InternalLinkage;
+        const std::string& name = ss.str();
+        Builder* bld = ctx->bld;
+        xassert(bld);
+        _x = bld->_alloca(ctx->t.i32, nullptr, name);
+        bld->store(ctx->c.ZERO, _x);
+
+    // global
     } else {
         ss << getIRName() << _num;
-        linkt = llvm::GlobalVariable::ExternalLinkage;
-    }
-    const std::string& name = ss.str();
-
-    if (_num == 0) {
-        _x = new llvm::GlobalVariable(*ctx->module, ctx->t.i32, CONSTANT,
+        llvm::GlobalVariable::LinkageTypes linkt =
+            llvm::GlobalVariable::ExternalLinkage;
+        const std::string& name = ss.str();
+        _x = new llvm::GlobalVariable(*ctx->module, ctx->t.i32, !CONSTANT,
             linkt, decl? nullptr : ctx->c.ZERO, name);
-        return;
     }
-
-    _x = new llvm::GlobalVariable(*ctx->module, ctx->t.i32, !CONSTANT,
-        linkt, decl? nullptr : ctx->c.ZERO, name);
 }
 
 
-XRegisters::XRegisters(Context* ctx, bool decl)
+XRegisters::XRegisters(Context* ctx, uint32_t flags)
 {
-    // XXX disabling global regs for now
-    xassert(!decl);
-    // _regs.reserve(NUM);
-    _locals.reserve(NUM);
+    // FIXME
+    xassert(!(flags & DECL));
 
-    for (size_t i = 0; i < NUM; i++) {
-        // globals
-        // _regs.emplace_back(XRegister(ctx, i,
-        //    decl? XRegister::DECL : XRegister::DEF));
-        // locals
-        _locals.emplace_back(XRegister(ctx, i,
-            XRegister::LOCAL |
-            (decl? XRegister::DECL : XRegister::NONE)));
-    }
+    _regs.reserve(NUM);
+    for (size_t i = 0; i < NUM; i++)
+        _regs.emplace_back(XRegister(ctx, i, flags));
 }
 
 }

@@ -107,7 +107,9 @@ llvm::Error Translator::start()
 
     // setup context
 
-    _ctx->x = new XRegisters(_ctx, !DECL);
+    // global register file
+    _ctx->x = new XRegisters(_ctx, XRegisters::NONE);
+
     _ctx->stack = new Stack(_ctx);
     _ctx->disasm = new Disassembler(&*_disAsm, &*_instPrinter, &*_sti);
     _ctx->_func = &_funMap;
@@ -147,7 +149,7 @@ llvm::Error Translator::finish()
 llvm::Error Translator::genSCHandler()
 {
     // FIXME merge SCHandler and translated code
-    _ctx->x = new XRegisters(_ctx, !DECL);
+    // _ctx->x = new XRegisters(_ctx, !DECL);
 
     if (auto err = Syscall(_ctx).genHandler())
         return err;

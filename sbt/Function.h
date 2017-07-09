@@ -6,6 +6,7 @@
 #include "Map.h"
 #include "Object.h"
 #include "Pointer.h"
+#include "XRegisters.h"
 
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/Error.h>
@@ -118,6 +119,12 @@ public:
     // was function terminated?
     bool terminated() const;
 
+    const XRegister& getReg(size_t i) const
+    {
+        xassert(_regs);
+        return _regs->getReg(i);
+    }
+
     // look up function by address
     static Function* getByAddr(Context* ctx, uint64_t addr);
 
@@ -134,6 +141,8 @@ private:
     Map<uint64_t, BasicBlockPtr> _bbMap;
 
     Function* _nextf = nullptr;
+
+    std::unique_ptr<XRegisters> _regs;
 
     // methods
 

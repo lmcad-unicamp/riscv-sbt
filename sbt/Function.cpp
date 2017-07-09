@@ -43,6 +43,9 @@ llvm::Error Function::translate()
     xassert(_addr != Constants::INVALID_ADDR);
     xassert(_end != Constants::INVALID_ADDR);
 
+    // create local register file
+    _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
+
     // start
     if (_name == "main") {
         if (auto err = startMain())
@@ -87,13 +90,16 @@ llvm::Error Function::startMain()
     BasicBlock* bbptr = &**_bbMap[_addr];
     bld->setInsertPoint(bbptr);
 
+    // create local register file
+    _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
+
     // set stack pointer
     bld->store(_ctx->stack->end(), XRegister::SP);
 
     // init syscall module
-    llvm::Function* f = llvm::Function::Create(t.voidFunc,
-        llvm::Function::ExternalLinkage, "syscall_init", _ctx->module);
-    bld->call(f);
+    //llvm::Function* f = llvm::Function::Create(t.voidFunc,
+    //    llvm::Function::ExternalLinkage, "syscall_init", _ctx->module);
+    //bld->call(f);
 
     _ctx->inMain = true;
     return llvm::Error::success();
@@ -116,6 +122,9 @@ llvm::Error Function::start()
     BasicBlock* bbptr = &**ptr;
     _ctx->bld->setInsertPoint(bbptr);
 
+    // create local register file
+    _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
+
     return llvm::Error::success();
 }
 
@@ -136,6 +145,7 @@ llvm::Error Function::finish()
     if (!bld->getInsertBlock()->terminated())
         bld->retVoid();
     _ctx->inMain = false;
+    _f->dump();
     return llvm::Error::success();
 }
 
