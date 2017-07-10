@@ -6,11 +6,18 @@
 
 #include <llvm/IR/Function.h>
 
+#include <vector>
+
 namespace sbt {
 
 void Syscall::declHandler()
 {
-    _ftRVSC = llvm::FunctionType::get(_t.i32, { _t.i32 }, !VAR_ARG);
+    std::vector<llvm::Type*> params;
+    params.reserve(MAX_ARGS);
+    for (size_t i = 0; i < MAX_ARGS; i++)
+        params.push_back(_t.i32);
+
+    _ftRVSC = llvm::FunctionType::get(_t.i32, _t.i32, !VAR_ARG);
     _fRVSC = llvm::Function::Create(
         _ftRVSC, llvm::Function::ExternalLinkage, "rv_syscall",
         _ctx->module);
@@ -20,7 +27,7 @@ void Syscall::declHandler()
 llvm::Error Syscall::genHandler()
 {
     llvm::Module* module = _ctx->module;
-    const auto& c = _ctx->c;
+    const Constants& c = _ctx->c;
 
     // declare X86 syscall functions
     const size_t n = 5;
@@ -65,88 +72,60 @@ llvm::Error Syscall::genHandler()
 
     declHandler();
 
+    // prepare
     Builder bldi(_ctx, NO_FIRST);
     Builder* bld = &bldi;
+    std::vector<llvm::Value*> args;
 
     // entry
     BasicBlock bbEntry(_ctx, bbPrefix + "entry", _fRVSC);
-    llvm::Argument &sc = *_fRVSC->arg_begin();
-
-    // exit
-    //
-    // return A0
-    BasicBlock bbExit(_ctx, bbPrefix + "exit", _fRVSC);
-    bld->setInsertPoint(bbExit);
-    bld->ret(bld->load(XRegister::A0));
-
-    // 2nd switch
-    BasicBlock bbSW2(_ctx, bbPrefix + "sw2", _fRVSC, bbExit.bb());
-
-    // first Switch:
-    // - switch based on RISC-V syscall number and:
-    //     - set number of args
-    //     - set X86 syscall number
+    // 1st arg: syscall #
+    auto argit = _fRVSC->arg_begin();
+    llvm::Argument &sc = *argit;
+    ++argit;
 
     // default case: call exit(99)
-    BasicBlock bbSW1Dfl(_ctx, bbPrefix + "sw1_default", _fRVSC, bbSW2.bb());
-    bld->setInsertPoint(bbSW1Dfl);
-    bld->store(c.i32(1), XRegister::T0);
-    bld->store(c.i32(X86_SYS_EXIT), XRegister::A7);
-    bld->store(c.i32(99), XRegister::A0);
-    bld->br(bbSW2);
+    BasicBlock bbDfl(_ctx, bbPrefix + "default", _fRVSC);
+    bld->setInsertPoint(bbDfl);
+    args.clear();
+    args.reserve(2);
+    args.push_back(c.i32(X86_SYS_EXIT));
+    args.push_back(c.i32(99));
+    bld->call(fX86SC[1]);
+    bld->ret(c.ZERO);
+
+    // switch (RISC-V syscall#)
 
     bld->setInsertPoint(bbEntry);
-    llvm::SwitchInst *sw1 = bld->sw(&sc, bbSW1Dfl);
+    llvm::SwitchInst *sw1 = bld->sw(&sc, bbDfl);
 
-    // other cases
-    auto addSW1Case = [&](const Syscall& s) {
+    auto setArgs = [this, &args](llvm::Value* sc, size_t n) {
+        args.clear();
+        args.reserve(n+1);
+        args.push_back(sc);
+
+        auto argit = _fRVSC->arg_begin();
+        ++argit;    // skip guest sc#
+        for (size_t i = 0; i < n; i++, ++argit)
+            args.push_back(&*argit);
+    };
+
+    // sw cases
+    auto addCase = [&](const Syscall& s) {
         std::string sss = bbPrefix;
         llvm::raw_string_ostream ss(sss);
         ss << "sw1_case_" << s.rv;
 
-        BasicBlock bb(_ctx, ss.str(), _fRVSC, bbSW2.bb());
+        BasicBlock bb(_ctx, ss.str(), _fRVSC, bbDfl.bb());
         bld->setInsertPoint(bb);
-        bld->store(llvm::ConstantInt::get(_t.i32, s.args), XRegister::T0);
-        bld->store(llvm::ConstantInt::get(_t.i32, s.x86), XRegister::A7);
-        bld->br(bbSW2);
+        setArgs(c.i32(s.x86), s.args);
+        llvm::Value* v = bld->call(fX86SC[s.args], args);
+        bld->ret(v);
         sw1->addCase(_ctx->c.i32(s.rv), bb.bb());
     };
 
     for (const Syscall& s : scv)
-        addSW1Case(s);
-
-    // second Switch:
-    // - switch based on syscall's number of args
-    //     and make the call
-
-    auto getSW2CaseBB = [&](size_t val) {
-        std::string sss = bbPrefix;
-        llvm::raw_string_ostream ss(sss);
-        ss << "sw2_case_" << val;
-
-        BasicBlock bb(_ctx, ss.str(), _fRVSC, bbExit.bb());
-        bld->setInsertPoint(bb);
-
-        // set args
-        std::vector<llvm::Value*> args = { bld->load(XRegister::A7) };
-        for (size_t i = 0; i < val; i++)
-            args.push_back(bld->load(XRegister::A0 + i));
-
-        // Make the syscall
-        llvm::Value* v = bld->call(fX86SC[val], args);
-        bld->store(v, XRegister::A0);
-        bld->br(bbExit);
-        return bb;
-    };
-
-    BasicBlock sw2Case0 = getSW2CaseBB(0);
-
-    // switch 2
-    bld->setInsertPoint(bbSW2);
-    llvm::SwitchInst* sw2 = bld->sw(bld->load(XRegister::T0), sw2Case0);
-    sw2->addCase(_ctx->c.ZERO, sw2Case0.bb());
-    for (size_t i = 1; i < n; i++)
-        sw2->addCase(_ctx->c.i32(i), getSW2CaseBB(i).bb());
+        addCase(s);
 
     return llvm::Error::success();
 }
@@ -154,6 +133,7 @@ llvm::Error Syscall::genHandler()
 
 void Syscall::call()
 {
+    // FIXME rewrite this to match new handler impl
     Builder* bld = _ctx->bld;
 
     llvm::Value* sc = bld->load(XRegister::A7);

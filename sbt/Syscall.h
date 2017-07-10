@@ -15,23 +15,27 @@ namespace sbt {
 class Syscall
 {
 public:
-  Syscall(Context* ctx) :
-    _ctx(ctx)
-  {}
+    Syscall(Context* ctx) :
+        _ctx(ctx)
+    {}
 
-  void call();
+    void call();
 
-  void declHandler();
+    llvm::Error genHandler();
 
-  llvm::Error genHandler();
+    static const size_t MAX_ARGS = 7;
 
 private:
-  Context* _ctx;
-  Types& _t = _ctx->t;
+    Context* _ctx;
+    Types& _t = _ctx->t;
 
-  // riscv syscall function
-  llvm::FunctionType* _ftRVSC;
-  llvm::Function* _fRVSC;
+    // riscv syscall function
+    llvm::FunctionType* _ftRVSC;
+    llvm::Function* _fRVSC;
+
+    // methods
+
+    void declHandler();
 };
 
 }

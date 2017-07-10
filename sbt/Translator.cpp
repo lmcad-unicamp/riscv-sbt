@@ -173,8 +173,6 @@ llvm::Error Translator::translate()
     if (auto err = start())
         return err;
 
-    _sc->declHandler();
-
     for (const auto& f : _inputFiles) {
         Module mod(_ctx);
         if (auto err = mod.translate(f))
