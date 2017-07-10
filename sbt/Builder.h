@@ -77,7 +77,9 @@ public:
     // store value in register
     llvm::StoreInst* store(llvm::Value* v, unsigned reg)
     {
-        xassert(reg != XRegister::ZERO);
+        if (reg == XRegister::ZERO)
+            return nullptr;
+
         xassert(_ctx->f);
 
         XRegister& x = _ctx->f->getReg(reg);
@@ -90,8 +92,10 @@ public:
     // nop
     void nop()
     {
-        llvm::Value* v = _builder->CreateAdd(_ctx->c.ZERO, _ctx->c.ZERO, "nop");
-        updateFirst(v);
+        llvm::Function* f = llvm::Intrinsic::
+            getDeclaration(_ctx->module, llvm::Intrinsic::donothing);
+        call(f);
+        xassert(_first);
     }
 
     // sign extend

@@ -1195,6 +1195,7 @@ void Instruction::dbgprint()
         llvm::MDString::get(*_ctx->ctx, "RISC-V Instruction"));
     std::string mdname = getMDName(_ss->str());
     // DBGF("mdname={0}, n={1:X+8}, first={2:X+8}", mdname, n, _bld->first());
+    xassert(_bld->first());
     _bld->first()->setMetadata(mdname, n);
 }
 

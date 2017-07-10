@@ -123,9 +123,9 @@ $(TRANSLATE_FILE).bc: $(TRANSLATE_GUEST).o
 
 # .bc -> .s
 $(TRANSLATE_FILE).s: $(TRANSLATE_FILE).bc $(TRANSLATE_FILE).ll
-	$(LLVM_INSTALL_DIR)/bin/opt -O3 $(TRANSLATE_FILE).bc -o $(TRANLATE_FILE).opt.bc
-	$(LLVM_INSTALL_DIR)/bin/llvm-dis -o $(TRANSLATE_FILE).opt.ll $(TRANLATE_FILE).opt.bc
-	llc -o $$@ -march $($(2)_MARCH) $(TRANLATE_FILE).opt.bc
+	$(LLVM_INSTALL_DIR)/bin/opt -O3 $(TRANSLATE_FILE).bc -o $(TRANSLATE_FILE).opt.bc
+	$(LLVM_INSTALL_DIR)/bin/llvm-dis -o $(TRANSLATE_FILE).opt.ll $(TRANSLATE_FILE).opt.bc
+	llc -o $$@ -march $($(2)_MARCH) $(TRANSLATE_FILE).opt.bc
 endef
 
 
@@ -151,7 +151,7 @@ $(eval TRANSLATE_C_FILE = $($(1)_PREFIX)-$($(2)_PREFIX)-$(3))
 
 $(call TRANSLATE,$(1),$(2),$(3),)
 
-$(eval $(2)_LIBS = $($(2)_SYSCALL_O))
+$(eval $(2)_LIBS = $($(2)_SYSCALL_O) $($(2)_COUNTERS_O))
 $(call ASNCLINK,$(2),$(TRANSLATE_C_FILE),clean.s,save-run.out)
 $(eval $(2)_LIBS =)
 

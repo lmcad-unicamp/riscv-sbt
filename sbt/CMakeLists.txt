@@ -77,6 +77,10 @@ set (can_use_assembler TRUE)
 add_library (x86-syscall OBJECT x86-syscall.s)
 target_compile_options (x86-syscall PRIVATE --32)
 
+# x86 counters
+add_library (x86-counters OBJECT x86-counters.s)
+target_compile_options (x86-counters PRIVATE --32)
+
 # SBT
 
 set (CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/llvm/lib")
@@ -136,5 +140,7 @@ install (TARGETS riscv-sbt DESTINATION bin)
 install (FILES ${CMAKE_BINARY_DIR}/libc.bc DESTINATION share/riscv-sbt)
 install (FILES ${CMAKE_BINARY_DIR}/CMakeFiles/x86-syscall.dir/x86-syscall.s.o
   RENAME x86-syscall.o DESTINATION share/riscv-sbt)
+install (FILES ${CMAKE_BINARY_DIR}/CMakeFiles/x86-counters.dir/x86-counters.s.o
+  RENAME x86-counters.o DESTINATION share/riscv-sbt)
 #install (FILES ${CMAKE_BINARY_DIR}/CMakeFiles/x86-rvsc.dir/x86-rvsc.s.o
 #  RENAME x86-rvsc.o DESTINATION share/riscv-sbt)
