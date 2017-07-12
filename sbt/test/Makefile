@@ -31,7 +31,7 @@ rv32-x86-hello.bc: rv32-hello.o x86-dummy.o
 rv32-x86-hello.s: rv32-x86-hello.bc
 	llc -O3 -o $@ -march x86 $<
 
-X86_LIBS = $(X86_SYSCALL_O) $(X86_RVSC_O) x86-dummy.o
+X86_LIBS = $(X86_SYSCALL_O) x86-dummy.o
 CLEAN_EXTRA = rv32-x86-hello.s
 $(eval $(call BUILD,X86,rv32-x86-hello,,,save-run.out))
 X86_LIBS =

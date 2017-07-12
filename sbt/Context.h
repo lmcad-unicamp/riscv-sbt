@@ -17,7 +17,6 @@ class Function;
 class SBTRelocation;
 class SBTSection;
 class Stack;
-class Syscall;
 class Translator;
 class XRegister;
 class XRegisters;
@@ -76,8 +75,6 @@ public:
   Types t;
   // x registers
   XRegisters* x = nullptr;
-  // syscall handler
-  Syscall* syscall = nullptr;
   // stack
   Stack* stack = nullptr;
   // flags

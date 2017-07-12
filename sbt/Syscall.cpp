@@ -17,14 +17,14 @@ void Syscall::declHandler()
     for (size_t i = 0; i < MAX_ARGS; i++)
         params.push_back(_t.i32);
 
-    _ftRVSC = llvm::FunctionType::get(_t.i32, _t.i32, !VAR_ARG);
+    _ftRVSC = llvm::FunctionType::get(_t.i32, params, !VAR_ARG);
     _fRVSC = llvm::Function::Create(
         _ftRVSC, llvm::Function::ExternalLinkage, "rv_syscall",
         _ctx->module);
 }
 
 
-llvm::Error Syscall::genHandler()
+void Syscall::genHandler()
 {
     llvm::Module* module = _ctx->module;
     const Constants& c = _ctx->c;
@@ -73,8 +73,10 @@ llvm::Error Syscall::genHandler()
     declHandler();
 
     // prepare
-    Builder bldi(_ctx, NO_FIRST);
-    Builder* bld = &bldi;
+    Builder* bld = _ctx->bld;
+    xassert(bld);
+    bld->saveInsertBlock();
+    bld->reset();
     std::vector<llvm::Value*> args;
 
     // entry
@@ -91,7 +93,7 @@ llvm::Error Syscall::genHandler()
     args.reserve(2);
     args.push_back(c.i32(X86_SYS_EXIT));
     args.push_back(c.i32(99));
-    bld->call(fX86SC[1]);
+    bld->call(fX86SC[1], args);
     bld->ret(c.ZERO);
 
     // switch (RISC-V syscall#)
@@ -114,10 +116,12 @@ llvm::Error Syscall::genHandler()
     auto addCase = [&](const Syscall& s) {
         std::string sss = bbPrefix;
         llvm::raw_string_ostream ss(sss);
-        ss << "sw1_case_" << s.rv;
+        ss << "case_" << s.rv;
 
         BasicBlock bb(_ctx, ss.str(), _fRVSC, bbDfl.bb());
         bld->setInsertPoint(bb);
+        DBGF("processing syscall: args={0}, rv={1}, x86={2}",
+            s.args, s.rv, s.x86);
         setArgs(c.i32(s.x86), s.args);
         llvm::Value* v = bld->call(fX86SC[s.args], args);
         bld->ret(v);
@@ -127,17 +131,34 @@ llvm::Error Syscall::genHandler()
     for (const Syscall& s : scv)
         addCase(s);
 
-    return llvm::Error::success();
+    bld->restoreInsertBlock();
+
+    // _fRVSC->dump();
 }
 
 
 void Syscall::call()
 {
-    // FIXME rewrite this to match new handler impl
     Builder* bld = _ctx->bld;
+    Function* f = _ctx->f;
+    xassert(f);
 
+    DBGF("call");
+
+    // set args
     llvm::Value* sc = bld->load(XRegister::A7);
     std::vector<llvm::Value*> args = { sc };
+    size_t i = 1;
+    size_t reg = XRegister::A0;
+    for (; i < MAX_ARGS; i++, reg++) {
+        // XXX
+        if (!f->getReg(reg).hasWrite())
+            break;
+        args.push_back(bld->load(reg));
+    }
+    for (; i < MAX_ARGS; i++)
+        args.push_back(_ctx->c.ZERO);
+
     llvm::Value* v = bld->call(_fRVSC, args);
     bld->store(v, XRegister::A0);
 }

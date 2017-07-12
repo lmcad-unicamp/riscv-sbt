@@ -942,21 +942,19 @@ mmtest: sbt
 ### BEGIN debugging targets ###
 ###
 
-TESTBIN := rv32-x86-jalr
+TESTBIN := rv32-x86-system
 .PHONY: test-prep
-test-prep: sbt qemu-tests-reset qemu-tests
-	$(MAKE) clean-$(TESTBIN)
+test-prep: sbt
+	$(MAKE) -C sbt/test clean-$(TESTBIN)
 
 .PHONY: test
 test: test-prep
-	($(MAKE) $(MAKE_DIR)$(TESTBIN) && echo Running test && \
-		$(MAKE_DIR)$(TESTBIN) && echo OK || echo rc=$$?) \
-		2>&1 | tee log.txt
+	rm -f log.txt
+	$(RUN) $(MAKE) -C sbt/test $(TESTBIN) run-$(TESTBIN)
 
 .PHONY: dbg
 dbg: test-prep
-	$(MAKE) $(MAKE_DIR)$(TESTBIN)
-	gdb $(MAKE_DIR)$(TESTBIN)
+	echo nop
 
 ###
 ### END debugging targets ###

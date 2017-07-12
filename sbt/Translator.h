@@ -28,100 +28,108 @@ class Translator
 {
 public:
 
-  // ctor
-  Translator(Context* ctx);
+    // ctor
+    Translator(Context* ctx);
 
-  // move only
-  Translator(Translator&&) = default;
-  Translator(const Translator&) = delete;
+    // move only
+    Translator(Translator&&) = default;
+    Translator(const Translator&) = delete;
 
-  ~Translator();
+    ~Translator();
 
-  void addInputFile(const std::string& file)
-  {
-    _inputFiles.push_back(file);
-  }
+    // setup
 
-  // gen syscall handler
-  llvm::Error genSCHandler();
+    void addInputFile(const std::string& file)
+    {
+        _inputFiles.push_back(file);
+    }
 
-  // translate input files
-  llvm::Error translate();
+    void setOutputFile(const std::string& file)
+    {
+        _outputFile = file;
+    }
 
-  // import external function
-  llvm::Expected<uint64_t> import(const std::string& func);
+    // translate input files
+    llvm::Error translate();
 
-  void setOutputFile(const std::string& file)
-  {
-    _outputFile = file;
-  }
+    // import external function
+    llvm::Expected<uint64_t> import(const std::string& func);
 
-  const Function& getCycles() const
-  {
-    return *_getCycles;
-  }
+    // counters
 
-  const Function& getTime() const
-  {
-    return *_getTime;
-  }
+    const Function& getCycles() const
+    {
+        return *_getCycles;
+    }
 
-  const Function& getInstRet() const
-  {
-    return *_getInstRet;
-  }
+    const Function& getTime() const
+    {
+        return *_getTime;
+    }
 
-  const Function& icaller() const
-  {
-    return _iCaller;
-  }
+    const Function& getInstRet() const
+    {
+        return *_getInstRet;
+    }
+
+    // indirect call handler
+    const Function& icaller() const
+    {
+        return _iCaller;
+    }
+
+    // syscall handler
+    Syscall& syscall();
+
+    void initCounters();
 
 private:
-  // data
+    // data
 
-  // set by ctor
-  Context* _ctx;
+    // set by ctor
+    Context* _ctx;
 
-  // set by sbt
-  std::vector<std::string> _inputFiles;
-  std::string _outputFile;
+    // set by sbt
+    std::vector<std::string> _inputFiles;
+    std::string _outputFile;
 
-  // target info
-  const llvm::Target* _target;
-  std::unique_ptr<const llvm::MCRegisterInfo> _mri;
-  std::unique_ptr<const llvm::MCAsmInfo> _asmInfo;
-  std::unique_ptr<const llvm::MCSubtargetInfo> _sti;
-  std::unique_ptr<const llvm::MCObjectFileInfo> _mofi;
-  std::unique_ptr<llvm::MCContext> _mc;
-  std::unique_ptr<const llvm::MCDisassembler> _disAsm;
-  std::unique_ptr<const llvm::MCInstrInfo> _mii;
-  std::unique_ptr<llvm::MCInstPrinter> _instPrinter;
+    // target info
+    const llvm::Target* _target;
+    std::unique_ptr<const llvm::MCRegisterInfo> _mri;
+    std::unique_ptr<const llvm::MCAsmInfo> _asmInfo;
+    std::unique_ptr<const llvm::MCSubtargetInfo> _sti;
+    std::unique_ptr<const llvm::MCObjectFileInfo> _mofi;
+    std::unique_ptr<llvm::MCContext> _mc;
+    std::unique_ptr<const llvm::MCDisassembler> _disAsm;
+    std::unique_ptr<const llvm::MCInstrInfo> _mii;
+    std::unique_ptr<llvm::MCInstPrinter> _instPrinter;
 
-  // icaller
-  Function _iCaller;
-  Map<std::string, FunctionPtr> _funMap;
-  Map<uint64_t, Function*> _funcByAddr;
+    // icaller
+    Function _iCaller;
+    Map<std::string, FunctionPtr> _funMap;
+    Map<uint64_t, Function*> _funcByAddr;
 
-  uint64_t _extFuncAddr = 0;
-  std::unique_ptr<llvm::Module> _lcModule;
+    uint64_t _extFuncAddr = 0;
+    std::unique_ptr<llvm::Module> _lcModule;
 
-  std::unique_ptr<Syscall> _sc;
+    std::unique_ptr<Syscall> _sc;
+    bool _initCounters = true;
 
-  // host functions
+    // host functions
 
-  FunctionPtr _sbtabort;
-  FunctionPtr _getCycles;
-  FunctionPtr _getTime;
-  FunctionPtr _getInstRet;
+    FunctionPtr _sbtabort;
+    FunctionPtr _getCycles;
+    FunctionPtr _getTime;
+    FunctionPtr _getInstRet;
 
 
-  // methods
+    // methods
 
-  llvm::Error start();
-  llvm::Error finish();
+    llvm::Error start();
+    llvm::Error finish();
 
-  // indirect function caller
-  llvm::Error genICaller();
+    // indirect function caller
+    llvm::Error genICaller();
 };
 
 } // sbt

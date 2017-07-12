@@ -137,10 +137,6 @@ llvm::Error Translator::start()
     _getTime->create(ft);
     _getInstRet->create(ft);
 
-    // syscall handler
-    _sc.reset(new Syscall(_ctx));
-    _ctx->syscall = &*_sc;
-
     return llvm::Error::success();
 }
 
@@ -151,15 +147,26 @@ llvm::Error Translator::finish()
 }
 
 
-llvm::Error Translator::genSCHandler()
+Syscall& Translator::syscall()
 {
-    // FIXME merge SCHandler and translated code
-    // _ctx->x = new XRegisters(_ctx, !DECL);
+    // create handler on first use (if any)
+    if (!_sc) {
+        _sc.reset(new Syscall(_ctx));
+        _sc->genHandler();
+    }
 
-    if (auto err = Syscall(_ctx).genHandler())
-        return err;
+    return *_sc;
+}
 
-    return llvm::Error::success();
+
+void Translator::initCounters()
+{
+    if (_initCounters) {
+        llvm::Function* f = llvm::Function::Create(_ctx->t.voidFunc,
+            llvm::Function::ExternalLinkage, "counters_init", _ctx->module);
+        _ctx->bld->call(f);
+        _initCounters = false;
+    }
 }
 
 

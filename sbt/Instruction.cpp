@@ -188,7 +188,7 @@ llvm::Error Instruction::translate()
         // ecall
         case RISCV::ECALL:
             *_os << "ecall";
-            _ctx->syscall->call();
+            _ctx->translator->syscall().call();
             break;
 
         // ebreak
@@ -633,6 +633,8 @@ llvm::Error Instruction::translateCSR(CSROp op, bool imm)
     }
     *_os << llvm::formatv("0x{0:X-4} = ", csr);
 
+    Translator* translator = _ctx->translator;
+    translator->initCounters();
     llvm::Value* v = _c->ZERO;
     switch (csr) {
         case CSR::RDCYCLE:

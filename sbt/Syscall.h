@@ -21,7 +21,7 @@ public:
 
     void call();
 
-    llvm::Error genHandler();
+    void genHandler();
 
     static const size_t MAX_ARGS = 7;
 

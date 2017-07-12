@@ -7,8 +7,8 @@
 # - get_time
 # - get_instret
 
-.global syscall_init
-syscall_init:
+.global counters_init
+counters_init:
     push %ebx
 
     ###

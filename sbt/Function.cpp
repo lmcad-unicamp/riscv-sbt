@@ -93,11 +93,6 @@ llvm::Error Function::startMain()
     // set stack pointer
     bld->store(_ctx->stack->end(), XRegister::SP);
 
-    // init syscall module
-    //llvm::Function* f = llvm::Function::Create(t.voidFunc,
-    //    llvm::Function::ExternalLinkage, "syscall_init", _ctx->module);
-    //bld->call(f);
-
     _ctx->inMain = true;
     return llvm::Error::success();
 }
@@ -143,7 +138,7 @@ llvm::Error Function::finish()
         bld->retVoid();
     _ctx->inMain = false;
     cleanRegs();
-    _f->dump();
+    // _f->dump();
     // _f->viewCFG();
     return llvm::Error::success();
 }
@@ -182,16 +177,6 @@ void Function::cleanRegs()
             }
             inst->eraseFromParent();
         }
-    }
-
-    // XXX test
-    DBGF("x10 users:");
-    XRegister& x = _regs->getReg(XRegister::A1);
-    llvm::Value* v = x.get();
-    llvm::Instruction* inst = llvm::dyn_cast<llvm::Instruction>(v);
-    xassert(inst);
-    for (auto u : inst->users()) {
-        u->dump();
     }
 }
 

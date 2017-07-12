@@ -75,7 +75,7 @@ llvm::Error SBT::run()
     if (llvm::verifyModule(*_module, &DBGS)) {
         InvalidBitcode serr;
         serr << "translation produced invalid bitcode!";
-        // _module->dump();
+        _module->dump();
         return error(serr);
     }
 
@@ -96,15 +96,6 @@ void SBT::write()
     llvm::raw_fd_ostream os(_outputFile, ec, llvm::sys::fs::F_None);
     WriteBitcodeToFile(&*_module, os);
     os.flush();
-}
-
-
-llvm::Error SBT::genSCHandler()
-{
-    if (auto err = _translator->genSCHandler())
-        return err;
-    write();
-    return llvm::Error::success();
 }
 
 
@@ -183,10 +174,6 @@ int main(int argc, char* argv[])
             "o",
             cl::desc("output filename"));
 
-    cl::opt<bool> genSCHandlerOpt(
-            "gen-sc-handler",
-            cl::desc("generate syscall handler"));
-
     cl::opt<bool> testOpt("test");
 
     // -debug is used by LLVM already
@@ -199,15 +186,8 @@ int main(int argc, char* argv[])
 
     const sbt::Constants& c = sbt::Constants::global();
 
-    // gen syscall handlers
-    if (genSCHandlerOpt) {
-        if (outputFileOpt.empty()) {
-            llvm::errs() << c.BIN_NAME
-                << ": output file not specified\n";
-            return 1;
-        }
     // debug test
-    } else if (testOpt) {
+    if (testOpt) {
         test();
     // translate
     } else {
@@ -236,14 +216,7 @@ int main(int argc, char* argv[])
         sbt::handleError(exp.takeError());
     sbt::SBT& sbt = exp.get();
 
-    bool hasErrors = false;
-    // generate syscall handler
-    if (genSCHandlerOpt) {
-        sbt::handleError(sbt.genSCHandler());
-        return EXIT_SUCCESS;
-    // translate files
-    } else
-        hasErrors = sbt::handleError(sbt.run());
+    bool hasErrors = sbt::handleError(sbt.run());
 
     // dump resulting IR
     // sbt.dump();
