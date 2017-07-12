@@ -875,6 +875,15 @@ tests: sbt
 	$(MAKE) -C $(TOPDIR)/test clean all run 2>&1 | tee log.txt
 	$(MAKE) -C $(TOPDIR)/sbt/test clean run-alltests  2>&1 | tee log.txt
 
+### rv32-system test
+
+SYSTEM := rv32-x86-system
+.PHONY: $(SYSTEM)
+$(SYSTEM): sbt
+	rm -f log.txt
+	$(MAKE) -C sbt/test clean-$(SYSTEM)
+	$(RUN) $(MAKE) -C sbt/test $(SYSTEM) run-$(SYSTEM)
+
 ###
 ### QEMU tests
 ###
@@ -942,19 +951,20 @@ mmtest: sbt
 ### BEGIN debugging targets ###
 ###
 
-TESTBIN := rv32-x86-system
+TESTBIN := rv32-x86-jal
 .PHONY: test-prep
-test-prep: sbt
-	$(MAKE) -C sbt/test clean-$(TESTBIN)
+test-prep: sbt qemu-tests-reset qemu-tests
+	$(MAKE) clean-$(TESTBIN)
 
 .PHONY: test
 test: test-prep
 	rm -f log.txt
-	$(RUN) $(MAKE) -C sbt/test $(TESTBIN) run-$(TESTBIN)
+	$(RUN) $(MAKE) $(MAKE_DIR)$(TESTBIN)
+	$(RUN) $(MAKE_DIR)$(TESTBIN)
 
 .PHONY: dbg
-dbg: test-prep
-	echo nop
+dbg:
+	gdb $(MAKE_DIR)$(TESTBIN)
 
 ###
 ### END debugging targets ###

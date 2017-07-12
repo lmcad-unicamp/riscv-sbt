@@ -934,6 +934,7 @@ llvm::Error Instruction::handleCall(uint64_t target, unsigned linkReg)
     Function* f = Function::getByAddr(_ctx, target);
 
     link(linkReg);
+    _ctx->f->storeRegisters();
 
     // call
     _bld->call(f->func());
@@ -946,6 +947,9 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
     DBGF("linkReg={1}", linkReg);
 
     link(linkReg);
+    // XXX this could be optimized out if we could antecipate that
+    //     the function being called is external (libc)
+    _ctx->f->storeRegisters();
 
     // prepare
     const Function& ic = _ctx->translator->icaller();

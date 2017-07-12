@@ -74,19 +74,12 @@ public:
         return _name;
     }
 
-    // llvm variable
-    /*
-    llvm::Value* var() const
-    {
-        return _x;
-    }
-    */
-
     // get RISC-V register number from llvm MCInst reg number
     static unsigned num(unsigned reg);
 
     llvm::Value* get()
     {
+        _touched = true;
         return _x;
     }
 
@@ -117,6 +110,11 @@ public:
         return _read || _write;
     }
 
+    bool touched() const
+    {
+        return _touched || hasAccess();
+    }
+
 private:
     unsigned _num;
     std::string _name = getName(_num);
@@ -124,6 +122,11 @@ private:
     bool _local;
     bool _read = false;
     bool _write = false;
+
+    // this flag may remain false only while in main(),
+    // because we don't load from global registers when
+    // we enter it
+    bool _touched = false;
 
 
     // register name on generated llvm IR

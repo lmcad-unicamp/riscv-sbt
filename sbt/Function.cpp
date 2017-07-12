@@ -116,6 +116,7 @@ llvm::Error Function::start()
 
     // create local register file
     _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
+    loadRegisters();
 
     return llvm::Error::success();
 }
@@ -334,6 +335,39 @@ void Function::transferBBs(uint64_t from, Function* to)
     DBGF("erasing our bbMap...");
     _bbMap.erase(st);
     DBGF("done");
+}
+
+
+void Function::loadRegisters()
+{
+    Builder* bld = _ctx->bld;
+    xassert(bld);
+
+    for (size_t i = 1; i < XRegisters::NUM; i++) {
+        XRegister& local = getReg(i);
+        XRegister& global = _ctx->x->getReg(i);
+        // NOTE don't count this write
+        llvm::Value* v = bld->load(global.getForRead());
+        bld->store(v, local.get());
+    }
+}
+
+
+void Function::storeRegisters()
+{
+    Builder* bld = _ctx->bld;
+    xassert(bld);
+
+    for (size_t i = 1; i < XRegisters::NUM; i++) {
+        XRegister& local = getReg(i);
+        if (!local.hasWrite())
+            continue;
+
+        XRegister& global = _ctx->x->getReg(i);
+        // NOTE don't count this read
+        llvm::Value* v = bld->load(local.get());
+        bld->store(v, global.getForWrite());
+    }
 }
 
 }

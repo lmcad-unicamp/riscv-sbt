@@ -151,8 +151,7 @@ void Syscall::call()
     size_t i = 1;
     size_t reg = XRegister::A0;
     for (; i < MAX_ARGS; i++, reg++) {
-        // XXX
-        if (!f->getReg(reg).hasWrite())
+        if (!f->getReg(reg).touched())
             break;
         args.push_back(bld->load(reg));
     }

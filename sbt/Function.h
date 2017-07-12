@@ -127,6 +127,10 @@ public:
 
     void cleanRegs();
 
+    // sync local register file
+    void loadRegisters();
+    void storeRegisters();
+
     // look up function by address
     static Function* getByAddr(Context* ctx, uint64_t addr);
 

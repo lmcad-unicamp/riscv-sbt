@@ -117,7 +117,6 @@ XRegister::XRegister(Context* ctx, unsigned num, uint32_t flags)
         Builder* bld = ctx->bld;
         xassert(bld);
         _x = bld->_alloca(ctx->t.i32, nullptr, name);
-        // bld->store(ctx->c.ZERO, _x);
 
     // global
     } else {
