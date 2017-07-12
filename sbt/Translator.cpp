@@ -50,6 +50,44 @@ Translator::~Translator()
 
 llvm::Error Translator::start()
 {
+    if (auto err = startTarget())
+        return err;
+
+    // setup context
+
+    // global register file
+    _ctx->x = new XRegisters(_ctx, XRegisters::NONE);
+    // stack
+    _ctx->stack = new Stack(_ctx);
+    // disassembler
+    _ctx->disasm = new Disassembler(&*_disAsm, &*_instPrinter, &*_sti);
+    // function lookup
+    _ctx->_func = &_funMap;
+    _ctx->_funcByAddr = &_funcByAddr;
+
+    // declare icaller
+    const Types& t = _ctx->t;
+    std::vector<llvm::Type*> args;
+    const size_t n = 9;
+    args.reserve(n);
+    for (size_t i = 0; i < n; i++)
+        args.push_back(t.i32);
+    _iCaller.create(llvm::FunctionType::get(t.i32, args, !VAR_ARG));
+
+    // SBT abort, using syscalls only
+    // - to abort on fatal errors such as: icaller could not resolve guest
+    //   address to host address
+    // - makes debugging easier
+    // - doesn't depend on C environment
+    _sbtabort.reset(new Function(_ctx, "sbtabort"));
+    _sbtabort->create();
+
+    return llvm::Error::success();
+}
+
+
+llvm::Error Translator::startTarget()
+{
     SBTError serr;
 
     // get target
@@ -105,38 +143,6 @@ llvm::Error Translator::start()
         return error(serr);
     }
 
-    // setup context
-
-    // global register file
-    _ctx->x = new XRegisters(_ctx, XRegisters::NONE);
-
-    _ctx->stack = new Stack(_ctx);
-    _ctx->disasm = new Disassembler(&*_disAsm, &*_instPrinter, &*_sti);
-    _ctx->_func = &_funMap;
-    _ctx->_funcByAddr = &_funcByAddr;
-
-    const auto& t = _ctx->t;
-    std::vector<llvm::Type*> args;
-    const size_t n = 9;
-    args.reserve(n);
-    for (size_t i = 0; i < n; i++)
-        args.push_back(t.i32);
-    _iCaller.create(llvm::FunctionType::get(t.i32, args, !VAR_ARG));
-
-    // host functions
-
-    llvm::FunctionType *ft = llvm::FunctionType::get(_ctx->t.i32, !VAR_ARG);
-
-    _sbtabort.reset(new Function(_ctx, "sbtabort"));
-    _getCycles.reset(new Function(_ctx, "get_cycles"));
-    _getTime.reset(new Function(_ctx, "get_time"));
-    _getInstRet.reset(new Function(_ctx, "get_instret"));
-
-    _sbtabort->create();
-    _getCycles->create(ft);
-    _getTime->create(ft);
-    _getInstRet->create(ft);
-
     return llvm::Error::success();
 }
 
@@ -165,6 +171,17 @@ void Translator::initCounters()
         llvm::Function* f = llvm::Function::Create(_ctx->t.voidFunc,
             llvm::Function::ExternalLinkage, "counters_init", _ctx->module);
         _ctx->bld->call(f);
+
+        llvm::FunctionType *ft = llvm::FunctionType::get(_ctx->t.i32, !VAR_ARG);
+
+        _getCycles.reset(new Function(_ctx, "get_cycles"));
+        _getTime.reset(new Function(_ctx, "get_time"));
+        _getInstRet.reset(new Function(_ctx, "get_instret"));
+
+        _getCycles->create(ft);
+        _getTime->create(ft);
+        _getInstRet->create(ft);
+
         _initCounters = false;
     }
 }

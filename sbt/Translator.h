@@ -57,6 +57,9 @@ public:
 
     // counters
 
+    // (this must be called before using any counter function)
+    void initCounters();
+
     const Function& getCycles() const
     {
         return *_getCycles;
@@ -81,7 +84,6 @@ public:
     // syscall handler
     Syscall& syscall();
 
-    void initCounters();
 
 private:
     // data
@@ -104,20 +106,21 @@ private:
     std::unique_ptr<const llvm::MCInstrInfo> _mii;
     std::unique_ptr<llvm::MCInstPrinter> _instPrinter;
 
-    // icaller
+    // icaller stuff
     Function _iCaller;
+    FunctionPtr _sbtabort;
     Map<std::string, FunctionPtr> _funMap;
     Map<uint64_t, Function*> _funcByAddr;
 
+    // import() stuff
     uint64_t _extFuncAddr = 0;
     std::unique_ptr<llvm::Module> _lcModule;
 
+    // syscall handler
     std::unique_ptr<Syscall> _sc;
+
+    // counters
     bool _initCounters = true;
-
-    // host functions
-
-    FunctionPtr _sbtabort;
     FunctionPtr _getCycles;
     FunctionPtr _getTime;
     FunctionPtr _getInstRet;
@@ -126,9 +129,11 @@ private:
     // methods
 
     llvm::Error start();
+    llvm::Error startTarget();
+
     llvm::Error finish();
 
-    // indirect function caller
+    // gen indirect function caller
     llvm::Error genICaller();
 };
 
