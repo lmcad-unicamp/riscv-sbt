@@ -79,8 +79,7 @@ endif
 
 include $(TOPDIR)/make/config.mk
 
-all:
-	echo Mibench
+all: dijkstra_large
 
 include $(TOPDIR)/make/rules.mk
 

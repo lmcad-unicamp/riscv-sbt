@@ -131,8 +131,10 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     // set symbol relocation info
     SBTSymbol ssym(realSym->address(), realSym->address(),
         realSym->name(), realSym->section(), addr);
-    DBGF("addr={0:X+4}, val={1:X+4}, name={2}, addend={3:X+8}",
-        ssym.addr, ssym.val, ssym.name, reloc->addend());
+    DBGF("addr={0:X+4}, val={1:X+4}, name={2}, section={3}, addend={4:X+8}",
+        ssym.addr, ssym.val, ssym.name,
+        ssym.sec? ssym.sec->name() : "null",
+        reloc->addend());
 
     xassert((ssym.sec || !ssym.addr) && "no section found for relocation");
 

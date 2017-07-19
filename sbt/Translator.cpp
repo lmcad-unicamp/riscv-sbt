@@ -241,7 +241,7 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
     llvm::Function* lf = _lcModule->getFunction(func);
     if (!lf) {
         SBTError serr;
-        serr << "function not found: " << func;
+        serr << __FUNCTION__ << "(): function not found: " << func;
         return error(serr);
     }
     llvm::FunctionType* ft = lf->getFunctionType();
