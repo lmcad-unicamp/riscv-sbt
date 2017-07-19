@@ -191,3 +191,65 @@ $(NBUILD_FILE): $(NBUILD_FILE).o
 $(call RUN,X86,$(1))
 $(call CLEAN,$(1),$(1))
 endef
+
+###
+### MIBENCH
+###
+
+# 1: prefix (X86/RV32)
+# 2: source dir/
+# 3: out dir/
+# 4: module (module.c -> module.s)
+define C2S
+$(3)$$($(1)_PREFIX)-$(4).s: $(2)$(4).c
+	$$($(1)_CLANG) $$($(1)_CLANG_FLAGS) $(CFLAGS) -o $$@ -S $$<
+endef
+
+# 1: prefix (X86/RV32)
+# 2: source dir/
+# 3: out dir/
+# 4: module (module.s -> module.o)
+define S2O
+$(3)$$($(1)_PREFIX)-$(4).o: $(2)$$($(1)_PREFIX)-$(4).s
+	$$($(1)_AS) -o $$@ -c $$<
+endef
+
+# 1: prefix (X86/RV32)
+# 2: output dir
+# 3: object files
+# 4: output file
+define CLINK2
+$(eval CL2_OBJS = $(addprefix $$($(1)_PREFIX)-,$(3)))
+
+$(2)$$($(1)_PREFIX)-$(4): $(addprefix $(2),$(CL2_OBJS))
+	cd $(2) && \
+	$$($(1)_LD) -o $$@ \
+		$$($(1)_LD_FLAGS0) $(CL2_OBJS) \
+		$($(1)_LIBS) \
+		$$($(1)_LD_FLAGS1)
+endef
+
+# TRANSLATE BINARY
+# 1: guest arch
+# 2: host arch
+# 3: dir
+# 4: mods
+# 5: output
+define TRANSLATE2
+$(eval T2_OBJS = $(foreach mod,$(4),$$($(1)_PREFIX)-$(mod).o))
+
+$(5).bc: $(addprefix $(3),$(T2_OBJS))
+	cd $(3) && \
+		riscv-sbt $(SBTFLAGS) -o $$@ $(T2_OBJS)
+	$(LLVM_INSTALL_DIR)/bin/llvm-dis -o $(5).ll $$@
+
+$(eval HOSTFILE = $$($(1)_PREFIX)-$$($(2)_PREFIX)-$(5))
+$(HOSTFILE).s: $(5).bc $(5).ll
+	$(LLVM_INSTALL_DIR)/bin/opt -O3 $(5).bc -o $(5).opt.bc
+	$(LLVM_INSTALL_DIR)/bin/llvm-dis -o $(5).opt.ll $(5).opt.bc
+	llc -o $$@ -march $($(2)_MARCH) $(5).opt.bc
+
+$(call S2O,$(2),$(3),$(3),$(HOSTFILE))
+
+$(call CLINK2,$(2),$(3),$(HOSTFILE).o,$(HOSTFILE))
+endef

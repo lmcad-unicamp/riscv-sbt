@@ -947,15 +947,6 @@ mmtest: sbt
 	$(RUN) $(MAKE) -C $(SBT_TEST_DIR) $(foreach target,$(TARGETS),$(target)-mm)
 	$(MAKE) mmm
 
-
-# Mibench source
-# http://vhosts.eecs.umich.edu/mibench//automotive.tar.gz
-# http://vhosts.eecs.umich.edu/mibench//network.tar.gz
-# http://vhosts.eecs.umich.edu/mibench//security.tar.gz
-# http://vhosts.eecs.umich.edu/mibench//telecomm.tar.gz
-# http://vhosts.eecs.umich.edu/mibench//office.tar.gz
-# http://vhosts.eecs.umich.edu/mibench//consumer.tar.gz
-
 ###
 ### BEGIN debugging targets ###
 ###
