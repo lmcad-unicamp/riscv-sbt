@@ -425,6 +425,13 @@ public:
         return i;
     }
 
+    llvm::UnreachableInst* unreachable()
+    {
+        llvm::UnreachableInst* inst = _builder->CreateUnreachable();
+        updateFirst(inst);
+        return inst;
+    }
+
     // get first instruction produced by the builder since last reset
     llvm::Instruction* first()
     {

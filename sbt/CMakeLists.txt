@@ -7,66 +7,66 @@ set (LLVM_CONFIG "$ENV{TOPDIR}/scripts/llvm-config.sh")
 
 # include dirs
 execute_process(
-  COMMAND ${LLVM_CONFIG} --inc
-  RESULT_VARIABLE RC1
-  OUTPUT_VARIABLE SBT_INCLUDE_DIRS
+    COMMAND ${LLVM_CONFIG} --inc
+    RESULT_VARIABLE RC1
+    OUTPUT_VARIABLE SBT_INCLUDE_DIRS
 )
 
 # compile options
 execute_process(
-  COMMAND ${LLVM_CONFIG} --flags
-  RESULT_VARIABLE RC2
-  OUTPUT_VARIABLE SBT_COMPILE_OPTIONS
+    COMMAND ${LLVM_CONFIG} --flags
+    RESULT_VARIABLE RC2
+    OUTPUT_VARIABLE SBT_COMPILE_OPTIONS
 )
 
 # compile defs
 execute_process(
-  COMMAND ${LLVM_CONFIG} --defs
-  RESULT_VARIABLE RC3
-  OUTPUT_VARIABLE SBT_COMPILE_DEFINITIONS
+    COMMAND ${LLVM_CONFIG} --defs
+    RESULT_VARIABLE RC3
+    OUTPUT_VARIABLE SBT_COMPILE_DEFINITIONS
 )
 
 # link dirs
 execute_process(
-  COMMAND ${LLVM_CONFIG} --link-dirs
-  RESULT_VARIABLE RC4
-  OUTPUT_VARIABLE SBT_LINK_DIRS
+    COMMAND ${LLVM_CONFIG} --link-dirs
+    RESULT_VARIABLE RC4
+    OUTPUT_VARIABLE SBT_LINK_DIRS
 )
 
 # sys libs
 execute_process(
-  COMMAND ${LLVM_CONFIG} --system-libs
-  RESULT_VARIABLE RC5
-  OUTPUT_VARIABLE SBT_SYS_LIBS
+    COMMAND ${LLVM_CONFIG} --system-libs
+    RESULT_VARIABLE RC5
+    OUTPUT_VARIABLE SBT_SYS_LIBS
 )
 
 # libs
 execute_process(
-  COMMAND ${LLVM_CONFIG} --libs arm bitwriter core object riscv
-    support target x86
-  RESULT_VARIABLE RC6
-  OUTPUT_VARIABLE SBT_LIBS
+    COMMAND ${LLVM_CONFIG} --libs arm bitwriter core object riscv
+      support target x86
+    RESULT_VARIABLE RC6
+    OUTPUT_VARIABLE SBT_LIBS
 )
 
 # abort if llvm-config failed
 if (RC1 OR RC2 OR RC3 OR RC4 OR RC5 OR RC6)
-  message(FATAL_ERROR "Failed to execute llvm-config.sh")
+    message(FATAL_ERROR "Failed to execute llvm-config.sh")
 endif()
 
 # set debug options
 message(STATUS "This is a ${CMAKE_BUILD_TYPE} build")
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-  set (CMAKE_VERBOSE_MAKEFILE ON)
-  message(STATUS "SBT_INCLUDE_DIRS = [${SBT_INCLUDE_DIRS}]")
-  message(STATUS "SBT_COMPILE_OPTIONS = [${SBT_COMPILE_OPTIONS}]")
-  message(STATUS "SBT_COMPILE_DEFINITIONS = [${SBT_COMPILE_DEFINITIONS}]")
-  message(STATUS "SBT_LINK_DIRS = [${SBT_LINK_DIRS}]")
-  message(STATUS "SBT_SYS_LIBS = [${SBT_SYS_LIBS}]")
-  message(STATUS "SBT_LIBS = [${SBT_LIBS}]")
+    set (CMAKE_VERBOSE_MAKEFILE ON)
+    message(STATUS "SBT_INCLUDE_DIRS = [${SBT_INCLUDE_DIRS}]")
+    message(STATUS "SBT_COMPILE_OPTIONS = [${SBT_COMPILE_OPTIONS}]")
+    message(STATUS "SBT_COMPILE_DEFINITIONS = [${SBT_COMPILE_DEFINITIONS}]")
+    message(STATUS "SBT_LINK_DIRS = [${SBT_LINK_DIRS}]")
+    message(STATUS "SBT_SYS_LIBS = [${SBT_SYS_LIBS}]")
+    message(STATUS "SBT_LIBS = [${SBT_LIBS}]")
 else()
-  set (SBT_COMPILE_DEFINITIONS ${SBT_COMPILE_DEFINITIONS} NDEBUG)
-  set (SBT_COMPILE_OPTIONS ${SBT_COMPILE_OPTIONS} -g)
-  #set (CMAKE_VERBOSE_MAKEFILE ON)
+    set (SBT_COMPILE_DEFINITIONS ${SBT_COMPILE_DEFINITIONS} NDEBUG)
+    set (SBT_COMPILE_OPTIONS ${SBT_COMPILE_OPTIONS} -g)
+    #set (CMAKE_VERBOSE_MAKEFILE ON)
 endif()
 
 # enable AT&T assembler
@@ -87,38 +87,45 @@ set (CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/llvm/lib")
 include_directories (${SBT_INCLUDE_DIRS})
 link_directories (${SBT_LINK_DIRS})
 add_executable (riscv-sbt
-  BasicBlock.cpp
-  Constants.cpp
-  Context.cpp
-  Disassembler.cpp
-  Function.cpp
-  Instruction.cpp
-  Module.cpp
-  Object.cpp
-  Relocation.cpp
-  SBTError.cpp
-  Section.cpp
-  Stack.cpp
-  Syscall.cpp
-  Translator.cpp
-  Types.cpp
-  Utils.cpp
-  XRegisters.cpp
-  sbt.cpp
-  )
+    BasicBlock.cpp
+    Constants.cpp
+    Context.cpp
+    Disassembler.cpp
+    Function.cpp
+    Instruction.cpp
+    Module.cpp
+    Object.cpp
+    Relocation.cpp
+    SBTError.cpp
+    Section.cpp
+    Stack.cpp
+    Syscall.cpp
+    Translator.cpp
+    Types.cpp
+    Utils.cpp
+    XRegisters.cpp
+    sbt.cpp
+    )
 target_compile_options (riscv-sbt PRIVATE ${SBT_COMPILE_OPTIONS})
 target_compile_definitions(riscv-sbt PRIVATE ${SBT_COMPILE_DEFINITIONS})
 target_link_libraries (riscv-sbt
-  ${SBT_LIBS}
-  ${SBT_SYS_LIBS}
+    ${SBT_LIBS}
+    ${SBT_SYS_LIBS}
 )
 
 set (LIBC_CPP ${PROJECT_SOURCE_DIR}/libc.cpp)
 
 # libc.bc
+set (RV32_SYSROOT $ENV{TCR}/riscv32-unknown-elf)
 add_custom_command(OUTPUT libc.bc
-  COMMAND clang -O0 -std=c++11 -femit-all-decls -emit-llvm -c ${LIBC_CPP}
-  MAIN_DEPENDENCY ${LIBC_CPP})
+    COMMAND clang
+        --target=riscv -mriscv=RV32IAMFD
+        -fno-exceptions -fno-rtti -O0
+        -std=c++11 -femit-all-decls -emit-llvm
+        -isysroot ${RV32_SYSROOT}
+        -isystem ${RV32_SYSROOT}/include
+        -c ${LIBC_CPP}
+        MAIN_DEPENDENCY ${LIBC_CPP})
 add_custom_target(libc DEPENDS libc.bc)
 add_dependencies(riscv-sbt libc)
 
@@ -127,6 +134,6 @@ add_dependencies(riscv-sbt libc)
 install (TARGETS riscv-sbt DESTINATION bin)
 install (FILES ${CMAKE_BINARY_DIR}/libc.bc DESTINATION share/riscv-sbt)
 install (FILES ${CMAKE_BINARY_DIR}/CMakeFiles/x86-syscall.dir/x86-syscall.s.o
-  RENAME x86-syscall.o DESTINATION share/riscv-sbt)
+    RENAME x86-syscall.o DESTINATION share/riscv-sbt)
 install (FILES ${CMAKE_BINARY_DIR}/CMakeFiles/x86-counters.dir/x86-counters.s.o
-  RENAME x86-counters.o DESTINATION share/riscv-sbt)
+    RENAME x86-counters.o DESTINATION share/riscv-sbt)

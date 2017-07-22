@@ -135,8 +135,16 @@ llvm::Error Function::finish()
 {
     auto bld = _ctx->bld;
     // add a return if there is no terminator in current block
-    if (!bld->getInsertBlock()->terminated())
-        bld->retVoid();
+    if (!bld->getInsertBlock()->terminated()) {
+        // there must always be a return instruction in main,
+        // except when a function that does not return is used,
+        // such as exit().
+        // In this case, the next instruction will be unreachable.
+        if (_ctx->inMain)
+            bld->unreachable();
+        else
+            bld->retVoid();
+    }
     _ctx->inMain = false;
     cleanRegs();
     // _f->dump();
@@ -220,9 +228,9 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
             xassert(bbptr && "BasicBlock not found!");
             DBGF("insertPoint={0}:", bbptr->name());
 
-            // if last instruction was not a branch, then branch
-            // from previous BB to current one
-            if (!_ctx->brWasLast)
+            // if last instruction did not terminate the BB,
+            // then branch from previous BB to current one
+            if (!_ctx->bld->getInsertBlock()->terminated())
                 _ctx->bld->br(bbptr);
             _ctx->bld->setInsertPoint(*bbptr);
 
@@ -231,8 +239,6 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
             if (it != _bbMap.end())
                 updateNextBB(it->key);
         }
-        // reset last instruction was branch flag
-        _ctx->brWasLast = false;
 
         // translate instruction
         Instruction inst(_ctx, addr, rawInst);
@@ -244,23 +250,13 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
         // add translated instruction to BB's instruction map
         (*curBB())(addr, std::move(_ctx->bld->first()));
 
-        // if last instruction terminated this function
-        // switch to a new one
-        //
-        // (ex: unconditional jump followed by alignment instrs)
-        if (terminated()) {
-            _end = addr + Instruction::SIZE;
-            if (end != _end) {
-                _nextf = Function::getByAddr(_ctx, _end);
-                _nextf->setEnd(end);
-
-                DBGF("function {0} was terminated at address {1:X+8}. "
-                        "Switching to function {2}",
-                        name(), addr, _nextf->name());
-
-                return llvm::Error::success();
-            }
-        }
+        // if last instruction terminated this basicblock
+        // switch to a new one. This is needed in case the
+        // next basic block was not explicitly created.
+        // This can happen, for instance, if an unconditional
+        // jump is followed by alignment instrs.
+        if (_ctx->bld->getInsertBlock()->terminated())
+            updateNextBB(addr + Instruction::SIZE);
     }
 
     return llvm::Error::success();

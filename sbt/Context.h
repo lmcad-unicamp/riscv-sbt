@@ -133,9 +133,6 @@ public:
 
   // current address
   uint64_t addr = 0;
-  // flags
-  // last instruction was a branch?
-  bool brWasLast = false;
 };
 
 }

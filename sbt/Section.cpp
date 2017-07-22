@@ -71,9 +71,8 @@ llvm::Error SBTSection::translate()
 
         // XXX function delimiters: global or function symbol
         std::string symname = sym->name();
-        bool isFunc = sym->type() == llvm::object::SymbolRef::ST_Function;
-        bool isGlobal = sym->flags() & llvm::object::SymbolRef::SF_Global;
-        bool isValid = isFunc || isGlobal;
+        bool isValid = SBTSymbol::isFunction(sym) ||
+            SBTSymbol::isGlobal(sym);
         // first: use a fake symbol if none available
         if (!isValid && i == 0) {
             xassert(symaddr == 0);

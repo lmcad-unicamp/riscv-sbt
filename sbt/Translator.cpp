@@ -240,7 +240,7 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
     // lookup function
     llvm::Function* lf = _lcModule->getFunction(func);
     if (!lf) {
-        SBTError serr;
+        FunctionNotFound serr;
         serr << __FUNCTION__ << "(): function not found: " << func;
         return error(serr);
     }
@@ -347,13 +347,11 @@ llvm::Error Translator::genICaller()
 
             // need to cast?
             if (ty != t.i32) {
-                /*
-                DBGF("cast from: ");
+                DBGF("cast from:");
                 v->getType()->dump();
-                DBGF("cast to: ");
+                DBGF("cast to:");
                 ty->dump();
                 DBGS.flush();
-                */
 
                 v = bld->bitOrPointerCast(v, ty);
             }

@@ -84,7 +84,6 @@ public:
     // syscall handler
     Syscall& syscall();
 
-
 private:
     // data
 

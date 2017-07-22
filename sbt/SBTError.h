@@ -91,6 +91,12 @@ public:
 };
 
 
+class FunctionNotFound : public SBTError
+{
+public:
+    using SBTError::SBTError;
+};
+
 } // sbt
 
 #endif

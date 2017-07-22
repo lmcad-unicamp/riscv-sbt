@@ -789,7 +789,6 @@ llvm::Error Instruction::translateBranch(BranchType bt)
 
     bool isCall = (bt == JAL || bt == JALR) &&
         linkReg != XRegister::ZERO;
-    _ctx->brWasLast = !isCall;
     const SBTSymbol& sym = _ctx->reloc->last();
 
     // JALR

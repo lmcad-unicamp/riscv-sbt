@@ -947,6 +947,11 @@ mmtest: sbt
 	$(RUN) $(MAKE) -C $(SBT_TEST_DIR) $(foreach target,$(TARGETS),$(target)-mm)
 	$(MAKE) mmm
 
+.PHONY: mibench
+mibench: sbt
+	rm -f log.txt
+	$(RUN) $(MAKE) -C $(TOPDIR)/mibench
+
 ###
 ### BEGIN debugging targets ###
 ###

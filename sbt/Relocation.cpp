@@ -3,9 +3,11 @@
 #include "Builder.h"
 #include "Instruction.h"
 #include "Object.h"
+#include "SBTError.h"
 #include "Section.h"
 #include "Translator.h"
 
+#include <llvm/IR/Module.h>
 #include <llvm/Object/ELF.h>
 #include <llvm/Support/FormatVariadic.h>
 
@@ -138,14 +140,8 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
 
     xassert((ssym.sec || !ssym.addr) && "no section found for relocation");
 
-    // FIXME
-    // bool isFunction = _ctx->funcByAddr(ssym.addr, !ASSERT_NOT_NULL);
-    // XXX using symbol info
-    // if (!isFunction)
-    //realSym->type() == llvm::object::SymbolRef::ST_Function;
-    //
-    // XXX assuming .text contains only code
-    bool isFunction = ssym.sec && ssym.sec->isText();
+    // XXX this finds local functions only
+    bool isFunction = ssym.isFunction();
 
     if (isFunction) {
         if (useVal)
@@ -174,15 +170,36 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
 
     llvm::Value* v = nullptr;
 
-    // external function case: return our handler instead
+    // external symbol case: handle data or function
     if (ssym.isExternal()) {
         auto expAddr =_ctx->translator->import(ssym.name);
-        if (!expAddr)
-            return expAddr.takeError();
-        uint64_t addr = expAddr.get();
-        DBGF("external: addr={0:X+8}, mask={1:X+8}", addr, mask);
-        addr &= mask;
-        v = _ctx->c.i32(addr);
+
+        // function not found: assume it is data
+        if (!expAddr) {
+            llvm::Error err = llvm::handleErrors(expAddr.takeError(),
+            [](const FunctionNotFound& serr) {
+                serr.log(DBGS);
+            });
+
+            if (err)
+                return std::move(err);
+
+            const Types& t = _ctx->t;
+            llvm::Constant* c = _ctx->module->getOrInsertGlobal(ssym.name, t.i32);
+            v = llvm::ConstantExpr::getPointerCast(c, t.i32);
+            v = _ctx->bld->_and(v, _ctx->c.i32(mask));
+
+            DBGF("external data: mask={1:X+8}", addr, mask);
+            v->dump();
+
+        // handle external function
+        } else {
+            uint64_t addr = expAddr.get();
+            DBGF("external function: addr={0:X+8}, mask={1:X+8}", addr, mask);
+
+            addr &= mask;
+            v = _ctx->c.i32(addr);
+        }
 
     // internal function case
     } else if (isFunction) {
@@ -197,8 +214,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
         Builder* bld = _ctx->bld;
 
         // get char* to memory
-        DBGS << __FUNCTION__ << llvm::formatv(": reloc={0:X+4}\n", ssym.val);
-        // abort();
+        DBGF("reloc={0:X+4}\n", ssym.val);
         std::vector<llvm::Value*> idx = { _ctx->c.ZERO, _ctx->c.i32(ssym.val) };
         v = bld->gep(_ctx->shadowImage, idx);
 
