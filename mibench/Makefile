@@ -90,14 +90,37 @@ include $(TOPDIR)/make/rules.mk
 # 4: mods
 # 5: bin
 define BENCH
+
+# .c -> .bc
 $(eval $(foreach mod,$(4),\
-    $(call C2S,$(1),$(2),$(3),$(mod))))
+    $(call C2BC,$(1),$(2),$(3),$(mod),$($(1)_PREFIX)-$(mod))))
 
+# LLVMLINK
+
+# .bc -> .ll
 $(eval $(foreach mod,$(4),\
-    $(call S2O,$(1),$(3),$(3),$(mod))))
+    $(call DIS,$(1),$(3),$($(1)_PREFIX)-$(mod))))
 
-$(eval $(call CLINK2,$(1),$(3),$(addsuffix .o,$(4)),$(5)))
+# .bc -> .opt.bc
+$(eval $(foreach mod,$(4),\
+    $(call OPT,$(1),$(3),$($(1)_PREFIX)-$(mod))))
 
+# .opt.bc -> .opt.ll
+$(eval $(foreach mod,$(4),\
+    $(call DIS,$(1),$(3),$($(1)_PREFIX)-$(mod).opt)))
+
+# .opt.bc -> .s
+$(eval $(foreach mod,$(4),\
+    $(call BC2S,$(1),$(3),$($(1)_PREFIX)-$(mod))))
+
+# .s -> .o
+$(eval $(foreach mod,$(4),\
+    $(call S2O,$(1),$(3),$($(1)_PREFIX)-$(mod))))
+
+# .o -> bin
+$(eval $(call CLINK2,$(1),$(3),$(addprefix $($(1)_PREFIX)-,$(4)),$($(1)_PREFIX)-$(5)))
+
+# targets
 $($(1)_PREFIX)-$(5): $(3) $(3)$($(1)_PREFIX)-$(5)
 endef
 
@@ -135,13 +158,15 @@ $(eval $(call BENCH,RV32,$(DIJKSTRA_SRC_DIR),$(DIJKSTRA_OUT_DIR),$(DIJKSTRA_MODS
 $(eval $(call BENCH,X86,$(DIJKSTRA_SRC_DIR),$(DIJKSTRA_OUT_DIR),$(DIJKSTRA_MODS),$(DIJKSTRA_BIN)))
 $(eval $(call BENCH2,RV32 X86,$(DIJKSTRA_OUT_DIR),$(DIJKSTRA_BIN)))
 
-$(eval $(call TRANSLATE2,RV32,X86,$(DIJKSTRA_OUT_DIR),$(DIJKSTRA_MODS),$(DIJKSTRA_BIN)))
+$(eval $(call TRANSLATE2,X86,$(DIJKSTRA_OUT_DIR),$(DIJKSTRA_MODS),$(DIJKSTRA_BIN)))
 
 $(DIJKSTRA_BIN): $(foreach arch,RV32 X86,$($(arch)_PREFIX)-$(DIJKSTRA_BIN)) \
-    $(foreach arch,X86,rv32-$($(arch)_PREFIX)-$(DIJKSTRA_BIN))
+	$(foreach arch,X86,$(DIJKSTRA_OUT_DIR)rv32-$($(arch)_PREFIX)-$(DIJKSTRA_BIN))
 
 ##
 
+clean:
+	rm -rf $(BUILD_MIBENCH)
 
 #$(eval $(call BUILD,X86,x86-mm,CLANG,mm,save-run.out))
 #$(eval $(call BUILD,RV32,rv32-mm,CLANG,mm,save-run.out))

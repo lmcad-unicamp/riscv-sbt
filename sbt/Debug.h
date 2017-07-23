@@ -43,17 +43,25 @@ extern bool g_debug;
 // debug stream
 #undef DBGS
 #undef DBGF
+#undef DBG
 #if ENABLE_DBGS
-#     include <llvm/Support/FormatVariadic.h>
-#     define DBGS (g_debug? llvm::outs() : llvm::nulls())
-#     define DBGF(...) \
+#   include <llvm/Support/FormatVariadic.h>
+#   define DBGS (g_debug? llvm::outs() : llvm::nulls())
+#   define DBGF(...) \
         do { \
-                if (g_debug) { \
+            if (g_debug) { \
                 DBGS << __FUNCTION__ << "(): " << llvm::formatv(__VA_ARGS__) << '\n'; \
                 DBGS.flush(); \
-                } \
+            } \
         } while (0)
+#   define DBG(a) \
+    do { \
+        if (g_debug) { \
+            a; \
+        } \
+    } while(0)
 #else
-#     define DBGS llvm::nulls()
-#     define DBGF(...)
+#   define DBGS llvm::nulls()
+#   define DBGF(...)
+#   define DBG(a)
 #endif

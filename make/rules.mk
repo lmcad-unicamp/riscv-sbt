@@ -1,40 +1,57 @@
 ### rules ###
 
-# $(warning CLEAN,$(1),$(2))
+# assembly program link
+# 1: prefix
+# 2: dir/
+# 3: modules
+# 4: output
+define LINK
+$(2)$(4): $(addprefix $(2),$(addsuffix .o,$(3)))
+	cd $(2) && \
+		$$($(1)_LD) -o $(4) $(addsuffix .o,$(3))
+endef
+
+# C program link
+# 1: prefix (X86/RV32)
+# 2: output dir
+# 3: modules
+# 4: output file
+define CLINK
+$(eval CL_OBJS = $(addsuffix .o,$(3)))
+
+$(2)$(4): $(addprefix $(2),$(CL_OBJS))
+	cd $(2) && \
+	$$($(1)_LD) -o $$@ \
+		$$($(1)_LD_FLAGS0) $(CL_OBJS) \
+		$$($(1)_LD_FLAGS1)
+endef
+
 
 # CLEAN
-# 1: module
-# 2: clean .s?
+# 1: dir
+# 2: module
+# 3: clean .s?
 define CLEAN
-clean-$(1):
+clean-$(2):
 	@echo $$@:
-	rm -f $(addprefix $(MAKE_DIR),\
-		$(1) $(1).o $(if $(2),$(1).s) $(1).bc $(1).ll $(1).out $(CLEAN_EXTRA))
+	cd $(1) && \
+		rm -f $(2) $(2).o $(if $(3),$(2).s,) $(2).bc $(2).ll $(2).out
 ###
 endef
 
 # RUN
 # 1: prefix
-# 2: program
-# 3: save output?
+# 2: dir/
+# 3: program
+# 4: save output?
 define RUN
-$(eval RUN_DIR = $(if $(MAKE_DIR),$(MAKE_DIR),./))
-$(eval RUN_PROG = $(RUN_DIR)$(2))
-run-$(2): $(RUN_PROG)
+run-$(3): $(2)$(3)
 	@echo $$@:
-ifeq ($$($(1)_RUN),)
-  ifeq ($(3),)
-	$(RUN_PROG)
+  ifeq ($(4),)
+	$$($(1)_RUN) $(2)$(3)
   else
-	$(RUN_PROG) | tee $(RUN_PROG).out
+	$$($(1)_RUN) $(2)$(3) | tee $(3).out
   endif
-else
-  ifeq ($(3),)
-	$$($(1)_RUN) $(RUN_PROG)
-  else
-	$$($(1)_RUN) $(RUN_PROG) | tee $(RUN_PROG).out
-  endif
-endif
 endef
 
 # Assemble
@@ -46,26 +63,7 @@ $(AS_FILE).o: $(AS_FILE).s
 	$$($(1)_AS) -o $$@ -c $$<
 endef
 
-# C program link
-# 1: prefix
-# 2: output module
-define CLINK
-$(eval CLINK_FILE = $(MAKE_DIR)$(2))
-$(CLINK_FILE): $(CLINK_FILE).o
-	$$($(1)_LD) -o $$@ \
-		$$($(1)_LD_FLAGS0) $$< \
-		$($(1)_LIBS) \
-		$$($(1)_LD_FLAGS1)
-endef
 
-# assembly program link
-# 1: prefix
-# 2: output module
-define LINK
-$(eval LINK_FILE = $(MAKE_DIR)$(2))
-$(LINK_FILE): $(LINK_FILE).o
-	$$($(1)_LD) -o $$@ $$< $($(1)_LIBS)
-endef
 
 # Assemble and link with C libs
 # 1: prefix
@@ -79,33 +77,6 @@ $(call RUN,$(1),$(2),$(4))
 $(call CLEAN,$(2),$(3))
 endef
 
-# BUILD
-# 1: prefix
-# 2: output module
-# 3: [opt] GCC/CLANG
-# 4: [opt] source .c file
-# 5: save run output?
-define BUILD
-$(eval BUILD_FILE = $(MAKE_DIR)$(2))
-
-# .c -> .s
-ifneq ($(4),)
-$(BUILD_FILE).s: $(MAKE_DIR)$(4).c
-	$$($(1)_$(3)) $$($(1)_$(3)_FLAGS) $(CFLAGS) -o $$@ -S $$<
-endif
-
-$(call AS,$(1),$(2))
-
-# .o -> elf
-ifneq ($(4),)
-$(call CLINK,$(1),$(2))
-else
-$(call LINK,$(1),$(2))
-endif
-
-$(call RUN,$(1),$(2),$(5))
-$(call CLEAN,$(2),$(4))
-endef
 
 # TRANSLATE BINARY
 # 1: guest arch
@@ -199,57 +170,91 @@ endef
 # 1: prefix (X86/RV32)
 # 2: source dir/
 # 3: out dir/
-# 4: module (module.c -> module.s)
-define C2S
-$(3)$$($(1)_PREFIX)-$(4).s: $(2)$(4).c
-	$$($(1)_CLANG) $$($(1)_CLANG_FLAGS) $(CFLAGS) -o $$@ -S $$<
+# 4: input file (.c)
+# 5: output file (.bc)
+define C2BC
+$(3)$(5).bc: $(2)$(4).c
+	cd $(3) && \
+		$(CLANG) $$($(1)_CLANG_FLAGS) $(EMITLLVM) $(4).c -o $(5).bc
 endef
 
 # 1: prefix (X86/RV32)
-# 2: source dir/
-# 3: out dir/
-# 4: module (module.s -> module.o)
+# 2: dir/
+# 3: module
+define DIS
+$(2)$(3).ll: $(2)$(3).bc
+	cd $(2) && \
+		$(DIS) $(3).bc -o $(3).ll
+endef
+
+### $(LLVMLINK) ${FILE1_bcs} -o $(BENCHNAME).bc
+
+# OPT (x2 for native)
+# 1: prefix (X86/RV32)
+# 2: dir/
+# 3: module
+define OPT
+$(2)$(3).opt.bc: $(2)$(3).bc $(2)$(3).ll
+	cd $(2) && \
+		$(OPT) $(OPT_FLAGS) $(3).bc -o $(3).opt.bc
+endef
+
+# 1: prefix (X86/RV32)
+# 2: dir/
+# 3: module
+define BC2S
+$(2)$(3).s: $(2)$(3).opt.bc $(2)$(3).opt.ll
+	cd $(2) && \
+		$(LLC) $(LLC_FLAGS) $($(1)_LLC_FLAGS) $(3).opt.bc -o $(3).s
+endef
+
+# 1: prefix (X86/RV32)
+# 2: dir/
+# 3: module (module.s -> module.o)
 define S2O
-$(3)$$($(1)_PREFIX)-$(4).o: $(2)$$($(1)_PREFIX)-$(4).s
-	$$($(1)_AS) -o $$@ -c $$<
+$(2)$(3).o: $(2)$(3).s
+	cd $(2) && \
+		$$($(1)_AS) -o $(3).o -c $(3).s
 endef
 
 # 1: prefix (X86/RV32)
 # 2: output dir
-# 3: object files
+# 3: modules
 # 4: output file
 define CLINK2
-$(eval CL2_OBJS = $(addprefix $$($(1)_PREFIX)-,$(3)))
+$(eval CL2_OBJS = $(addsuffix .o,$(3)))
 
-$(2)$$($(1)_PREFIX)-$(4): $(addprefix $(2),$(CL2_OBJS))
+$(2)$(4): $(addprefix $(2),$(CL2_OBJS))
 	cd $(2) && \
 	$$($(1)_LD) -o $$@ \
 		$$($(1)_LD_FLAGS0) $(CL2_OBJS) \
+		$$($(1)_SYSCALL_O) \
 		$($(1)_LIBS) \
 		$$($(1)_LD_FLAGS1)
 endef
 
+
+# $(STATICBT) -target=$(ARCH) $(SBTOPT) -stacksize $(STACKSIZE) $(BENCHNAME)-oi.o -o=$(BENCHNAME)-oi.bc
+# $(OPT) $(OPTFLAGS) $(BENCHNAME)-oi.bc -o $(BENCHNAME)-oi.bc
+
 # TRANSLATE BINARY
-# 1: guest arch
-# 2: host arch
-# 3: dir
-# 4: mods
-# 5: output
+# 1: host arch
+# 2: dir
+# 3: mod
 define TRANSLATE2
-$(eval T2_OBJS = $(foreach mod,$(4),$$($(1)_PREFIX)-$(mod).o))
+$(2)$(3).bc: $(2)$(RV32_PREFIX)-$(3).o
+	cd $(2) && \
+		riscv-sbt $(SBTFLAGS) -o $(3).bc $(RV32_PREFIX)-$(3).o && \
+		$(LLVM_INSTALL_DIR)/bin/llvm-dis -o $(3).ll $(3).bc
 
-$(5).bc: $(addprefix $(3),$(T2_OBJS))
-	cd $(3) && \
-		riscv-sbt $(SBTFLAGS) -o $$@ $(T2_OBJS)
-	$(LLVM_INSTALL_DIR)/bin/llvm-dis -o $(5).ll $$@
+$(eval HOSTFILE = rv32-$$($(1)_PREFIX)-$(3))
+$(2)$(HOSTFILE).s: $(2)$(3).bc $(2)$(3).ll
+	cd $(2) && \
+		$(OPT) -O3 $(3).bc -o $(3).opt.bc && \
+		$(DIS) -o $(3).opt.ll $(3).opt.bc && \
+		llc -o $(HOSTFILE).s -march $($(1)_MARCH) $(3).opt.bc
 
-$(eval HOSTFILE = $$($(1)_PREFIX)-$$($(2)_PREFIX)-$(5))
-$(HOSTFILE).s: $(5).bc $(5).ll
-	$(LLVM_INSTALL_DIR)/bin/opt -O3 $(5).bc -o $(5).opt.bc
-	$(LLVM_INSTALL_DIR)/bin/llvm-dis -o $(5).opt.ll $(5).opt.bc
-	llc -o $$@ -march $($(2)_MARCH) $(5).opt.bc
+$(call S2O,$(1),$(2),$(2),$(HOSTFILE))
 
-$(call S2O,$(2),$(3),$(3),$(HOSTFILE))
-
-$(call CLINK2,$(2),$(3),$(HOSTFILE).o,$(HOSTFILE))
+$(call CLINK2,$(1),$(2),$(HOSTFILE),$(HOSTFILE))
 endef

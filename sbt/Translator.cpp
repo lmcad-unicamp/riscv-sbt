@@ -348,9 +348,9 @@ llvm::Error Translator::genICaller()
             // need to cast?
             if (ty != t.i32) {
                 DBGF("cast from:");
-                v->getType()->dump();
+                DBG(v->getType()->dump());
                 DBGF("cast to:");
-                ty->dump();
+                DBG(ty->dump());
                 DBGS.flush();
 
                 v = bld->bitOrPointerCast(v, ty);

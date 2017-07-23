@@ -190,7 +190,6 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             v = _ctx->bld->_and(v, _ctx->c.i32(mask));
 
             DBGF("external data: mask={1:X+8}", addr, mask);
-            v->dump();
 
         // handle external function
         } else {

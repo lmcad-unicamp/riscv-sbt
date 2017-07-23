@@ -1,62 +1,110 @@
 include $(TOPDIR)/make/config.mk
 
-BINS := rv32-hello rv32-gcc-hello rv32-clang-hello x86-clang-hello
-EXTRA := rv64-hello rv64-gcc-hello rv64-clang-hello \
-         rv32-gcc-linux-hello rv64-gcc-linux-hello
+BINS  := rv32-hello rv32-gcc-hello rv32-clang-hello x86-clang-hello
 
-all: $(BINS)
-extra: $(EXTRA)
+all:  $(BINS)
 
 include $(TOPDIR)/make/rules.mk
 
-$(eval $(call BUILD,RV32,rv32-hello))
-$(eval $(call BUILD,RV64,rv64-hello))
-$(eval $(call BUILD,RV32,rv32-gcc-hello,GCC,hello))
-$(eval $(call BUILD,RV64,rv64-gcc-hello,GCC,hello))
-$(eval $(call BUILD,RV32,rv32-clang-hello,CLANG,hello))
-$(eval $(call BUILD,RV64,rv64-clang-hello,CLANG,hello))
-$(eval $(call BUILD,X86,x86-clang-hello,CLANG,hello))
+
+RV32_GCC := $(RV32_TRIPLE)-gcc
+X86_GCC  := $(X86_64_TRIPLE)-gcc -m32
+
+# 1: prefix (X86/RV32)
+# 2: source dir/
+# 3: out dir/
+# 4: input file (.c)
+# 5: output file (.s)
+define GCC_C2S
+$(3)$(5).s: $(2)$(4).c
+	cd $(3) && \
+		$$($(1)_GCC) -S $(2)$(4).c -o $(5).s
+endef
+
+# 1: prefix (X86/RV32)
+# 2: source dir/
+# 3: out dir/
+# 4: input file (.c)
+# 5: output file (.s)
+define CLANG_C2S
+$(3)$(5).s: $(2)$(4).c
+	cd $(3) && \
+		$$($(1)_CLANG) $$($(1)_CLANG_FLAGS) $(CLANG_FLAGS) -S $(2)$(4).c -o $(5).s
+endef
 
 
-# linux 32
+$(eval $(call S2O,RV32,./,rv32-hello))
+$(eval $(call LINK,RV32,./,rv32-hello,rv32-hello))
+$(eval $(call CLEAN,./,rv32-hello))
+$(eval $(call RUN,RV32,./,rv32-hello))
 
-M32 := -march=rv32g -mabi=ilp32d
-CFLAGS := -Wall -Werror -O2
+$(eval $(call GCC_C2S,RV32,./,./,hello,rv32-gcc-hello))
+$(eval $(call S2O,RV32,./,rv32-gcc-hello))
+$(eval $(call CLINK,RV32,./,rv32-gcc-hello,rv32-gcc-hello))
+$(eval $(call CLEAN,./,rv32-gcc-hello,clean.s))
+$(eval $(call RUN,RV32,./,rv32-gcc-hello))
 
-rv32-gcc-linux-hello: rv32-gcc-linux-hello.o
-	$(RV64_LINUX_TRIPLE)-gcc $(M32) -static -o $@ $<
+$(eval $(call CLANG_C2S,RV32,./,./,hello,rv32-clang-hello))
+$(eval $(call S2O,RV32,./,rv32-clang-hello))
+$(eval $(call CLINK,RV32,./,rv32-clang-hello,rv32-clang-hello))
+$(eval $(call CLEAN,./,rv32-clang-hello,clean.s))
+$(eval $(call RUN,RV32,./,rv32-clang-hello))
 
-rv32-gcc-linux-hello.o: hello.c
-	$(RV64_LINUX_TRIPLE)-gcc $(M32) $(CFLAGS) -o $@ -c $<
-
-clean-rv32-gcc-linux-hello:
-	rm -f rv32-gcc-linux-hello rv32-gcc-linux-hello.o
-
-SPIKE32 := spike $(PK32)
-run-rv32-gcc-linux-hello:
-	$(SPIKE32) rv32-gcc-linux-hello
-
-# linux 64
-
-rv64-gcc-linux-hello: rv64-gcc-linux-hello.o
-	$(RV64_LINUX_TRIPLE)-gcc -static -o $@ $<
-
-rv64-gcc-linux-hello.o: hello.c
-	$(RV64_LINUX_TRIPLE)-gcc $(CFLAGS) -o $@ -c $<
-
-clean-rv64-gcc-linux-hello:
-	rm -f rv64-gcc-linux-hello rv64-gcc-linux-hello.o
-
-SPIKE64 := spike --isa=RV64IMAFD pk
-run-rv64-gcc-linux-hello:
-	$(SPIKE64) rv64-gcc-linux-hello
-
+$(eval $(call CLANG_C2S,X86,./,./,hello,x86-clang-hello))
+$(eval $(call S2O,X86,./,x86-clang-hello))
+$(eval $(call CLINK,X86,./,x86-clang-hello,x86-clang-hello))
+$(eval $(call CLEAN,./,x86-clang-hello,clean.s))
+$(eval $(call RUN,X86,./,x86-clang-hello))
 
 # run/clean
 
 run: $(foreach prog,$(BINS),run-$(prog))
 
-run-extra: $(foreach prog,$(EXTRA),run-$(prog))
-clean-extra: $(foreach prog,$(EXTRA),clean-$(prog))
+clean: $(foreach prog,$(BINS),clean-$(prog))
 
-clean: $(foreach prog,$(BINS),clean-$(prog)) clean-extra
+
+### extra
+#EXTRA := rv64-hello rv64-gcc-hello rv64-clang-hello \
+#         rv32-gcc-linux-hello rv64-gcc-linux-hello
+#
+#extra: $(EXTRA)
+#
+#$(eval $(call BUILD,RV64,rv64-hello))
+#$(eval $(call BUILD,RV64,rv64-gcc-hello,GCC,hello))
+#$(eval $(call BUILD,RV64,rv64-clang-hello,CLANG,hello))
+#
+## linux 32
+#
+#M32    := -march=rv32g -mabi=ilp32d
+#CFLAGS := -Wall -Werror -O2
+#
+#rv32-gcc-linux-hello: rv32-gcc-linux-hello.o
+#	$(RV64_LINUX_TRIPLE)-gcc $(M32) -static -o $@ $<
+#
+#rv32-gcc-linux-hello.o: hello.c
+#	$(RV64_LINUX_TRIPLE)-gcc $(M32) $(CFLAGS) -o $@ -c $<
+#
+#clean-rv32-gcc-linux-hello:
+#	rm -f rv32-gcc-linux-hello rv32-gcc-linux-hello.o
+#
+#SPIKE32 := spike $(PK32)
+#run-rv32-gcc-linux-hello:
+#	$(SPIKE32) rv32-gcc-linux-hello
+#
+## linux 64
+#
+#rv64-gcc-linux-hello: rv64-gcc-linux-hello.o
+#	$(RV64_LINUX_TRIPLE)-gcc -static -o $@ $<
+#
+#rv64-gcc-linux-hello.o: hello.c
+#	$(RV64_LINUX_TRIPLE)-gcc $(CFLAGS) -o $@ -c $<
+#
+#clean-rv64-gcc-linux-hello:
+#	rm -f rv64-gcc-linux-hello rv64-gcc-linux-hello.o
+#
+#SPIKE64 := spike --isa=RV64IMAFD pk
+#run-rv64-gcc-linux-hello:
+#	$(SPIKE64) rv64-gcc-linux-hello
+#
+#run-extra: $(foreach prog,$(EXTRA),run-$(prog))
+#clean-extra: $(foreach prog,$(EXTRA),clean-$(prog))

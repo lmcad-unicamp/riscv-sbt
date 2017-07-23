@@ -952,6 +952,9 @@ mibench: sbt
 	rm -f log.txt
 	$(RUN) $(MAKE) -C $(TOPDIR)/mibench
 
+mibench-clean:
+	$(MAKE) -C $(TOPDIR)/mibench clean
+
 ###
 ### BEGIN debugging targets ###
 ###
