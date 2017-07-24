@@ -79,69 +79,41 @@ endif
 
 include $(TOPDIR)/make/config.mk
 
-all: dijkstra_large
+DIJKSTRA_BIN := dijkstra_large
+
+all: $(DIJKSTRA_BIN)
 
 include $(TOPDIR)/make/rules.mk
 
-
-# 1: arch
-# 2: src dir
-# 3: out dir
-# 4: mods
-# 5: bin
-define BENCH
-
-# .c -> .bc
-$(eval $(foreach mod,$(4),\
-    $(call C2BC,$(1),$(2),$(3),$(mod),$($(1)_PREFIX)-$(mod))))
-
-# LLVMLINK
-
-# .bc -> .ll
-$(eval $(foreach mod,$(4),\
-    $(call DIS,$(1),$(3),$($(1)_PREFIX)-$(mod))))
-
-# .bc -> .opt.bc
-$(eval $(foreach mod,$(4),\
-    $(call OPT,$(1),$(3),$($(1)_PREFIX)-$(mod))))
-
-# .opt.bc -> .opt.ll
-$(eval $(foreach mod,$(4),\
-    $(call DIS,$(1),$(3),$($(1)_PREFIX)-$(mod).opt)))
-
-# .opt.bc -> .s
-$(eval $(foreach mod,$(4),\
-    $(call BC2S,$(1),$(3),$($(1)_PREFIX)-$(mod))))
-
-# .s -> .o
-$(eval $(foreach mod,$(4),\
-    $(call S2O,$(1),$(3),$($(1)_PREFIX)-$(mod))))
-
-# .o -> bin
-$(eval $(call CLINK2,$(1),$(3),$(addprefix $($(1)_PREFIX)-,$(4)),$($(1)_PREFIX)-$(5)))
-
-# targets
-$($(1)_PREFIX)-$(5): $(3) $(3)$($(1)_PREFIX)-$(5)
-endef
-
-# 1: archs
-# 2: out dir
-# 3: bin
-define BENCH2
-$(2):
-	mkdir -p $$@
-
-$(3)-clean:
-	rm -f $(2)*
-endef
-
-###
-###
-
-
-MIBENCH := $(TOPDIR)/mibench
+MIBENCH       := $(TOPDIR)/mibench
 BUILD_MIBENCH := $(BUILD_DIR)/mibench
-CFLAGS = -Wall -O3
+
+
+# 1: src dir/
+# 2: out dir/
+# 3: mods
+# 4: bin
+define BENCH
+$(call BUILD,X86,$(1),$(2),$(3),x86-$(4))
+
+$(call BUILDO,RV32,$(1),$(2),$(3),rv32-$(4))
+$(call TRANSLATE,X86,$(1),$(2),rv32-$(4),rv32-x86-$(4))
+
+$(2):
+	mkdir -p $(2)
+
+$(4): $(2) x86-$(4) rv32-x86-$(4)
+endef
+
+
+# 1: out dir/
+# 2: test
+# 3: args
+define MITEST
+test-$(2):
+	$(SCRIPTS_DIR)/measure.py $(1) $(2) $(3)
+endef
+
 
 ##
 ## 05- DIJKSTRA
@@ -152,23 +124,15 @@ DIJKSTRA_SRC_DIR := $(MIBENCH)/$(DIJKSTRA_DIR)/
 DIJKSTRA_OUT_DIR := $(BUILD_MIBENCH)/$(DIJKSTRA_DIR)/
 
 DIJKSTRA_MODS := dijkstra_large
-DIJKSTRA_BIN := dijkstra_large
 
-$(eval $(call BENCH,RV32,$(DIJKSTRA_SRC_DIR),$(DIJKSTRA_OUT_DIR),$(DIJKSTRA_MODS),$(DIJKSTRA_BIN)))
-$(eval $(call BENCH,X86,$(DIJKSTRA_SRC_DIR),$(DIJKSTRA_OUT_DIR),$(DIJKSTRA_MODS),$(DIJKSTRA_BIN)))
-$(eval $(call BENCH2,RV32 X86,$(DIJKSTRA_OUT_DIR),$(DIJKSTRA_BIN)))
+RV32_CLANG_FLAGS =
 
-$(eval $(call TRANSLATE2,X86,$(DIJKSTRA_OUT_DIR),$(DIJKSTRA_MODS),$(DIJKSTRA_BIN)))
+$(eval \
+$(call BENCH,$(DIJKSTRA_SRC_DIR),$(DIJKSTRA_OUT_DIR),$(DIJKSTRA_MODS),$(DIJKSTRA_BIN)))
+$(eval \
+$(call MITEST,$(DIJKSTRA_OUT_DIR),$(DIJKSTRA_BIN),$(DIJKSTRA_SRC_DIR)input.dat))
 
-$(DIJKSTRA_BIN): $(foreach arch,RV32 X86,$($(arch)_PREFIX)-$(DIJKSTRA_BIN)) \
-	$(foreach arch,X86,$(DIJKSTRA_OUT_DIR)rv32-$($(arch)_PREFIX)-$(DIJKSTRA_BIN))
-
-##
+###
 
 clean:
 	rm -rf $(BUILD_MIBENCH)
-
-#$(eval $(call BUILD,X86,x86-mm,CLANG,mm,save-run.out))
-#$(eval $(call BUILD,RV32,rv32-mm,CLANG,mm,save-run.out))
-#$(eval $(call TRANSLATE_C,RV32,X86,mm))
-

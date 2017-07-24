@@ -1,0 +1,2 @@
+device-tree-compiler #riscv-isa-sim
+gawk # glibc

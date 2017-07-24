@@ -116,14 +116,11 @@ target_link_libraries (riscv-sbt
 set (LIBC_CPP ${PROJECT_SOURCE_DIR}/libc.cpp)
 
 # libc.bc
-set (RV32_SYSROOT $ENV{TCR}/riscv32-unknown-elf)
 add_custom_command(OUTPUT libc.bc
     COMMAND clang
-        --target=riscv -mriscv=RV32IAMFD
+        --target=i386
         -fno-exceptions -fno-rtti -O0
         -std=c++11 -femit-all-decls -emit-llvm
-        -isysroot ${RV32_SYSROOT}
-        -isystem ${RV32_SYSROOT}/include
         -c ${LIBC_CPP}
         MAIN_DEPENDENCY ${LIBC_CPP})
 add_custom_target(libc DEPENDS libc.bc)

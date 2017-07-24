@@ -183,6 +183,12 @@ $(call CBUILDS,$(1),$(3),$(3),$(5),$(5),$(6))
 endef
 
 
+define BUILDO
+$(call BUILD1,$(1),$(2),$(3),$(4),$(5),$(6))
+$(call S2O,$(1),$(3),$(3),$(5))
+endef
+
+
 # TRANSLATE OBJ
 # 1: host arch
 # 2: dir

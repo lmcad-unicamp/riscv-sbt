@@ -14,10 +14,11 @@ class TestData:
 
 
 class Test:
-    def __init__(self, dir, test, target):
+    def __init__(self, target, dir, test, args):
+        self.target = target
         self.dir = dir
         self.test = test
-        self.target = target
+        self.args = args
 
         bin = target + '-' + test
         self.native = TestData(bin)
@@ -26,11 +27,13 @@ class Test:
     def run1(self, td):
         print("measuring", td.bin)
         path = self.dir + '/' + td.bin
-        print(path)
+        args = [path]
+        args.extend(self.args)
+        print(args)
         sys.stdout.flush()
         with open(td.out, 'w') as f:
             t0 = time.time()
-            subprocess.check_call([path], stdout=f)
+            subprocess.check_call(args, stdout=f)
             t1 = time.time()
             t = t1 - t0
         print("time taken:", t)
@@ -49,18 +52,19 @@ class Test:
         print("overhead=", oh, sep='')
 
 
-def measure(dir, test_name, target):
-    test = Test(dir, test_name, target)
+def measure(target, dir, test_name, args):
+    test = Test(target, dir, test_name, args)
     test.run()
 
 
+# dir test arg
 def main(args):
-    if len(args) != 3:
+    if len(args) < 3:
         raise RuntimeError("wrong number of args")
     dir = args[1]
     test = args[2]
     print("measuring", test)
     for target in TARGETS:
-        measure(dir, test, target)
+        measure(target, dir, test, args[3:])
 
 main(sys.argv)

@@ -147,6 +147,15 @@ llvm::Error Function::finish()
     }
     _ctx->inMain = false;
     cleanRegs();
+
+	// last BB may be empty
+	auto it = bbmap().end();
+	--it;
+	if (it->val->bb()->empty()) {
+		DBGF("removing empty BB: {0}", it->val->name());
+		it->val->bb()->eraseFromParent();
+	}
+
     // _f->dump();
     // _f->viewCFG();
     return llvm::Error::success();
