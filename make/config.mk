@@ -24,15 +24,13 @@ TOOLCHAIN_DIR  := $(TOOLCHAIN)/$(BUILD_TYPE_DIR)
 REMOTE_DIR     := $(TOPDIR)/remote
 BUILD_DIR      := $(TOPDIR)/build
 PATCHES_DIR    := $(TOPDIR)/patches
+SCRIPTS_DIR    := $(TOPDIR)/scripts
 SUBMODULES_DIR := $(TOPDIR)/submodules
-MAKE_DIR        =
 
 #
 # flags
 #
 
-CFLAGS         = -Wall -Werror -O3
-CXXFLAGS       = $(CFLAGS) -std=c++11
 MAKE_OPTS     ?= -j9
 
 #
@@ -43,11 +41,12 @@ SBTFLAGS        = #-x
 SBT_SHARE_DIR  := $(TOOLCHAIN_DIR)/share/riscv-sbt
 X86_SYSCALL_O  := $(SBT_SHARE_DIR)/x86-syscall.o
 X86_COUNTERS_O := $(SBT_SHARE_DIR)/x86-counters.o
-X86_DUMMY_O    := $(TOPDIR)/sbt/test/x86-dummy.o
 
 #
 # tools
 #
+
+LOG               := $(SCRIPTS_DIR)/run.sh
 
 RV32_TRIPLE       := riscv32-unknown-elf
 X86_64_TRIPLE     := x86_64-linux-gnu
@@ -143,7 +142,7 @@ RV64_SYSROOT      := $(TOOLCHAIN_RELEASE)/$(RV64_TRIPLE)
 RV64_SYSROOT_FLAG := -isysroot $(RV64_SYSROOT) \
                      -isystem $(RV64_SYSROOT)/include
 
-RV64_CLANG_FLAGS  := --target=riscv64 -mriscv=RV64IAMFD $(RV64_SYSROOT_FLAG)
+RV64_CLANG_FLAGS  := --target=riscv64 -mriscv=RV64IMAFD $(RV64_SYSROOT_FLAG)
 
 RV64_AS           := $(RV64_TRIPLE)-as
 RV64_LD           := $(RV64_TRIPLE)-ld

@@ -26,6 +26,7 @@ class Test:
     def run1(self, td):
         print("measuring", td.bin)
         path = self.dir + '/' + td.bin
+        print(path)
         sys.stdout.flush()
         with open(td.out, 'w') as f:
             t0 = time.time()

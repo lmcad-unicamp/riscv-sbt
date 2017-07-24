@@ -2,7 +2,7 @@ include $(TOPDIR)/make/config.mk
 
 ### config ####
 
-SRC_DIR     := $(PWD)/
+SRC_DIR     := $(shell pwd)/
 SBT_OUT_DIR := $(BUILD_DIR)/sbt/$(BUILD_TYPE_DIR)/test/
 
 TESTS := hello
@@ -100,3 +100,54 @@ run-alltests: run-tests run-utests run-x86-test-syscall
 
 clean:
 	rm -rf $(SBT_OUT_DIR)
+
+###
+### QEMU tests
+###
+
+QEMU_TESTS_BUILD := $(BUILD_DIR)/riscv-qemu-tests
+OUT_DIR := $(QEMU_TESTS_BUILD)/rv32i/
+
+RV32_TESTS := add addi and andi aiupc \
+    beq bge bgeu blt bltu bne \
+    jal jalr \
+    lui lb lbu lhu lw sb sw or ori \
+    sll slli slt slti sltiu sltu sra srai srl srli sub xor xori
+RV32_TESTS_FAILING :=
+RV32_TESTS_MISSING := csrrw csrrs csrrc csrrwi csrrsi csrrci \
+    ecall ebreak fence fence.i lh sh
+
+RV32_TESTS_TARGETS := $(addprefix rv32-x86-,$(RV32_TESTS))
+
+define TEST2
+$(eval TEST2_RV32  = $(2))
+$(eval TEST2_TRANS = rv32-x86-$(2))
+
+.PHONY:
+run-$(TEST2_RV32):
+	$(RV32_RUN) $(1)$(TEST2_RV32) | tee $(1)$(TEST2_RV32).out
+
+test-$(2): run-$(TEST2_RV32) run-$(TEST2_TRANS)
+	diff $(1)$(TEST2_RV32).out $(1)$(TEST2_TRANS).out
+endef
+
+$(foreach test,$(RV32_TESTS),\
+    $(eval $(call TEST2,$(OUT_DIR),$(test))))
+
+$(foreach test,$(RV32_TESTS),\
+    $(eval $(call TRANSLATE_ASM,X86,$(OUT_DIR),$(OUT_DIR),$(test),rv32-x86-$(test))))
+
+.PHONY: rv32tests_status
+rv32tests_status:
+	@echo passing: `echo $(RV32_TESTS) | wc -w`
+	@echo $(RV32_TESTS)
+	@echo failing: `echo $(RV32_TESTS_FAILING) | wc -w`
+	@echo $(RV32_TESTS_FAILING)
+	@echo missing: `echo $(RV32_TESTS_MISSING) | wc -w`
+	@echo $(RV32_TESTS_MISSING)
+	@echo total: \
+		`echo $(RV32_TESTS) $(RV32_TESTS_FAILING) $(RV32_TESTS_MISSING) | wc -w`
+
+.PHONY: rv32tests
+rv32tests:
+	$(MAKE) $(RV32_TESTS_TARGETS) $(foreach test,$(RV32_TESTS),test-$(test))

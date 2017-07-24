@@ -28,7 +28,6 @@ LLVM := \
 
 NEEDED := \
 	$(TC32) \
-	$(TCX86) \
 	$(LLVM) \
 	SBT_DEBUG \
 	SBT_RELEASE
@@ -59,6 +58,7 @@ ALL := \
 	$(NEEDED) \
 	$(TEST32) \
 	$(TC64) \
+	$(TCX86) \
 	$(TEST64) \
 	$(LINUX) \
 	$(QEMU) \
@@ -67,8 +67,7 @@ ALL := \
 all: \
 	$(SBT) \
 	riscv-isa-sim \
-	riscv-pk-32 \
-	x86-newlib-gcc
+	riscv-pk-32
 
 gcc64: riscv-newlib-gcc-64
 gcc-linux: riscv-linux-gcc
@@ -81,7 +80,8 @@ extra: \
 	riscv-pk-64 \
 	qemu \
 	qemu-user \
-	qemu-tests
+	qemu-tests \
+	x86-newlib-gcc
 
 ###
 ### rules
@@ -870,87 +870,52 @@ update_files:
 lc:
 	cat $(TOPDIR)/sbt/*.h $(TOPDIR)/sbt/*.cpp $(TOPDIR)/sbt/*.s | wc -l
 
+
+SBT_TEST_DIR := $(TOPDIR)/sbt/test
+
 .PHONY: tests
 tests: sbt
-	$(MAKE) -C $(TOPDIR)/test clean all run 2>&1 | tee log.txt
-	$(MAKE) -C $(TOPDIR)/sbt/test clean run-alltests  2>&1 | tee log.txt
+	rm -f log.txt
+	$(LOG) $(MAKE) -C $(TOPDIR)/test clean all run
+	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) clean run-alltests
 
 ### rv32-system test
 
-SYSTEM := rv32-x86-system
-.PHONY: $(SYSTEM)
-$(SYSTEM): sbt
-	rm -f log.txt
-	$(MAKE) -C sbt/test clean-$(SYSTEM)
-	$(RUN) $(MAKE) -C sbt/test $(SYSTEM) run-$(SYSTEM)
+SBT_OUT_DIR := $(BUILD_DIR)/sbt/$(BUILD_TYPE_DIR)/test/
 
-###
+.PHONY: test-system
+test-system: sbt
+	rm -f log.txt $(SBT_OUT_DIR)rv32-*system*
+	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) test-system
+
 ### QEMU tests
-###
-
-MAKE_DIR := $(dir $(X86_DUMMY_O))
-$(eval $(call AS,X86,$(basename $(notdir $(X86_DUMMY_O)))))
-
-MAKE_DIR := $(QEMU_TESTS_BUILD)/rv32i/
-RV32_TESTS := add addi and andi aiupc \
-    beq bge bgeu blt bltu bne \
-    jal jalr \
-    lui lb lbu lhu lw sb sw or ori \
-    sll slli slt slti sltiu sltu sra srai srl srli sub xor xori
-RV32_TESTS_FAILING :=
-RV32_TESTS_MISSING := csrrw csrrs csrrc csrrwi csrrsi csrrci \
-  ecall ebreak fence fence.i lh sh
-RV32_TESTS_TARGETS := $(addprefix $(MAKE_DIR)rv32-x86-,$(RV32_TESTS))
-RV32_TESTS_CLEAN := $(addprefix clean-rv32-x86-,$(RV32_TESTS))
-RV32_TESTS_RUN := $(addprefix run-rv32-x86-,$(RV32_TESTS))
-$(eval $(foreach test,$(RV32_TESTS),\
-  $(call TRANSLATE_ASM,RV32,X86,$(test),noprefix)))
-
-rv32tests_status:
-	@echo passing: `echo $(RV32_TESTS) | wc -w`
-	@echo $(RV32_TESTS)
-	@echo failing: `echo $(RV32_TESTS_FAILING) | wc -w`
-	@echo $(RV32_TESTS_FAILING)
-	@echo missing: `echo $(RV32_TESTS_MISSING) | wc -w`
-	@echo $(RV32_TESTS_MISSING)
-	@echo total: \
-		`echo $(RV32_TESTS) $(RV32_TESTS_FAILING) $(RV32_TESTS_MISSING) | wc -w`
 
 .PHONY: rv32tests
-rv32tests: $(QEMU_TESTS_TOOLCHAIN)
-	$(MAKE) $(SBT)-build1 $(SBT)-install
+rv32tests: qemu-tests-reset $(QEMU_TESTS_TOOLCHAIN) sbt
+	rm -f log.txt
 	$(MAKE) -C $(QEMU_TESTS_BUILD)/rv32i clean all
-	$(MAKE) $(X86_DUMMY_O) $(RV32_TESTS_CLEAN) $(RV32_TESTS_TARGETS) \
-		$(RV32_TESTS_RUN)
+	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) rv32tests
 
 ###
 ### matrix multiply test
 ###
 
-SCRIPTS := $(TOPDIR)/scripts
-RUN := $(SCRIPTS)/run.sh
-
-xxx:
-	$(RUN) "echo out && false"
-	true
-
 TARGETS := rv32 x86 rv32-x86
-SBT_TEST_DIR := $(TOPDIR)/sbt/test
 
 mmm:
-	$(RUN) $(TOPDIR)/scripts/measure.py $(SBT_TEST_DIR) mm
+	$(LOG) $(TOPDIR)/scripts/measure.py $(SBT_OUT_DIR) mm
 
 .PHONY: mmtest
 mmtest: sbt
-	rm -f log.txt
-	$(RUN) $(MAKE) -C $(SBT_TEST_DIR) $(foreach target,$(TARGETS),clean-$(target)-mm)
-	$(RUN) $(MAKE) -C $(SBT_TEST_DIR) $(foreach target,$(TARGETS),$(target)-mm)
+	rm -f log.txt $(SBT_OUT_DIR)*-mm*
+	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) mm
 	$(MAKE) mmm
+
 
 .PHONY: mibench
 mibench: sbt
 	rm -f log.txt
-	$(RUN) $(MAKE) -C $(TOPDIR)/mibench
+	$(LOG) $(MAKE) -C $(TOPDIR)/mibench
 
 mibench-clean:
 	$(MAKE) -C $(TOPDIR)/mibench clean
@@ -962,17 +927,17 @@ mibench-clean:
 TESTBIN := rv32-x86-jal
 .PHONY: test-prep
 test-prep: sbt qemu-tests-reset qemu-tests
-	$(MAKE) clean-$(TESTBIN)
+	# clean
 
 .PHONY: test
 test: test-prep
 	rm -f log.txt
-	$(RUN) $(MAKE) $(MAKE_DIR)$(TESTBIN)
-	$(RUN) $(MAKE_DIR)$(TESTBIN)
+	$(LOG) $(MAKE) $(TESTBIN)
+	$(LOG) $(TESTBIN)
 
 .PHONY: dbg
 dbg:
-	gdb $(MAKE_DIR)$(TESTBIN)
+	gdb $(TESTBIN)
 
 ###
 ### END debugging targets ###

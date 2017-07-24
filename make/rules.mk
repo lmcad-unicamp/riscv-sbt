@@ -221,6 +221,3 @@ $(call TRANSLATE1,$(1),$(2),$(3),$(4),$(5),$(6))
 $(call BUILDS,$(1),$(3),$(3),$(5),$(5),$(6) $(X86_SYSCALL_O))
 endef
 
-
-# $(STATICBT) -target=$(ARCH) $(SBTOPT) -stacksize $(STACKSIZE) $(BENCHNAME)-oi.o -o=$(BENCHNAME)-oi.bc
-# $(OPT) $(OPTFLAGS) $(BENCHNAME)-oi.bc -o $(BENCHNAME)-oi.bc
