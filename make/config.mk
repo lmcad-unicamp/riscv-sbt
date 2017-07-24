@@ -59,14 +59,14 @@ RV32_PREFIX       := rv32
 X86_PREFIX        := x86
 
 X86_MARCH         := x86
-
+RV32_MARCH        := riscv
 
 #
 # clang
 #
 
 CLANG             := clang
-RV32_CLANG        := $(CLANG) --target=riscv -mriscv=RV32IAMFD
+RV32_CLANG        := $(CLANG) --target=riscv -mriscv=RV32IMAFD
 X86_CLANG         := $(CLANG) --target=i386
 
 CLANG_FLAGS       := -fno-rtti -fno-exceptions
@@ -79,12 +79,13 @@ EMITLLVM          := -emit-llvm -c -O3 -mllvm -disable-llvm-optzns
 
 LLC               := llc
 LLC_FLAGS         := -relocation-model=static -O3 #-stats
+RV32_LLC_FLAGS    := -march=$(RV32_MARCH) -mcpu=RV32IMAFD
 X86_LLC_FLAGS     := -march=$(X86_MARCH) #-mattr=avx2
 
-OPT               := $(LLVM_INSTALL_DIR)/bin/opt
-OPT_FLAGS         := -O3 #-stats
+LLVMOPT           := $(LLVM_INSTALL_DIR)/bin/opt
+LLVMOPT_FLAGS     := -O3 #-stats
 
-DIS               := $(LLVM_INSTALL_DIR)/bin/llvm-dis
+LLVMDIS           := $(LLVM_INSTALL_DIR)/bin/llvm-dis
 
 #
 # AS

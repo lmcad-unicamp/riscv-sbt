@@ -1,4 +1,5 @@
 *.o
+*.out
 rv32-clang-*
 rv32-gcc-*
 rv32-hello

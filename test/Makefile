@@ -21,40 +21,18 @@ $(3)$(5).s: $(2)$(4).c
 		$$($(1)_GCC) -S $(2)$(4).c -o $(5).s
 endef
 
-# 1: prefix (X86/RV32)
-# 2: source dir/
-# 3: out dir/
-# 4: input file (.c)
-# 5: output file (.s)
-define CLANG_C2S
-$(3)$(5).s: $(2)$(4).c
-	cd $(3) && \
-		$$($(1)_CLANG) $$($(1)_CLANG_FLAGS) $(CLANG_FLAGS) -S $(2)$(4).c -o $(5).s
-endef
-
-
-$(eval $(call S2O,RV32,./,rv32-hello))
-$(eval $(call LINK,RV32,./,rv32-hello,rv32-hello))
+$(eval $(call BUILDS,RV32,./,./,rv32-hello,rv32-hello))
 $(eval $(call CLEAN,./,rv32-hello))
-$(eval $(call RUN,RV32,./,rv32-hello))
 
 $(eval $(call GCC_C2S,RV32,./,./,hello,rv32-gcc-hello))
-$(eval $(call S2O,RV32,./,rv32-gcc-hello))
-$(eval $(call CLINK,RV32,./,rv32-gcc-hello,rv32-gcc-hello))
+$(eval $(call CBUILDS,RV32,./,./,rv32-gcc-hello,rv32-gcc-hello))
 $(eval $(call CLEAN,./,rv32-gcc-hello,clean.s))
-$(eval $(call RUN,RV32,./,rv32-gcc-hello))
 
-$(eval $(call CLANG_C2S,RV32,./,./,hello,rv32-clang-hello))
-$(eval $(call S2O,RV32,./,rv32-clang-hello))
-$(eval $(call CLINK,RV32,./,rv32-clang-hello,rv32-clang-hello))
+$(eval $(call BUILD,RV32,./,./,hello,rv32-clang-hello))
 $(eval $(call CLEAN,./,rv32-clang-hello,clean.s))
-$(eval $(call RUN,RV32,./,rv32-clang-hello))
 
-$(eval $(call CLANG_C2S,X86,./,./,hello,x86-clang-hello))
-$(eval $(call S2O,X86,./,x86-clang-hello))
-$(eval $(call CLINK,X86,./,x86-clang-hello,x86-clang-hello))
+$(eval $(call BUILD,X86,./,./,hello,x86-clang-hello))
 $(eval $(call CLEAN,./,x86-clang-hello,clean.s))
-$(eval $(call RUN,X86,./,x86-clang-hello))
 
 # run/clean
 
