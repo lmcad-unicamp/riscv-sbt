@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 #define F(x) \
-  auto rv32_##x = x;
+  void* rv32_##x = x;
 
 F(abort)
 F(exit)
@@ -17,4 +17,3 @@ F(perror)
 F(printf)
 F(putchar)
 F(puts)
-// F(__isoc99_fscanf)

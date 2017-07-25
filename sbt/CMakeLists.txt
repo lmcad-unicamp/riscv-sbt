@@ -113,16 +113,15 @@ target_link_libraries (riscv-sbt
     ${SBT_SYS_LIBS}
 )
 
-set (LIBC_CPP ${PROJECT_SOURCE_DIR}/libc.cpp)
+set (LIBC_C ${PROJECT_SOURCE_DIR}/libc.c)
 
 # libc.bc
 add_custom_command(OUTPUT libc.bc
     COMMAND clang
-        --target=i386
-        -fno-exceptions -fno-rtti -O0
-        -std=c++11 -femit-all-decls -emit-llvm
-        -c ${LIBC_CPP}
-        MAIN_DEPENDENCY ${LIBC_CPP})
+        --target=riscv -mriscv=RV32IMAFD
+        -emit-llvm -c -O3 -mllvm -disable-llvm-optzns
+        ${LIBC_C}
+        MAIN_DEPENDENCY ${LIBC_C})
 add_custom_target(libc DEPENDS libc.bc)
 add_dependencies(riscv-sbt libc)
 
