@@ -131,6 +131,8 @@ public:
     void loadRegisters();
     void storeRegisters();
 
+    void copyArgv();
+
     // look up function by address
     static Function* getByAddr(Context* ctx, uint64_t addr);
 

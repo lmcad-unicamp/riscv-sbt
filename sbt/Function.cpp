@@ -77,7 +77,10 @@ llvm::Error Function::startMain()
     Builder* bld = _ctx->bld;
 
     // int main();
-    llvm::FunctionType* ft = llvm::FunctionType::get(t.i32, !VAR_ARG);
+    llvm::FunctionType* ft =
+        llvm::FunctionType::get(t.i32,
+            { t.i32, t.i32 },
+            !VAR_ARG);
     _f = llvm::Function::Create(ft,
         llvm::Function::ExternalLinkage, _name, _ctx->module);
 
@@ -89,6 +92,8 @@ llvm::Error Function::startMain()
 
     // create local register file
     _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
+
+    copyArgv();
 
     // set stack pointer
     bld->store(_ctx->stack->end(), XRegister::SP);
@@ -148,13 +153,13 @@ llvm::Error Function::finish()
     _ctx->inMain = false;
     cleanRegs();
 
-	// last BB may be empty
-	auto it = bbmap().end();
-	--it;
-	if (it->val->bb()->empty()) {
-		DBGF("removing empty BB: {0}", it->val->name());
-		it->val->bb()->eraseFromParent();
-	}
+    // last BB may be empty
+    auto it = bbmap().end();
+    --it;
+    if (it->val->bb()->empty()) {
+        DBGF("removing empty BB: {0}", it->val->name());
+        it->val->bb()->eraseFromParent();
+    }
 
     // _f->dump();
     // _f->viewCFG();
@@ -373,6 +378,18 @@ void Function::storeRegisters()
         llvm::Value* v = bld->load(local.get());
         bld->store(v, global.getForWrite());
     }
+}
+
+
+void Function::copyArgv()
+{
+    llvm::Function::arg_iterator arg = _f->arg_begin();
+    llvm::Argument& argc = *arg;
+    llvm::Argument& argv = *++arg;
+
+    Builder* bld = _ctx->bld;
+    bld->store(&argc, XRegister::A0);
+    bld->store(&argv, XRegister::A1);
 }
 
 }

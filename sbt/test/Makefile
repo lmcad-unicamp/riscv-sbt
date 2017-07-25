@@ -45,6 +45,21 @@ $(eval $(call TRANSLATE_ASM,X86,$(SRC_DIR),$(SBT_OUT_DIR),rv32-hello,rv32-x86-he
 $(eval $(call CBUILDS,X86,$(SRC_DIR),$(SBT_OUT_DIR),x86-test-syscall,x86-test-syscall,$(X86_SYSCALL_O)))
 
 
+### argc/argv ###
+
+$(eval $(call BUILD,X86,$(SRC_DIR),$(SBT_OUT_DIR),argv,x86-argv))
+.PHONY: test-x86-argv
+test-x86-argv: $(SBT_OUT_DIR)x86-argv
+	$< one two three
+
+$(eval $(call BUILDO,RV32,$(SRC_DIR),$(SBT_OUT_DIR),argv,rv32-argv))
+$(eval $(call TRANSLATE,X86,$(SRC_DIR),$(SBT_OUT_DIR),rv32-argv,rv32-x86-argv))
+$(eval $(call CLEAN,$(SBT_OUT_DIR),rv32-x86-argv,clean.s))
+.PHONY: test-rv32-x86-argv
+test-rv32-x86-argv: $(SBT_OUT_DIR)rv32-x86-argv
+	$< one two three
+
+
 ### mm (matrix multiply) ###
 
 $(eval $(call BUILD,RV32,$(SRC_DIR),$(SBT_OUT_DIR),mm,rv32-mm))
