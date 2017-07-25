@@ -1146,7 +1146,7 @@ llvm::Error Instruction::handleJumpToOffs(
         BBIter it = bbmap->lower_bound(target);
 
         // BB already exists
-        if (target == it->key) {
+        if (it != bbmap->end() && target == it->key) {
             DBGF("target exists");
             targetBB = &*it->val;
         // need to create new BB
