@@ -21,6 +21,7 @@ public:
   llvm::IntegerType* i8;
   llvm::IntegerType* i16;
   llvm::IntegerType* i32;
+  llvm::IntegerType* i64;
 
   llvm::PointerType* i8ptr;
   llvm::PointerType* i16ptr;

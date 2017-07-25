@@ -100,10 +100,6 @@ llvm::Error Instruction::translate()
         case RISCV::ANDI:
             err = translateALUOp(AND, AF_IMM);
             break;
-        // TODO group M instructions
-        case RISCV::MUL:
-            err = translateALUOp(MUL, AF_NONE);
-            break;
         case RISCV::OR:
             err = translateALUOp(OR, AF_NONE);
             break;
@@ -148,6 +144,32 @@ llvm::Error Instruction::translate()
             break;
         case RISCV::XORI:
             err = translateALUOp(XOR, AF_IMM);
+            break;
+
+        // M instructions
+        case RISCV::MUL:
+            err = translateM(MUL);
+            break;
+        case RISCV::MULH:
+            err = translateM(MULH);
+            break;
+        case RISCV::MULHSU:
+            err = translateM(MULHSU);
+            break;
+        case RISCV::MULHU:
+            err = translateM(MULHU);
+            break;
+        case RISCV::DIV:
+            err = translateM(DIV);
+            break;
+        case RISCV::DIVU:
+            err = translateM(DIVU);
+            break;
+        case RISCV::REM:
+            err = translateM(REM);
+            break;
+        case RISCV::REMU:
+            err = translateM(REMU);
             break;
 
         // UI (upper immediate)
@@ -339,7 +361,6 @@ llvm::Error Instruction::translateALUOp(ALUOp op, uint32_t flags)
     switch (op) {
         case ADD: *_os << "add";    break;
         case AND: *_os << "and";    break;
-        case MUL: *_os << "mul";    break;
         case OR:    *_os << "or";     break;
         case SLL: *_os << "sll";    break;
         case SLT: *_os << "slt";    break;
@@ -376,11 +397,6 @@ llvm::Error Instruction::translateALUOp(ALUOp op, uint32_t flags)
             v = _bld->_and(o1, o2);
             break;
 
-        // TODO group M instructions
-        case MUL:
-            v = _bld->mul(o1, o2);
-            break;
-
         case OR:
             v = _bld->_or(o1, o2);
             break;
@@ -411,6 +427,65 @@ llvm::Error Instruction::translateALUOp(ALUOp op, uint32_t flags)
 
         case XOR:
             v = _bld->_xor(o1, o2);
+            break;
+    }
+
+    _bld->store(v, o);
+
+    return llvm::Error::success();
+}
+
+
+llvm::Error Instruction::translateM(MOp op)
+{
+    switch (op) {
+        case MUL:       *_os << "mul";      break;
+        case MULH:      *_os << "mulh";     break;
+        case MULHSU:    *_os << "mulhsu";   break;
+        case MULHU:     *_os << "mulhu";    break;
+        case DIV:       *_os << "div";      break;
+        case DIVU:      *_os << "divu";     break;
+        case REM:       *_os << "rem";      break;
+        case REMU:      *_os << "remu";     break;
+    }
+    *_os << '\t';
+
+    unsigned o = getRD();
+    llvm::Value* o1 = getReg(1);
+    llvm::Value* o2 = getReg(2);
+
+    llvm::Value* v;
+    switch (op) {
+        case MUL:
+            v = _bld->mul(o1, o2);
+            break;
+
+        case MULH:
+            v = _bld->mulh(o1, o2);
+            break;
+
+        case MULHSU:
+            v = _bld->mulhsu(o1, o2);
+            break;
+
+        case MULHU:
+            v = _bld->mulhu(o1, o2);
+            break;
+
+        case DIV:
+            v = _bld->div(o1, o2);
+            break;
+
+        case DIVU:
+            v = _bld->divu(o1, o2);
+            break;
+
+        case REM:
+            v = _bld->rem(o1, o2);
+            break;
+
+        case REMU:
+            v = _bld->remu(o1, o2);
             break;
     }
 

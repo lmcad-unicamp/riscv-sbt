@@ -18,6 +18,7 @@ class Builder
     Context* _ctx;
     llvm::IRBuilder<>* _builder;
     Types* _t;
+    Constants* _c;
     llvm::Instruction* _first = nullptr;
     BasicBlock* _bb = nullptr;
     BasicBlock* _savedBB = nullptr;
@@ -27,7 +28,8 @@ public:
         :
         _ctx(ctx),
         _builder(ctx->builder),
-        _t(&_ctx->t)
+        _t(&_ctx->t),
+        _c(&_ctx->c)
     {
         if (noFirst)
             _first = reinterpret_cast<llvm::Instruction*>(1);
@@ -106,10 +108,24 @@ public:
         return v2;
     }
 
+    llvm::Value* sext64(llvm::Value* v)
+    {
+        llvm::Value* v2 = _builder->CreateSExt(v, _t->i64);
+        updateFirst(v2);
+        return v2;
+    }
+
     // zero extend
     llvm::Value* zext(llvm::Value* v)
     {
         llvm::Value* v2 = _builder->CreateZExt(v, _t->i32);
+        updateFirst(v2);
+        return v2;
+    }
+
+    llvm::Value* zext64(llvm::Value* v)
+    {
+        llvm::Value* v2 = _builder->CreateZExt(v, _t->i64);
         updateFirst(v2);
         return v2;
     }
@@ -132,6 +148,57 @@ public:
 
     llvm::Value* mul(llvm::Value* a, llvm::Value* b) {
         llvm::Value* v = _builder->CreateMul(a, b);
+        updateFirst(v);
+        return v;
+    }
+
+    llvm::Value* mulh(llvm::Value* a, llvm::Value* b) {
+        llvm::Value* a64 = sext64(a);
+        llvm::Value* b64 = sext64(b);
+        llvm::Value* v = mul(a64, b64);
+        v = sra(v, _c->i64(32));
+        v = truncOrBitCastI32(v);
+        return v;
+    }
+
+    llvm::Value* mulhu(llvm::Value* a, llvm::Value* b) {
+        llvm::Value* a64 = zext64(a);
+        llvm::Value* b64 = zext64(b);
+        llvm::Value* v = mul(a64, b64);
+        v = srl(v, _c->i64(32));
+        v = truncOrBitCastI32(v);
+        return v;
+    }
+
+    llvm::Value* mulhsu(llvm::Value* a, llvm::Value* b) {
+        llvm::Value* a64 = sext64(a);
+        llvm::Value* b64 = zext64(b);
+        llvm::Value* v = mul(a64, b64);
+        v = sra(v, _c->i64(32));
+        v = truncOrBitCastI32(v);
+        return v;
+    }
+
+    llvm::Value* div(llvm::Value* a, llvm::Value* b) {
+        llvm::Value* v = _builder->CreateSDiv(a, b);
+        updateFirst(v);
+        return v;
+    }
+
+    llvm::Value* divu(llvm::Value* a, llvm::Value* b) {
+        llvm::Value* v = _builder->CreateUDiv(a, b);
+        updateFirst(v);
+        return v;
+    }
+
+    llvm::Value* rem(llvm::Value* a, llvm::Value* b) {
+        llvm::Value* v = _builder->CreateSRem(a, b);
+        updateFirst(v);
+        return v;
+    }
+
+    llvm::Value* remu(llvm::Value* a, llvm::Value* b) {
+        llvm::Value* v = _builder->CreateURem(a, b);
         updateFirst(v);
         return v;
     }
@@ -285,6 +352,14 @@ public:
     llvm::Value* truncOrBitCastI16(llvm::Value* i32)
     {
         llvm::Value* v = _builder->CreateTruncOrBitCast(i32, _t->i16);
+        updateFirst(v);
+        return v;
+    }
+
+    // trunc or cast to i32
+    llvm::Value* truncOrBitCastI32(llvm::Value* i64)
+    {
+        llvm::Value* v = _builder->CreateTruncOrBitCast(i64, _t->i32);
         updateFirst(v);
         return v;
     }

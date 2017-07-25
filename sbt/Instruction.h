@@ -62,7 +62,6 @@ private:
     enum ALUOp {
         ADD,
         AND,
-        MUL,
         OR,
         SLL,
         SLT,
@@ -108,6 +107,17 @@ private:
         RC
     };
 
+    enum MOp {
+        MUL,
+        MULH,
+        MULHSU,
+        MULHU,
+        DIV,
+        DIVU,
+        REM,
+        REMU
+    };
+
 
     // methods
 
@@ -145,6 +155,9 @@ private:
 
     // CSR ops
     llvm::Error translateCSR(CSROp op, bool imm);
+
+    // Multiply/divide extension
+    llvm::Error translateM(MOp op);
 
     // helpers
 

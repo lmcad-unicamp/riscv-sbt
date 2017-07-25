@@ -32,47 +32,52 @@ static const char nl = '\n';
 class Constants
 {
 public:
-  static const uint64_t INVALID_ADDR = ~0ULL;
+    static const uint64_t INVALID_ADDR = ~0ULL;
 
-  // name of the SBT binary/executable
-  const std::string BIN_NAME = "riscv-sbt";
-  // int32 zero
-  llvm::ConstantInt* ZERO = nullptr;
+    // name of the SBT binary/executable
+    const std::string BIN_NAME = "riscv-sbt";
+    // int32 zero
+    llvm::ConstantInt* ZERO = nullptr;
 
-  /**
-   * Init Constants instance.
-   * Except for BIN_NAME, all other members may be
-   * uninitialized before this call.
-   */
-  void init(llvm::LLVMContext* ctx);
+    /**
+     * Init Constants instance.
+     * Except for BIN_NAME, all other members may be
+     * uninitialized before this call.
+     */
+    void init(llvm::LLVMContext* ctx);
 
-  // get path to libc.bc
-  const std::string& libCBC() const
-  {
-    return _libCBC;
-  }
+    // get path to libc.bc
+    const std::string& libCBC() const
+    {
+        return _libCBC;
+    }
 
-  // get a constant int32 llvm value
-  llvm::ConstantInt* i32(int32_t i) const
-  {
-    return llvm::ConstantInt::get(llvm::Type::getInt32Ty(*_ctx), i);
-  }
+    // get a constant int32 llvm value
+    llvm::ConstantInt* i32(int32_t i) const
+    {
+        return llvm::ConstantInt::get(llvm::Type::getInt32Ty(*_ctx), i);
+    }
 
-  /**
-   * Get global Constants instance.
-   *
-   * This method should not be used to get anything that depends
-   * on the LLVMContext used to initialize an instance of Constants.
-   */
-  static const Constants& global()
-  {
-    static Constants c;
-    return c;
-  }
+    llvm::ConstantInt* i64(int64_t i) const
+    {
+        return llvm::ConstantInt::get(llvm::Type::getInt64Ty(*_ctx), i);
+    }
+
+    /**
+     * Get global Constants instance.
+     *
+     * This method should not be used to get anything that depends
+     * on the LLVMContext used to initialize an instance of Constants.
+     */
+    static const Constants& global()
+    {
+        static Constants c;
+        return c;
+    }
 
 private:
-  std::string _libCBC;
-  llvm::LLVMContext* _ctx = nullptr;
+    std::string _libCBC;
+    llvm::LLVMContext* _ctx = nullptr;
 };
 
 } // sbt
