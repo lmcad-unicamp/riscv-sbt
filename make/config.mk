@@ -37,7 +37,7 @@ MAKE_OPTS     ?= -j9
 # SBT
 #
 
-SBTFLAGS        = -x
+SBTFLAGS        = #-x
 SBT_SHARE_DIR  := $(TOOLCHAIN_DIR)/share/riscv-sbt
 X86_SYSCALL_O  := $(SBT_SHARE_DIR)/x86-syscall.o
 X86_COUNTERS_O := $(SBT_SHARE_DIR)/x86-counters.o
@@ -66,7 +66,7 @@ RV32_MARCH        := riscv
 
 CLANG             := clang
 RV32_CLANG        := $(CLANG) --target=riscv -mriscv=RV32IMAFD
-X86_CLANG         := $(CLANG) --target=i386
+X86_CLANG         := $(CLANG) --target=x86_64-unknown-linux-gnu -m32
 
 CLANG_FLAGS       := -fno-rtti -fno-exceptions
 
@@ -79,7 +79,7 @@ EMITLLVM          := -emit-llvm -c -O3 -mllvm -disable-llvm-optzns
 LLC               := llc
 LLC_FLAGS         := -relocation-model=static -O3 #-stats
 RV32_LLC_FLAGS    := -march=$(RV32_MARCH) -mcpu=RV32IMAFD
-X86_LLC_FLAGS     := -march=$(X86_MARCH) #-mattr=avx2
+X86_LLC_FLAGS     := -march=$(X86_MARCH) -mattr=avx2
 
 LLVMOPT           := $(LLVM_INSTALL_DIR)/bin/opt
 LLVMOPT_FLAGS     := -O3 #-stats

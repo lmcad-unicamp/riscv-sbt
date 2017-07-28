@@ -183,8 +183,14 @@ $(call CBUILDS,$(1),$(3),$(3),$(5),$(5),$(6))
 endef
 
 
+# build object file
+# optimize only one time
 define BUILDO
-$(call BUILD1,$(1),$(2),$(3),$(4),$(5),$(6))
+$(call C2BC,$(1),$(2),$(3),$(4),$(5))
+$(call DIS,$(1),$(3),$(5))
+$(call OPT,$(1),$(3),$(5),$(5).opt)
+$(call DIS,$(1),$(3),$(5).opt)
+$(call BC2S,$(1),$(3),$(5).opt,$(5))
 $(call S2O,$(1),$(3),$(3),$(5))
 endef
 

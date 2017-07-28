@@ -222,3 +222,101 @@ mibench/build_all_x86.sh:
             - skip cjpeg and djpeg in -oneregion mode
             - SBTOPT="-optimize $opts" make
             - copy binaries to testes-x86/bin
+
+
+
+OpenISA
+-------
+
+# .c -> x86
+
+clang -target x86_64-unknown-linux-gnu -O3 -mllvm -disable-llvm-optzns -m32 -emit-llvm -c dijkstra_large.c -o dijkstra_large.bc
+
+llvm-link dijkstra_large.bc2 -o dijkstra_large-nat.bc
+
+opt -O3 dijkstra_large-nat.bc -o dijkstra_large-nat.bc
+opt -O3 dijkstra_large-nat.bc -o dijkstra_large-nat.bc
+
+llc -relocation-model=static -O3 -march=x86 -mattr=avx2 dijkstra_large-nat.bc -o dijkstra_large-nat-x86.s
+
+clang -target x86_64-unknown-linux-gnu -m32 -g dijkstra_large-nat-x86.s -o dijkstra_large-nat-x86 -lm
+
+
+# .c -> oi.o
+
+clang -target mipsel-unknown-linux -emit-llvm -c --sysroot=/home/luporl/dd/git/openisa/sbt-sysheaders -O3 -mllvm -disable-llvm-optzns dijkstra_large.c -o dijkstra_large.bc
+
+llvm-link dijkstra_large.bc -o dijkstra_large.bc
+
+opt -O3 dijkstra_large.bc -o dijkstra_large.bc
+
+llc -relocation-model=static -O3 -march=mipsel dijkstra_large.bc -o dijkstra_large.s
+
+llvm-mc -triple mipsel-unknown-linux -assemble -filetype=obj -o=dijkstra_large-oi.o dijkstra_large.s
+
+
+# oi.o -> oi-x86
+
+static-bt -target=x86 -optimize -oneregion -stacksize 4000 dijkstra_large-oi.o -o=dijkstra_large-oi.bc
+
+opt -O3 dijkstra_large-oi.bc -o dijkstra_large-oi.bc
+
+llc -relocation-model=static -O3 -march=x86 -mattr=avx2 dijkstra_large-oi.bc -o dijkstra_large-oi-x86.s
+
+clang -target x86_64-unknown-linux-gnu -m32 -g dijkstra_large-oi-x86.s -o dijkstra_large-oi-x86 -lm
+
+sbtpass2 dijkstra_large-oi-x86
+
+
+# repeat with: static-bt -nolocals / "" (globals) / -abi-locals
+
+
+RISC-V
+------
+
+# .c -> x86
+
+clang --target=x86_64-unknown-linux-gnu -m32 -emit-llvm -c -O3 -mllvm -disable-llvm-optzns dijkstra_large.c -o x86-dijkstra_large.bc
+
+llvm-dis x86-dijkstra_large.bc -o x86-dijkstra_large.ll
+opt -O3 x86-dijkstra_large.bc -o x86-dijkstra_large.opt.bc
+llvm-dis x86-dijkstra_large.opt.bc -o x86-dijkstra_large.opt.ll
+opt -O3 x86-dijkstra_large.opt.bc -o x86-dijkstra_large.opt2.bc
+llvm-dis x86-dijkstra_large.opt2.bc -o x86-dijkstra_large.opt2.ll
+
+llc -relocation-model=static -O3 -march=x86 -mattr=avx2 x86-dijkstra_large.opt2.bc -o x86-dijkstra_large.s
+
+# assembling and linking with GNU as/ld, because these are also used with
+# RISC-V, as LLVM can't assemble and link RISC-V code yet.
+
+x86_64-linux-gnu-as --32 -o x86-dijkstra_large.o -c x86-dijkstra_large.s
+
+x86_64-linux-gnu-ld -m elf_i386 -o x86-dijkstra_large /usr/lib32/crt1.o /usr/lib32/crti.o x86-dijkstra_large.o /usr/lib32/libc.a /usr/lib/gcc/x86_64-linux-gnu/4.9.2/32/libgcc.a /usr/lib/gcc/x86_64-linux-gnu/4.9.2/32/libgcc_eh.a /usr/lib32/libc.a /usr/lib32/crtn.o
+
+
+# .c -> rv32.o
+
+clang --target=riscv -mriscv=RV32IMAFD -emit-llvm -c -O3 -mllvm -disable-llvm-optzns dijkstra_large.c -o rv32-dijkstra_large.bc
+
+llvm-dis rv32-dijkstra_large.bc -o rv32-dijkstra_large.ll
+opt -O3 rv32-dijkstra_large.bc -o rv32-dijkstra_large.opt.bc
+llvm-dis rv32-dijkstra_large.opt.bc -o rv32-dijkstra_large.opt.ll
+
+llc -relocation-model=static -O3 -march=riscv -mcpu=RV32IMAFD rv32-dijkstra_large.opt.bc -o rv32-dijkstra_large.s
+
+# RISC-V needs to use GNU as/ld, as LLVM for RISC-V doesn't support assembling
+# and linking yet
+
+riscv32-unknown-elf-as -o rv32-dijkstra_large.o -c rv32-dijkstra_large.s
+
+riscv-sbt -o rv32-x86-dijkstra_large.bc rv32-dijkstra_large.o
+
+llvm-dis rv32-x86-dijkstra_large.bc -o rv32-x86-dijkstra_large.ll
+opt -O3 rv32-x86-dijkstra_large.bc -o rv32-x86-dijkstra_large.opt.bc
+llvm-dis rv32-x86-dijkstra_large.opt.bc -o rv32-x86-dijkstra_large.opt.ll
+
+llc -relocation-model=static -O3 -march=x86 -mattr=avx2 rv32-x86-dijkstra_large.opt.bc -o rv32-x86-dijkstra_large.s
+
+x86_64-linux-gnu-as --32 -o rv32-x86-dijkstra_large.o -c rv32-x86-dijkstra_large.s
+
+x86_64-linux-gnu-ld -m elf_i386 -o rv32-x86-dijkstra_large /usr/lib32/crt1.o /usr/lib32/crti.o rv32-x86-dijkstra_large.o /mnt/ssd/riscv-sbt/toolchain/debug/share/riscv-sbt/x86-syscall.o /usr/lib32/libc.a /usr/lib/gcc/x86_64-linux-gnu/4.9.2/32/libgcc.a /usr/lib/gcc/x86_64-linux-gnu/4.9.2/32/libgcc_eh.a /usr/lib32/libc.a /usr/lib32/crtn.o
