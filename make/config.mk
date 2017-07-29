@@ -37,7 +37,7 @@ MAKE_OPTS     ?= -j9
 # SBT
 #
 
-SBTFLAGS        = #-x
+SBTFLAGS        = -x
 SBT_SHARE_DIR  := $(TOOLCHAIN_DIR)/share/riscv-sbt
 X86_SYSCALL_O  := $(SBT_SHARE_DIR)/x86-syscall.o
 X86_COUNTERS_O := $(SBT_SHARE_DIR)/x86-counters.o
@@ -91,7 +91,7 @@ LLVMDIS           := $(LLVM_INSTALL_DIR)/bin/llvm-dis
 #
 
 RV32_AS           := $(RV32_TRIPLE)-as
-X86_AS            := $(X86_64_TRIPLE)-as --32
+X86_AS            := $(X86_64_TRIPLE)-as --32 -g
 
 #
 # LD

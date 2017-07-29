@@ -77,60 +77,73 @@ ifeq ($(TOPDIR),)
 $(error "TOPDIR not set. Please run 'source scripts/setenv.sh' first.")
 endif
 
+###
+### CONFIG
+###
+
 include $(TOPDIR)/make/config.mk
 
-DIJKSTRA_BIN := dijkstra_large
-
-all: $(DIJKSTRA_BIN)
-
-include $(TOPDIR)/make/rules.mk
 
 MIBENCH       := $(TOPDIR)/mibench
 BUILD_MIBENCH := $(BUILD_DIR)/mibench
 
-
-# 1: src dir/
-# 2: out dir/
-# 3: mods
-# 4: bin
-define BENCH
-$(call BUILD,X86,$(1),$(2),$(3),x86-$(4))
-
-$(call BUILDO,RV32,$(1),$(2),$(3),rv32-$(4))
-$(call TRANSLATE,X86,$(1),$(2),rv32-$(4),rv32-x86-$(4))
-
-$(2):
-	mkdir -p $(2)
-
-$(4): $(2) x86-$(4) rv32-x86-$(4)
-endef
-
-
-# 1: out dir/
-# 2: test
-# 3: args
-define MITEST
-test-$(2):
-	$(SCRIPTS_DIR)/measure.py $(1) $(2) $(3)
-endef
-
-
-##
-## 05- DIJKSTRA
-##
-
-DIJKSTRA_DIR := network/dijkstra
-DIJKSTRA_SRC_DIR := $(MIBENCH)/$(DIJKSTRA_DIR)/
-DIJKSTRA_OUT_DIR := $(BUILD_MIBENCH)/$(DIJKSTRA_DIR)/
-
-DIJKSTRA_MODS := dijkstra_large
-
 RV32_CLANG_FLAGS =
 
-$(eval \
-$(call BENCH,$(DIJKSTRA_SRC_DIR),$(DIJKSTRA_OUT_DIR),$(DIJKSTRA_MODS),$(DIJKSTRA_BIN)))
-$(eval \
-$(call MITEST,$(DIJKSTRA_OUT_DIR),$(DIJKSTRA_BIN),$(DIJKSTRA_SRC_DIR)input.dat))
+## 05- DIJKSTRA
+
+DIJKSTRA_BIN    := dijkstra
+DIJKSTRA_DIR    := network/dijkstra
+DIJKSTRA_MODS   := dijkstra_large
+DIJKSTRA_ARGS   := $(MIBENCH)/$(DIJKSTRA_DIR)/input.dat
+
+## 11- CRC32
+
+CRC32_BIN       := crc
+CRC32_DIR       := telecomm/CRC32
+CRC32_MODS      := crc_32
+CRC32_ARGS      := $(MIBENCH)/telecomm/adpcm/data/large.pcm
+
+##
+
+BENCHS          := DIJKSTRA CRC32
+
+###
+### RULES
+###
+
+all: $(foreach bench,$(BENCHS),$($(bench)_BIN))
+
+include $(TOPDIR)/make/rules.mk
+
+
+# 1: bench name
+define BENCH
+$(eval BENCH_BIN = $($(1)_BIN))
+$(eval BENCH_SRC_DIR = $(MIBENCH)/$($(1)_DIR)/)
+$(eval BENCH_OUT_DIR = $(BUILD_MIBENCH)/$($(1)_DIR)/)
+$(eval BENCH_MODS = $($(1)_MODS))
+$(eval BENCH_ARGS = $($(1)_ARGS))
+
+$(call BUILD,X86,$(BENCH_SRC_DIR),$(BENCH_OUT_DIR),$(BENCH_MODS),x86-$(BENCH_BIN))
+
+$(call BUILDO,RV32,$(BENCH_SRC_DIR),$(BENCH_OUT_DIR),$(BENCH_MODS),rv32-$(BENCH_BIN))
+$(call TRANSLATE,X86,$(BENCH_SRC_DIR),$(BENCH_OUT_DIR),rv32-$(BENCH_BIN),rv32-x86-$(BENCH_BIN))
+
+$(BENCH_OUT_DIR):
+	mkdir -p $(BENCH_OUT_DIR)
+
+$(BENCH_BIN): $(BENCH_OUT_DIR) x86-$(BENCH_BIN) rv32-x86-$(BENCH_BIN)
+
+test-$(BENCH_BIN):
+	$(SCRIPTS_DIR)/measure.py $(BENCH_OUT_DIR) $(BENCH_BIN) $(BENCH_ARGS)
+endef
+
+
+###
+### GEN RULES
+###
+
+$(foreach bench,$(BENCHS),$(eval $(call BENCH,$(bench))))
 
 ###
 

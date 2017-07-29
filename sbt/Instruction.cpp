@@ -1041,7 +1041,7 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
     unsigned reg = XRegister::A0;
     for (; i < n; i++, reg++) {
         XRegister& x = f->getReg(reg);
-        if (!x.hasWrite())
+        if (!x.touched())
             break;
         args.push_back(_bld->load(reg));
     }
