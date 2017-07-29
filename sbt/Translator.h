@@ -81,6 +81,12 @@ public:
         return _iCaller;
     }
 
+    const Function& isExternal() const
+    {
+        return _isExternal;
+    }
+
+
     // syscall handler
     Syscall& syscall();
 
@@ -107,12 +113,14 @@ private:
 
     // icaller stuff
     Function _iCaller;
+    Function _isExternal;
     FunctionPtr _sbtabort;
     Map<std::string, FunctionPtr> _funMap;
     Map<uint64_t, Function*> _funcByAddr;
 
     // import() stuff
-    uint64_t _extFuncAddr = 0;
+    static const uint64_t FIRST_EXT_FUNC_ADDR = 0xFFFF0000;
+    uint64_t _extFuncAddr = FIRST_EXT_FUNC_ADDR;
     std::unique_ptr<llvm::Module> _lcModule;
 
     // syscall handler
@@ -133,7 +141,8 @@ private:
     llvm::Error finish();
 
     // gen indirect function caller
-    llvm::Error genICaller();
+    void genICaller();
+    void genIsExternal();
 };
 
 } // sbt

@@ -33,6 +33,7 @@ class Constants
 {
 public:
     static const uint64_t INVALID_ADDR = ~0ULL;
+    static const size_t INSTRUCTION_SIZE = 4;
 
     // name of the SBT binary/executable
     const std::string BIN_NAME = "riscv-sbt";
@@ -56,6 +57,11 @@ public:
     llvm::ConstantInt* i32(int32_t i) const
     {
         return llvm::ConstantInt::get(llvm::Type::getInt32Ty(*_ctx), i);
+    }
+
+    llvm::ConstantInt* u32(uint32_t u) const
+    {
+        return llvm::ConstantInt::get(llvm::Type::getInt32Ty(*_ctx), u);
     }
 
     llvm::ConstantInt* i64(int64_t i) const

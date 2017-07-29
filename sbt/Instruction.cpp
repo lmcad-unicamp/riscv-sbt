@@ -1008,10 +1008,11 @@ llvm::Error Instruction::handleCall(uint64_t target, unsigned linkReg)
     Function* f = Function::getByAddr(_ctx, target);
 
     link(linkReg);
-    _ctx->f->storeRegisters();
 
     // call
+    _ctx->f->storeRegisters();
     _bld->call(f->func());
+    _ctx->f->loadRegisters();
     return llvm::Error::success();
 }
 
@@ -1020,17 +1021,33 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
 {
     DBGF("linkReg={1}", linkReg);
 
-    link(linkReg);
-    // XXX this could be optimized out if we could antecipate that
-    //     the function being called is external (libc)
-    _ctx->f->storeRegisters();
-
     // prepare
-    const Function& ic = _ctx->translator->icaller();
-    llvm::Function* llic = ic.func();
+    Translator* translator = _ctx->translator;
     Function* f = _ctx->f;
-    xassert(llic);
     xassert(f);
+    llvm::Function* llf = f->func();
+    xassert(llf);
+    const Function& ie = translator->isExternal();
+    llvm::Function* llie = ie.func();
+    xassert(llie);
+    const Function& ic = translator->icaller();
+    llvm::Function* llic = ic.func();
+    xassert(llic);
+
+    // link
+    link(linkReg);
+
+    // isExternal?
+    llvm::Value* ext = _bld->call(llie, target);
+    BasicBlock *bbSaveRegs = f->newUBB(_addr, "save_regs");
+    BasicBlock *bbICall = f->newUBB(_addr, "icall");
+    _bld->condBr(ext, bbICall, bbSaveRegs);
+
+    // save regs
+    _bld->setInsertPoint(bbSaveRegs);
+    f->storeRegisters();
+    _bld->br(bbICall);
+    _bld->setInsertPoint(bbICall);
 
     // set args
     size_t n = llic->arg_size();
@@ -1054,6 +1071,17 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
 
     // call
     llvm::Value* v = _bld->call(llic, args);
+
+    // restore regs
+    BasicBlock *bbRestoreRegs = f->newUBB(_addr, "restore_regs");
+    BasicBlock *bbICallEnd = f->newUBB(_addr, "icall_end");
+    _bld->condBr(ext, bbICallEnd, bbRestoreRegs);
+
+    _bld->setInsertPoint(bbRestoreRegs);
+    f->loadRegisters();
+    _bld->br(bbICallEnd);
+
+    _bld->setInsertPoint(bbICallEnd);
     _bld->store(v, XRegister::A0);
 
     return llvm::Error::success();
@@ -1078,28 +1106,6 @@ llvm::Error Instruction::handleCallExt(llvm::Value* target, unsigned linkReg)
 }
 
 
-template <typename Key, typename Value,
-    typename Iter = typename sbt::Map<Key, Value>::Iter>
-static Iter getTarget(sbt::Map<Key, Value>& map, const Key& target)
-{
-    Iter it = map.lower_bound(target);
-
-    // target is the last entry
-    if (it == map.end()) {
-        xassert(!map.empty() && "empty map!");
-        return --it;
-    // entry matches target
-    } else if (target == it->key)
-        return it;
-    // target is probably the previous one
-    else if (it != map.begin())
-        return --it;
-    // target is the first one
-    else
-        return it;
-}
-
-
 static bool inBounds(
     uint64_t val,
     uint64_t begin,
@@ -1118,21 +1124,14 @@ llvm::Error Instruction::handleJumpToOffs(
 
     xassert(target != _addr && "unexpected jump to self instruction!");
 
-    using BBMap = std::decay<decltype(((Function*)0)->bbmap())>::type;
-    using BBIter = BBMap::Iter;
-
     const bool isCall = linkReg != XRegister::ZERO;
     const bool needNextBB = !isCall;
     const uint64_t nextInstrAddr = _addr + Instruction::SIZE;
     Function* func;
-    BBMap* bbmap;
-    BBMap* targetBBMap;
     BasicBlock* targetBB;
 
     // init vars
     func = _ctx->f;
-    bbmap = &func->bbmap();
-    targetBBMap = bbmap;
 
     // link
     if (!cond && isCall)
@@ -1143,18 +1142,15 @@ llvm::Error Instruction::handleJumpToOffs(
         DBGF("jump forward");
 
         // get basic block with start address >= target
-        BBIter it = bbmap->lower_bound(target);
+        BasicBlock* bb = func->lowerBoundBB(target);
 
         // BB already exists
-        if (it != bbmap->end() && target == it->key) {
+        if (bb && target == bb->addr()) {
             DBGF("target exists");
-            targetBB = &*it->val;
+            targetBB = bb;
         // need to create new BB
         } else {
-            BasicBlock* beforeBB = it != bbmap->end()? &*it->val : nullptr;
-            (*bbmap)(target, BasicBlockPtr(
-                new BasicBlock(_ctx, target, func, beforeBB)));
-            targetBB = &**(*bbmap)[target];
+            targetBB = func->newBB(target, bb);
             func->updateNextBB(target);
         }
 
@@ -1162,38 +1158,25 @@ llvm::Error Instruction::handleJumpToOffs(
     } else {
         DBGF("jump backward");
 
-        auto targetInBounds = [](uint64_t target, BasicBlock* bb, const BBIter& it) {
-            uint64_t begin = it->key;
-            uint64_t end = it->key + bb->bb()->size() * Instruction::SIZE;
+        auto targetInBounds = [](uint64_t target, BasicBlock* bb) {
+            uint64_t begin = bb->addr();
+            uint64_t end = begin + bb->bb()->size() *
+                Constants::INSTRUCTION_SIZE;
             return inBounds(target, begin, end);
         };
 
-        BBIter it = getTarget(*bbmap, target);
-        targetBB = &*it->val;
-        bool inBound = targetInBounds(target, targetBB, it);
-
-        // targetBB not found in current function: look in other functions
-        if (!inBound) {
-            auto fi = getTarget(*_ctx->_funcByAddr, target);
-            Function* targetFunc = fi->val;
-            targetBBMap = &targetFunc->bbmap();
-            it = getTarget(*targetBBMap, target);
-            targetBB = &*it->val;
-            inBound = targetInBounds(target, targetBB, it);
-            DBGF("target={0:X+8}, func={1}, targetFunc={2}, targetInBounds={3}",
-                    target, func->name(), targetFunc->name(), inBound);
-            xassert(false && "target basic block is in another function!");
-        }
+        targetBB = func->getBackBB(target);
+        bool inBound = targetInBounds(target, targetBB);
+        xassert(inBound && "target basic block not found!");
 
         // need to split targetBB?
-        if (it->key != target) {
+        if (targetBB->addr() != target) {
             // if we're on the BB that's going to be splitted
             // then we need to switch to the lower part
             BasicBlock* curBB = _bld->getInsertBlock();
             bool switchToTargetBB = curBB == targetBB;
 
-            (*targetBBMap)(target, targetBB->split(target));
-            targetBB = &**(*targetBBMap)[target];
+            targetBB = func->addBB(target, targetBB->split(target));
 
             // switch
             if (switchToTargetBB)
@@ -1203,15 +1186,11 @@ llvm::Error Instruction::handleJumpToOffs(
 
     if (needNextBB) {
         BasicBlock* beforeBB = nullptr;
-        auto p = (*bbmap)[nextInstrAddr];
+        BasicBlock* bb = func->findBB(nextInstrAddr);
         // nextBB already exists?
-        if (!p) {
-            auto it = bbmap->lower_bound(nextInstrAddr);
-            if (it != bbmap->end())
-                beforeBB = &*it->val;
-
-            (*bbmap)(nextInstrAddr, BasicBlockPtr(
-                new BasicBlock(_ctx, nextInstrAddr, func, beforeBB)));
+        if (!bb) {
+            beforeBB = func->lowerBoundBB(nextInstrAddr);
+            func->newBB(nextInstrAddr, beforeBB);
         }
 
         func->updateNextBB(nextInstrAddr);
@@ -1219,7 +1198,7 @@ llvm::Error Instruction::handleJumpToOffs(
 
     // branch
     if (cond) {
-        BasicBlock* next = &**(*bbmap)[nextInstrAddr];
+        BasicBlock* next = func->findBB(nextInstrAddr);
         if (targetBB->addr() == next->addr())
             DBGF("WARNING: conditional branch to next instruction");
         _bld->condBr(cond, targetBB, next);

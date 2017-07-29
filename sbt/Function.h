@@ -86,13 +86,88 @@ public:
         return _addr;
     }
 
+    //
+
+    // BB
+
+    BasicBlock* newBB(uint64_t addr, BasicBlock* beforeBB = nullptr)
+    {
+        _bbMap(addr, BasicBlockPtr(
+            new BasicBlock(_ctx, addr, _f,
+                beforeBB? beforeBB->bb() : nullptr)));
+        return &**_bbMap[addr];
+    }
+
+    BasicBlock* addBB(uint64_t addr, BasicBlockPtr&& bb)
+    {
+        _bbMap(addr, std::move(bb));
+        return &**_bbMap[addr];
+    }
+
+    BasicBlock* newUBB(uint64_t addr, const std::string& name)
+    {
+        const std::string bbname = BasicBlock::getBBName(addr) + "_" + name;
+        BasicBlock* bb = new BasicBlock(_ctx, bbname, _f);
+        BasicBlockPtr bbptr(bb);
+
+        auto* p = _ubbMap[addr];
+        // first on this addr
+        if (!p)
+            _ubbMap(addr, std::vector<BasicBlockPtr>(std::move(bbptr)));
+        else
+            p->emplace_back(std::move(bbptr));
+        return bb;
+    }
+
+    BasicBlock* findBB(uint64_t addr)
+    {
+        BasicBlockPtr* ptr = _bbMap[addr];
+        if (!ptr)
+            return nullptr;
+        return &**ptr;
+    }
+
+    BasicBlock* lowerBoundBB(uint64_t addr)
+    {
+        auto it = _bbMap.lower_bound(addr);
+        if (it == _bbMap.end())
+            return nullptr;
+        return &*it->val;
+    }
+
+    BasicBlock* getBackBB(uint64_t addr)
+    {
+        auto it = _bbMap.lower_bound(addr);
+
+        // last
+        if (it == _bbMap.end()) {
+            xassert(!_bbMap.empty() && "empty bbMap!");
+            --it;
+        // exact match
+        } else if (it->key == addr)
+            ;
+        // previous
+        else if (it != _bbMap.begin())
+            --it;
+        // else: first
+
+        return &*it->val;
+    }
+
+    uint64_t nextBBAddr(uint64_t curAddr)
+    {
+        auto it = _bbMap.lower_bound(curAddr + Constants::INSTRUCTION_SIZE);
+        if (it != _bbMap.end())
+            return it->key;
+        return Constants::INVALID_ADDR;
+    }
+
     // basic block map
     Map<uint64_t, BasicBlockPtr>& bbmap()
     {
         return _bbMap;
     }
 
-    //
 
     // update next basic block address
     void updateNextBB(uint64_t addr)
@@ -100,6 +175,8 @@ public:
         if (_nextBB <= addr || addr < _nextBB)
             _nextBB = addr;
     }
+
+    // BB end
 
     void setEnd(uint64_t end)
     {
@@ -147,6 +224,10 @@ private:
     // address of next basic block
     uint64_t _nextBB = 0;
     Map<uint64_t, BasicBlockPtr> _bbMap;
+
+    // untracked BBs map: <addr, BBs>
+    // addr: guest address where the BBs belong to
+    Map<uint64_t, std::vector<BasicBlockPtr>> _ubbMap;
 
     Function* _nextf = nullptr;
 

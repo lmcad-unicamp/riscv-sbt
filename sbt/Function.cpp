@@ -85,10 +85,7 @@ llvm::Error Function::startMain()
         llvm::Function::ExternalLinkage, _name, _ctx->module);
 
     // first bb
-    BasicBlockPtr bb(new BasicBlock(_ctx, _addr, _f));
-    _bbMap(_addr, std::move(bb));
-    BasicBlock* bbptr = &**_bbMap[_addr];
-    bld->setInsertPoint(bbptr);
+    bld->setInsertPoint(newBB(_addr));
 
     // create local register file
     _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
@@ -109,15 +106,10 @@ llvm::Error Function::start()
 
     DBGF("addr={0:X+8}", _addr);
 
-    BasicBlockPtr* ptr = _bbMap[_addr];
-
-    if (!ptr) {
-        _bbMap(_addr, BasicBlockPtr(new BasicBlock(_ctx, _addr, _f)));
-        ptr = _bbMap[_addr];
-        xassert(ptr);
-    }
-    BasicBlock* bbptr = &**ptr;
-    _ctx->bld->setInsertPoint(bbptr);
+    BasicBlock* ptr = findBB(_addr);
+    if (!ptr)
+        ptr = newBB(_addr);
+    _ctx->bld->setInsertPoint(ptr);
 
     // create local register file
     _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
@@ -154,7 +146,7 @@ llvm::Error Function::finish()
     cleanRegs();
 
     // last BB may be empty
-    auto it = bbmap().end();
+    auto it = _bbMap.end();
     --it;
     if (it->val->bb()->empty()) {
         DBGF("removing empty BB: {0}", it->val->name());
@@ -238,7 +230,7 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
         // update current bb
         DBGF("addr={0:X+8}, _nextBB={1:X+8}", addr, _nextBB);
         if (_nextBB && addr == _nextBB) {
-            BasicBlock* bbptr = &**_bbMap[addr];
+            BasicBlock* bbptr = findBB(addr);
             xassert(bbptr && "BasicBlock not found!");
             DBGF("insertPoint={0}:", bbptr->name());
 
@@ -249,14 +241,14 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
             _ctx->bld->setInsertPoint(*bbptr);
 
             // set next BB pointer
-            auto it = _bbMap.lower_bound(addr + size);
-            if (it != _bbMap.end())
-                updateNextBB(it->key);
+            uint64_t nextBB = nextBBAddr(addr);
+            if (nextBB != Constants::INVALID_ADDR)
+                updateNextBB(nextBB);
         }
 
         // translate instruction
         Instruction inst(_ctx, addr, rawInst);
-        // note: Instruction::translate() may change _bbMap,
+        // note: Instruction::translate() may change bbMap,
         // possibly invalidating bbptr
         if (auto err = inst.translate())
             return err;
@@ -312,7 +304,7 @@ Function* Function::getByAddr(Context* ctx, uint64_t addr)
 BasicBlock* Function::curBB()
 {
     uint64_t addr = _ctx->bld->getInsertBlock()->addr();
-    BasicBlock* bb = &**_bbMap[addr];
+    BasicBlock* bb = findBB(addr);
     xassert(bb && "couldn't find current basic block!");
     return bb;
 }
@@ -322,29 +314,44 @@ void Function::transferBBs(uint64_t from, Function* to)
 {
     DBGF("from={0:X+8}, to={1}, func={2}", from, to->name(), name());
 
+    // transfer tracked BBs
     to->_nextBB = _nextBB;
     auto st = _bbMap.lower_bound(from);
     auto it = st;
     auto end = _bbMap.end();
-
     xassert(to->_bbMap.empty());
-    // to->_bbMap.erase(to->_bbMap.begin());
 
     while (it != end) {
         auto key = it->key;
         DBGF("key={0:X+8}", key);
         to->_bbMap(key, std::move(it->val));
 
-        // XXX test
-        BasicBlockPtr* val = to->_bbMap[key];
-        xassert(val);
-        DBGF("{0}", (*val)->name());
+        DBG(BasicBlockPtr* val = to->_bbMap[key];
+            xassert(val);
+            DBGF("{0}", (*val)->name()));
 
         ++it;
     }
     DBGF("erasing our bbMap...");
     _bbMap.erase(st);
-    DBGF("done");
+    DBGF("bbMap done");
+
+    // transfer untracked BBs
+    DBGF("tranferring uBBs...");
+    auto ust = _ubbMap.lower_bound(from);
+    auto uit = ust;
+    auto uend = _ubbMap.end();
+    xassert(to->_ubbMap.empty());
+
+    while (uit != uend) {
+        auto ukey = uit->key;
+        DBGF("ukey={0:X+8}", ukey);
+        to->_ubbMap(ukey, std::move(uit->val));
+        ++uit;
+    }
+    DBGF("erasing our ubbMap...");
+    _ubbMap.erase(ust);
+    DBGF("ubbMap done");
 }
 
 

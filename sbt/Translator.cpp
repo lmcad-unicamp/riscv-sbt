@@ -37,7 +37,8 @@ namespace sbt {
 Translator::Translator(Context* ctx)
     :
     _ctx(ctx),
-    _iCaller(_ctx, "rv32_icaller")
+    _iCaller(_ctx, "rv32_icaller"),
+    _isExternal(_ctx, "rv32_isExternal")
 {
     _ctx->translator = this;
 }
@@ -73,6 +74,8 @@ llvm::Error Translator::start()
     for (size_t i = 0; i < n; i++)
         args.push_back(t.i32);
     _iCaller.create(llvm::FunctionType::get(t.i32, args, !VAR_ARG));
+
+    _isExternal.create(llvm::FunctionType::get(t.i32, { t.i32 }, !VAR_ARG));
 
     // SBT abort, using syscalls only
     // - to abort on fatal errors such as: icaller could not resolve guest
@@ -149,7 +152,9 @@ llvm::Error Translator::startTarget()
 
 llvm::Error Translator::finish()
 {
-    return genICaller();
+    genIsExternal();
+    genICaller();
+    return llvm::Error::success();
 }
 
 
@@ -250,8 +255,6 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
         "external functions with more than 8 params are not supported!");
 
     // set a fake guest address for the external function
-    if (!_extFuncAddr)
-        _extFuncAddr = 0xFFFF0000;
     uint64_t addr = _extFuncAddr;
     DBGF("{0:X+8} -> {1}", addr, func);
 
@@ -269,7 +272,7 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
 }
 
 
-llvm::Error Translator::genICaller()
+void Translator::genICaller()
 {
     DBGF("entry");
 
@@ -383,8 +386,37 @@ llvm::Error Translator::genICaller()
         bld->setInsertPoint(bbBeg);
         sw->addCase(c.i32(addr), dest.bb());
     }
+}
 
-    return llvm::Error::success();
+
+void Translator::genIsExternal()
+{
+    DBGF("entry");
+
+    // prepare
+    const Constants& c = _ctx->c;
+    Builder bldi(_ctx, NO_FIRST);
+    Builder* bld = &bldi;
+    llvm::Function* ie = _isExternal.func();
+    xassert(ie);
+
+    xassert(!ie->arg_empty());
+    llvm::Argument& target = *ie->arg_begin();
+
+    // basic blocks
+    BasicBlock bbEntry(_ctx, "ie_entry", ie);
+    BasicBlock bbTrue(_ctx, "ie_true", ie);
+    BasicBlock bbFalse(_ctx, "ie_false", ie);
+
+    bld->setInsertPoint(bbEntry);
+    llvm::Value* cond = bld->uge(&target, c.u32(FIRST_EXT_FUNC_ADDR));
+    bld->condBr(cond, &bbTrue, &bbFalse);
+
+    bld->setInsertPoint(bbTrue);
+    bld->ret(c.i32(1));
+
+    bld->setInsertPoint(bbFalse);
+    bld->ret(c.ZERO);
 }
 
 } // sbt
