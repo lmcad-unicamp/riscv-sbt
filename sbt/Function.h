@@ -107,14 +107,19 @@ public:
     BasicBlock* newUBB(uint64_t addr, const std::string& name)
     {
         const std::string bbname = BasicBlock::getBBName(addr) + "_" + name;
-        BasicBlock* bb = new BasicBlock(_ctx, bbname, _f);
+        BasicBlock* beforeBB = lowerBoundBB(addr + Constants::INSTRUCTION_SIZE);
+        BasicBlock* bb = new BasicBlock(_ctx, bbname, _f,
+            beforeBB? beforeBB->bb() : nullptr);
+        bb->untracked(true);
         BasicBlockPtr bbptr(bb);
 
-        auto* p = _ubbMap[addr];
+        std::vector<BasicBlockPtr>* p = _ubbMap[addr];
         // first on this addr
-        if (!p)
-            _ubbMap(addr, std::vector<BasicBlockPtr>(std::move(bbptr)));
-        else
+        if (!p) {
+            std::vector<BasicBlockPtr> vec;
+            vec.emplace_back(std::move(bbptr));
+            _ubbMap(addr, std::move(vec));
+        } else
             p->emplace_back(std::move(bbptr));
         return bb;
     }
@@ -161,13 +166,6 @@ public:
             return it->key;
         return Constants::INVALID_ADDR;
     }
-
-    // basic block map
-    Map<uint64_t, BasicBlockPtr>& bbmap()
-    {
-        return _bbMap;
-    }
-
 
     // update next basic block address
     void updateNextBB(uint64_t addr)
@@ -238,9 +236,6 @@ private:
     llvm::Error startMain();
     llvm::Error start();
     llvm::Error finish();
-
-    // current basic block pointer
-    BasicBlock* curBB();
 };
 
 using FunctionPtr = Pointer<Function>;

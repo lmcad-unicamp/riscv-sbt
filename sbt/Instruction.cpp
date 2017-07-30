@@ -1020,6 +1020,7 @@ llvm::Error Instruction::handleCall(uint64_t target, unsigned linkReg)
 llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
 {
     DBGF("linkReg={1}", linkReg);
+    const bool alwaysSync = false;
 
     // prepare
     Translator* translator = _ctx->translator;
@@ -1038,16 +1039,28 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
     link(linkReg);
 
     // isExternal?
-    llvm::Value* ext = _bld->call(llie, target);
-    BasicBlock *bbSaveRegs = f->newUBB(_addr, "save_regs");
-    BasicBlock *bbICall = f->newUBB(_addr, "icall");
-    _bld->condBr(ext, bbICall, bbSaveRegs);
+    llvm::Value* ext;
+    BasicBlock* bbSaveRegs;
+    BasicBlock* bbICall;
+    if (!alwaysSync) {
+        // XXX FIXME for debugging only - uncomment this later
+        //ext = _bld->call(llie, target);
+        ext = _c->i32(0);
+        ext = _bld->eq(ext, _c->i32(1));
+        bbSaveRegs = f->newUBB(_addr, "save_regs");
+        bbICall = f->newUBB(_addr, "icall");
+        _bld->condBr(ext, bbICall, bbSaveRegs);
 
-    // save regs
-    _bld->setInsertPoint(bbSaveRegs);
+        // save regs
+        _bld->setInsertPoint(bbSaveRegs);
+    }
+
     f->storeRegisters();
-    _bld->br(bbICall);
-    _bld->setInsertPoint(bbICall);
+
+    if (!alwaysSync) {
+        _bld->br(bbICall);
+        _bld->setInsertPoint(bbICall);
+    }
 
     // set args
     size_t n = llic->arg_size();
@@ -1073,15 +1086,17 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
     llvm::Value* v = _bld->call(llic, args);
 
     // restore regs
-    BasicBlock *bbRestoreRegs = f->newUBB(_addr, "restore_regs");
-    BasicBlock *bbICallEnd = f->newUBB(_addr, "icall_end");
-    _bld->condBr(ext, bbICallEnd, bbRestoreRegs);
+    if (!alwaysSync) {
+        BasicBlock *bbRestoreRegs = f->newUBB(_addr, "restore_regs");
+        BasicBlock *bbICallEnd = f->newUBB(_addr, "icall_end");
+        _bld->condBr(ext, bbICallEnd, bbRestoreRegs);
 
-    _bld->setInsertPoint(bbRestoreRegs);
-    f->loadRegisters();
-    _bld->br(bbICallEnd);
+        _bld->setInsertPoint(bbRestoreRegs);
+        f->loadRegisters();
+        _bld->br(bbICallEnd);
 
-    _bld->setInsertPoint(bbICallEnd);
+        _bld->setInsertPoint(bbICallEnd);
+    }
     _bld->store(v, XRegister::A0);
 
     return llvm::Error::success();
@@ -1133,10 +1148,6 @@ llvm::Error Instruction::handleJumpToOffs(
     // init vars
     func = _ctx->f;
 
-    // link
-    if (!cond && isCall)
-        _bld->store(_c->i32(nextInstrAddr), linkReg);
-
     // jump forward
     if (target > _addr) {
         DBGF("jump forward");
@@ -1183,6 +1194,10 @@ llvm::Error Instruction::handleJumpToOffs(
                 _bld->setInsertPoint(targetBB);
         }
     }
+
+    // link
+    if (!cond && isCall)
+        _bld->store(_c->i32(nextInstrAddr), linkReg);
 
     if (needNextBB) {
         BasicBlock* beforeBB = nullptr;

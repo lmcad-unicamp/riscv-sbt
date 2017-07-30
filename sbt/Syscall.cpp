@@ -73,10 +73,10 @@ void Syscall::genHandler()
     declHandler();
 
     // prepare
-    Builder* bld = _ctx->bld;
-    xassert(bld);
-    bld->saveInsertBlock();
-    bld->reset();
+    llvm::IRBuilder<>* builder = _ctx->builder;
+    llvm::BasicBlock* savedBB = builder->GetInsertBlock();
+    Builder bldi(_ctx, NO_FIRST);
+    Builder* bld = &bldi;
     std::vector<llvm::Value*> args;
 
     // entry
@@ -131,8 +131,7 @@ void Syscall::genHandler()
     for (const Syscall& s : scv)
         addCase(s);
 
-    bld->restoreInsertBlock();
-
+    builder->SetInsertPoint(savedBB);
     // _fRVSC->dump();
 }
 

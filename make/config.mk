@@ -79,7 +79,7 @@ EMITLLVM          := -emit-llvm -c -O3 -mllvm -disable-llvm-optzns
 LLC               := llc
 LLC_FLAGS         := -relocation-model=static -O3 #-stats
 RV32_LLC_FLAGS    := -march=$(RV32_MARCH) -mcpu=RV32IMAFD
-X86_LLC_FLAGS     := -march=$(X86_MARCH) -mattr=avx2
+X86_LLC_FLAGS     := -march=$(X86_MARCH) -mattr=avx #-mattr=avx2
 
 LLVMOPT           := $(LLVM_INSTALL_DIR)/bin/opt
 LLVMOPT_FLAGS     := -O3 #-stats

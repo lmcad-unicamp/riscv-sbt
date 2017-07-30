@@ -22,14 +22,15 @@ BasicBlock::BasicBlock(
 // main constructor
 BasicBlock::BasicBlock(
     Context* ctx,
-    llvm::StringRef name,
+    const std::string& name,
     llvm::Function* f,
     llvm::BasicBlock* beforeBB)
     :
-    _ctx(ctx)
+    _ctx(ctx),
+    _name(name)
 {
-    DBGF("{0}", name);
-    _bb = llvm::BasicBlock::Create(*_ctx->ctx, name, f, beforeBB);
+    DBGF("{0}", _name);
+    _bb = llvm::BasicBlock::Create(*_ctx->ctx, _name, f, beforeBB);
 }
 
 
@@ -40,7 +41,8 @@ BasicBlock::~BasicBlock()
 
 BasicBlockPtr BasicBlock::split(uint64_t addr)
 {
-    DBGF("addr={0:X+8}: 1st_addr={1:X+8}", addr, this->addr());
+    DBGF("addr={0:X+8}: 1st_addr={1:X+8}, name={2}",
+        addr, this->addr(), name());
 
     auto res = _instrMap[addr];
     xassert(res && "instruction not found!");

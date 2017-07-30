@@ -205,7 +205,8 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
 
     // for each instruction
     // XXX assuming fixed size instructions
-    uint64_t size = Instruction::SIZE;
+    uint64_t size = Constants::INSTRUCTION_SIZE;
+    Builder* bld = _ctx->bld;
     for (uint64_t addr = st; addr < end; addr += size) {
         _ctx->addr = addr;
 
@@ -231,14 +232,15 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
         DBGF("addr={0:X+8}, _nextBB={1:X+8}", addr, _nextBB);
         if (_nextBB && addr == _nextBB) {
             BasicBlock* bbptr = findBB(addr);
-            xassert(bbptr && "BasicBlock not found!");
+            if (!bbptr)
+                bbptr = newBB(addr, lowerBoundBB(addr));
             DBGF("insertPoint={0}:", bbptr->name());
 
             // if last instruction did not terminate the BB,
             // then branch from previous BB to current one
-            if (!_ctx->bld->getInsertBlock()->terminated())
-                _ctx->bld->br(bbptr);
-            _ctx->bld->setInsertPoint(*bbptr);
+            if (!bld->getInsertBlock()->terminated())
+                bld->br(bbptr);
+            bld->setInsertPoint(*bbptr);
 
             // set next BB pointer
             uint64_t nextBB = nextBBAddr(addr);
@@ -248,21 +250,47 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
 
         // translate instruction
         Instruction inst(_ctx, addr, rawInst);
-        // note: Instruction::translate() may change bbMap,
-        // possibly invalidating bbptr
+        BasicBlock* bb = bld->getInsertBlock();
         if (auto err = inst.translate())
             return err;
-        // DBGF("addr={0:X+8}", addr);
         // add translated instruction to BB's instruction map
-        (*curBB())(addr, std::move(_ctx->bld->first()));
+        llvm::Instruction* first = bld->first();
+        llvm::BasicBlock* fbb = first->getParent();
 
-        // if last instruction terminated this basicblock
+        // BB of first instr != BB before translating instr:
+        //   - BB was split
+        //   - current BB became the bottom part of the split
+        //   - first instruction should be on the bottom part
+        if (fbb != bb->bb()) {
+            bb = bld->getInsertBlock();
+            xassert(!bb->untracked());
+            xassert(bb->bb() == fbb);
+        }
+
+        /*
+        if (bb->bb() != first->getParent()) {
+            DBGF("bb:");
+            bb->bb()->dump();
+            DBGF("first's bb:");
+            first->getParent()->dump();
+            DBGS.flush();
+            xunreachable("first instruction is in wrong BB!");
+        }
+        */
+        (*bb)(addr, std::move(first));
+
+        // If last instruction terminated this basicblock
         // switch to a new one. This is needed in case the
         // next basic block was not explicitly created.
         // This can happen, for instance, if an unconditional
         // jump is followed by alignment instrs.
-        if (_ctx->bld->getInsertBlock()->terminated())
-            updateNextBB(addr + Instruction::SIZE);
+        //
+        // Also switch to a new BB if we are inside an
+        // untracked BB, to make it possible to split
+        // the BB later.
+        bb = bld->getInsertBlock();
+        if (bb->terminated() || bb->untracked())
+            updateNextBB(addr + Constants::INSTRUCTION_SIZE);
     }
 
     return llvm::Error::success();
@@ -301,21 +329,12 @@ Function* Function::getByAddr(Context* ctx, uint64_t addr)
 }
 
 
-BasicBlock* Function::curBB()
-{
-    uint64_t addr = _ctx->bld->getInsertBlock()->addr();
-    BasicBlock* bb = findBB(addr);
-    xassert(bb && "couldn't find current basic block!");
-    return bb;
-}
-
-
 void Function::transferBBs(uint64_t from, Function* to)
 {
     DBGF("from={0:X+8}, to={1}, func={2}", from, to->name(), name());
 
     // transfer tracked BBs
-    to->_nextBB = _nextBB;
+    to->_nextBB = 0;
     auto st = _bbMap.lower_bound(from);
     auto it = st;
     auto end = _bbMap.end();
@@ -329,6 +348,9 @@ void Function::transferBBs(uint64_t from, Function* to)
         DBG(BasicBlockPtr* val = to->_bbMap[key];
             xassert(val);
             DBGF("{0}", (*val)->name()));
+
+        if (!to->_nextBB && key != from)
+            to->_nextBB = key;
 
         ++it;
     }

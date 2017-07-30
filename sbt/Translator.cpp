@@ -266,7 +266,7 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
     // add to maps
     _funcByAddr(_extFuncAddr, std::move(f));
     _funMap(f->name(), std::move(fp));
-    _extFuncAddr += Instruction::SIZE;
+    _extFuncAddr += Constants::INSTRUCTION_SIZE;
 
     return addr;
 }

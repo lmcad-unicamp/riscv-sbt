@@ -134,6 +134,9 @@ $(BENCH_OUT_DIR):
 
 $(BENCH_BIN): $(BENCH_OUT_DIR) x86-$(BENCH_BIN) rv32-x86-$(BENCH_BIN)
 
+clean-$(BENCH_BIN):
+	rm -rf $(BENCH_OUT_DIR)
+
 test-$(BENCH_BIN):
 	$(SCRIPTS_DIR)/measure.py $(BENCH_OUT_DIR) $(BENCH_BIN) $(BENCH_ARGS)
 endef

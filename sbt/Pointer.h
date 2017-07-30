@@ -24,7 +24,7 @@ public:
         _ptr(std::move(other._ptr))
     {
         other._ptr.reset();
-        NULL_CHECK;
+        // NULL_CHECK;
     }
 
     Pointer& operator=(Pointer&& other)
