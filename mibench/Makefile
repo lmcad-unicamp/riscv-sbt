@@ -87,7 +87,7 @@ include $(TOPDIR)/make/config.mk
 MIBENCH       := $(TOPDIR)/mibench
 BUILD_MIBENCH := $(BUILD_DIR)/mibench
 
-RV32_CLANG_FLAGS =
+BENCH_TRANSLATE = 1
 
 ## 05- DIJKSTRA
 
@@ -115,6 +115,16 @@ all: $(foreach bench,$(BENCHS),$($(bench)_BIN))
 
 include $(TOPDIR)/make/rules.mk
 
+# 1: arch
+# 2: dir/
+# 3: bin
+# 4: args
+define TEST2
+$(eval TEST2_BIN = $$($(1)_PREFIX)-$(3))
+test2-$(TEST2_BIN):
+	$$($(1)_RUN) $(2)$(TEST2_BIN) $(4) | tee $(2)$(TEST2_BIN).out
+endef
+
 
 # 1: bench name
 define BENCH
@@ -126,19 +136,29 @@ $(eval BENCH_ARGS = $($(1)_ARGS))
 
 $(call BUILD,X86,$(BENCH_SRC_DIR),$(BENCH_OUT_DIR),$(BENCH_MODS),x86-$(BENCH_BIN))
 
-$(call BUILDO,RV32,$(BENCH_SRC_DIR),$(BENCH_OUT_DIR),$(BENCH_MODS),rv32-$(BENCH_BIN))
-$(call TRANSLATE,X86,$(BENCH_SRC_DIR),$(BENCH_OUT_DIR),rv32-$(BENCH_BIN),rv32-x86-$(BENCH_BIN))
+$(call BUILD,RV32,$(BENCH_SRC_DIR),$(BENCH_OUT_DIR),$(BENCH_MODS),rv32-$(BENCH_BIN))
+
+ifeq ($(BENCH_TRANSLATE),1)
+$(eval BENCH_RV32_CLANG_FLAGS = $(RV32_CLANG_FLAGS))
+$(eval RV32_CLANG_FLAGS = )
+$(call BUILDO,RV32,$(BENCH_SRC_DIR),$(BENCH_OUT_DIR),$(BENCH_MODS),rv32_x86-$(BENCH_BIN))
+$(eval RV32_CLANG_FLAGS = $(BENCH_RV32_CLANG_FLAGS))
+$(call TRANSLATE,X86,$(BENCH_SRC_DIR),$(BENCH_OUT_DIR),rv32_x86-$(BENCH_BIN),rv32-x86-$(BENCH_BIN))
+endif
 
 $(BENCH_OUT_DIR):
 	mkdir -p $(BENCH_OUT_DIR)
 
-$(BENCH_BIN): $(BENCH_OUT_DIR) x86-$(BENCH_BIN) rv32-x86-$(BENCH_BIN)
+$(BENCH_BIN): $(BENCH_OUT_DIR) rv32-$(BENCH_BIN) x86-$(BENCH_BIN) \
+    $(if $(BENCH_TRANSLATE),rv32-x86-$(BENCH_BIN),)
 
 clean-$(BENCH_BIN):
 	rm -rf $(BENCH_OUT_DIR)
 
 test-$(BENCH_BIN):
 	$(SCRIPTS_DIR)/measure.py $(BENCH_OUT_DIR) $(BENCH_BIN) $(BENCH_ARGS)
+
+$(foreach arch,RV32 X86,$(call TEST2,$(arch),$(BENCH_OUT_DIR),$(BENCH_BIN),$(BENCH_ARGS)))
 endef
 
 
@@ -152,3 +172,4 @@ $(foreach bench,$(BENCHS),$(eval $(call BENCH,$(bench))))
 
 clean:
 	rm -rf $(BUILD_MIBENCH)
+

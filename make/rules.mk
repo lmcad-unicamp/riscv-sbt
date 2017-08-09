@@ -8,9 +8,10 @@
 # 4: input (.c)
 # 5: output (.bc)
 define C2BC
+$(eval C2BC_CLANG_FLAGS = $$($(1)_CLANG_FLAGS))
 $(3)$(5).bc: $(2)$(4).c
 	cd $(3) && \
-		$$($(1)_CLANG) $$($(1)_CLANG_FLAGS) $(EMITLLVM) $(2)$(4).c -o $(5).bc
+		$$($(1)_CLANG) $(C2BC_CLANG_FLAGS) $(EMITLLVM) $(2)$(4).c -o $(5).bc
 endef
 
 
