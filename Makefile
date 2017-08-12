@@ -915,7 +915,7 @@ mmtest: sbt
 .PHONY: mibench
 mibench: sbt
 	rm -f log.txt
-	$(LOG) $(MAKE) -C $(TOPDIR)/mibench
+	$(LOG) $(MAKE) -C $(TOPDIR)/mibench $(TARGETS)
 
 mibench-clean:
 	$(MAKE) -C $(TOPDIR)/mibench clean

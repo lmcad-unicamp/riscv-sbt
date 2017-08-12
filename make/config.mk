@@ -85,6 +85,7 @@ LLVMOPT           := $(LLVM_INSTALL_DIR)/bin/opt
 LLVMOPT_FLAGS     := -O3 #-stats
 
 LLVMDIS           := $(LLVM_INSTALL_DIR)/bin/llvm-dis
+LLVMLINK          := $(LLVM_INSTALL_DIR)/bin/llvm-link
 
 #
 # AS
@@ -107,7 +108,7 @@ RV32_LIB_GCC      := $(TOOLCHAIN_RELEASE)/lib/gcc/$(RV32_TRIPLE)/7.1.1
 RV32_CRT0         := $(RV32_LIB)/crt0.o
 RV32_LD_FLAGS0    := -L$(RV32_LIB) -L$(RV32_LIB_GCC) \
                      -dT ldscripts/elf32lriscv.x $(RV32_CRT0)
-RV32_LD_FLAGS1    := -lc -lgloss -lc -lgcc
+RV32_LD_FLAGS1    := -lm -lc -lgloss -lc -lgcc
 
 # x86
 
@@ -119,15 +120,16 @@ X86_CRTN        := $(X86_LIB)/crtn.o
 X86_LGCC        := $(X86_LIB_GCC)/libgcc.a
 X86_LEH         := $(X86_LIB_GCC)/libgcc_eh.a
 X86_LC          := $(X86_LIB)/libc.a
+X86_LM          := $(X86_LIB)/libm.a
 X86_LD_FLAGS0   := $(X86_CRT1) $(X86_CRTI)
-X86_LD_FLAGS1   := $(X86_LC) $(X86_LGCC) $(X86_LEH) $(X86_LC) $(X86_CRTN)
+X86_LD_FLAGS1   := $(X86_LM) $(X86_LC) $(X86_LGCC) $(X86_LEH) $(X86_LC) $(X86_CRTN)
 
 #X86_CRTBEGIN    := $(X86_LIB_GCC)/crtbegin.o
 #X86_CRTEND      := $(X86_LIB_GCC)/crtend.o
 
 
 #
-# extra stuff
+# extra (unused) stuff
 #
 
 RV32_LINUX_TRIPLE := riscv32-unknown-linux-gnu

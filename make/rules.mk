@@ -15,6 +15,17 @@ $(3)$(5).bc: $(2)$(4).c
 endef
 
 
+# LLVM LINK
+# 1: arch
+# 2: dir/
+# 3: inputs (.bc)
+# 4: output (.bc)
+define LLLINK
+$(2)$(4).bc: $(foreach bc,$(3),$(2)$(bc).bc)
+	cd $(2) && \
+		$(LLVMLINK) $(foreach bc,$(3),$(bc).bc) -o $(4).bc
+endef
+
 # DIS
 # 1: arch
 # 2: dir/
@@ -150,12 +161,27 @@ endef
 # 1: arch
 # 2: source dir/
 # 3: out dir/
-# 4: input file (.c)
+# 4: input files (.c)
 # 5: output file (bin)
 # 6: libs
 
-define BUILD1
+define C2BCNDIS
 $(call C2BC,$(1),$(2),$(3),$(4),$(5))
+$(call DIS,$(1),$(3),$(5))
+endef
+
+define BUILD1
+$(eval BUILD1_PREFIX = $($(1)_PREFIX))
+
+ifeq ($(words $(4)),1)
+$(call C2BC,$(1),$(2),$(3),$(4),$(5))
+else
+$(foreach c,$(4),\
+$(call C2BCNDIS,$(1),$(2),$(3),$(c),$(BUILD1_PREFIX)-$(c)_bc1))
+
+$(call LLLINK,$(1),$(3),$(foreach bc,$(4),$(BUILD1_PREFIX)-$(bc)_bc1),$(5))
+endif
+
 $(call DIS,$(1),$(3),$(5))
 $(call OPT,$(1),$(3),$(5),$(5).opt)
 $(call DIS,$(1),$(3),$(5).opt)

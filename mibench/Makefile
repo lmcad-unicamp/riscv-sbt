@@ -87,9 +87,47 @@ include $(TOPDIR)/make/config.mk
 MIBENCH       := $(TOPDIR)/mibench
 BUILD_MIBENCH := $(BUILD_DIR)/mibench
 
-BENCH_TRANSLATE = 1
+ARCHS = RV32 X86
+BENCH_TRANSLATE =
+
+## 01- BASICMATH
+# runs OK
+# results WRONG
+
+BASICMATH_BIN   := basicmath
+BASICMATH_DIR   := automotive/basicmath
+BASICMATH_MODS  := basicmath_large rad2deg cubic isqrt
+BASICMATH_ARGS  :=
+
+## 02- BITCOUNT
+# runs OK
+# results WRONG
+
+BITCOUNT_BIN    := bitcount
+BITCOUNT_DIR    := automotive/bitcount
+BITCOUNT_MODS   := bitcnt_1 bitcnt_2 bitcnt_3 bitcnt_4 \
+                   bitcnts bitfiles bitstrng bstr_i
+BITCOUNT_ARGS   := 1125000
+
+## 03- SUSAN
+# smoothing: OK
+# edges: wrong results
+# corners: segfault
+
+SUSAN_BIN       := susan
+SUSAN_DIR       := automotive/susan
+SUSAN_MODS      := susan
+SUSAN_ARGS      := notests
+
+## 04- PATRICIA
+
+PATRICIA_BIN    := patricia
+PATRICIA_DIR    := network/patricia
+PATRICIA_MODS   := patricia patricia_test
+PATRICIA_ARGS   := $(MIBENCH)/$(PATRICIA_DIR)/large.udp
 
 ## 05- DIJKSTRA
+# OK
 
 DIJKSTRA_BIN    := dijkstra
 DIJKSTRA_DIR    := network/dijkstra
@@ -97,15 +135,16 @@ DIJKSTRA_MODS   := dijkstra_large
 DIJKSTRA_ARGS   := $(MIBENCH)/$(DIJKSTRA_DIR)/input.dat
 
 ## 11- CRC32
+# OK
 
-CRC32_BIN       := crc
+CRC32_BIN       := crc32
 CRC32_DIR       := telecomm/CRC32
 CRC32_MODS      := crc_32
 CRC32_ARGS      := $(MIBENCH)/telecomm/adpcm/data/large.pcm
 
 ##
 
-BENCHS          := DIJKSTRA CRC32
+BENCHS          := BASICMATH BITCOUNT SUSAN PATRICIA DIJKSTRA CRC32
 
 ###
 ### RULES
@@ -121,7 +160,7 @@ include $(TOPDIR)/make/rules.mk
 # 4: args
 define TEST2
 $(eval TEST2_BIN = $$($(1)_PREFIX)-$(3))
-test2-$(TEST2_BIN):
+test2-$(TEST2_BIN): $(2)$(TEST2_BIN)
 	$$($(1)_RUN) $(2)$(TEST2_BIN) $(4) | tee $(2)$(TEST2_BIN).out
 endef
 
@@ -155,10 +194,15 @@ $(BENCH_BIN): $(BENCH_OUT_DIR) rv32-$(BENCH_BIN) x86-$(BENCH_BIN) \
 clean-$(BENCH_BIN):
 	rm -rf $(BENCH_OUT_DIR)
 
+ifneq ($(BENCH_ARGS),notests)
 test-$(BENCH_BIN):
 	$(SCRIPTS_DIR)/measure.py $(BENCH_OUT_DIR) $(BENCH_BIN) $(BENCH_ARGS)
 
 $(foreach arch,RV32 X86,$(call TEST2,$(arch),$(BENCH_OUT_DIR),$(BENCH_BIN),$(BENCH_ARGS)))
+test2-$(BENCH_BIN): $(BENCH_OUT_DIR) \
+		$(foreach arch,RV32 X86,test2-$$($(arch)_PREFIX)-$(BENCH_BIN))
+	diff $(BENCH_OUT_DIR)rv32-$(BENCH_BIN).out $(BENCH_OUT_DIR)x86-$(BENCH_BIN).out
+endif
 endef
 
 
@@ -167,6 +211,31 @@ endef
 ###
 
 $(foreach bench,$(BENCHS),$(eval $(call BENCH,$(bench))))
+
+SUSAN_SRC_DIR := $(MIBENCH)/$(SUSAN_DIR)
+SUSAN_OUT_DIR := $(BUILD_MIBENCH)/$(SUSAN_DIR)
+SUSAN_INPUT   := $(SUSAN_SRC_DIR)/input_large.pgm
+RV32_SUSAN    := $(RV32_PREFIX)-$(SUSAN_BIN)
+X86_SUSAN     := $(X86_PREFIX)-$(SUSAN_BIN)
+SUSAN_BINS    := $(foreach bin,$(RV32_SUSAN) $(X86_SUSAN),$(SUSAN_OUT_DIR)/$(bin))
+
+# 1: name
+# 2: flag
+define SUSAN_TEST
+test2-susan-$(1): $(SUSAN_BINS)
+	cd $(SUSAN_OUT_DIR) && \
+		$(RV32_RUN) $(RV32_SUSAN) $(SUSAN_INPUT) rv32-output_large.$(1).pgm $(2)
+	cd $(SUSAN_OUT_DIR) && \
+		./$(X86_SUSAN) $(SUSAN_INPUT) x86-output_large.$(1).pgm $(2)
+	cd $(SUSAN_OUT_DIR) && \
+		diff rv32-output_large.$(1).pgm x86-output_large.$(1).pgm
+endef
+
+$(eval $(call SUSAN_TEST,smoothing,-s))
+$(eval $(call SUSAN_TEST,edges,-e))
+$(eval $(call SUSAN_TEST,corners,-c))
+
+test2-susan: $(foreach test,smoothing edges corners,test2-susan-$(test))
 
 ###
 
