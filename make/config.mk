@@ -49,16 +49,20 @@ X86_COUNTERS_O := $(SBT_SHARE_DIR)/x86-counters.o
 LOG               := $(SCRIPTS_DIR)/run.sh
 
 RV32_TRIPLE       := riscv32-unknown-elf
+RV64_LINUX_TRIPLE := riscv64-unknown-linux-gnu
 X86_64_TRIPLE     := x86_64-linux-gnu
 
 RV32_RUN          := LD_LIBRARY_PATH=$(TOOLCHAIN_RELEASE)/lib spike $(PK32)
+RV32_LINUX_RUN    := qemu-riscv32
 X86_RUN           :=
 
 RV32_PREFIX       := rv32
+RV32_LINUX_PREFIX := $(RV32_PREFIX)
 X86_PREFIX        := x86
 
 X86_MARCH         := x86
 RV32_MARCH        := riscv
+RV32_LINUX_MARCH  := $(RV32_MARCH)
 
 #
 # clang
@@ -66,6 +70,7 @@ RV32_MARCH        := riscv
 
 CLANG             := clang
 RV32_CLANG        := $(CLANG) --target=riscv -mriscv=RV32IMAFD
+RV32_LINUX_CLANG  := $(CLANG) --target=riscv -mriscv=RV32IMAFD
 X86_CLANG         := $(CLANG) --target=x86_64-unknown-linux-gnu -m32
 
 CLANG_FLAGS       := -fno-rtti -fno-exceptions
@@ -74,11 +79,16 @@ RV32_SYSROOT      := $(TOOLCHAIN_RELEASE)/$(RV32_TRIPLE)
 RV32_SYSROOT_FLAG := -isysroot $(RV32_SYSROOT) -isystem $(RV32_SYSROOT)/include
 RV32_CLANG_FLAGS   = $(RV32_SYSROOT_FLAG)
 
+RV64_LINUX_SYSROOT      := $(TOOLCHAIN_RELEASE)/sysroot
+RV64_LINUX_SYSROOT_FLAG := -isysroot $(RV64_LINUX_SYSROOT) -isystem $(RV64_LINUX_SYSROOT)/usr/include
+RV32_LINUX_CLANG_FLAGS   = $(RV64_LINUX_SYSROOT_FLAG) -D__riscv_xlen=32
+
 EMITLLVM          := -emit-llvm -c -O3 -mllvm -disable-llvm-optzns
 
 LLC               := llc
 LLC_FLAGS         := -relocation-model=static -O3 #-stats
 RV32_LLC_FLAGS    := -march=$(RV32_MARCH) -mcpu=RV32IMAFD
+RV32_LINUX_LLC_FLAGS := $(RV32_LLC_FLAGS)
 X86_LLC_FLAGS     := -march=$(X86_MARCH) -mattr=avx #-mattr=avx2
 
 LLVMOPT           := $(LLVM_INSTALL_DIR)/bin/opt
@@ -92,13 +102,17 @@ LLVMLINK          := $(LLVM_INSTALL_DIR)/bin/llvm-link
 #
 
 RV32_AS           := $(RV32_TRIPLE)-as
-X86_AS            := $(X86_64_TRIPLE)-as --32 -g
+RV64_LINUX_AS     := $(RV64_LINUX_TRIPLE)-as
+RV32_LINUX_AS     := $(RV64_LINUX_AS) -march=rv32g -mabi=ilp32d
+X86_AS            := $(X86_64_TRIPLE)-as --32 #-g
 
 #
 # LD
 #
 
 RV32_LD           := $(RV32_TRIPLE)-ld
+RV64_LINUX_LD     := $(RV64_LINUX_TRIPLE)-ld
+RV32_LINUX_LD     := $(RV64_LINUX_LD) -m elf32lriscv
 X86_LD            := $(X86_64_TRIPLE)-ld -m elf_i386
 
 # RISC-V 32 bit
@@ -109,6 +123,20 @@ RV32_CRT0         := $(RV32_LIB)/crt0.o
 RV32_LD_FLAGS0    := -L$(RV32_LIB) -L$(RV32_LIB_GCC) \
                      -dT ldscripts/elf32lriscv.x $(RV32_CRT0)
 RV32_LD_FLAGS1    := -lm -lc -lgloss -lc -lgcc
+
+RV32_LINUX_LIB       := $(RV64_LINUX_SYSROOT)/lib32/ilp32d
+RV32_LINUX_USR_LIB   := $(RV64_LINUX_SYSROOT)/usr/lib32/ilp32d
+RV32_LINUX_LIB_GCC   := $(TOOLCHAIN_RELEASE)/lib/gcc/$(RV64_LINUX_TRIPLE)/7.1.1/lib32/ilp32d
+RV32_LINUX_CRT1      := $(RV32_LINUX_USR_LIB)/crt1.o
+RV32_LINUX_CRTI      := $(RV32_LINUX_LIB_GCC)/crti.o
+RV32_LINUX_CRTN      := $(RV32_LINUX_LIB_GCC)/crtn.o
+RV32_LINUX_CRTBEGIN  := $(RV32_LINUX_LIB_GCC)/crtbeginT.o
+RV32_LINUX_CRTEND    := $(RV32_LINUX_LIB_GCC)/crtend.o
+RV32_LINUX_LD_FLAGS0 := -static -L$(RV32_LINUX_LIB_GCC) -L$(RV32_LINUX_USR_LIB) \
+                        $(RV32_LINUX_CRT1) $(RV32_LINUX_CRTI) $(RV32_LINUX_CRTBEGIN)
+RV32_LINUX_LD_FLAGS1 := -lm -lc -lgcc -lgcc_eh -lc \
+                        $(RV32_LINUX_CRTEND) $(RV32_LINUX_CRTN)
+
 
 # x86
 
@@ -121,8 +149,8 @@ X86_LGCC        := $(X86_LIB_GCC)/libgcc.a
 X86_LEH         := $(X86_LIB_GCC)/libgcc_eh.a
 X86_LC          := $(X86_LIB)/libc.a
 X86_LM          := $(X86_LIB)/libm.a
-X86_LD_FLAGS0   := $(X86_CRT1) $(X86_CRTI)
-X86_LD_FLAGS1   := $(X86_LM) $(X86_LC) $(X86_LGCC) $(X86_LEH) $(X86_LC) $(X86_CRTN)
+X86_LD_FLAGS0   := -static -L$(X86_LIB_GCC) $(X86_CRT1) $(X86_CRTI)
+X86_LD_FLAGS1   := -lm -lc -lgcc -lgcc_eh -lc $(X86_CRTN)
 
 #X86_CRTBEGIN    := $(X86_LIB_GCC)/crtbegin.o
 #X86_CRTEND      := $(X86_LIB_GCC)/crtend.o
@@ -134,7 +162,6 @@ X86_LD_FLAGS1   := $(X86_LM) $(X86_LC) $(X86_LGCC) $(X86_LEH) $(X86_LC) $(X86_CR
 
 RV32_LINUX_TRIPLE := riscv32-unknown-linux-gnu
 RV64_TRIPLE       := riscv64-unknown-elf
-RV64_LINUX_TRIPLE := riscv64-unknown-linux-gnu
 X86_TRIPLE        := i386-unknown-elf
 
 RV64_RUN          := LD_LIBRARY_PATH=$(TOOLCHAIN_RELEASE)/lib spike --isa=RV64IMAFDC pk

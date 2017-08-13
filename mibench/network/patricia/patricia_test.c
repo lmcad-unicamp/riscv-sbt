@@ -43,7 +43,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#include <rpc/rpc.h>
+/* #include <rpc/rpc.h> */
 #include <netinet/in.h>
 #include <arpa/inet.h>
 

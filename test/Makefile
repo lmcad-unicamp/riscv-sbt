@@ -1,6 +1,7 @@
 include $(TOPDIR)/make/config.mk
 
-BINS  := rv32-hello rv32-gcc-hello rv32-clang-hello x86-clang-hello
+BINS  := rv32-hello rv32-gcc-hello rv32-clang-hello x86-clang-hello \
+         rv32-linux-hello
 
 all:  $(BINS)
 
@@ -33,6 +34,9 @@ $(eval $(call CLEAN,./,rv32-clang-hello,clean.s))
 
 $(eval $(call BUILD,X86,./,./,hello,x86-clang-hello))
 $(eval $(call CLEAN,./,x86-clang-hello,clean.s))
+
+$(eval $(call BUILD,RV32_LINUX,./,./,hello,rv32-linux-hello))
+$(eval $(call CLEAN,./,rv32-linux-hello,clean.s))
 
 # run/clean
 

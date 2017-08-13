@@ -84,11 +84,12 @@ endif
 include $(TOPDIR)/make/config.mk
 
 
-MIBENCH       := $(TOPDIR)/mibench
-BUILD_MIBENCH := $(BUILD_DIR)/mibench
+MIBENCH         := $(TOPDIR)/mibench
+BUILD_MIBENCH   := $(BUILD_DIR)/mibench
 
-ARCHS = RV32 X86
-BENCH_TRANSLATE =
+RV32_ARCH       := RV32_LINUX
+ARCHS           := $(RV32_ARCH) X86
+BENCH_TRANSLATE  =
 
 ## 01- BASICMATH
 # runs OK
@@ -175,13 +176,13 @@ $(eval BENCH_ARGS = $($(1)_ARGS))
 
 $(call BUILD,X86,$(BENCH_SRC_DIR),$(BENCH_OUT_DIR),$(BENCH_MODS),x86-$(BENCH_BIN))
 
-$(call BUILD,RV32,$(BENCH_SRC_DIR),$(BENCH_OUT_DIR),$(BENCH_MODS),rv32-$(BENCH_BIN))
+$(call BUILD,$(RV32_ARCH),$(BENCH_SRC_DIR),$(BENCH_OUT_DIR),$(BENCH_MODS),rv32-$(BENCH_BIN))
 
 ifeq ($(BENCH_TRANSLATE),1)
-$(eval BENCH_RV32_CLANG_FLAGS = $(RV32_CLANG_FLAGS))
-$(eval RV32_CLANG_FLAGS = )
-$(call BUILDO,RV32,$(BENCH_SRC_DIR),$(BENCH_OUT_DIR),$(BENCH_MODS),rv32_x86-$(BENCH_BIN))
-$(eval RV32_CLANG_FLAGS = $(BENCH_RV32_CLANG_FLAGS))
+$(eval BENCH_$(RV32_ARCH)_CLANG_FLAGS = $($(RV32_ARCH)_CLANG_FLAGS))
+$(eval $(RV32_ARCH)_CLANG_FLAGS = )
+$(call BUILDO,$(RV32_ARCH),$(BENCH_SRC_DIR),$(BENCH_OUT_DIR),$(BENCH_MODS),rv32_x86-$(BENCH_BIN))
+$(eval $(RV32_ARCH)_CLANG_FLAGS = $(BENCH_$(RV32_ARCH)_CLANG_FLAGS))
 $(call TRANSLATE,X86,$(BENCH_SRC_DIR),$(BENCH_OUT_DIR),rv32_x86-$(BENCH_BIN),rv32-x86-$(BENCH_BIN))
 endif
 
@@ -198,9 +199,9 @@ ifneq ($(BENCH_ARGS),notests)
 test-$(BENCH_BIN):
 	$(SCRIPTS_DIR)/measure.py $(BENCH_OUT_DIR) $(BENCH_BIN) $(BENCH_ARGS)
 
-$(foreach arch,RV32 X86,$(call TEST2,$(arch),$(BENCH_OUT_DIR),$(BENCH_BIN),$(BENCH_ARGS)))
+$(foreach arch,$(ARCHS),$(call TEST2,$(arch),$(BENCH_OUT_DIR),$(BENCH_BIN),$(BENCH_ARGS)))
 test2-$(BENCH_BIN): $(BENCH_OUT_DIR) \
-		$(foreach arch,RV32 X86,test2-$$($(arch)_PREFIX)-$(BENCH_BIN))
+		$(foreach arch,$(ARCHS),test2-$$($(arch)_PREFIX)-$(BENCH_BIN))
 	diff $(BENCH_OUT_DIR)rv32-$(BENCH_BIN).out $(BENCH_OUT_DIR)x86-$(BENCH_BIN).out
 endif
 endef
@@ -224,7 +225,7 @@ SUSAN_BINS    := $(foreach bin,$(RV32_SUSAN) $(X86_SUSAN),$(SUSAN_OUT_DIR)/$(bin
 define SUSAN_TEST
 test2-susan-$(1): $(SUSAN_BINS)
 	cd $(SUSAN_OUT_DIR) && \
-		$(RV32_RUN) $(RV32_SUSAN) $(SUSAN_INPUT) rv32-output_large.$(1).pgm $(2)
+		$($(RV32_ARCH)_RUN) $(RV32_SUSAN) $(SUSAN_INPUT) rv32-output_large.$(1).pgm $(2)
 	cd $(SUSAN_OUT_DIR) && \
 		./$(X86_SUSAN) $(SUSAN_INPUT) x86-output_large.$(1).pgm $(2)
 	cd $(SUSAN_OUT_DIR) && \
