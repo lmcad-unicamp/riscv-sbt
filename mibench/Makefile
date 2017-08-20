@@ -92,8 +92,7 @@ ARCHS           := $(RV32_ARCH) X86
 BENCH_TRANSLATE  =
 
 ## 01- BASICMATH
-# runs OK
-# results WRONG
+# wrong results
 
 BASICMATH_BIN   := basicmath
 BASICMATH_DIR   := automotive/basicmath
@@ -101,8 +100,7 @@ BASICMATH_MODS  := basicmath_large rad2deg cubic isqrt
 BASICMATH_ARGS  :=
 
 ## 02- BITCOUNT
-# runs OK
-# results WRONG
+# wrong results
 
 BITCOUNT_BIN    := bitcount
 BITCOUNT_DIR    := automotive/bitcount
@@ -121,6 +119,7 @@ SUSAN_MODS      := susan
 SUSAN_ARGS      := notests
 
 ## 04- PATRICIA
+# wrong results
 
 PATRICIA_BIN    := patricia
 PATRICIA_DIR    := network/patricia
@@ -135,6 +134,25 @@ DIJKSTRA_DIR    := network/dijkstra
 DIJKSTRA_MODS   := dijkstra_large
 DIJKSTRA_ARGS   := $(MIBENCH)/$(DIJKSTRA_DIR)/input.dat
 
+## 06- RIJNDAEL
+# OK
+
+RIJNDAEL_BIN    := rijndael
+RIJNDAEL_DIR    := security/rijndael
+RIJNDAEL_MODS   := aes aesxam
+RIJNDAEL_ARGS   := notests
+
+## 07- BLOWFISH
+
+BLOWFISH_BIN          := blowfish
+BLOWFISH_DIR          := security/blowfish
+BLOWFISH_OBJS         := bf_skey bf_ecb bf_enc bf_cbc bf_cfb64 bf_ofb64
+BLOWFISH_BF           := bf
+BLOWFISH_BFTEST       := bftest
+BLOWFISH_BFSPEED      := bfspeed
+BLOWFISH_MODS         :=
+BLOWFISH_ARGS         := notests
+
 ## 11- CRC32
 # OK
 
@@ -145,7 +163,8 @@ CRC32_ARGS      := $(MIBENCH)/telecomm/adpcm/data/large.pcm
 
 ##
 
-BENCHS          := BASICMATH BITCOUNT SUSAN PATRICIA DIJKSTRA CRC32
+BENCHS          := BASICMATH BITCOUNT SUSAN PATRICIA RIJNDAEL BLOWFISH \
+                   DIJKSTRA CRC32
 
 ###
 ### RULES
@@ -211,7 +230,75 @@ endef
 ### GEN RULES
 ###
 
-$(foreach bench,$(BENCHS),$(eval $(call BENCH,$(bench))))
+$(foreach bench,$(filter-out BLOWFISH,$(BENCHS)),$(eval $(call BENCH,$(bench))))
+
+###
+### BLOWFISH
+###
+
+BF_SRC_DIR := $(MIBENCH)/$(BLOWFISH_DIR)/
+BF_OUT_DIR := $(BUILD_MIBENCH)/$(BLOWFISH_DIR)/
+BF_OBJS    := $(BLOWFISH_OBJS)
+
+$(BF_OUT_DIR):
+	mkdir -p $(BF_OUT_DIR)
+
+# build BF common bcs
+# 1: arch
+define BF_BUILD1
+$(eval BF_PREFIX = $($(1)_PREFIX))
+$(eval BF_BLIB = $(BF_PREFIX)-blib)
+
+$(call BUILD2,$(1),$(BF_SRC_DIR),$(BF_OUT_DIR),$(BF_OBJS),$(BF_BLIB))
+endef
+
+# build 1 BF bin
+# 1: arch
+# 2: bin
+define BF_BUILD2
+$(eval BF_PREFIX = $($(1)_PREFIX))
+$(eval BF_BIN = $(BF_PREFIX)-$(2))
+$(eval BF_BLIB = $(BF_PREFIX)-blib)
+
+$(call BUILD2,$(1),$(BF_SRC_DIR),$(BF_OUT_DIR),$(2),$(BF_BIN)_bc1)
+$(call LLLINK,$(1),$(BF_OUT_DIR),$(BF_BIN)_bc1 $(BF_BLIB),$(BF_BIN))
+$(call DIS,$(1),$(BF_OUT_DIR),$(BF_BIN))
+$(call BUILD3,$(1),$(BF_OUT_DIR),$(BF_OUT_DIR),$(BF_BIN),$(BF_BIN))
+$(call CBUILDS,$(1),$(BF_OUT_DIR),$(BF_OUT_DIR),$(BF_BIN),$(BF_BIN))
+endef
+
+define BF_BUILDxxx
+$(eval BF_BINS = $(BLOWFISH_BF) $(BLOWFISH_BFTEST) $(BLOWFISH_BFSPEED))
+
+$(call BF_BUILD1,$(1))
+$(foreach bin,$(BF_BINS),$(call BF_BUILD2,$(1),$(bin)))
+
+$(eval BF_PREFIX = $($(1)_PREFIX))
+
+$(BF_PREFIX)-$(BLOWFISH_BIN): $(BF_OUT_DIR) \
+                              $(addprefix $(BF_OUT_DIR)$(BF_PREFIX)-,$(BF_BINS))
+endef
+
+define BF_BUILD
+$(eval BF_PREFIX = $($(1)_PREFIX))
+$(eval BF_BIN = $(BF_PREFIX)-$(BLOWFISH_BF))
+
+$(call GCC_BUILD,$(1),$(BF_SRC_DIR),$(BF_OUT_DIR),$(BLOWFISH_BF) $(BF_OBJS),$(BF_BIN))
+
+$(BF_PREFIX)-$(BLOWFISH_BIN): $(BF_OUT_DIR) $(addprefix $(BF_OUT_DIR),$(BF_BIN))
+endef
+
+
+$(foreach arch,$(ARCHS),$(eval $(call BF_BUILD,$(arch))))
+
+$(BLOWFISH_BIN): $(foreach arch,$(ARCHS),$($(arch)_PREFIX)-$(BLOWFISH_BIN))
+
+clean-$(BLOWFISH_BIN):
+	rm -rf $(BF_OUT_DIR)
+
+###
+### SUSAN TESTS
+###
 
 SUSAN_SRC_DIR := $(MIBENCH)/$(SUSAN_DIR)
 SUSAN_OUT_DIR := $(BUILD_MIBENCH)/$(SUSAN_DIR)
@@ -237,6 +324,90 @@ $(eval $(call SUSAN_TEST,edges,-e))
 $(eval $(call SUSAN_TEST,corners,-c))
 
 test2-susan: $(foreach test,smoothing edges corners,test2-susan-$(test))
+
+###
+### RIJNDAEL TESTS
+###
+
+RIJNDAEL_SRC_DIR       := $(MIBENCH)/$(RIJNDAEL_DIR)
+RIJNDAEL_OUT_DIR       := $(BUILD_MIBENCH)/$(RIJNDAEL_DIR)
+RV32_RIJNDAEL_INPUT_E  := $(RIJNDAEL_SRC_DIR)/input_large.asc
+RV32_RIJNDAEL_OUTPUT_E := $(RIJNDAEL_OUT_DIR)/$($(RV32_ARCH)_PREFIX)-output_large.enc
+RV32_RIJNDAEL_INPUT_D  := $(RV32_RIJNDAEL_OUTPUT_E)
+RV32_RIJNDAEL_OUTPUT_D := $(RIJNDAEL_OUT_DIR)/$($(RV32_ARCH)_PREFIX)-output_large.dec
+RV32_RIJNDAEL          := $($(RV32_ARCH)_PREFIX)-$(RIJNDAEL_BIN)
+X86_RIJNDAEL_INPUT_E   := $(RIJNDAEL_SRC_DIR)/input_large.asc
+X86_RIJNDAEL_OUTPUT_E  := $(RIJNDAEL_OUT_DIR)/$(X86_PREFIX)-output_large.enc
+X86_RIJNDAEL_INPUT_D   := $(X86_RIJNDAEL_OUTPUT_E)
+X86_RIJNDAEL_OUTPUT_D  := $(RIJNDAEL_OUT_DIR)/$(X86_PREFIX)-output_large.dec
+X86_RIJNDAEL           := $(X86_PREFIX)-$(RIJNDAEL_BIN)
+RIJNDAEL_BINS          := $(foreach bin,$(RV32_RIJNDAEL) $(X86_RIJNDAEL),$(RIJNDAEL_OUT_DIR)/$(bin))
+
+define RIJNDAEL_TEST
+$(eval RIJNDAEL_TEST_SUFFIX = $(shell echo -n $(2) | tr a-z A-Z))
+test2-rijndael-$(1): $(RIJNDAEL_BINS)
+	cd $(RIJNDAEL_OUT_DIR) && \
+		$($(RV32_ARCH)_RUN) $(RV32_RIJNDAEL) \
+		$(RV32_RIJNDAEL_INPUT_$(RIJNDAEL_TEST_SUFFIX)) \
+		$(RV32_RIJNDAEL_OUTPUT_$(RIJNDAEL_TEST_SUFFIX)) \
+		$(2) 1234567890abcdeffedcba09876543211234567890abcdeffedcba0987654321
+	cd $(RIJNDAEL_OUT_DIR) && \
+		./$(X86_RIJNDAEL) \
+		$(X86_RIJNDAEL_INPUT_$(RIJNDAEL_TEST_SUFFIX)) \
+		$(X86_RIJNDAEL_OUTPUT_$(RIJNDAEL_TEST_SUFFIX)) \
+		$(2) 1234567890abcdeffedcba09876543211234567890abcdeffedcba0987654321
+	cd $(RIJNDAEL_OUT_DIR) && \
+		diff \
+		$(RV32_RIJNDAEL_OUTPUT_$(RIJNDAEL_TEST_SUFFIX)) \
+		$(X86_RIJNDAEL_OUTPUT_$(RIJNDAEL_TEST_SUFFIX))
+endef
+
+$(eval $(call RIJNDAEL_TEST,enc,e))
+$(eval $(call RIJNDAEL_TEST,dec,d))
+
+test2-rijndael: $(foreach test,enc dec,test2-rijndael-$(test))
+
+###
+### BLOWFISH TESTS
+###
+
+BLOWFISH_SRC_DIR       := $(MIBENCH)/$(BLOWFISH_DIR)
+BLOWFISH_OUT_DIR       := $(BUILD_MIBENCH)/$(BLOWFISH_DIR)
+RV32_BLOWFISH_INPUT_E  := $(BLOWFISH_SRC_DIR)/input_large.asc
+RV32_BLOWFISH_OUTPUT_E := $(BLOWFISH_OUT_DIR)/$($(RV32_ARCH)_PREFIX)-output_large.enc
+RV32_BLOWFISH_INPUT_D  := $(RV32_BLOWFISH_OUTPUT_E)
+RV32_BLOWFISH_OUTPUT_D := $(BLOWFISH_OUT_DIR)/$($(RV32_ARCH)_PREFIX)-output_large.asc
+RV32_BLOWFISH          := $($(RV32_ARCH)_PREFIX)-$(BLOWFISH_BF)
+X86_BLOWFISH_INPUT_E   := $(BLOWFISH_SRC_DIR)/input_large.asc
+X86_BLOWFISH_OUTPUT_E  := $(BLOWFISH_OUT_DIR)/$(X86_PREFIX)-output_large.enc
+X86_BLOWFISH_INPUT_D   := $(X86_BLOWFISH_OUTPUT_E)
+X86_BLOWFISH_OUTPUT_D  := $(BLOWFISH_OUT_DIR)/$(X86_PREFIX)-output_large.asc
+X86_BLOWFISH           := $(X86_PREFIX)-$(BLOWFISH_BF)
+BLOWFISH_BINS          := $(foreach bin,$(RV32_BLOWFISH) $(X86_BLOWFISH),$(BLOWFISH_OUT_DIR)/$(bin))
+
+define BLOWFISH_TEST
+$(eval BLOWFISH_TEST_SUFFIX = $(shell echo -n $(2) | tr a-z A-Z))
+test2-blowfish-$(1): $(BLOWFISH_BINS)
+	cd $(BLOWFISH_OUT_DIR) && \
+		$($(RV32_ARCH)_RUN) $(RV32_BLOWFISH) $(2) \
+		$(RV32_BLOWFISH_INPUT_$(BLOWFISH_TEST_SUFFIX)) \
+		$(RV32_BLOWFISH_OUTPUT_$(BLOWFISH_TEST_SUFFIX)) \
+		1234567890abcdeffedcba0987654321
+	cd $(BLOWFISH_OUT_DIR) && \
+		./$(X86_BLOWFISH) $(2) \
+		$(X86_BLOWFISH_INPUT_$(BLOWFISH_TEST_SUFFIX)) \
+		$(X86_BLOWFISH_OUTPUT_$(BLOWFISH_TEST_SUFFIX)) \
+		1234567890abcdeffedcba0987654321
+	cd $(BLOWFISH_OUT_DIR) && \
+		diff \
+		$(RV32_BLOWFISH_OUTPUT_$(BLOWFISH_TEST_SUFFIX)) \
+		$(X86_BLOWFISH_OUTPUT_$(BLOWFISH_TEST_SUFFIX))
+endef
+
+$(eval $(call BLOWFISH_TEST,enc,e))
+$(eval $(call BLOWFISH_TEST,dec,d))
+
+test2-blowfish: $(foreach test,enc dec,test2-blowfish-$(test))
 
 ###
 

@@ -65,6 +65,14 @@ RV32_MARCH        := riscv
 RV32_LINUX_MARCH  := $(RV32_MARCH)
 
 #
+# gcc
+#
+
+RV32_GCC       := $(RV32_TRIPLE)-gcc
+RV32_LINUX_GCC := $(RV64_LINUX_TRIPLE)-gcc -march=rv32g -mabi=ilp32d
+X86_GCC        := gcc -m32
+
+#
 # clang
 #
 
@@ -145,15 +153,14 @@ X86_LIB_GCC     := /usr/lib/gcc/$(X86_64_TRIPLE)/4.9.2/32
 X86_CRT1        := $(X86_LIB)/crt1.o
 X86_CRTI        := $(X86_LIB)/crti.o
 X86_CRTN        := $(X86_LIB)/crtn.o
+X86_CRTBEGIN    := $(X86_LIB_GCC)/crtbegin.o
+X86_CRTEND      := $(X86_LIB_GCC)/crtend.o
 X86_LGCC        := $(X86_LIB_GCC)/libgcc.a
 X86_LEH         := $(X86_LIB_GCC)/libgcc_eh.a
-X86_LC          := $(X86_LIB)/libc.a
-X86_LM          := $(X86_LIB)/libm.a
-X86_LD_FLAGS0   := -static -L$(X86_LIB_GCC) $(X86_CRT1) $(X86_CRTI)
-X86_LD_FLAGS1   := -lm -lc -lgcc -lgcc_eh -lc $(X86_CRTN)
-
-#X86_CRTBEGIN    := $(X86_LIB_GCC)/crtbegin.o
-#X86_CRTEND      := $(X86_LIB_GCC)/crtend.o
+X86_LD_FLAGS0   := -static -L$(X86_LIB_GCC) \
+                   $(X86_CRT1) $(X86_CRTI) $(X86_CRTBEGIN)
+X86_LD_FLAGS1   := -lm -lc -lgcc -lgcc_eh -lc \
+                   $(X86_CRTEND) $(X86_CRTN)
 
 
 #

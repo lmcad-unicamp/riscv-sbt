@@ -61,7 +61,7 @@ cc:
 	$(MAKE) CC=cc CFLAGS="-O $(OPTS) $(CFLAG)" all
 
 gcc:
-	$(MAKE) CC=gcc CFLAGS="-O3 -fomit-frame-pointer $(OPTS) $(CFLAG)" all
+	$(MAKE) CC="gcc -m32" CFLAGS="-O3 -fomit-frame-pointer $(OPTS) $(CFLAG)" all
 
 x86-elf:
 	$(MAKE) BF_ENC='asm/bx86-elf.o' CC=$(CC) CFLAGS="-DELF $(OPTS) $(CFLAG)" all

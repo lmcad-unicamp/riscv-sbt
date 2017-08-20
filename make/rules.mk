@@ -61,6 +61,20 @@ $(2)$(4).s: $(2)$(3).bc $(2)$(3).ll
 endef
 
 
+# C2O
+# 1: arch
+# 2: source dir/
+# 3: out dir/
+# 4: input (.c)
+# 5: output (.o)
+define C2O
+$(3)$(5).o: $(2)$(4).c
+	cd $(3) && \
+		$($(1)_GCC) -static -O3 -fomit-frame-pointer -c $(2)$(4).c -o $(5).o
+
+endef
+
+
 # S2O
 # 1: arch
 # 2: source dir/
@@ -100,6 +114,24 @@ $(2)$(4): $(addprefix $(2),$(CL_OBJS))
 	$$($(1)_LD) -o $$@ \
 		$$($(1)_LD_FLAGS0) $(CL_OBJS) $(5) \
 		$$($(1)_LD_FLAGS1)
+endef
+
+define CLINKS
+$(eval CL_SRCS = $(addsuffix .s,$(3)))
+
+$(2)$(4): $(addprefix $(2),$(CL_SRCS))
+	cd $(2) && \
+		$($(1)_GCC) -static -O3 -o $$@ $(CL_SRCS) $(5)
+endef
+
+define GCC_LINK
+$(eval CL_OBJS = $(addsuffix .o,$(3)))
+
+$(warning $(2)$(4):)
+$(2)$(4): $(addprefix $(2),$(CL_OBJS))
+	cd $(2) && \
+		$($(1)_GCC) -static -o $(4) $(CL_OBJS) $(5)
+
 endef
 
 
@@ -170,24 +202,34 @@ $(call C2BC,$(1),$(2),$(3),$(4),$(5))
 $(call DIS,$(1),$(3),$(5))
 endef
 
-define BUILD1
-$(eval BUILD1_PREFIX = $($(1)_PREFIX))
+# multi C2BC and link
+define BUILD2
+$(eval BUILD2_PREFIX = $($(1)_PREFIX))
 
 ifeq ($(words $(4)),1)
 $(call C2BC,$(1),$(2),$(3),$(4),$(5))
 else
 $(foreach c,$(4),\
-$(call C2BCNDIS,$(1),$(2),$(3),$(c),$(BUILD1_PREFIX)-$(c)_bc1))
+$(call C2BCNDIS,$(1),$(2),$(3),$(c),$(BUILD2_PREFIX)-$(c)_bc1))
 
-$(call LLLINK,$(1),$(3),$(foreach bc,$(4),$(BUILD1_PREFIX)-$(bc)_bc1),$(5))
+$(call LLLINK,$(1),$(3),$(foreach bc,$(4),$(BUILD2_PREFIX)-$(bc)_bc1),$(5))
 endif
 
 $(call DIS,$(1),$(3),$(5))
+endef
+
+# OPT/DIS x2 then BC2S
+define BUILD3
 $(call OPT,$(1),$(3),$(5),$(5).opt)
 $(call DIS,$(1),$(3),$(5).opt)
 $(call OPT,$(1),$(3),$(5).opt,$(5).opt2)
 $(call DIS,$(1),$(3),$(5).opt2)
 $(call BC2S,$(1),$(3),$(5).opt2,$(5))
+endef
+
+define BUILD1
+$(call BUILD2,$(1),$(2),$(3),$(4),$(5),$(6))
+$(call BUILD3,$(1),$(2),$(3),$(4),$(5),$(6))
 endef
 
 define BUILDS
@@ -197,9 +239,15 @@ $(call RUN,$(1),$(3),$(5),save-run.out)
 $(call ALIAS,$(3),$(5))
 endef
 
+#define CBUILDS
+#$(call S2O,$(1),$(2),$(3),$(5))
+#$(call CLINK,$(1),$(3),$(5),$(5),$(6))
+#$(call RUN,$(1),$(3),$(5),save-run.out)
+#$(call ALIAS,$(3),$(5))
+#endef
+
 define CBUILDS
-$(call S2O,$(1),$(2),$(3),$(5))
-$(call CLINK,$(1),$(3),$(5),$(5),$(6))
+$(call CLINKS,$(1),$(3),$(5),$(5),$(6))
 $(call RUN,$(1),$(3),$(5),save-run.out)
 $(call ALIAS,$(3),$(5))
 endef
@@ -209,6 +257,13 @@ $(call BUILD1,$(1),$(2),$(3),$(4),$(5),$(6))
 $(call CBUILDS,$(1),$(3),$(3),$(5),$(5),$(6))
 endef
 
+define GCC_BUILD
+$(eval BUILD_PREFIX = $($(1)_PREFIX))
+$(eval $(foreach c,$(4),\
+$(call C2O,$(1),$(2),$(3),$(c),$(BUILD_PREFIX)-$(c))))
+
+$(call GCC_LINK,$(1),$(3),$(addprefix $(BUILD_PREFIX)-,$(4)),$(5),)
+endef
 
 # build object file
 # optimize only one time
