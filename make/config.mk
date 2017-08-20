@@ -72,6 +72,10 @@ RV32_GCC       := $(RV32_TRIPLE)-gcc
 RV32_LINUX_GCC := $(RV64_LINUX_TRIPLE)-gcc -march=rv32g -mabi=ilp32d
 X86_GCC        := gcc -m32
 
+GCC_CFLAGS     := -static -O3
+# debug
+# GCC_CFLAGS     := -static -O0 -g
+
 #
 # clang
 #

@@ -90,6 +90,7 @@ BUILD_MIBENCH   := $(BUILD_DIR)/mibench
 RV32_ARCH       := RV32_LINUX
 ARCHS           := $(RV32_ARCH) X86
 BENCH_TRANSLATE  =
+BENCH_GCC_BUILD := 1
 
 ## 01- BASICMATH
 # wrong results
@@ -106,7 +107,7 @@ BITCOUNT_BIN    := bitcount
 BITCOUNT_DIR    := automotive/bitcount
 BITCOUNT_MODS   := bitcnt_1 bitcnt_2 bitcnt_3 bitcnt_4 \
                    bitcnts bitfiles bitstrng bstr_i
-BITCOUNT_ARGS   := 1125000
+BITCOUNT_ARGS   := 1125000 | sed 's/Time:[^;]*; //;/^Best/d;/^Worst/d'
 
 ## 03- SUSAN
 # smoothing: OK
@@ -143,6 +144,7 @@ RIJNDAEL_MODS   := aes aesxam
 RIJNDAEL_ARGS   := notests
 
 ## 07- BLOWFISH
+# wrong results
 
 BLOWFISH_BIN          := blowfish
 BLOWFISH_DIR          := security/blowfish
@@ -178,8 +180,9 @@ include $(TOPDIR)/make/rules.mk
 # 2: dir/
 # 3: bin
 # 4: args
+# 5: prefix suffix (eg: gcc-)
 define TEST2
-$(eval TEST2_BIN = $$($(1)_PREFIX)-$(3))
+$(eval TEST2_BIN = $$($(1)_PREFIX)-$(5)$(3))
 test2-$(TEST2_BIN): $(2)$(TEST2_BIN)
 	$$($(1)_RUN) $(2)$(TEST2_BIN) $(4) | tee $(2)$(TEST2_BIN).out
 endef
@@ -195,6 +198,9 @@ $(eval BENCH_ARGS = $($(1)_ARGS))
 
 $(call BUILD,X86,$(BENCH_SRC_DIR),$(BENCH_OUT_DIR),$(BENCH_MODS),x86-$(BENCH_BIN))
 
+$(if $(BENCH_GCC_BUILD),\
+$(call GCC_BUILD,$(RV32_ARCH),$(BENCH_SRC_DIR),$(BENCH_OUT_DIR),$(BENCH_MODS),rv32-gcc-$(BENCH_BIN)))
+
 $(call BUILD,$(RV32_ARCH),$(BENCH_SRC_DIR),$(BENCH_OUT_DIR),$(BENCH_MODS),rv32-$(BENCH_BIN))
 
 ifeq ($(BENCH_TRANSLATE),1)
@@ -208,7 +214,9 @@ endif
 $(BENCH_OUT_DIR):
 	mkdir -p $(BENCH_OUT_DIR)
 
-$(BENCH_BIN): $(BENCH_OUT_DIR) rv32-$(BENCH_BIN) x86-$(BENCH_BIN) \
+$(BENCH_BIN): $(BENCH_OUT_DIR) \
+    rv32-$(BENCH_BIN) x86-$(BENCH_BIN) \
+    $(if $(BENCH_GCC_BUILD),rv32-gcc-$(BENCH_BIN),) \
     $(if $(BENCH_TRANSLATE),rv32-x86-$(BENCH_BIN),)
 
 clean-$(BENCH_BIN):
@@ -218,10 +226,20 @@ ifneq ($(BENCH_ARGS),notests)
 test-$(BENCH_BIN):
 	$(SCRIPTS_DIR)/measure.py $(BENCH_OUT_DIR) $(BENCH_BIN) $(BENCH_ARGS)
 
-$(foreach arch,$(ARCHS),$(call TEST2,$(arch),$(BENCH_OUT_DIR),$(BENCH_BIN),$(BENCH_ARGS)))
+$(foreach arch,$(ARCHS),$(call TEST2,$(arch),$(BENCH_OUT_DIR),$(BENCH_BIN),$(BENCH_ARGS),))
 test2-$(BENCH_BIN): $(BENCH_OUT_DIR) \
 		$(foreach arch,$(ARCHS),test2-$$($(arch)_PREFIX)-$(BENCH_BIN))
 	diff $(BENCH_OUT_DIR)rv32-$(BENCH_BIN).out $(BENCH_OUT_DIR)x86-$(BENCH_BIN).out
+
+$(if $(BENCH_GCC_BUILD),\
+$(call TEST2,$(RV32_ARCH),$(BENCH_OUT_DIR),$(BENCH_BIN),$(BENCH_ARGS),gcc-))
+
+ifeq ($(BENCH_GCC_BUILD),1)
+test2-gcc-$(BENCH_BIN): $(BENCH_OUT_DIR) \
+		$(foreach pref,rv32-gcc x86,test2-$(pref)-$(BENCH_BIN))
+	diff $(BENCH_OUT_DIR)rv32-gcc-$(BENCH_BIN).out $(BENCH_OUT_DIR)x86-$(BENCH_BIN).out
+endif
+
 endif
 endef
 
@@ -267,7 +285,7 @@ $(call BUILD3,$(1),$(BF_OUT_DIR),$(BF_OUT_DIR),$(BF_BIN),$(BF_BIN))
 $(call CBUILDS,$(1),$(BF_OUT_DIR),$(BF_OUT_DIR),$(BF_BIN),$(BF_BIN))
 endef
 
-define BF_BUILDxxx
+define BF_BUILD_ALL_TESTS
 $(eval BF_BINS = $(BLOWFISH_BF) $(BLOWFISH_BFTEST) $(BLOWFISH_BFSPEED))
 
 $(call BF_BUILD1,$(1))
@@ -280,6 +298,15 @@ $(BF_PREFIX)-$(BLOWFISH_BIN): $(BF_OUT_DIR) \
 endef
 
 define BF_BUILD
+$(eval BF_PREFIX = $($(1)_PREFIX))
+$(eval BF_BIN = $(BF_PREFIX)-$(BLOWFISH_BF))
+
+$(call BUILD,$(1),$(BF_SRC_DIR),$(BF_OUT_DIR),$(BLOWFISH_BF) $(BF_OBJS),$(BF_BIN))
+
+$(BF_PREFIX)-$(BLOWFISH_BIN): $(BF_OUT_DIR) $(addprefix $(BF_OUT_DIR),$(BF_BIN))
+endef
+
+define BF_BUILD_GCC
 $(eval BF_PREFIX = $($(1)_PREFIX))
 $(eval BF_BIN = $(BF_PREFIX)-$(BLOWFISH_BF))
 
@@ -383,7 +410,7 @@ X86_BLOWFISH_OUTPUT_E  := $(BLOWFISH_OUT_DIR)/$(X86_PREFIX)-output_large.enc
 X86_BLOWFISH_INPUT_D   := $(X86_BLOWFISH_OUTPUT_E)
 X86_BLOWFISH_OUTPUT_D  := $(BLOWFISH_OUT_DIR)/$(X86_PREFIX)-output_large.asc
 X86_BLOWFISH           := $(X86_PREFIX)-$(BLOWFISH_BF)
-BLOWFISH_BINS          := $(foreach bin,$(RV32_BLOWFISH) $(X86_BLOWFISH),$(BLOWFISH_OUT_DIR)/$(bin))
+BLOWFISH_BINS          := $(RV32_BLOWFISH) $(X86_BLOWFISH)
 
 define BLOWFISH_TEST
 $(eval BLOWFISH_TEST_SUFFIX = $(shell echo -n $(2) | tr a-z A-Z))
@@ -392,12 +419,14 @@ test2-blowfish-$(1): $(BLOWFISH_BINS)
 		$($(RV32_ARCH)_RUN) $(RV32_BLOWFISH) $(2) \
 		$(RV32_BLOWFISH_INPUT_$(BLOWFISH_TEST_SUFFIX)) \
 		$(RV32_BLOWFISH_OUTPUT_$(BLOWFISH_TEST_SUFFIX)) \
-		1234567890abcdeffedcba0987654321
+		1234567890abcdeffedcba0987654321; \
+		[ $$$$? -eq 1 ]
 	cd $(BLOWFISH_OUT_DIR) && \
 		./$(X86_BLOWFISH) $(2) \
 		$(X86_BLOWFISH_INPUT_$(BLOWFISH_TEST_SUFFIX)) \
 		$(X86_BLOWFISH_OUTPUT_$(BLOWFISH_TEST_SUFFIX)) \
-		1234567890abcdeffedcba0987654321
+		1234567890abcdeffedcba0987654321; \
+		[ $$$$? -eq 1 ]
 	cd $(BLOWFISH_OUT_DIR) && \
 		diff \
 		$(RV32_BLOWFISH_OUTPUT_$(BLOWFISH_TEST_SUFFIX)) \

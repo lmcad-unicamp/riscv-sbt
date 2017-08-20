@@ -12,6 +12,7 @@ $(eval C2BC_CLANG_FLAGS = $$($(1)_CLANG_FLAGS))
 $(3)$(5).bc: $(2)$(4).c
 	cd $(3) && \
 		$$($(1)_CLANG) $(C2BC_CLANG_FLAGS) $(EMITLLVM) $(2)$(4).c -o $(5).bc
+
 endef
 
 
@@ -24,6 +25,7 @@ define LLLINK
 $(2)$(4).bc: $(foreach bc,$(3),$(2)$(bc).bc)
 	cd $(2) && \
 		$(LLVMLINK) $(foreach bc,$(3),$(bc).bc) -o $(4).bc
+
 endef
 
 # DIS
@@ -34,6 +36,7 @@ define DIS
 $(2)$(3).ll: $(2)$(3).bc
 	cd $(2) && \
 		$(LLVMDIS) $(3).bc -o $(3).ll
+
 endef
 
 
@@ -46,6 +49,7 @@ define OPT
 $(2)$(4).bc: $(2)$(3).bc $(2)$(3).ll
 	cd $(2) && \
 		$(LLVMOPT) $(LLVMOPT_FLAGS) $(3).bc -o $(4).bc
+
 endef
 
 
@@ -58,22 +62,8 @@ define BC2S
 $(2)$(4).s: $(2)$(3).bc $(2)$(3).ll
 	cd $(2) && \
 		$(LLC) $(LLC_FLAGS) $($(1)_LLC_FLAGS) $(3).bc -o $(4).s
-endef
-
-
-# C2O
-# 1: arch
-# 2: source dir/
-# 3: out dir/
-# 4: input (.c)
-# 5: output (.o)
-define C2O
-$(3)$(5).o: $(2)$(4).c
-	cd $(3) && \
-		$($(1)_GCC) -static -O3 -fomit-frame-pointer -c $(2)$(4).c -o $(5).o
 
 endef
-
 
 # S2O
 # 1: arch
@@ -84,6 +74,7 @@ define S2O
 $(3)$(4).o: $(2)$(4).s
 	cd $(3) && \
 		$$($(1)_AS) -o $(4).o -c $(2)$(4).s
+
 endef
 
 
@@ -97,6 +88,7 @@ define LINK
 $(2)$(4): $(addprefix $(2),$(addsuffix .o,$(3)))
 	cd $(2) && \
 		$$($(1)_LD) -o $(4) $(addsuffix .o,$(3)) $(5)
+
 endef
 
 
@@ -114,6 +106,7 @@ $(2)$(4): $(addprefix $(2),$(CL_OBJS))
 	$$($(1)_LD) -o $$@ \
 		$$($(1)_LD_FLAGS0) $(CL_OBJS) $(5) \
 		$$($(1)_LD_FLAGS1)
+
 endef
 
 define CLINKS
@@ -121,16 +114,37 @@ $(eval CL_SRCS = $(addsuffix .s,$(3)))
 
 $(2)$(4): $(addprefix $(2),$(CL_SRCS))
 	cd $(2) && \
-		$($(1)_GCC) -static -O3 -o $$@ $(CL_SRCS) $(5)
+		$($(1)_GCC) $(GCC_CFLAGS) -o $$@ $(CL_SRCS) $(5) -lm
+
 endef
 
+
+# C2O
+# 1: arch
+# 2: source dir/
+# 3: out dir/
+# 4: input (.c)
+# 5: output (.o)
+define GCC_C2O
+$(3)$(5).o: $(2)$(4).c
+	cd $(3) && \
+		$($(1)_GCC) $(GCC_CFLAGS) -c $(2)$(4).c -o $(5).o
+
+endef
+
+
+# CLINK
+# 1: arch
+# 2: dir/
+# 3: objs
+# 4: output
+# 5: libs
 define GCC_LINK
 $(eval CL_OBJS = $(addsuffix .o,$(3)))
 
-$(warning $(2)$(4):)
 $(2)$(4): $(addprefix $(2),$(CL_OBJS))
 	cd $(2) && \
-		$($(1)_GCC) -static -o $(4) $(CL_OBJS) $(5)
+		$($(1)_GCC) $(GCC_CFLAGS) -o $(4) $(CL_OBJS) $(5) -lm
 
 endef
 
@@ -145,7 +159,7 @@ clean-$(2):
 	cd $(1) && \
 		rm -f $(2) $(2).o $(if $(3),$(2).s,) $(2).bc $(2).ll \
 			$(2).opt.bc $(2).opt.ll $(2).opt2.bc $(2).opt2.ll $(2).out
-###
+
 endef
 
 
@@ -162,6 +176,7 @@ run-$(3): $(2)$(3)
   else
 	$$($(1)_RUN) $(2)$(3) | tee $(2)$(3).out
   endif
+
 endef
 
 
@@ -173,6 +188,7 @@ ifneq ($(1),./)
 .PHONY: $(2)
 $(2): $(1) $(1)$(2)
 endif
+
 endef
 
 
@@ -186,6 +202,7 @@ $(eval TEST_TRANS = $(RV32_PREFIX)-$($(1)_PREFIX)-$(3))
 
 test-$(3): run-$(TEST_RV32) run-$(TEST_TRANS)
 	diff $(2)$(TEST_RV32).out $(2)$(TEST_TRANS).out
+
 endef
 
 
@@ -260,9 +277,11 @@ endef
 define GCC_BUILD
 $(eval BUILD_PREFIX = $($(1)_PREFIX))
 $(eval $(foreach c,$(4),\
-$(call C2O,$(1),$(2),$(3),$(c),$(BUILD_PREFIX)-$(c))))
+$(call GCC_C2O,$(1),$(2),$(3),$(c),$(BUILD_PREFIX)-$(c))))
 
 $(call GCC_LINK,$(1),$(3),$(addprefix $(BUILD_PREFIX)-,$(4)),$(5),)
+$(call RUN,$(1),$(3),$(5),save-run.out)
+$(call ALIAS,$(3),$(5))
 endef
 
 # build object file
@@ -286,6 +305,7 @@ define TRANSLATE_OBJ
 $(2)$(4).bc: $(2)$(3).o
 	cd $(2) && \
 		riscv-sbt $(SBTFLAGS) -o $(4).bc $(3).o
+
 endef
 
 
