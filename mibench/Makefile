@@ -95,7 +95,7 @@ BENCH_GCC_BUILD := 1
 ## 01- BASICMATH
 # wrong results
 
-BASICMATH_BIN   := basicmath
+BASICMATH_NAME  := basicmath
 BASICMATH_DIR   := automotive/basicmath
 BASICMATH_MODS  := basicmath_large rad2deg cubic isqrt
 BASICMATH_ARGS  :=
@@ -103,7 +103,7 @@ BASICMATH_ARGS  :=
 ## 02- BITCOUNT
 # wrong results
 
-BITCOUNT_BIN    := bitcount
+BITCOUNT_NAME   := bitcount
 BITCOUNT_DIR    := automotive/bitcount
 BITCOUNT_MODS   := bitcnt_1 bitcnt_2 bitcnt_3 bitcnt_4 \
                    bitcnts bitfiles bitstrng bstr_i
@@ -114,7 +114,7 @@ BITCOUNT_ARGS   := 1125000 | sed 's/Time:[^;]*; //;/^Best/d;/^Worst/d'
 # edges: wrong results
 # corners: segfault
 
-SUSAN_BIN       := susan
+SUSAN_NAME      := susan
 SUSAN_DIR       := automotive/susan
 SUSAN_MODS      := susan
 SUSAN_ARGS      := notests
@@ -122,7 +122,7 @@ SUSAN_ARGS      := notests
 ## 04- PATRICIA
 # wrong results
 
-PATRICIA_BIN    := patricia
+PATRICIA_NAME   := patricia
 PATRICIA_DIR    := network/patricia
 PATRICIA_MODS   := patricia patricia_test
 PATRICIA_ARGS   := $(MIBENCH)/$(PATRICIA_DIR)/large.udp
@@ -130,7 +130,7 @@ PATRICIA_ARGS   := $(MIBENCH)/$(PATRICIA_DIR)/large.udp
 ## 05- DIJKSTRA
 # OK
 
-DIJKSTRA_BIN    := dijkstra
+DIJKSTRA_NAME   := dijkstra
 DIJKSTRA_DIR    := network/dijkstra
 DIJKSTRA_MODS   := dijkstra_large
 DIJKSTRA_ARGS   := $(MIBENCH)/$(DIJKSTRA_DIR)/input.dat
@@ -138,7 +138,7 @@ DIJKSTRA_ARGS   := $(MIBENCH)/$(DIJKSTRA_DIR)/input.dat
 ## 06- RIJNDAEL
 # OK
 
-RIJNDAEL_BIN    := rijndael
+RIJNDAEL_NAME   := rijndael
 RIJNDAEL_DIR    := security/rijndael
 RIJNDAEL_MODS   := aes aesxam
 RIJNDAEL_ARGS   := notests
@@ -146,7 +146,7 @@ RIJNDAEL_ARGS   := notests
 ## 07- BLOWFISH
 # wrong results
 
-BLOWFISH_BIN    := blowfish
+BLOWFISH_NAME   := blowfish
 BLOWFISH_DIR    := security/blowfish
 BLOWFISH_MODS   := bf bf_skey bf_ecb bf_enc bf_cbc bf_cfb64 bf_ofb64
 BLOWFISH_ARGS   := notests
@@ -154,7 +154,7 @@ BLOWFISH_ARGS   := notests
 ## 08- SHA
 # OK
 
-SHA_BIN         := sha
+SHA_NAME        := sha
 SHA_DIR         := security/sha
 SHA_MODS        := sha_driver sha
 SHA_ARGS        := $(MIBENCH)/$(SHA_DIR)/input_large.asc
@@ -162,7 +162,7 @@ SHA_ARGS        := $(MIBENCH)/$(SHA_DIR)/input_large.asc
 ## 09- RAWCAUDIO
 # wrong results
 
-RAWCAUDIO_BIN   := rawcaudio
+RAWCAUDIO_NAME  := rawcaudio
 RAWCAUDIO_DIR   := telecomm/adpcm
 RAWCAUDIO_MODS  := rawcaudio adpcm
 RAWCAUDIO_ARGS  := < $(MIBENCH)/$(RAWCAUDIO_DIR)/data/large.pcm
@@ -173,7 +173,7 @@ RAWCAUDIO_NO_TEE := 1
 ## 10- RAWDAUDIO
 # OK
 
-RAWDAUDIO_BIN   := rawdaudio
+RAWDAUDIO_NAME  := rawdaudio
 RAWDAUDIO_DIR   := telecomm/adpcm
 RAWDAUDIO_MODS  := rawdaudio adpcm
 RAWDAUDIO_ARGS  := < $(MIBENCH)/$(RAWDAUDIO_DIR)/data/large.adpcm
@@ -184,7 +184,7 @@ RAWDAUDIO_NO_TEE := 1
 ## 11- CRC32
 # OK
 
-CRC32_BIN       := crc32
+CRC32_NAME      := crc32
 CRC32_DIR       := telecomm/CRC32
 CRC32_MODS      := crc_32
 CRC32_ARGS      := $(MIBENCH)/telecomm/adpcm/data/large.pcm
@@ -194,21 +194,79 @@ CRC32_ARGS      := $(MIBENCH)/telecomm/adpcm/data/large.pcm
 #      FP rounding between RV32 and X86
 # LLVM: wrong results
 
-FFT_BIN         := fft
+FFT_NAME        := fft
 FFT_DIR         := telecomm/FFT
 FFT_MODS        := main fftmisc fourierf
 FFT_ARGS        := notests
 
+## 13- STRINGSEARCH
+# OK
+
+STRINGSEARCH_NAME := stringsearch
+STRINGSEARCH_BIN  := search_large
+STRINGSEARCH_DIR  := office/stringsearch
+STRINGSEARCH_MODS := bmhasrch bmhisrch bmhsrch pbmsrch_large
+STRINGSEARCH_ARGS :=
+
+## 14- LAME
+# segfault
+
+LAME_NAME := lame
+LAME_DIR  := consumer/lame
+LAME_SRC_DIR_SUFFIX := /lame3.70
+
+LAME_MODS := \
+        main \
+        brhist \
+        formatBitstream \
+        fft \
+        get_audio \
+        l3bitstream \
+        id3tag \
+        ieeefloat \
+        lame \
+        newmdct \
+        parse \
+        portableio \
+        psymodel \
+        quantize \
+        quantize-pvt \
+        vbrquantize \
+        reservoir \
+        tables \
+        takehiro \
+        timestatus \
+        util \
+        VbrTag \
+        version \
+        gtkanal \
+        gpkplotting \
+        mpglib/common \
+        mpglib/dct64_i386 \
+        mpglib/decode_i386 \
+        mpglib/layer3 \
+        mpglib/tabinit \
+        mpglib/interface \
+        mpglib/main
+
+LAME_CFLAGS := -DLAMEPARSE -DLAMESNDFILE
+LAME_DEPS := $(BUILD_MIBENCH)/$(LAME_DIR)/mpglib
+
+LAME_ARGS := notests
+
+$(BUILD_MIBENCH)/$(LAME_DIR)/mpglib:
+	mkdir -p $@
+
 ##
 
-BENCHS          := BASICMATH BITCOUNT SUSAN PATRICIA RIJNDAEL BLOWFISH \
-                   SHA RAWCAUDIO RAWDAUDIO DIJKSTRA CRC32 FFT
+BENCHS          := BASICMATH BITCOUNT SUSAN PATRICIA RIJNDAEL BLOWFISH SHA \
+                   RAWCAUDIO RAWDAUDIO DIJKSTRA CRC32 FFT STRINGSEARCH LAME
 
 ###
 ### RULES
 ###
 
-all: $(foreach bench,$(BENCHS),$($(bench)_BIN))
+all: $(foreach bench,$(BENCHS),$($(bench)_NAME))
 
 include $(TOPDIR)/make/rules.mk
 
@@ -228,12 +286,14 @@ endef
 
 # 1: bench name
 define BENCH
-$(eval BENCH_BIN = $($(1)_BIN))
+$(eval BENCH_NAME = $($(1)_NAME))
+$(eval BENCH_BIN = $(if $($(1)_BIN),$($(1)_BIN),$(BENCH_NAME)))
 $(eval BENCH_SRC_DIR = $(MIBENCH)/$($(1)_DIR)$($(1)_SRC_DIR_SUFFIX)/)
 $(eval BENCH_OUT_DIR = $(BUILD_MIBENCH)/$($(1)_DIR)$($(1)_OUT_DIR_SUFFIX)/)
 $(eval BENCH_MODS = $($(1)_MODS))
 $(eval BENCH_ARGS = $($(1)_ARGS))
 $(eval BENCH_NOTEE = $($(1)_NO_TEE))
+$(eval BUILD_CFLAGS = $($(1)_CFLAGS))
 
 $(call BUILD,X86,$(BENCH_SRC_DIR),$(BENCH_OUT_DIR),$(BENCH_MODS),x86-$(BENCH_BIN))
 
@@ -253,21 +313,21 @@ endif
 $(BENCH_OUT_DIR):
 	mkdir -p $(BENCH_OUT_DIR)
 
-$(BENCH_BIN): $(BENCH_OUT_DIR) \
+$(BENCH_NAME): $(BENCH_OUT_DIR) $($(1)_DEPS) \
     rv32-$(BENCH_BIN) x86-$(BENCH_BIN) \
     $(if $(BENCH_GCC_BUILD),rv32-gcc-$(BENCH_BIN),) \
     $(if $(BENCH_TRANSLATE),rv32-x86-$(BENCH_BIN),)
 
-clean-$(BENCH_BIN):
+clean-$(BENCH_NAME):
 	rm -rf $(BENCH_OUT_DIR)
 
 ifneq ($(BENCH_ARGS),notests)
-test-$(BENCH_BIN):
+test-$(BENCH_NAME):
 	$(SCRIPTS_DIR)/measure.py $(BENCH_OUT_DIR) $(BENCH_BIN) $(BENCH_ARGS)
 
 $(foreach arch,$(ARCHS),\
 $(call TEST2,$(arch),$(BENCH_OUT_DIR),$(BENCH_BIN),$(BENCH_ARGS),,$(BENCH_NOTEE)))
-test2-$(BENCH_BIN): $(BENCH_OUT_DIR) \
+test2-$(BENCH_NAME): $(BENCH_OUT_DIR) \
 		$(foreach arch,$(ARCHS),test2-$$($(arch)_PREFIX)-$(BENCH_BIN))
 	diff $(BENCH_OUT_DIR)rv32-$(BENCH_BIN).out $(BENCH_OUT_DIR)x86-$(BENCH_BIN).out
 
@@ -275,7 +335,7 @@ $(if $(BENCH_GCC_BUILD),\
 $(call TEST2,$(RV32_ARCH),$(BENCH_OUT_DIR),$(BENCH_BIN),$(BENCH_ARGS),gcc-,$(BENCH_NOTEE)))
 
 ifeq ($(BENCH_GCC_BUILD),1)
-test2-gcc-$(BENCH_BIN): $(BENCH_OUT_DIR) \
+test2-gcc-$(BENCH_NAME): $(BENCH_OUT_DIR) \
 		$(foreach pref,rv32-gcc x86,test2-$(pref)-$(BENCH_BIN))
 	diff $(BENCH_OUT_DIR)rv32-gcc-$(BENCH_BIN).out $(BENCH_OUT_DIR)x86-$(BENCH_BIN).out
 endif
@@ -294,6 +354,7 @@ $(foreach bench,$(BENCHS),$(eval $(call BENCH,$(bench))))
 ### SUSAN TESTS
 ###
 
+SUSAN_BIN     := $(SUSAN_NAME)
 SUSAN_SRC_DIR := $(MIBENCH)/$(SUSAN_DIR)
 SUSAN_OUT_DIR := $(BUILD_MIBENCH)/$(SUSAN_DIR)
 SUSAN_INPUT   := $(SUSAN_SRC_DIR)/input_large.pgm
@@ -331,6 +392,7 @@ test2-gcc-susan: $(foreach test,smoothing edges corners,test2-gcc-susan-$(test))
 ### RIJNDAEL TESTS
 ###
 
+RIJNDAEL_BIN           := $(RIJNDAEL_NAME)
 RIJNDAEL_SRC_DIR       := $(MIBENCH)/$(RIJNDAEL_DIR)
 RIJNDAEL_OUT_DIR       := $(BUILD_MIBENCH)/$(RIJNDAEL_DIR)
 X86_RIJNDAEL_INPUT_E   := $(RIJNDAEL_SRC_DIR)/input_large.asc
@@ -386,6 +448,7 @@ test2-gcc-rijndael: $(foreach test,enc dec,test2-gcc-rijndael-$(test))
 ### BLOWFISH TESTS
 ###
 
+BLOWFISH_BIN           := $(BLOWFISH_NAME)
 BLOWFISH_SRC_DIR       := $(MIBENCH)/$(BLOWFISH_DIR)
 BLOWFISH_OUT_DIR       := $(BUILD_MIBENCH)/$(BLOWFISH_DIR)
 X86_BLOWFISH_INPUT_E   := $(BLOWFISH_SRC_DIR)/input_large.asc
@@ -460,8 +523,6 @@ $(eval TEST3_BIN = $(TEST3_PREFIX)$(3))
 $(eval TEST3_OUT = $(TEST3_PREFIX)$(6))
 $(eval TEST3_AS_ALIAS = $(shell test $(1) != $(RV32_ARCH) -a -n "$(7)" && echo -n 1))
 
-$(warning $(1),$(7),TEST3_AS_ALIAS = $(TEST3_AS_ALIAS))
-
 ifeq ($(TEST3_AS_ALIAS),)
 test3-$(TEST3_NAME): $(2)$(TEST3_BIN)
 	$$($(1)_RUN) $(2)$(TEST3_BIN) $(4) $(5) $(2)$(TEST3_OUT)
@@ -485,7 +546,7 @@ $(foreach arch,$(ARCHS),$(eval \
 $(call TEST3,$(arch),$(1),$(2),$(3),$(4),$(5),$(6),$(7))))
 
 $(eval GCC_ = $(6))
-$(eval TEST3_BASENAME = $(if $(7),$(7),$(3)))
+$(eval TEST3_BASENAME = $(if $(7),$(7),$(2)))
 $(eval TEST3_NAME = $(GCC_)$(TEST3_BASENAME))
 $(eval TEST3_OUT = $(5))
 test3-$(TEST3_NAME): $(foreach arch,$(ARCHS),test3-$($(arch)_PREFIX)-$(TEST3_NAME))
@@ -504,6 +565,7 @@ $(call TEST3_ALL_ARCHS,$(1),$(2),$(3),$(4),$(5),,$(6))
 $(call TEST3_ALL_ARCHS,$(1),$(2),$(3),$(4),$(5),gcc-,$(6))
 endef
 
+FFT_BIN     := $(FFT_NAME)
 FFT_OUT_DIR := $(BUILD_MIBENCH)/$(FFT_DIR)/
 
 $(eval $(call TEST3_LLVM_GCC,$(FFT_OUT_DIR),$(FFT_BIN),8 32768,>,output_large.txt,fft1))
@@ -512,6 +574,24 @@ $(eval $(call TEST3_LLVM_GCC,$(FFT_OUT_DIR),$(FFT_BIN),8 32768 -i,>,output_large
 test2-fft: test3-fft1 test3-fft2
 
 test2-gcc-fft: test3-gcc-fft1 test3-gcc-fft2
+
+
+###
+### LAME TESTS
+###
+
+LAME_BIN     := $(LAME_NAME)
+LAME_OUT_DIR := $(BUILD_MIBENCH)/$(LAME_DIR)/
+LAME_SRC_DIR := $(MIBENCH)/$(LAME_DIR)/
+
+$(eval $(call TEST3_LLVM_GCC,$(LAME_OUT_DIR),$(LAME_BIN),\
+$(LAME_SRC_DIR)large.wav $(LAME_OUT_DIR)output_large.mp3,\
+&& mv $(LAME_OUT_DIR)output_large.mp3,output_large.mp3,))
+
+test2-lame: test3-lame
+
+test2-gcc-lame: test3-gcc-lame
+
 
 ###
 

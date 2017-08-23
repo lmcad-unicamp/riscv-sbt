@@ -885,12 +885,12 @@ bin_search_StepSize2 (lame_global_flags *gfp,int desired_rate, int start, int *i
 
 
 
+#define NOASM
 
-
-#if (defined(__GNUC__) && defined(__i386__))
+#if (defined(__GNUC__) && defined(__i386__) && !defined(NOASM))
 #define USE_GNUC_ASM
 #endif
-#ifdef _MSC_VER
+#if (defined(_MSC_VER) && !defined(NOASM))
 #define USE_MSC_ASM
 #endif
 

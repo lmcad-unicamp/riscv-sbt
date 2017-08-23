@@ -11,7 +11,7 @@ define C2BC
 $(eval C2BC_CLANG_FLAGS = $$($(1)_CLANG_FLAGS))
 $(3)$(5).bc: $(2)$(4).c
 	cd $(3) && \
-		$$($(1)_CLANG) $(C2BC_CLANG_FLAGS) $(EMITLLVM) $(2)$(4).c -o $(5).bc
+		$$($(1)_CLANG) $(C2BC_CLANG_FLAGS) $(BUILD_CFLAGS) $(EMITLLVM) $(2)$(4).c -o $(5).bc
 
 endef
 
@@ -128,7 +128,7 @@ endef
 define GCC_C2O
 $(3)$(5).o: $(2)$(4).c
 	cd $(3) && \
-		$($(1)_GCC) $(GCC_CFLAGS) -c $(2)$(4).c -o $(5).o
+		$($(1)_GCC) $(GCC_CFLAGS) $(BUILD_CFLAGS) -c $(2)$(4).c -o $(5).o
 
 endef
 
@@ -219,6 +219,12 @@ $(call C2BC,$(1),$(2),$(3),$(4),$(5))
 $(call DIS,$(1),$(3),$(5))
 endef
 
+# 1: prefix
+# 2: path
+define ADD_PREFIX
+$(dir $(2))$(1)-$(notdir $(2))
+endef
+
 # multi C2BC and link
 define BUILD2
 $(eval BUILD2_PREFIX = $($(1)_PREFIX))
@@ -227,9 +233,9 @@ ifeq ($(words $(4)),1)
 $(call C2BC,$(1),$(2),$(3),$(4),$(5))
 else
 $(foreach c,$(4),\
-$(call C2BCNDIS,$(1),$(2),$(3),$(c),$(BUILD2_PREFIX)-$(c)_bc1))
+$(call C2BCNDIS,$(1),$(2),$(3),$(c),$(call ADD_PREFIX,$(BUILD2_PREFIX),$(c)_bc1)))
 
-$(call LLLINK,$(1),$(3),$(foreach bc,$(4),$(BUILD2_PREFIX)-$(bc)_bc1),$(5))
+$(call LLLINK,$(1),$(3),$(foreach bc,$(4),$(call ADD_PREFIX,$(BUILD2_PREFIX),$(bc)_bc1)),$(5))
 endif
 
 $(call DIS,$(1),$(3),$(5))
@@ -277,9 +283,11 @@ endef
 define GCC_BUILD
 $(eval BUILD_PREFIX = $($(1)_PREFIX))
 $(eval $(foreach c,$(4),\
-$(call GCC_C2O,$(1),$(2),$(3),$(c),$(BUILD_PREFIX)-$(c))))
+$(call GCC_C2O,$(1),$(2),$(3),$(c),$(call ADD_PREFIX,$(BUILD_PREFIX),$(c)))))
 
-$(call GCC_LINK,$(1),$(3),$(addprefix $(BUILD_PREFIX)-,$(4)),$(5),)
+$(call GCC_LINK,$(1),$(3),\
+$(foreach o,$(4),$(call ADD_PREFIX,$(BUILD_PREFIX),$(o))),$(5),)
+
 $(call RUN,$(1),$(3),$(5),save-run.out)
 $(call ALIAS,$(3),$(5))
 endef
