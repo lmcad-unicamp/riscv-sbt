@@ -146,10 +146,40 @@ RIJNDAEL_ARGS   := notests
 ## 07- BLOWFISH
 # wrong results
 
-BLOWFISH_BIN          := blowfish
-BLOWFISH_DIR          := security/blowfish
-BLOWFISH_MODS         := bf bf_skey bf_ecb bf_enc bf_cbc bf_cfb64 bf_ofb64
-BLOWFISH_ARGS         := notests
+BLOWFISH_BIN    := blowfish
+BLOWFISH_DIR    := security/blowfish
+BLOWFISH_MODS   := bf bf_skey bf_ecb bf_enc bf_cbc bf_cfb64 bf_ofb64
+BLOWFISH_ARGS   := notests
+
+## 08- SHA
+# OK
+
+SHA_BIN         := sha
+SHA_DIR         := security/sha
+SHA_MODS        := sha_driver sha
+SHA_ARGS        := $(MIBENCH)/$(SHA_DIR)/input_large.asc
+
+## 09- RAWCAUDIO
+# wrong results
+
+RAWCAUDIO_BIN   := rawcaudio
+RAWCAUDIO_DIR   := telecomm/adpcm
+RAWCAUDIO_MODS  := rawcaudio adpcm
+RAWCAUDIO_ARGS  := < $(MIBENCH)/$(RAWCAUDIO_DIR)/data/large.pcm
+RAWCAUDIO_SRC_DIR_SUFFIX := /src
+RAWCAUDIO_OUT_DIR_SUFFIX := /rawcaudio
+RAWCAUDIO_NO_TEE := 1
+
+## 10- RAWDAUDIO
+# OK
+
+RAWDAUDIO_BIN   := rawdaudio
+RAWDAUDIO_DIR   := telecomm/adpcm
+RAWDAUDIO_MODS  := rawdaudio adpcm
+RAWDAUDIO_ARGS  := < $(MIBENCH)/$(RAWDAUDIO_DIR)/data/large.adpcm
+RAWDAUDIO_SRC_DIR_SUFFIX := /src
+RAWDAUDIO_OUT_DIR_SUFFIX := /rawdaudio
+RAWDAUDIO_NO_TEE := 1
 
 ## 11- CRC32
 # OK
@@ -159,10 +189,20 @@ CRC32_DIR       := telecomm/CRC32
 CRC32_MODS      := crc_32
 CRC32_ARGS      := $(MIBENCH)/telecomm/adpcm/data/large.pcm
 
+## 12- FFT
+# GCC: results are slightly different, probably due to different
+#      FP rounding between RV32 and X86
+# LLVM: wrong results
+
+FFT_BIN         := fft
+FFT_DIR         := telecomm/FFT
+FFT_MODS        := main fftmisc fourierf
+FFT_ARGS        := notests
+
 ##
 
 BENCHS          := BASICMATH BITCOUNT SUSAN PATRICIA RIJNDAEL BLOWFISH \
-                   DIJKSTRA CRC32
+                   SHA RAWCAUDIO RAWDAUDIO DIJKSTRA CRC32 FFT
 
 ###
 ### RULES
@@ -177,20 +217,23 @@ include $(TOPDIR)/make/rules.mk
 # 3: bin
 # 4: args
 # 5: prefix suffix (eg: gcc-)
+# 6: no-tee?
 define TEST2
 $(eval TEST2_BIN = $$($(1)_PREFIX)-$(5)$(3))
+$(eval TEST2_OUT = $(if $(6),>,| tee))
 test2-$(TEST2_BIN): $(2)$(TEST2_BIN)
-	$$($(1)_RUN) $(2)$(TEST2_BIN) $(4) | tee $(2)$(TEST2_BIN).out
+	$$($(1)_RUN) $(2)$(TEST2_BIN) $(4) $(TEST2_OUT) $(2)$(TEST2_BIN).out
 endef
 
 
 # 1: bench name
 define BENCH
 $(eval BENCH_BIN = $($(1)_BIN))
-$(eval BENCH_SRC_DIR = $(MIBENCH)/$($(1)_DIR)/)
-$(eval BENCH_OUT_DIR = $(BUILD_MIBENCH)/$($(1)_DIR)/)
+$(eval BENCH_SRC_DIR = $(MIBENCH)/$($(1)_DIR)$($(1)_SRC_DIR_SUFFIX)/)
+$(eval BENCH_OUT_DIR = $(BUILD_MIBENCH)/$($(1)_DIR)$($(1)_OUT_DIR_SUFFIX)/)
 $(eval BENCH_MODS = $($(1)_MODS))
 $(eval BENCH_ARGS = $($(1)_ARGS))
+$(eval BENCH_NOTEE = $($(1)_NO_TEE))
 
 $(call BUILD,X86,$(BENCH_SRC_DIR),$(BENCH_OUT_DIR),$(BENCH_MODS),x86-$(BENCH_BIN))
 
@@ -222,13 +265,14 @@ ifneq ($(BENCH_ARGS),notests)
 test-$(BENCH_BIN):
 	$(SCRIPTS_DIR)/measure.py $(BENCH_OUT_DIR) $(BENCH_BIN) $(BENCH_ARGS)
 
-$(foreach arch,$(ARCHS),$(call TEST2,$(arch),$(BENCH_OUT_DIR),$(BENCH_BIN),$(BENCH_ARGS),))
+$(foreach arch,$(ARCHS),\
+$(call TEST2,$(arch),$(BENCH_OUT_DIR),$(BENCH_BIN),$(BENCH_ARGS),,$(BENCH_NOTEE)))
 test2-$(BENCH_BIN): $(BENCH_OUT_DIR) \
 		$(foreach arch,$(ARCHS),test2-$$($(arch)_PREFIX)-$(BENCH_BIN))
 	diff $(BENCH_OUT_DIR)rv32-$(BENCH_BIN).out $(BENCH_OUT_DIR)x86-$(BENCH_BIN).out
 
 $(if $(BENCH_GCC_BUILD),\
-$(call TEST2,$(RV32_ARCH),$(BENCH_OUT_DIR),$(BENCH_BIN),$(BENCH_ARGS),gcc-))
+$(call TEST2,$(RV32_ARCH),$(BENCH_OUT_DIR),$(BENCH_BIN),$(BENCH_ARGS),gcc-,$(BENCH_NOTEE)))
 
 ifeq ($(BENCH_GCC_BUILD),1)
 test2-gcc-$(BENCH_BIN): $(BENCH_OUT_DIR) \
@@ -395,6 +439,79 @@ $(eval $(call BLOWFISH_TESTS,gcc-))
 
 test2-blowfish: $(foreach test,enc dec,test2-blowfish-$(test))
 test2-gcc-blowfish: $(foreach test,enc dec,test2-gcc-blowfish-$(test))
+
+###
+### FFT TESTS
+###
+
+# 1: arch
+# 2: dir/
+# 3: bin
+# 4: args
+# 5: out redirect: >, | tee
+# 6: output file
+# 7: prefix suffix (eg: gcc-)
+# 8: test name (default=bin)
+define TEST3
+$(eval TEST3_PREFIX = $($(1)_PREFIX)-$(7))
+$(eval TEST3_BASENAME = $(if $(8),$(8),$(3)))
+$(eval TEST3_NAME = $(TEST3_PREFIX)$(TEST3_BASENAME))
+$(eval TEST3_BIN = $(TEST3_PREFIX)$(3))
+$(eval TEST3_OUT = $(TEST3_PREFIX)$(6))
+$(eval TEST3_AS_ALIAS = $(shell test $(1) != $(RV32_ARCH) -a -n "$(7)" && echo -n 1))
+
+$(warning $(1),$(7),TEST3_AS_ALIAS = $(TEST3_AS_ALIAS))
+
+ifeq ($(TEST3_AS_ALIAS),)
+test3-$(TEST3_NAME): $(2)$(TEST3_BIN)
+	$$($(1)_RUN) $(2)$(TEST3_BIN) $(4) $(5) $(2)$(TEST3_OUT)
+
+else
+test3-$(TEST3_NAME): test3-$($(1)_PREFIX)-$(TEST3_BASENAME)
+
+endif
+
+endef
+
+# 1: dir/
+# 2: bin
+# 3: args
+# 4: out redirect: >, | tee
+# 5: output file
+# 6: prefix suffix (eg: gcc-)
+# 7: test name (default=bin)
+define TEST3_ALL_ARCHS
+$(foreach arch,$(ARCHS),$(eval \
+$(call TEST3,$(arch),$(1),$(2),$(3),$(4),$(5),$(6),$(7))))
+
+$(eval GCC_ = $(6))
+$(eval TEST3_BASENAME = $(if $(7),$(7),$(3)))
+$(eval TEST3_NAME = $(GCC_)$(TEST3_BASENAME))
+$(eval TEST3_OUT = $(5))
+test3-$(TEST3_NAME): $(foreach arch,$(ARCHS),test3-$($(arch)_PREFIX)-$(TEST3_NAME))
+	diff $(1)rv32-$(GCC_)$(TEST3_OUT) $(1)x86-$(TEST3_OUT)
+
+endef
+
+# 1: dir/
+# 2: bin
+# 3: args
+# 4: out redirect: >, | tee
+# 5: output file
+# 6: test name (default=bin)
+define TEST3_LLVM_GCC
+$(call TEST3_ALL_ARCHS,$(1),$(2),$(3),$(4),$(5),,$(6))
+$(call TEST3_ALL_ARCHS,$(1),$(2),$(3),$(4),$(5),gcc-,$(6))
+endef
+
+FFT_OUT_DIR := $(BUILD_MIBENCH)/$(FFT_DIR)/
+
+$(eval $(call TEST3_LLVM_GCC,$(FFT_OUT_DIR),$(FFT_BIN),8 32768,>,output_large.txt,fft1))
+$(eval $(call TEST3_LLVM_GCC,$(FFT_OUT_DIR),$(FFT_BIN),8 32768 -i,>,output_large.inv.txt,fft2))
+
+test2-fft: test3-fft1 test3-fft2
+
+test2-gcc-fft: test3-gcc-fft1 test3-gcc-fft2
 
 ###
 
