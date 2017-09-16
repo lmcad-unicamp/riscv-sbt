@@ -1,5 +1,5 @@
 ifeq ($(TOPDIR),)
-$(error "TOPDIR not set. Please run 'source scripts/setenv.sh' first.")
+$(error "TOPDIR not set. Please run '. scripts/env.sh' first.")
 endif
 
 include $(TOPDIR)/make/config.mk
