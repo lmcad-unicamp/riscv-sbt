@@ -1,0 +1,811 @@
+# build type for LLVM and SBT (Release or Debug)
+# WARNING: using Release LLVM builds with Debug SBT CAN cause problems!
+ifeq ($(BUILD_TYPE),Debug)
+  SBT := sbt-debug
+else
+  SBT := sbt-release
+endif
+
+TC32 := \
+	BINUTILS32 \
+	NEWLIB_GCC32
+
+TCX86 := \
+	BINUTILS_X86 \
+	NEWLIB_GCC_X86
+
+LLVM := \
+	LLVM_DEBUG \
+	LLVM_RELEASE \
+	RISCV_LLVM_DEBUG \
+	RISCV_LLVM_RELEASE
+
+NEEDED := \
+	$(TC32) \
+	$(LLVM) \
+	SBT_DEBUG \
+	SBT_RELEASE
+
+TEST32 := \
+	FESVR \
+	SIM \
+	PK32
+
+TC64 := \
+	BINUTILS64 \
+	NEWLIB_GCC64
+
+TEST64 := \
+	PK64
+
+LINUX := \
+	BINUTILS_LINUX \
+	LINUX_GCC \
+	LINUX
+
+QEMU := \
+	QEMU \
+	QEMU_USER \
+	QEMU_TESTS
+
+ALL := \
+	RISCV_GNU_TOOLCHAIN
+	$(NEEDED) \
+	$(TEST32) \
+	$(TC64) \
+	$(TCX86) \
+	$(TEST64) \
+	$(LINUX) \
+	$(QEMU) \
+	RVEMU
+
+all: \
+	riscv-gnu-toolchain
+	$(SBT) \
+	riscv-isa-sim \
+	riscv-pk-32
+
+gcc64: riscv-newlib-gcc-64
+gcc-linux: riscv-linux-gcc
+
+extra: \
+	gcc64 \
+	gcc-linux \
+	riscvemu \
+	riscv-linux \
+	riscv-pk-64 \
+	qemu \
+	qemu-user \
+	qemu-tests \
+	x86-newlib-gcc
+
+
+###
+### riscv-binutils-gdb
+###
+
+# 32 bit
+
+BINUTILS32_BUILD := $(BUILD_DIR)/riscv-binutils-gdb/32
+BINUTILS32_MAKEFILE := $(BINUTILS32_BUILD)/Makefile
+BINUTILS32_OUT := $(BINUTILS32_BUILD)/ld/ld-new
+BINUTILS32_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/$(RV32_TRIPLE)-ld
+BINUTILS32_CONFIGURE := $(SUBMODULES_DIR)/riscv-binutils-gdb/configure \
+                      --target=$(RV32_TRIPLE) \
+                      --prefix=$(TOOLCHAIN_RELEASE) \
+                      --disable-werror
+BINUTILS32_ALIAS := riscv-binutils-gdb-32
+
+# 64 bit
+
+BINUTILS64_BUILD := $(BUILD_DIR)/riscv-binutils-gdb/64
+BINUTILS64_MAKEFILE := $(BINUTILS64_BUILD)/Makefile
+BINUTILS64_OUT := $(BINUTILS64_BUILD)/ld/ld-new
+BINUTILS64_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/$(RV64_TRIPLE)-ld
+BINUTILS64_CONFIGURE := $(SUBMODULES_DIR)/riscv-binutils-gdb/configure \
+                      --target=$(RV64_TRIPLE) \
+                      --prefix=$(TOOLCHAIN_RELEASE) \
+                      --disable-werror
+BINUTILS64_ALIAS := riscv-binutils-gdb-64
+
+# x86
+
+BINUTILS_X86_BUILD := $(BUILD_DIR)/x86-binutils-gdb
+BINUTILS_X86_MAKEFILE := $(BINUTILS_X86_BUILD)/Makefile
+BINUTILS_X86_OUT := $(BINUTILS_X86_BUILD)/ld/ld-new
+BINUTILS_X86_TOOLCHAIN := $(TOOLCHAIN_X86)/bin/$(X86_TRIPLE)-ld
+BINUTILS_X86_CONFIGURE := $(SUBMODULES_DIR)/riscv-binutils-gdb/configure \
+                          --target=$(X86_TRIPLE) \
+                          --prefix=$(TOOLCHAIN_X86)
+BINUTILS_X86_ALIAS := x86-binutils-gdb
+
+# linux
+
+SYSROOT := $(TOOLCHAIN_RELEASE)/sysroot
+
+BINUTILS_LINUX_BUILD := $(BUILD_DIR)/riscv-binutils-gdb/linux
+BINUTILS_LINUX_MAKEFILE := $(BINUTILS_LINUX_BUILD)/Makefile
+BINUTILS_LINUX_OUT := $(BINUTILS_LINUX_BUILD)/ld/ld-new
+BINUTILS_LINUX_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/$(RV64_LINUX_TRIPLE)-ld
+BINUTILS_LINUX_CONFIGURE := $(SUBMODULES_DIR)/riscv-binutils-gdb/configure \
+                      --target=$(RV64_LINUX_TRIPLE) \
+                      --prefix=$(TOOLCHAIN_RELEASE) \
+                      --with-sysroot=$(SYSROOT) \
+                      --enable-multilib \
+                      --disable-werror \
+                      --disable-nls
+BINUTILS_LINUX_ALIAS := riscv-binutils-gdb-linux
+
+BINUTILS_LINUX_POSTINSTALL := \
+  mkdir -p $(SYSROOT)/usr/ && \
+  cp -a $(SUBMODULES_DIR)/riscv-gnu-toolchain/linux-headers/include $(SYSROOT)/usr/
+
+
+###
+### riscv-newlib-gcc
+###
+
+SRC_NEWLIB_GCC := $(BUILD_DIR)/riscv-newlib-gcc
+$(SRC_NEWLIB_GCC)/stamp:
+	$(eval $@_DIR := $(shell dirname $@))
+	cp -a $(SUBMODULES_DIR)/riscv-gcc $($@_DIR).tmp
+	cp -a $(SUBMODULES_DIR)/riscv-newlib/. $($@_DIR).tmp
+	cp -a $(SUBMODULES_DIR)/riscv-gcc/include/. $($@_DIR).tmp/include
+	mv $($@_DIR).tmp $($@_DIR) && touch $@
+
+# 32 bit
+
+NEWLIB_GCC32_BUILD := $(BUILD_DIR)/riscv-newlib-gcc/32
+NEWLIB_GCC32_MAKEFILE := $(NEWLIB_GCC32_BUILD)/Makefile
+NEWLIB_GCC32_OUT := $(NEWLIB_GCC32_BUILD)/gcc/xgcc
+NEWLIB_GCC32_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/$(RV32_TRIPLE)-gcc
+NEWLIB_GCC32_CONFIGURE := $(BUILD_DIR)/riscv-newlib-gcc/configure \
+                 --target=$(RV32_TRIPLE) \
+                 --prefix=$(TOOLCHAIN_RELEASE) \
+                 --without-headers \
+                 --disable-shared \
+                 --disable-threads \
+                 --enable-languages=c,c++ \
+                 --with-system-zlib \
+                 --enable-tls \
+                 --with-newlib \
+                 --disable-libmudflap \
+                 --disable-libssp \
+                 --disable-libquadmath \
+                 --disable-libgomp \
+                 --disable-nls \
+                 --enable-multilib=no \
+                 --enable-checking=yes \
+                 --with-abi=ilp32d \
+                 --with-arch=rv32g
+NEWLIB_GCC32_MAKE_FLAGS := inhibit-libc=true
+NEWLIB_GCC32_ALIAS := riscv-newlib-gcc-32
+NEWLIB_GCC32_DEPS := $(BINUTILS32_TOOLCHAIN) $(SRC_NEWLIB_GCC)/stamp
+
+# 64 bit
+
+NEWLIB_GCC64_BUILD := $(BUILD_DIR)/riscv-newlib-gcc/64
+NEWLIB_GCC64_MAKEFILE := $(NEWLIB_GCC64_BUILD)/Makefile
+NEWLIB_GCC64_OUT := $(NEWLIB_GCC64_BUILD)/gcc/xgcc
+NEWLIB_GCC64_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/$(RV64_TRIPLE)-gcc
+NEWLIB_GCC64_CONFIGURE := $(BUILD_DIR)/riscv-newlib-gcc/configure \
+                 --target=$(RV64_TRIPLE) \
+                 --prefix=$(TOOLCHAIN_RELEASE) \
+                 --without-headers \
+                 --disable-shared \
+                 --disable-threads \
+                 --enable-languages=c,c++ \
+                 --with-system-zlib \
+                 --enable-tls \
+                 --with-newlib \
+                 --disable-libmudflap \
+                 --disable-libssp \
+                 --disable-libquadmath \
+                 --disable-libgomp \
+                 --disable-nls \
+                 --enable-multilib=no \
+                 --enable-checking=yes \
+                 --with-abi=lp64d \
+                 --with-arch=rv64g
+NEWLIB_GCC64_MAKE_FLAGS := inhibit-libc=true
+NEWLIB_GCC64_ALIAS := riscv-newlib-gcc-64
+NEWLIB_GCC64_DEPS := $(BINUTILS64_TOOLCHAIN) $(SRC_NEWLIB_GCC)/stamp
+
+# x86
+
+NEWLIB_GCC_X86_BUILD := $(BUILD_DIR)/x86-newlib-gcc
+NEWLIB_GCC_X86_MAKEFILE := $(NEWLIB_GCC_X86_BUILD)/Makefile
+NEWLIB_GCC_X86_OUT := $(NEWLIB_GCC_X86_BUILD)/gcc/xgcc
+NEWLIB_GCC_X86_TOOLCHAIN := $(TOOLCHAIN_X86)/bin/$(X86_TRIPLE)-gcc
+NEWLIB_GCC_X86_CONFIGURE := $(BUILD_DIR)/riscv-newlib-gcc/configure \
+                 --target=$(X86_TRIPLE) \
+                 --prefix=$(TOOLCHAIN_X86) \
+                 --without-headers \
+                 --disable-shared \
+                 --disable-threads \
+                 --enable-languages=c,c++ \
+                 --with-system-zlib \
+                 --enable-tls \
+                 --with-newlib \
+                 --disable-libmudflap \
+                 --disable-libssp \
+                 --disable-libquadmath \
+                 --disable-libgomp \
+                 --disable-nls \
+                 --enable-multilib=no
+NEWLIB_GCC_X86_ALIAS := x86-newlib-gcc
+NEWLIB_GCC_X86_DEPS := $(BINUTILS_X86_TOOLCHAIN)
+
+###
+### riscv-linux-gcc
+###
+
+# multilib
+
+LINUX_GCC_BASE  := $(BUILD_DIR)/riscv-linux-gcc
+LINUX_GCC_STAGE2 := $(LINUX_GCC_BASE)/stage2
+LINUX_GCC_BUILD  := $(LINUX_GCC_STAGE2)
+LINUX_GCC_MAKEFILE := $(LINUX_GCC_BUILD)/Makefile
+LINUX_GCC_OUT := $(LINUX_GCC_BUILD)/gcc/xgcc
+LINUX_GCC_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/$(RV64_LINUX_TRIPLE)-gcc
+LINUX_GCC_CONFIGURE := \
+    cd $(LINUX_GCC_BUILD) && \
+    $(SUBMODULES_DIR)/riscv-gcc/configure \
+    --target=$(RV64_LINUX_TRIPLE) \
+    --prefix=$(TOOLCHAIN_RELEASE) \
+    --with-sysroot=$(SYSROOT) \
+    --with-system-zlib \
+    --enable-shared \
+    --enable-tls \
+    --enable-languages=c,c++ \
+    --disable-libmudflap \
+    --disable-libssp \
+    --disable-libquadmath \
+    --disable-nls \
+    --disable-bootstrap \
+    --enable-checking=yes \
+    --enable-multilib \
+    --with-abi=lp64d \
+    --with-arch=rv64g
+LINUX_GCC_ALIAS := riscv-linux-gcc
+
+MULTILIB_NAMES := rv32ima-ilp32 rv32imafd-ilp32d rv64ima-lp64 rv64imafd-lp64d
+LINUX_GCC_STAMPS := $(LINUX_GCC_BASE)/stamps
+LINUX_GCC_DEPS := \
+  $(addprefix $(LINUX_GCC_STAMPS)/build-glibc-linux-,$(MULTILIB_NAMES)) \
+  $(LINUX_GCC_STAMPS)/build-glibc-linux-headers
+
+LINUX_GCC_POSTINSTALL := \
+  cp -a $(TOOLCHAIN_RELEASE)/$(RV64_LINUX_TRIPLE)/lib* $(SYSROOT)
+
+#
+# stage1
+#
+
+LINUX_GCC_STAGE1 := $(LINUX_GCC_BASE)/stage1
+LINUX_GCC_STAGE1_OUT := $(LINUX_GCC_STAGE1)/output
+$(LINUX_GCC_STAMPS)/build-gcc-linux-stage1: $(BINUTILS_LINUX_TOOLCHAIN)
+	mkdir -p $(LINUX_GCC_STAGE1)
+	cd $(LINUX_GCC_STAGE1) && \
+	$(SUBMODULES_DIR)/riscv-gcc/configure \
+		--target=$(RV64_LINUX_TRIPLE) \
+		--prefix=$(LINUX_GCC_STAGE1_OUT) \
+		--with-sysroot=$(SYSROOT) \
+		--with-newlib \
+		--without-headers \
+		--disable-shared \
+		--disable-threads \
+		--with-system-zlib \
+		--enable-tls \
+		--enable-languages=c \
+		--disable-libatomic \
+		--disable-libmudflap \
+		--disable-libssp \
+		--disable-libquadmath \
+		--disable-libgomp \
+		--disable-nls \
+		--disable-bootstrap \
+		--enable-checking=yes \
+		--enable-multilib \
+		--with-abi=lp64d \
+		--with-arch=rv64g
+	$(MAKE) $(MAKE_OPTS) -C $(LINUX_GCC_STAGE1) inhibit-libc=true all-gcc
+	$(MAKE) -C $(LINUX_GCC_STAGE1) inhibit-libc=true install-gcc
+	$(MAKE) $(MAKE_OPTS) -C $(LINUX_GCC_STAGE1) inhibit-libc=true all-target-libgcc
+	$(MAKE) -C $(LINUX_GCC_STAGE1) inhibit-libc=true install-target-libgcc
+	ln -sf $(TOOLCHAIN_RELEASE)/bin/$(RV64_LINUX_TRIPLE)-as \
+		$(LINUX_GCC_STAGE1_OUT)/libexec/gcc/$(RV64_LINUX_TRIPLE)/7.1.1/as
+	mkdir -p $(dir $@) && touch $@
+
+#
+# glibc
+#
+
+LINUX_GLIBC := $(LINUX_GCC_BASE)/glibc
+LINUX_GLIBC_HEADERS := $(LINUX_GCC_BASE)/glibc/headers
+GLIBC_CC_FOR_TARGET := $(LINUX_GCC_STAGE1_OUT)/bin/$(RV64_LINUX_TRIPLE)-gcc
+
+$(LINUX_GCC_STAMPS)/build-glibc-linux-%: \
+    $(LINUX_GCC_STAMPS)/build-gcc-linux-stage1
+	$(eval $@_ARCH := $(word 4,$(subst -, ,$(notdir $@))))
+	$(eval $@_ABI := $(word 5,$(subst -, ,$(notdir $@))))
+	$(eval $@_LIBDIRSUFFIX := $(if $($@_ABI),$(shell echo $($@_ARCH) | \
+		sed 's/.*rv\([0-9]*\).*/\1/')/$($@_ABI),))
+	$(eval $@_XLEN := $(if $($@_ABI),$(shell echo $($@_ARCH) | \
+		sed 's/.*rv\([0-9]*\).*/\1/'),$(XLEN)))
+	$(eval $@_CFLAGS := $(if $($@_ABI),-march=$($@_ARCH) -mabi=$($@_ABI),))
+	$(eval $@_LIBDIROPTS := $(if $@_LIBDIRSUFFIX,--libdir=/usr/lib$($@_LIBDIRSUFFIX) libc_cv_slibdir=/lib$($@_LIBDIRSUFFIX) libc_cv_rtlddir=/lib,))
+	$(eval $@_BUILDDIR := $(LINUX_GLIBC)/$($@_ARCH)-$($@_ABI))
+	mkdir -p $($@_BUILDDIR)
+	cd $($@_BUILDDIR) && \
+		CC="$(GLIBC_CC_FOR_TARGET) $($@_CFLAGS)" \
+		CFLAGS="-g -O2 $($@_CFLAGS)" \
+		ASFLAGS="$($@_CFLAGS)" \
+		$(SUBMODULES_DIR)/riscv-glibc/configure \
+		--host=riscv$($@_XLEN)-unknown-linux-gnu \
+		--prefix=/usr \
+		--disable-werror \
+		--enable-shared \
+		--with-headers=$(SUBMODULES_DIR)/riscv-gnu-toolchain/linux-headers/include \
+		--enable-multilib \
+		--enable-kernel=3.0.0 \
+		$($@_LIBDIROPTS)
+	$(MAKE) $(MAKE_OPTS) -C $($@_BUILDDIR)
+	+flock $(SYSROOT)/.lock $(MAKE) -C $($@_BUILDDIR) install install_root=$(SYSROOT)
+	mkdir -p $(dir $@) && touch $@
+
+
+$(LINUX_GCC_STAMPS)/build-glibc-linux-headers: \
+    $(LINUX_GCC_STAMPS)/build-gcc-linux-stage1
+	mkdir -p $(LINUX_GLIBC_HEADERS)
+	cd $(LINUX_GLIBC_HEADERS) && \
+	CC="$(LINUX_GCC_STAGE1_OUT)/bin/$(RV64_LINUX_TRIPLE)-gcc" \
+	$(SUBMODULES_DIR)/riscv-glibc/configure \
+		--host=$(RV64_LINUX_TRIPLE) \
+		--prefix=$(SYSROOT)/usr \
+		--enable-shared \
+		--with-headers=$(SUBMODULES_DIR)/riscv-gnu-toolchain/linux-headers/include \
+		--disable-multilib \
+		--enable-kernel=3.0.0
+	$(MAKE) -C $(LINUX_GLIBC_HEADERS) install-headers
+	mkdir -p $(dir $@) && touch $@
+
+###
+### linux
+###
+
+LINUX_PKG_FILE := linux-4.6.2.tar.xz
+LINUX_URL := https://cdn.kernel.org/pub/linux/kernel/v4.x/$(LINUX_PKG_FILE)
+LINUX_PKG := $(REMOTE_DIR)/$(LINUX_PKG_FILE)
+LINUX_DIR := $(TOPDIR)/riscv-linux
+LINUX_SRC := $(BUILD_DIR)/linux-4.6.2
+
+LINUX_BUILD := $(LINUX_SRC)
+LINUX_MAKEFILE := $(LINUX_BUILD)/Makefile
+LINUX_OUT := $(LINUX_BUILD)/vmlinux
+LINUX_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/$(RV64_TRIPLE)/bin/vmlinux
+LINUX_CONFIGURE := cd $(LINUX_BUILD) && \
+                   $(MAKE) ARCH=riscv defconfig && \
+                   cp $(LINUX_DIR)/riscv.config .config
+LINUX_MAKE_FLAGS := ARCH=riscv vmlinux
+LINUX_INSTALL := cp $(LINUX_OUT) $(LINUX_TOOLCHAIN)
+LINUX_ALIAS := riscv-linux
+LINUX_DEPS  := $(RVEMU_TOOLCHAIN) $(LINUX_SRC)/stamps/initramfs
+
+$(LINUX_PKG):
+	mkdir -p $(dir $@)
+	wget $(LINUX_URL) -O $@
+
+$(LINUX_SRC)/stamps/source: $(LINUX_PKG)
+	tar -C $(BUILD_DIR) -xvf $(LINUX_PKG)
+	cd $(LINUX_SRC) && \
+	git init && \
+	git remote add -t master origin https://github.com/riscv/riscv-linux.git && \
+	git fetch && \
+	git checkout -f -t origin/master
+	mkdir -p $(dir $@) && touch $@
+
+$(LINUX_SRC)/stamps/initramfs: $(LINUX_SRC)/stamps/source
+	mkdir -p $(LINUX_BUILD)/rootfs
+	cd $(LINUX_BUILD) && \
+	sudo rm -rf initramfs && \
+	sudo mount -o loop $(ROOT_FS) rootfs && \
+	sudo cp -a rootfs initramfs && \
+	sudo umount rootfs && \
+	sudo cp $(LINUX_DIR)/init.sh initramfs/init && \
+	sudo rm -rf initramfs/lost+found && \
+	mkdir -p $(dir $@) && touch $@
+
+###
+### cmake
+###
+
+CMAKE_PKG_FILE := cmake-3.5.2-Linux-x86_64.tar.gz
+CMAKE_URL := http://www.cmake.org/files/v3.5/$(CMAKE_PKG_FILE)
+CMAKE_PKG := $(REMOTE_DIR)/$(CMAKE_PKG_FILE)
+CMAKE_BUILD := $(BUILD_DIR)/cmake
+CMAKE := $(CMAKE_BUILD)/bin/cmake
+
+$(CMAKE_PKG):
+	mkdir -p $(dir $@)
+	wget $(CMAKE_URL) -O $@
+
+$(CMAKE): $(CMAKE_PKG)
+	mkdir -p $(CMAKE_BUILD)
+	tar --strip-components=1 -xvf $(CMAKE_PKG) -C $(CMAKE_BUILD)
+	touch $(CMAKE)
+
+.PHONY: cmake
+cmake: $(CMAKE)
+
+###
+### riscv-fesvr
+###
+
+FESVR_BUILD := $(BUILD_DIR)/riscv-fesvr
+FESVR_MAKEFILE := $(FESVR_BUILD)/Makefile
+FESVR_OUT := $(FESVR_BUILD)/libfesvr.so
+FESVR_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/lib/libfesvr.so
+FESVR_CONFIGURE := $(SUBMODULES_DIR)/riscv-fesvr/configure \
+                   --prefix=$(TOOLCHAIN_RELEASE)
+FESVR_ALIAS := riscv-fesvr
+
+# riscv-isa-sim
+SIM_BUILD := $(BUILD_DIR)/riscv-isa-sim
+SIM_MAKEFILE := $(SIM_BUILD)/Makefile
+SIM_OUT := $(SIM_BUILD)/spike
+SIM_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/spike
+SIM_CONFIGURE := $(SUBMODULES_DIR)/riscv-isa-sim/configure \
+                 --prefix=$(TOOLCHAIN_RELEASE) \
+                 --with-fesvr=$(TOOLCHAIN_RELEASE) \
+                 --with-isa=RV32IMAFDC
+SIM_ALIAS := riscv-isa-sim
+SIM_DEPS := $(FESVR_TOOLCHAIN)
+
+###
+### riscv-pk
+###
+
+# 32 bit
+
+PK_PATCHED := $(BUILD_DIR)/riscv-pk/.patched
+$(PK_PATCHED): $(PATCHES_DIR)/riscv-pk-32-bit-build-fix.patch
+	cd $(SUBMODULES_DIR)/riscv-pk && patch < $<
+	mkdir -p $(dir $@) && touch $@
+
+.PHONY: riscv-pk-unpatch
+riscv-pk-unpatch:
+	cd $(SUBMODULES_DIR)/riscv-pk && \
+		git checkout configure configure.ac && \
+		rm -f $(PK_PATCHED)
+
+PK32_BUILD := $(BUILD_DIR)/riscv-pk/32
+PK32_MAKEFILE := $(PK32_BUILD)/Makefile
+PK32_OUT := $(PK32_BUILD)/pk
+PK32_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/$(RV32_TRIPLE)/bin/pk
+PK32_CONFIGURE := $(SUBMODULES_DIR)/riscv-pk/configure \
+                  --prefix=$(TOOLCHAIN_RELEASE) \
+                  --host=$(RV32_TRIPLE) \
+                  --enable-32bit
+PK32_ALIAS := riscv-pk-32
+PK32_DEPS := $(PK_PATCHED)
+
+# 64 bit
+
+PK64_BUILD := $(BUILD_DIR)/riscv-pk/64
+PK64_MAKEFILE := $(PK64_BUILD)/Makefile
+PK64_OUT := $(PK64_BUILD)/pk
+PK64_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/$(RV64_TRIPLE)/bin/pk
+PK64_CONFIGURE := $(SUBMODULES_DIR)/riscv-pk/configure \
+                  --prefix=$(TOOLCHAIN_RELEASE) \
+                  --host=$(RV64_TRIPLE) \
+                  --with-payload=$(LINUX_TOOLCHAIN)
+PK64_ALIAS := riscv-pk-64
+PK64_DEPS := $(PK_PATCHED) $(LINUX_TOOLCHAIN)
+
+###
+### llvm
+###
+
+# common
+
+LLVM_COMMON_CMAKE_OPTS := \
+    -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86"
+
+# riscv-llvm debug
+
+RISCV_LLVM_DEBUG_BUILD := $(BUILD_DIR)/riscv-llvm/debug
+RISCV_LLVM_DEBUG_MAKEFILE := $(RISCV_LLVM_DEBUG_BUILD)/Makefile
+RISCV_LLVM_DEBUG_OUT := $(RISCV_LLVM_DEBUG_BUILD)/bin/clang
+RISCV_LLVM_DEBUG_TOOLCHAIN := $(TOOLCHAIN_DEBUG)/bin/clang
+RISCV_LLVM_DEBUG_CONFIGURE := \
+    $(CMAKE) $(LLVM_COMMON_CMAKE_OPTS) \
+             -DCMAKE_BUILD_TYPE=Debug \
+             -DBUILD_SHARED_LIBS=ON \
+             -DCMAKE_INSTALL_PREFIX=$(TOOLCHAIN_DEBUG) \
+             $(SUBMODULES_DIR)/riscv-llvm
+RISCV_LLVM_DEBUG_ALIAS := riscv-llvm-debug
+RISCV_CLANG_LINK := $(SUBMODULES_DIR)/riscv-llvm/tools/clang
+RISCV_LLVM_DEBUG_DEPS := $(NEWLIB_GCC32_TOOLCHAIN) $(CMAKE) $(RISCV_CLANG_LINK)
+
+$(RISCV_CLANG_LINK):
+	ln -sf $(SUBMODULES_DIR)/riscv-clang $@
+
+# llvm debug
+
+LLVM_DEBUG_BUILD := $(BUILD_DIR)/llvm/debug
+LLVM_DEBUG_MAKEFILE := $(LLVM_DEBUG_BUILD)/Makefile
+LLVM_DEBUG_OUT := $(LLVM_DEBUG_BUILD)/bin/clang
+LLVM_DEBUG_INSTALL_DIR := $(TOOLCHAIN_DEBUG)/llvm
+LLVM_DEBUG_TOOLCHAIN := $(LLVM_DEBUG_INSTALL_DIR)/bin/clang
+LLVM_DEBUG_CONFIGURE := \
+    $(CMAKE) $(LLVM_COMMON_CMAKE_OPTS) \
+             -DCMAKE_BUILD_TYPE=Debug \
+             -DBUILD_SHARED_LIBS=ON \
+             -DCMAKE_INSTALL_PREFIX=$(LLVM_DEBUG_INSTALL_DIR) \
+             $(SUBMODULES_DIR)/llvm
+LLVM_DEBUG_ALIAS := llvm-debug
+CLANG_LINK := $(SUBMODULES_DIR)/llvm/tools/clang
+LLVM_DEBUG_DEPS := $(NEWLIB_GCC32_TOOLCHAIN) $(CMAKE) $(CLANG_LINK)
+
+LLVM_DEBUG_POSTINSTALL := \
+  SRC=$(LLVM_DEBUG_BUILD)/lib/Target/RISCV && \
+  DST=$(LLVM_DEBUG_INSTALL_DIR)/include/llvm/Target/RISCV && \
+  mkdir -p $$DST && \
+  (for f in RISCVGenInstrInfo.inc RISCVGenRegisterInfo.inc; do \
+    cp $$SRC/$$f $$DST/$$f || exit 1; \
+  done)
+
+$(CLANG_LINK):
+	ln -sf $(SUBMODULES_DIR)/clang $@
+
+# riscv-llvm release
+
+RISCV_LLVM_RELEASE_BUILD := $(BUILD_DIR)/riscv-llvm/release
+RISCV_LLVM_RELEASE_MAKEFILE := $(RISCV_LLVM_RELEASE_BUILD)/Makefile
+RISCV_LLVM_RELEASE_OUT := $(RISCV_LLVM_RELEASE_BUILD)/bin/clang
+RISCV_LLVM_RELEASE_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/clang
+RISCV_LLVM_RELEASE_CONFIGURE := \
+    $(CMAKE) $(LLVM_COMMON_CMAKE_OPTS) \
+             -DCMAKE_BUILD_TYPE=Release \
+             -DCMAKE_INSTALL_PREFIX=$(TOOLCHAIN_RELEASE) \
+             $(SUBMODULES_DIR)/riscv-llvm
+RISCV_LLVM_RELEASE_ALIAS := riscv-llvm-release
+RISCV_LLVM_RELEASE_DEPS := $(NEWLIB_GCC32_TOOLCHAIN) $(CMAKE) $(RISCV_CLANG_LINK)
+
+# llvm release
+
+LLVM_RELEASE_BUILD := $(BUILD_DIR)/llvm/release
+LLVM_RELEASE_MAKEFILE := $(LLVM_RELEASE_BUILD)/Makefile
+LLVM_RELEASE_OUT := $(LLVM_RELEASE_BUILD)/bin/clang
+LLVM_RELEASE_INSTALL_DIR := $(TOOLCHAIN_RELEASE)/llvm
+LLVM_RELEASE_TOOLCHAIN := $(LLVM_RELEASE_INSTALL_DIR)/bin/clang
+LLVM_RELEASE_CONFIGURE := \
+    $(CMAKE) $(LLVM_COMMON_CMAKE_OPTS) \
+             -DCMAKE_BUILD_TYPE=Release \
+             -DCMAKE_INSTALL_PREFIX=$(LLVM_RELEASE_INSTALL_DIR) \
+             $(SUBMODULES_DIR)/llvm
+LLVM_RELEASE_ALIAS := llvm-release
+LLVM_RELEASE_DEPS := $(NEWLIB_GCC32_TOOLCHAIN) $(CMAKE) $(CLANG_LINK)
+
+LLVM_RELEASE_POSTINSTALL := \
+  SRC=$(LLVM_RELEASE_BUILD)/lib/Target/RISCV && \
+  DST=$(LLVM_RELEASE_INSTALL_DIR)/include/llvm/Target/RISCV && \
+  mkdir -p $$DST && \
+  (for f in RISCVGenInstrInfo.inc RISCVGenRegisterInfo.inc; do \
+    cp $$SRC/$$f $$DST/$$f || exit 1; \
+  done)
+
+###
+### sbt
+###
+
+# debug
+
+SBT_DEBUG_BUILD := $(BUILD_DIR)/sbt/debug
+SBT_DEBUG_MAKEFILE := $(SBT_DEBUG_BUILD)/Makefile
+SBT_DEBUG_OUT := $(SBT_DEBUG_BUILD)/riscv-sbt
+SBT_DEBUG_TOOLCHAIN := $(TOOLCHAIN_DEBUG)/bin/riscv-sbt
+SBT_DEBUG_CONFIGURE := \
+    $(CMAKE) -DCMAKE_BUILD_TYPE=Debug \
+             -DCMAKE_INSTALL_PREFIX=$(TOOLCHAIN_DEBUG) \
+             $(TOPDIR)/sbt
+SBT_DEBUG_ALIAS := sbt-debug
+SBT_DEBUG_DEPS := $(RISCV_LLVM_DEBUG_TOOLCHAIN) $(LLVM_DEBUG_TOOLCHAIN)
+
+# release
+
+SBT_RELEASE_BUILD := $(BUILD_DIR)/sbt/release
+SBT_RELEASE_MAKEFILE := $(SBT_RELEASE_BUILD)/Makefile
+SBT_RELEASE_OUT := $(SBT_RELEASE_BUILD)/riscv-sbt
+SBT_RELEASE_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/riscv-sbt
+SBT_RELEASE_CONFIGURE := \
+    $(CMAKE) -DCMAKE_BUILD_TYPE=Release \
+             -DCMAKE_INSTALL_PREFIX=$(TOOLCHAIN_RELEASE) \
+             $(TOPDIR)/sbt
+SBT_RELEASE_ALIAS := sbt-release
+SBT_RELEASE_DEPS := $(RISCV_LLVM_RELEASE_TOOLCHAIN) $(LLVM_RELEASE_TOOLCHAIN)
+
+.PHONY: sbt
+sbt: $(SBT)-build $(SBT)-install
+
+###
+### riscvemu
+###
+
+RVEMU_PKG_FILE := riscvemu-2017-01-12.tar.gz
+RVEMU_URL   := http://www.bellard.org/riscvemu/$(RVEMU_PKG_FILE)
+RVEMU_PKG := $(REMOTE_DIR)/$(RVEMU_PKG_FILE)
+RVEMU_SRC := $(BUILD_DIR)/riscvemu-2017-01-12
+
+$(RVEMU_PKG):
+	mkdir -p $(dir $@)
+	wget $(RVEMU_URL) -O $@
+
+$(RVEMU_SRC)/extracted: $(RVEMU_PKG)
+	tar -C $(BUILD_DIR) -xvf $(RVEMU_PKG)
+	touch $@
+
+RVEMU_BUILD := $(RVEMU_SRC)
+RVEMU_PKG_LINUX_FILE := diskimage-linux-riscv64-2017-01-07.tar.gz
+RVEMU_LINUX_URL  := http://www.bellard.org/riscvemu/$(RVEMU_PKG_LINUX_FILE)
+RVEMU_LINUX_PKG  := $(REMOTE_DIR)/$(RVEMU_PKG_LINUX_FILE)
+RVEMU_LINUX_SRC  := $(RVEMU_BUILD)/diskimage-linux-riscv64-2017-01-07
+
+RVEMU_MAKEFILE := $(RVEMU_BUILD)/Makefile
+RVEMU_OUT := $(RVEMU_BUILD)/riscvemu
+RVEMU_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/riscvemu
+RVEMU_CONFIGURE := true
+RVEMU_INSTALL   := cd $(RVEMU_BUILD) && \
+  cp riscvemu riscvemu32 riscvemu64 riscvemu128 $(TOOLCHAIN_RELEASE)/bin/ && \
+  DIR=$(TOOLCHAIN_RELEASE)/share/riscvemu && \
+  mkdir -p $$DIR && \
+  cp $(RVEMU_LINUX_SRC)/bbl.bin $(RVEMU_LINUX_SRC)/root.bin $$DIR && \
+  F=$(TOOLCHAIN_RELEASE)/bin/riscvemu64_linux && \
+  echo "riscvemu $$DIR/bbl.bin $$DIR/root.bin" > $$F && \
+  chmod +x $$F
+RVEMU_ALIAS := riscvemu
+RVEMU_DEPS := $(RVEMU_SRC)/extracted $(RVEMU_LINUX_SRC)/extracted
+
+$(RVEMU_LINUX_PKG):
+	mkdir -p $(dir $@)
+	wget $(RVEMU_LINUX_URL) -O $@
+
+$(RVEMU_LINUX_SRC)/extracted: $(RVEMU_LINUX_PKG)
+	mkdir -p $(RVEMU_BUILD)
+	tar -C $(RVEMU_BUILD) -xvf $(RVEMU_LINUX_PKG)
+	touch $@
+
+###
+### QEMU
+###
+
+# system
+
+QEMU_BUILD := $(BUILD_DIR)/qemu
+QEMU_MAKEFILE := $(QEMU_BUILD)/Makefile
+QEMU_OUT := $(QEMU_BUILD)/qemu-system-riscv32
+QEMU_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/qemu-system-riscv32
+QEMU_CONFIGURE := $(SUBMODULES_DIR)/riscv-qemu/configure \
+  --prefix=$(TOOLCHAIN_RELEASE) \
+  --target-list=riscv64-softmmu,riscv32-softmmu
+QEMU_ALIAS := qemu
+
+# user
+
+QEMU_USER_BUILD := $(BUILD_DIR)/qemu-user
+QEMU_USER_MAKEFILE := $(QEMU_USER_BUILD)/Makefile
+QEMU_USER_OUT := $(QEMU_USER_BUILD)/qemu-riscv32
+QEMU_USER_TOOLCHAIN := $(TOOLCHAIN_RELEASE)/bin/qemu-riscv32
+QEMU_USER_CONFIGURE := $(SUBMODULES_DIR)/riscv-qemu/configure \
+  --prefix=$(TOOLCHAIN_RELEASE) \
+  --target-list=riscv64-linux-user,riscv32-linux-user
+QEMU_USER_ALIAS := qemu-user
+
+# tests
+
+QEMU_TESTS_BUILD := $(BUILD_DIR)/riscv-qemu-tests
+QEMU_TESTS_MAKEFILE := $(QEMU_TESTS_BUILD)/Makefile
+
+.PHONY: qemu-tests-reset
+qemu-tests-reset:
+	rm -rf $(QEMU_TESTS_BUILD)
+
+.PHONY: qemu-tests-prepare
+qemu-tests-prepare: qemu-tests-reset
+	cp -a $(PATCHES_DIR)/riscv-qemu-tests $(QEMU_TESTS_BUILD)
+
+QEMU_TESTS_CONFIGURE := \
+    $(MAKE) -C $(TOPDIR) qemu-tests-prepare
+QEMU_TESTS_MAKE_FLAGS := all32
+QEMU_TESTS_OUT := $(QEMU_TESTS_BUILD)/test1
+QEMU_TESTS_TOOLCHAIN := $(QEMU_TESTS_BUILD)/rv32i/add.o
+QEMU_TESTS_INSTALL := true
+QEMU_TESTS_ALIAS := qemu-tests
+QEMU_TESTS_DEPS := $(BINUTILS_LINUX)
+
+###
+### TEST targets
+###
+
+
+lc:
+	cat $(TOPDIR)/sbt/*.h $(TOPDIR)/sbt/*.cpp $(TOPDIR)/sbt/*.s | wc -l
+
+
+SBT_TEST_DIR := $(TOPDIR)/sbt/test
+
+.PHONY: tests
+tests: sbt
+	rm -f log.txt
+	$(LOG) $(MAKE) -C $(TOPDIR)/test clean all run
+	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) clean run-alltests
+
+### rv32-system test
+
+SBT_OUT_DIR := $(BUILD_DIR)/sbt/$(BUILD_TYPE_DIR)/test/
+
+.PHONY: test-system
+test-system: sbt
+	rm -f log.txt $(SBT_OUT_DIR)rv32-*system*
+	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) test-system
+
+### QEMU tests
+
+.PHONY: rv32tests
+rv32tests: qemu-tests-reset $(QEMU_TESTS_TOOLCHAIN) sbt
+	rm -f log.txt
+	$(MAKE) -C $(QEMU_TESTS_BUILD)/rv32i clean all
+	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) rv32tests
+
+###
+### matrix multiply test
+###
+
+TARGETS := rv32 x86 rv32-x86
+
+mmm:
+	$(LOG) $(TOPDIR)/scripts/measure.py $(SBT_OUT_DIR) mm
+
+.PHONY: mmtest
+mmtest: sbt
+	rm -f log.txt $(SBT_OUT_DIR)*-mm*
+	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) mm
+	$(MAKE) mmm
+
+
+.PHONY: mibench
+mibench: sbt
+	rm -f log.txt
+	$(LOG) $(MAKE) -C $(TOPDIR)/mibench $(MIBENCHS)
+
+mibench-clean:
+	$(MAKE) -C $(TOPDIR)/mibench clean
+
+###
+### BEGIN debugging targets ###
+###
+
+TESTBIN := rv32-x86-jal
+.PHONY: test-prep
+test-prep: sbt qemu-tests-reset qemu-tests
+	# clean
+
+.PHONY: test
+test: test-prep
+	rm -f log.txt
+	$(LOG) $(MAKE) $(TESTBIN)
+	$(LOG) $(TESTBIN)
+
+.PHONY: dbg
+dbg:
+	gdb $(TESTBIN)
+
+###
+### END debugging targets ###
+###
+
+# clean all
+clean: $(foreach prog,$(ALL),$($(prog)_ALIAS)-clean) riscv-pk-unpatch
+	rm -rf $(BUILD_DIR)
+	rm -rf $(TOOLCHAIN)/*
