@@ -5,9 +5,10 @@ RUN apt-get update && \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-RUN git clone https://github.com/OpenISA/riscv-sbt.git
-
-RUN cd /riscv-sbt && git submodule update --init --recursive
+RUN git clone \
+    --depth 1 --shallow-submodules --recursive \
+    -b unstable \
+    https://github.com/OpenISA/riscv-sbt.git
 
 # RISC-V toolchain pre-reqs
 RUN apt-get update \
