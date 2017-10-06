@@ -132,6 +132,7 @@ $(call RULE_BUILD,$(1))
 $(call RULE_UPDATE_FILELIST,$(1))
 $(call RULE_INSTALL,$(1))
 $(call RULE_ALIAS,$(1))
+$(call RULE_RMPKG,$(1))
 $(call RULE_CLEAN,$(1))
 endef
 

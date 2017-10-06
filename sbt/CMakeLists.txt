@@ -119,7 +119,7 @@ set (LIBC_C ${PROJECT_SOURCE_DIR}/libc.c)
 # libc.bc
 add_custom_command(OUTPUT libc.bc
     COMMAND clang
-        --target=riscv -mriscv=RV32IMAFD
+        --target=riscv32
         -emit-llvm -c -O3 -mllvm -disable-llvm-optzns
         ${LIBC_C}
         MAIN_DEPENDENCY ${LIBC_C})
