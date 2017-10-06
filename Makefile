@@ -4,13 +4,14 @@ endif
 
 include $(TOPDIR)/make/config.mk
 
-ALL := LLVM
+# ALL := LOWRISC_LLVM_DEBUG
 
-all: riscv-gnu-toolchain
+all: lowrisc-llvm-debug
 
 include $(TOPDIR)/make/rules.mk
 include $(TOPDIR)/make/build_pkg.mk
 include $(TOPDIR)/make/riscv-gnu-toolchain.mk
+include $(TOPDIR)/make/llvm.mk
 
 ###
 # apply lowrisc patches
@@ -33,5 +34,5 @@ patch-llvm:
 ### generate all rules
 ###
 
-#$(foreach prog,$(ALL),$(eval $(call RULE_ALL,$(prog))))
+# $(foreach prog,$(ALL),$(eval $(call RULE_ALL,$(prog))))
 

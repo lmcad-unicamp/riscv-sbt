@@ -507,11 +507,6 @@ PK64_DEPS := $(PK_PATCHED) $(LINUX_TOOLCHAIN)
 ### llvm
 ###
 
-# common
-
-LLVM_COMMON_CMAKE_OPTS := \
-    -DLLVM_TARGETS_TO_BUILD="ARM;RISCV;X86"
-
 # riscv-llvm debug
 
 RISCV_LLVM_DEBUG_BUILD := $(BUILD_DIR)/riscv-llvm/debug

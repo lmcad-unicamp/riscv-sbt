@@ -35,4 +35,9 @@ RUN apt-get update \
 #    libusb-1.0-0-dev \
 #    pkg-config \
 
+# RUN apt-get update \
+# && apt-get install -y ninja-build \
+# && rm -rf /var/lib/apt/lists/*
+# lowrisc-llvm-debug
+
 CMD ["/bin/bash"]

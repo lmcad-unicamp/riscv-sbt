@@ -49,6 +49,25 @@ define UPDATE_FILES
 endef
 
 
+define RULE_UPDATE_FILELIST =
+.PHONY: $$($(1)_ALIAS)-update-filelist
+$$($(1)_ALIAS)-update-filelist:
+	@echo "*** $$@ ***"
+	echo "Updating file list..."
+	if [ -f $$(TOOLCHAIN)/pkg/$$($(1)_ALIAS).files ]; then \
+		echo "Skipped: file list already exists"; \
+	else \
+		if [ ! -f $$(TOOLCHAIN)/pkg/all.files ]; then \
+			mkdir -p $$(TOOLCHAIN)/pkg; \
+			touch $$(TOOLCHAIN)/pkg/all.files; \
+		fi; \
+		cd $$(TOOLCHAIN) && \
+		$$(NEW_FILES) > pkg/$$($(1)_ALIAS).files && \
+		$(call UPDATE_FILES,$(1)); \
+	fi
+
+endef
+
 ###
 ### install
 ###
@@ -65,18 +84,7 @@ endif
 ifneq ($$($(1)_POSTINSTALL),)
 	$$($(1)_POSTINSTALL)
 endif
-	echo "Updating file list..."
-	if [ -f $$(TOOLCHAIN)/pkg/$$($(1)_ALIAS).files ]; then \
-		echo "Skipped: file list already exists"; \
-	else \
-		if [ ! -f $$(TOOLCHAIN)/pkg/all.files ]; then \
-			mkdir -p $$(TOOLCHAIN)/pkg; \
-			touch $$(TOOLCHAIN)/pkg/all.files; \
-		fi; \
-		cd $$(TOOLCHAIN) && \
-		$$(NEW_FILES) > pkg/$$($(1)_ALIAS).files && \
-		$(call UPDATE_FILES,$(1)); \
-	fi
+	$(MAKE) $$($(1)_ALIAS)-update-filelist
 
 ### install only when build OUTPUT changes
 $$($(1)_TOOLCHAIN): $$($(1)_OUT)
@@ -121,6 +129,7 @@ endef
 define RULE_ALL =
 $(call RULE_MAKEFILE,$(1))
 $(call RULE_BUILD,$(1))
+$(call RULE_UPDATE_FILELIST,$(1))
 $(call RULE_INSTALL,$(1))
 $(call RULE_ALIAS,$(1))
 $(call RULE_CLEAN,$(1))

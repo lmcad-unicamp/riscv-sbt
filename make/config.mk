@@ -46,6 +46,8 @@ X86_COUNTERS_O := $(SBT_SHARE_DIR)/x86-counters.o
 # tools
 #
 
+CMAKE             := cmake
+
 LOG               := $(SCRIPTS_DIR)/run.sh
 
 RV32_TRIPLE       := riscv32-unknown-elf
