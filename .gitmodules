@@ -42,3 +42,6 @@
 	path = submodules/riscv-llvm
 	url = https://github.com/openisa/llvm
 	branch = riscv
+[submodule "lowrisc-llvm"]
+	path = submodules/lowrisc-llvm
+	url = https://github.com/lowRISC/riscv-llvm
