@@ -13,24 +13,12 @@
 [submodule "clang"]
 	path = submodules/clang
 	url = https://github.com/OpenISA/clang
-[submodule "riscv-binutils-gdb"]
-	path = submodules/riscv-binutils-gdb
-	url = https://github.com/riscv/riscv-binutils-gdb
-[submodule "riscv-newlib"]
-	path = submodules/riscv-newlib
-	url = https://github.com/riscv/riscv-newlib
-[submodule "riscv-gcc"]
-	path = submodules/riscv-gcc
-	url = https://github.com/riscv/riscv-gcc
 [submodule "riscv-gnu-toolchain"]
 	path = submodules/riscv-gnu-toolchain
 	url = https://github.com/riscv/riscv-gnu-toolchain
 [submodule "riscv-qemu"]
 	path = submodules/riscv-qemu
 	url = https://github.com/riscv/riscv-qemu
-[submodule "riscv-glibc"]
-	path = submodules/riscv-glibc
-	url = https://github.com/riscv/riscv-glibc
 [submodule "submodules/riscv-qemu-tests"]
 	path = submodules/riscv-qemu-tests
 	url = https://github.com/arsv/riscv-qemu-tests
