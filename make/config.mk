@@ -63,7 +63,7 @@ RV32_LINUX_PREFIX := $(RV32_PREFIX)
 X86_PREFIX        := x86
 
 X86_MARCH         := x86
-RV32_MARCH        := riscv
+RV32_MARCH        := riscv32
 RV32_LINUX_MARCH  := $(RV32_MARCH)
 
 #
@@ -83,17 +83,17 @@ GCC_CFLAGS     := -static -O3
 #
 
 CLANG             := clang
-RV32_CLANG        := $(CLANG) --target=riscv -mriscv=RV32IMAFD
-RV32_LINUX_CLANG  := $(CLANG) --target=riscv -mriscv=RV32IMAFD
+RV32_CLANG        := $(CLANG) --target=riscv32
+RV32_LINUX_CLANG  := $(CLANG) --target=riscv32
 X86_CLANG         := $(CLANG) --target=x86_64-unknown-linux-gnu -m32
 
 CLANG_FLAGS       := -fno-rtti -fno-exceptions
 
-RV32_SYSROOT      := $(TOOLCHAIN_RELEASE)/$(RV32_TRIPLE)
+RV32_SYSROOT      := $(TOOLCHAIN_RELEASE)/opt/riscv/$(RV32_TRIPLE)
 RV32_SYSROOT_FLAG := -isysroot $(RV32_SYSROOT) -isystem $(RV32_SYSROOT)/include
 RV32_CLANG_FLAGS   = $(RV32_SYSROOT_FLAG)
 
-RV64_LINUX_SYSROOT      := $(TOOLCHAIN_RELEASE)/sysroot
+RV64_LINUX_SYSROOT      := $(TOOLCHAIN_RELEASE)/opt/riscv/sysroot
 RV64_LINUX_SYSROOT_FLAG := -isysroot $(RV64_LINUX_SYSROOT) -isystem $(RV64_LINUX_SYSROOT)/usr/include
 RV32_LINUX_CLANG_FLAGS   = $(RV64_LINUX_SYSROOT_FLAG) -D__riscv_xlen=32
 
@@ -101,15 +101,15 @@ EMITLLVM          := -emit-llvm -c -O3 -mllvm -disable-llvm-optzns
 
 LLC               := llc
 LLC_FLAGS         := -relocation-model=static -O3 #-stats
-RV32_LLC_FLAGS    := -march=$(RV32_MARCH) -mcpu=RV32IMAFD
+RV32_LLC_FLAGS    := -march=$(RV32_MARCH) -mattr=+m
 RV32_LINUX_LLC_FLAGS := $(RV32_LLC_FLAGS)
 X86_LLC_FLAGS     := -march=$(X86_MARCH) -mattr=avx #-mattr=avx2
 
-LLVMOPT           := $(LLVM_INSTALL_DIR)/bin/opt
+LLVMOPT           := opt
 LLVMOPT_FLAGS     := -O3 #-stats
 
-LLVMDIS           := $(LLVM_INSTALL_DIR)/bin/llvm-dis
-LLVMLINK          := $(LLVM_INSTALL_DIR)/bin/llvm-link
+LLVMDIS           := llvm-dis
+LLVMLINK          := llvm-link
 
 #
 # AS

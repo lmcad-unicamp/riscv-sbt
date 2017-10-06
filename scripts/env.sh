@@ -34,6 +34,10 @@ export PATH="$TCD/bin:$PATH"
 echo "$PATH" | grep "$TCR/opt/riscv/bin" >/dev/null ||
 export PATH="$TCR/opt/riscv/bin:$PATH"
 
+# toolchain: lowrisc-llvm
+echo "$PATH" | grep "$TCD/lowrisc-llvm/bin" >/dev/null ||
+export PATH="$TCD/lowrisc-llvm/bin:$PATH"
+
 export BUILD_DIR=$TOPDIR/build
 export PK32=$TCR/riscv32-unknown-elf/bin/pk
 export PK64=$TCR/riscv64-unknown-elf/bin/pk
