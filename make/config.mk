@@ -66,12 +66,15 @@ X86_MARCH         := x86
 RV32_MARCH        := riscv32
 RV32_LINUX_MARCH  := $(RV32_MARCH)
 
+# RV32_LINUX_ABI    := ilp32d
+RV32_LINUX_ABI    := ilp32
+
 #
 # gcc
 #
 
 RV32_GCC       := $(RV32_TRIPLE)-gcc
-RV32_LINUX_GCC := $(RV64_LINUX_TRIPLE)-gcc -march=rv32g -mabi=ilp32d
+RV32_LINUX_GCC := $(RV64_LINUX_TRIPLE)-gcc -march=rv32g -mabi=$(RV32_LINUX_ABI)
 X86_GCC        := gcc -m32
 
 GCC_CFLAGS     := -static -O3
@@ -117,7 +120,7 @@ LLVMLINK          := llvm-link
 
 RV32_AS           := $(RV32_TRIPLE)-as
 RV64_LINUX_AS     := $(RV64_LINUX_TRIPLE)-as
-RV32_LINUX_AS     := $(RV64_LINUX_AS) -march=rv32g -mabi=ilp32d
+RV32_LINUX_AS     := $(RV64_LINUX_AS) -march=rv32g -mabi=$(RV32_LINUX_ABI)
 X86_AS            := $(X86_64_TRIPLE)-as --32 #-g
 
 #

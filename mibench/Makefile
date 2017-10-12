@@ -5,73 +5,6 @@
 # http://vhosts.eecs.umich.edu/mibench//telecomm.tar.gz
 # http://vhosts.eecs.umich.edu/mibench//office.tar.gz
 # http://vhosts.eecs.umich.edu/mibench//consumer.tar.gz
-#
-# 01- automotive/basicmath/basicmath_large
-# - need FP: yes
-# - multiple files
-#
-# 02- automotive/bitcount/bitcnts
-# - need FP: yes
-# - multiple files
-#
-# 03- automotive/susan/susan
-# - need FP: yes
-# - single file
-# - 2122 lines
-#
-# 04- network/patricia/patricia
-# - need FP: yes
-# - multiple files
-#
-# 05- network/dijkstra/dijkstra_large
-# - need FP: no
-# - single file
-# - 174 lines
-#
-# 06- security/rijndael/rijndael
-# - need FP: no
-# - multiple files
-# - 827
-#
-# 07- security/blowfish/bf
-# - huge
-#
-# 08- security/sha/sha
-# - need FP: no
-# - multiple files
-# - 269 lines
-#
-# 09- telecomm/adpcm/rawcaudio
-# - need FP: no
-# - multiple files
-#
-# 10- telecomm/adpcm/rawdaudio
-# - need FP: no
-# - multiple files
-#
-# 11- telecomm/CRC32/crc
-# - need FP: no
-# - single file
-# - 281 lines
-#
-# 12- telecomm/FFT/fft
-# - need FP: yes
-# - multiple files
-# - 469 lines
-#
-# 13- office/stringsearch/search_large
-# - need FP: no
-# - multiple files
-# - lines: 3216
-#
-# 14- consumer/lame/lame3.70/lame
-# - huge
-#
-# can run now: 5, 11 (2)
-# need multiple files only: 6, 8, 9, 10, 13 (5)
-# need FP only: 3 (1)
-# need multiple files and FP: 1, 2, 4, 12 (4)
-# huge: 7, 14 (2)
 
 ifeq ($(TOPDIR),)
 $(error "TOPDIR not set. Please run 'source scripts/setenv.sh' first.")
@@ -93,7 +26,8 @@ BENCH_TRANSLATE  =
 BENCH_GCC_BUILD := 1
 
 ## 01- BASICMATH
-# wrong results
+# old: wrong results
+# new: OK (soft-float)
 
 BASICMATH_NAME  := basicmath
 BASICMATH_DIR   := automotive/basicmath
@@ -101,7 +35,8 @@ BASICMATH_MODS  := basicmath_large rad2deg cubic isqrt
 BASICMATH_ARGS  :=
 
 ## 02- BITCOUNT
-# wrong results
+# old: wrong results
+# new: OK (soft-float)
 
 BITCOUNT_NAME   := bitcount
 BITCOUNT_DIR    := automotive/bitcount
@@ -110,9 +45,11 @@ BITCOUNT_MODS   := bitcnt_1 bitcnt_2 bitcnt_3 bitcnt_4 \
 BITCOUNT_ARGS   := 1125000 | sed 's/Time:[^;]*; //;/^Best/d;/^Worst/d'
 
 ## 03- SUSAN
-# smoothing: OK
-# edges: wrong results
-# corners: segfault
+# old:
+#   smoothing: OK
+#   edges: wrong results
+#   corners: segfault
+# new: OK (soft-float)
 
 SUSAN_NAME      := susan
 SUSAN_DIR       := automotive/susan
@@ -120,7 +57,8 @@ SUSAN_MODS      := susan
 SUSAN_ARGS      := notests
 
 ## 04- PATRICIA
-# wrong results
+# old: wrong results
+# new: OK (soft float)
 
 PATRICIA_NAME   := patricia
 PATRICIA_DIR    := network/patricia
@@ -128,7 +66,8 @@ PATRICIA_MODS   := patricia patricia_test
 PATRICIA_ARGS   := $(MIBENCH)/$(PATRICIA_DIR)/large.udp
 
 ## 05- DIJKSTRA
-# OK
+# old: OK
+# new: OK
 
 DIJKSTRA_NAME   := dijkstra
 DIJKSTRA_DIR    := network/dijkstra
@@ -136,7 +75,8 @@ DIJKSTRA_MODS   := dijkstra_large
 DIJKSTRA_ARGS   := $(MIBENCH)/$(DIJKSTRA_DIR)/input.dat
 
 ## 06- RIJNDAEL
-# OK
+# old: OK
+# new: OK
 
 RIJNDAEL_NAME   := rijndael
 RIJNDAEL_DIR    := security/rijndael
@@ -144,7 +84,8 @@ RIJNDAEL_MODS   := aes aesxam
 RIJNDAEL_ARGS   := notests
 
 ## 07- BLOWFISH
-# wrong results
+# old: wrong results
+# new: wrong results
 
 BLOWFISH_NAME   := blowfish
 BLOWFISH_DIR    := security/blowfish
@@ -152,7 +93,8 @@ BLOWFISH_MODS   := bf bf_skey bf_ecb bf_enc bf_cbc bf_cfb64 bf_ofb64
 BLOWFISH_ARGS   := notests
 
 ## 08- SHA
-# OK
+# old: OK
+# new: OK
 
 SHA_NAME        := sha
 SHA_DIR         := security/sha
@@ -160,7 +102,8 @@ SHA_MODS        := sha_driver sha
 SHA_ARGS        := $(MIBENCH)/$(SHA_DIR)/input_large.asc
 
 ## 09- RAWCAUDIO
-# wrong results
+# old: wrong results
+# new: OK
 
 RAWCAUDIO_NAME  := rawcaudio
 RAWCAUDIO_DIR   := telecomm/adpcm
@@ -171,7 +114,8 @@ RAWCAUDIO_OUT_DIR_SUFFIX := /rawcaudio
 RAWCAUDIO_NO_TEE := 1
 
 ## 10- RAWDAUDIO
-# OK
+# old: OK
+# new: OK
 
 RAWDAUDIO_NAME  := rawdaudio
 RAWDAUDIO_DIR   := telecomm/adpcm
@@ -182,7 +126,8 @@ RAWDAUDIO_OUT_DIR_SUFFIX := /rawdaudio
 RAWDAUDIO_NO_TEE := 1
 
 ## 11- CRC32
-# OK
+# old: OK
+# new: OK
 
 CRC32_NAME      := crc32
 CRC32_DIR       := telecomm/CRC32
@@ -193,6 +138,7 @@ CRC32_ARGS      := $(MIBENCH)/telecomm/adpcm/data/large.pcm
 # GCC: results are slightly different, probably due to different
 #      FP rounding between RV32 and X86
 # LLVM: wrong results
+# new: OK (soft-float)
 
 FFT_NAME        := fft
 FFT_DIR         := telecomm/FFT
@@ -200,7 +146,8 @@ FFT_MODS        := main fftmisc fourierf
 FFT_ARGS        := notests
 
 ## 13- STRINGSEARCH
-# OK
+# old: OK
+# new: OK
 
 STRINGSEARCH_NAME := stringsearch
 STRINGSEARCH_BIN  := search_large
@@ -209,7 +156,8 @@ STRINGSEARCH_MODS := bmhasrch bmhisrch bmhsrch pbmsrch_large
 STRINGSEARCH_ARGS :=
 
 ## 14- LAME
-# segfault
+# old: segfault
+# new: OK (soft-float)
 
 LAME_NAME := lame
 LAME_DIR  := consumer/lame
