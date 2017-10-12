@@ -44,7 +44,7 @@ define RULE_NINJA_BUILD =
 .PHONY: $$($(1)_ALIAS)-build
 $$($(1)_ALIAS)-build:
 	@echo "*** $$@ ***"
-	$(CMAKE) --build $$($(1)_BUILD)
+	$(CMAKE) --build $$($(1)_BUILD) -- $(MAKE_OPTS)
 
 #### build only when MAKEFILE changes
 $$($(1)_OUT): $$($(1)_MAKEFILE)
