@@ -77,7 +77,9 @@ RV32_GCC       := $(RV32_TRIPLE)-gcc
 RV32_LINUX_GCC := $(RV64_LINUX_TRIPLE)-gcc -march=rv32g -mabi=$(RV32_LINUX_ABI)
 X86_GCC        := gcc -m32
 
-GCC_CFLAGS     := -static -O3
+_O             := -O3
+
+GCC_CFLAGS     := -static $(_O)
 # debug
 # GCC_CFLAGS     := -static -O0 -g
 
@@ -100,16 +102,16 @@ RV64_LINUX_SYSROOT      := $(TOOLCHAIN_RELEASE)/opt/riscv/sysroot
 RV64_LINUX_SYSROOT_FLAG := -isysroot $(RV64_LINUX_SYSROOT) -isystem $(RV64_LINUX_SYSROOT)/usr/include
 RV32_LINUX_CLANG_FLAGS   = $(RV64_LINUX_SYSROOT_FLAG) -D__riscv_xlen=32
 
-EMITLLVM          := -emit-llvm -c -O3 -mllvm -disable-llvm-optzns
+EMITLLVM          := -emit-llvm -c $(_O) -mllvm -disable-llvm-optzns
 
 LLC               := llc
-LLC_FLAGS         := -relocation-model=static -O3 #-stats
+LLC_FLAGS         := -relocation-model=static $(_O) #-stats
 RV32_LLC_FLAGS    := -march=$(RV32_MARCH) -mattr=+m
 RV32_LINUX_LLC_FLAGS := $(RV32_LLC_FLAGS)
 X86_LLC_FLAGS     := -march=$(X86_MARCH) -mattr=avx #-mattr=avx2
 
 LLVMOPT           := opt
-LLVMOPT_FLAGS     := -O3 #-stats
+LLVMOPT_FLAGS     := $(_O) #-stats
 
 LLVMDIS           := llvm-dis
 LLVMLINK          := llvm-link

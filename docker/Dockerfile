@@ -66,4 +66,25 @@ RUN ["/bin/bash", "-c", ". scripts/env.sh && make sbt-debug"]
 
 RUN ["/bin/bash", "-c", ". scripts/env.sh && make riscv-gnu-toolchain-linux"]
 
+RUN git submodule update --recursive --init submodules/riscv-fesvr
+RUN git submodule update --recursive --init submodules/riscv-isa-sim
+RUN git submodule update --recursive --init submodules/riscv-pk
+RUN git submodule update --recursive --init submodules/riscv-qemu
+
+RUN ["/bin/bash", "-c", ". scripts/env.sh && make riscv-isa-sim"]
+RUN ["/bin/bash", "-c", ". scripts/env.sh && make riscv-pk-32"]
+
+RUN apt-get update \
+    && apt-get install -y \
+    python \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update \
+    && apt-get install -y \
+    libglib2.0-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN ["/bin/bash", "-c", ". scripts/env.sh && make qemu-user"]
+
 CMD ["/bin/bash"]

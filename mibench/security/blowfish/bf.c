@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <ctype.h>
 #include "blowfish.h"
 
 int
@@ -87,8 +89,8 @@ while(!feof(fp))
 	i=0;
 }
 
-close(fp);
-close(fp2);
+fclose(fp);
+fclose(fp2);
 
 exit(1);
 }
