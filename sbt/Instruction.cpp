@@ -669,7 +669,7 @@ llvm::Error Instruction::translateFence(bool fi)
     *_os << "fence";
 
     _bld->fence(llvm::AtomicOrdering::AcquireRelease,
-        llvm::SynchronizationScope::CrossThread);
+        llvm::SyncScope::System);
     return llvm::Error::success();
 }
 

@@ -441,7 +441,7 @@ public:
     }
 
     // fence
-    void fence(llvm::AtomicOrdering order, llvm::SynchronizationScope scope)
+    void fence(llvm::AtomicOrdering order, llvm::SyncScope::ID scope)
     {
         llvm::Value* v = _builder->CreateFence(order, scope);
         updateFirst(v);
