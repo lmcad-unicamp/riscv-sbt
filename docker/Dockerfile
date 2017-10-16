@@ -1,26 +1,19 @@
 FROM debian:stretch
 
+# install git and unbuffer (expect) to perform the clone, showing
+# its progress
 RUN apt-get update && \
     apt-get install -y \
+    expect \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-RUN git clone \
-    --depth 1 -b unstable \
-    https://github.com/OpenISA/riscv-sbt.git
+# clone main repo
+RUN unbuffer git clone https://github.com/OpenISA/riscv-sbt.git
 
 WORKDIR /riscv-sbt
 
-RUN git submodule init submodules/llvm
-RUN git submodule update --recursive submodules/llvm
-
-RUN git submodule init submodules/clang
-RUN git submodule update --recursive submodules/clang
-
-RUN git submodule init submodules/lowrisc-llvm
-RUN git submodule update --recursive submodules/lowrisc-llvm
-
-# RISC-V toolchain pre-reqs
+# install RISC-V toolchain pre-reqs
 RUN apt-get update \
     && apt-get install -y \
     autoconf \
@@ -43,45 +36,44 @@ RUN apt-get update \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN git submodule update --recursive --init submodules/riscv-gnu-toolchain
-
+# riscv-gnu-toolchain
+RUN unbuffer git submodule update --recursive --init submodules/riscv-gnu-toolchain
 RUN ["/bin/bash", "-c", ". scripts/env.sh && make riscv-gnu-toolchain"]
+RUN ["/bin/bash", "-c", ". scripts/env.sh && make riscv-gnu-toolchain-linux"]
+
+# LLVM/clang
+RUN unbuffer git submodule update --recursive --init submodules/llvm
+RUN unbuffer git submodule update --recursive --init submodules/clang
+RUN unbuffer git submodule update --recursive --init submodules/lowrisc-llvm
 
 RUN apt-get update \
     && apt-get install -y \
     cmake \
+    g++-multilib \
     ninja-build \
     python3 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN ["/bin/bash", "-c", ". scripts/env.sh && make lowrisc-llvm-debug"]
+RUN ["/bin/bash", "-c", ". scripts/env.sh && make MAKE_OPTS=-j4 lowrisc-llvm-debug"]
 
-RUN apt-get update \
-    && apt-get install -y \
-    g++-multilib \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN git pull
+# SBT
 RUN ["/bin/bash", "-c", ". scripts/env.sh && make sbt-debug"]
 
-RUN ["/bin/bash", "-c", ". scripts/env.sh && make riscv-gnu-toolchain-linux"]
-
+# riscv emulators
 RUN git submodule update --recursive --init submodules/riscv-fesvr
 RUN git submodule update --recursive --init submodules/riscv-isa-sim
 RUN git submodule update --recursive --init submodules/riscv-pk
-RUN git submodule update --recursive --init submodules/riscv-qemu
 
 RUN ["/bin/bash", "-c", ". scripts/env.sh && make riscv-isa-sim"]
 RUN ["/bin/bash", "-c", ". scripts/env.sh && make riscv-pk-32"]
+
+# qemu
+RUN git submodule update --recursive --init submodules/riscv-qemu
 
 RUN apt-get update \
     && apt-get install -y \
     python \
     pkg-config \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN apt-get update \
-    && apt-get install -y \
     libglib2.0-dev \
     && rm -rf /var/lib/apt/lists/*
 
