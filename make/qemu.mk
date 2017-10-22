@@ -37,7 +37,7 @@ qemu-tests-reset:
 
 .PHONY: qemu-tests-prepare
 qemu-tests-prepare: qemu-tests-reset
-	cp -a $(PATCHES_DIR)/riscv-qemu-tests $(QEMU_TESTS_BUILD)
+	cp -a $(TOPDIR)/riscv-qemu-tests $(QEMU_TESTS_BUILD)
 
 QEMU_TESTS_CONFIGURE := \
     $(MAKE) -C $(TOPDIR) qemu-tests-prepare

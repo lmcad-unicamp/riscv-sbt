@@ -15,6 +15,7 @@ endif
 ALL := \
 	FESVR \
 	PK32 \
+	QEMU_TESTS \
 	QEMU_USER \
 	SBT_DEBUG \
 	SIM \
