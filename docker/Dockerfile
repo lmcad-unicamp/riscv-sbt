@@ -79,4 +79,13 @@ RUN apt-get update \
 
 RUN ["/bin/bash", "-c", ". scripts/env.sh && make qemu-user"]
 
+# needed by test-system
+#RUN apt-get update \
+#    && apt-get install -y \
+#    msr-tools \
+#    && rm -rf /var/lib/apt/lists/*
+#
+#RUN ["/bin/bash", "-c",
+# ". scripts/env.sh && ./scripts/setmsr.sh && make test-system"]
+
 CMD ["/bin/bash"]

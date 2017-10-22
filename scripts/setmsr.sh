@@ -37,3 +37,4 @@ for core in `seq 0 $MAXCORE`; do
   wrmsr -p $core $msr 0x00000000000003b3
 done
 
+echo 2 > /sys/devices/cpu/rdpmc
