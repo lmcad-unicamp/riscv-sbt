@@ -308,7 +308,7 @@ $(eval TO_IN = $(3))
 $(eval TO_OUT = $(4))
 
 $(TO_DIR)$(TO_OUT).bc: $(TO_DIR)$(TO_IN).o
-	riscv-sbt $(SBTFLAGS) -o $$@ $$^ > $(TOPDIR)/sbt.log
+	riscv-sbt $(SBTFLAGS) -o $$@ $$^ &> $(TOPDIR)/sbt.log
 
 endef
 

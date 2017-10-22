@@ -5,13 +5,9 @@ FAIL:	.ascii	"FAIL\n"
 .type FAIL, object
 .size FAIL, FLEN
 
-.text
-.align 4
-
 .macro START
 	.text
 	.globl _start
-	.align 4
 	_start:
 .endm
 
