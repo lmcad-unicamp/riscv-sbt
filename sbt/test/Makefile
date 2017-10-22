@@ -72,25 +72,40 @@ mm: rv32-mm x86-mm rv32-x86-mm
 
 #### RV32 Translator unit tests ###
 
+define UTEST
+$(eval UTEST_SRCDIR = $(1))
+$(eval UTEST_DSTDIR = $(2))
+$(eval UTEST_NAME = $(3))
+$(eval UTEST_RV32NAME = rv32-$(UTEST_NAME))
+$(eval UTEST_X86NAME = rv32-x86-$(UTEST_NAME))
+
+$(call S2O,RV32,$(UTEST_SRCDIR),$(UTEST_DSTDIR),$(UTEST_RV32NAME),$(UTEST_RV32NAME))
+$(call CLINK,RV32,$(UTEST_DSTDIR),$(UTEST_DSTDIR),$(UTEST_RV32NAME),$(UTEST_RV32NAME))
+$(call RUN,RV32,$(UTEST_DSTDIR),$(UTEST_RV32NAME),save-run.out)
+
+$(call TRANSLATE,X86,$(UTEST_DSTDIR),$(UTEST_DSTDIR),$(UTEST_RV32NAME),$(UTEST_X86NAME),$(X86_COUNTERS_O))
+
+.PHONY: $(UTEST_NAME)
+$(UTEST_NAME): $(UTEST_DSTDIR) $(addprefix $(UTEST_DSTDIR),$(UTEST_RV32NAME) $(UTEST_X86NAME))
+
+.PHONY: test-$(UTEST_NAME)
+test-$(UTEST_NAME): $(UTEST_NAME) run-$(UTEST_RV32NAME) run-$(UTEST_X86NAME)
+	diff $(UTEST_DSTDIR)$(UTEST_RV32NAME).out $(UTEST_DSTDIR)$(UTEST_X86NAME).out
+
+endef
+
 UTESTS := load-store alu-ops branch fence system m
 RV32_UTESTS := $(foreach test,$(UTESTS),rv32-$(test))
 RV32_X86_UTESTS := $(foreach test,$(UTESTS),rv32-x86-$(test))
 
-$(foreach test,$(RV32_UTESTS),\
-    $(eval $(call CBUILDS,RV32,$(SRC_DIR),$(SBT_OUT_DIR),$(test),$(test))))
-
 $(foreach test,$(UTESTS),\
-    $(eval $(call TRANSLATE,X86,$(SRC_DIR),$(SBT_OUT_DIR),rv32-$(test),rv32-x86-$(test),$(X86_COUNTERS_O))))
-
-$(foreach test,$(UTESTS),\
-    $(eval $(call TEST,X86,$(SBT_OUT_DIR),$(test))))
+$(eval $(call UTEST,$(SRC_DIR),$(SBT_OUT_DIR),$(test))))
 
 .PHONY: utests
-utests: $(RV32_UTESTS) $(RV32_X86_UTESTS)
+utests: $(UTESTS)
 
 # XXX removed system from utests to run (need MSR access and performance
 # counters support (not always available in VMs))
-.PHONY: run-utests
 run-utests: utests $(foreach test,$(filter-out system,$(UTESTS)),test-$(test))
 	@echo "All unit tests passed!"
 

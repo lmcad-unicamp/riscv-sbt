@@ -117,7 +117,7 @@ llvm::Error Translator::startTarget()
         return error(serr);
     }
 
-    llvm::SubtargetFeatures features;
+    llvm::SubtargetFeatures features("+m");
     _sti.reset(
             _target->createMCSubtargetInfo(tripleName, "", features.getString()));
     if (!_sti) {

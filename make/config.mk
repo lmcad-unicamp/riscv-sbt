@@ -37,7 +37,7 @@ MAKE_OPTS     ?= -j9
 # SBT
 #
 
-SBTFLAGS        = #-x
+SBTFLAGS        = -x
 SBT_SHARE_DIR  := $(TOOLCHAIN_DIR)/share/riscv-sbt
 X86_SYSCALL_O  := $(SBT_SHARE_DIR)/x86-syscall.o
 X86_COUNTERS_O := $(SBT_SHARE_DIR)/x86-counters.o

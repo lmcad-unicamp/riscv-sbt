@@ -58,6 +58,7 @@ llvm::Error Instruction::translate()
     // disasm
     size_t size;
     if (auto err = _ctx->disasm->disasm(_addr, _rawInst, _inst, size)) {
+#if 0
         // handle invalid encoding
         llvm::Error err2 = llvm::handleErrors(std::move(err),
             [&](const InvalidInstructionEncoding& serr) {
@@ -81,6 +82,9 @@ llvm::Error Instruction::translate()
             return err2;
         else
             return llvm::Error::success();
+#else
+        return err;
+#endif
     }
 
 

@@ -34,6 +34,7 @@ include $(TOPDIR)/make/llvm.mk
 include $(TOPDIR)/make/spike.mk
 include $(TOPDIR)/make/qemu.mk
 include $(TOPDIR)/make/sbt.mk
+include $(TOPDIR)/make/tests.mk
 
 ###
 # apply lowrisc patches
