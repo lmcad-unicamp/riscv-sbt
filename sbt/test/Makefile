@@ -37,8 +37,6 @@ $(eval $(call BUILDS,RV32,$(SRC_DIR),$(SBT_OUT_DIR),rv32-hello,rv32-hello))
 $(eval $(call BUILDS,X86,$(SRC_DIR),$(SBT_OUT_DIR),x86-hello,x86-hello))
 $(eval $(call TRANSLATE_ASM,X86,$(SRC_DIR),$(SBT_OUT_DIR),rv32-hello,rv32-x86-hello))
 
-#$(eval $(call S2O,X86,$(SRC_DIR),$(SBT_OUT_DIR),x86-dummy))
-
 
 ### x86-test-syscall ###
 
@@ -62,9 +60,13 @@ test-rv32-x86-argv: $(SBT_OUT_DIR)rv32-x86-argv
 
 ### mm (matrix multiply) ###
 
-$(eval $(call BUILD,RV32,$(SRC_DIR),$(SBT_OUT_DIR),mm,rv32-mm))
-$(eval $(call BUILD,X86,$(SRC_DIR),$(SBT_OUT_DIR),mm,x86-mm))
+$(eval $(call BUILDO,RV32,$(SRC_DIR),$(SBT_OUT_DIR),mm,rv32-mm))
+$(eval $(call CLINK,RV32,$(SBT_OUT_DIR),$(SBT_OUT_DIR),rv32-mm,rv32-mm))
+$(eval $(call RUN,RV32,$(SBT_OUT_DIR),rv32-mm,save-run.out))
+$(eval $(call ALIAS,$(SBT_OUT_DIR),rv32-mm))
 $(eval $(call TRANSLATE,X86,$(SRC_DIR),$(SBT_OUT_DIR),rv32-mm,rv32-x86-mm))
+
+$(eval $(call BUILD,X86,$(SRC_DIR),$(SBT_OUT_DIR),mm,x86-mm))
 
 .PHONY: mm
 mm: rv32-mm x86-mm rv32-x86-mm
@@ -110,6 +112,21 @@ run-utests: utests $(foreach test,$(filter-out system,$(UTESTS)),test-$(test))
 	@echo "All unit tests passed!"
 
 ###
+
+
+# TEST
+# 1: host arch
+# 2: dir/
+# 3: module
+define TEST
+$(eval TEST_RV32 = $(RV32_PREFIX)-$(3))
+$(eval TEST_TRANS = $(RV32_PREFIX)-$($(1)_PREFIX)-$(3))
+
+test-$(3): run-$(TEST_RV32) run-$(TEST_TRANS)
+	diff $(2)$(TEST_RV32).out $(2)$(TEST_TRANS).out
+
+endef
+
 
 $(foreach test,$(TESTS),\
     $(eval $(call TEST,X86,$(SBT_OUT_DIR),$(test))))

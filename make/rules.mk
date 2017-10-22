@@ -1,34 +1,59 @@
 ### rules ###
 
 
-# C2BC
-# 1: arch
-# 2: source dir/
-# 3: out dir/
-# 4: input (.c)
-# 5: output (.bc)
+# .c -> .bc
 define C2BC
-$(eval C2BC_CLANG_FLAGS = $$($(1)_CLANG_FLAGS))
-$(3)$(5).bc: $(2)$(4).c
-	cd $(3) && \
-		$$($(1)_CLANG) $(C2BC_CLANG_FLAGS) $(BUILD_CFLAGS) $(EMITLLVM) $(2)$(4).c -o $(5).bc
+$(eval C2BC_SRCDIR = $(2))
+$(eval C2BC_DSTDIR = $(3))
+$(eval C2BC_IN = $(4))
+$(eval C2BC_OUT = $(5))
+$(eval C2BC_CLANG_FLAGS = $($(1)_CLANG_FLAGS))
+
+$(C2BC_DSTDIR)$(C2BC_OUT).bc: $(C2BC_SRCDIR)$(C2BC_IN).c
+	$($(1)_CLANG) $(C2BC_CLANG_FLAGS) $(BUILD_CFLAGS) $(EMITLLVM) $$^ -o $$@
 
 endef
 
 
-# LLVM LINK
-# 1: arch
-# 2: dir/
-# 3: inputs (.bc)
-# 4: output (.bc)
+# .c -> .o
+define C2O
+$(eval C2O_SRCDIR = $(2))
+$(eval C2O_DSTDIR = $(3))
+$(eval C2O_IN = $(4))
+$(eval C2O_OUT = $(5))
+
+$(C2O_DSTDIR)$(C2O_OUT).o: $(GCC_C2O_SRCDIR)$(GCC_C2O_IN).c
+	$($(1)_GCC) $(GCC_CFLAGS) $(BUILD_CFLAGS) -c $$< -o $$@
+
+endef
+
+
+# .c -> .o
+define GCC_C2O
+$(eval C2O_SRCDIR = $(2))
+$(eval C2O_DSTDIR = $(3))
+$(eval C2O_IN = $(4))
+$(eval C2O_OUT = $(5))
+
+$(C2O_DSTDIR)$(C2O_OUT).o: $(C2O_SRCDIR)$(C2O_IN).c
+	$($(1)_GCC) $(GCC_CFLAGS) $(BUILD_CFLAGS) -c $$< -o $$@
+
+endef
+
+
+# *.bc -> .bc
 define LLLINK
-$(2)$(4).bc: $(foreach bc,$(3),$(2)$(bc).bc)
-	cd $(2) && \
-		$(LLVMLINK) $(foreach bc,$(3),$(bc).bc) -o $(4).bc
+$(eval LLLINK_DIR = $(2))
+$(eval LLLINK_INS = $(3))
+$(eval LLLINK_OUT = $(4))
+
+$(LLLINK_DIR)$(LLLINK_OUT).bc: $(foreach bc,$(LLLINK_INS),$(LLLINK_SRCDIR)$(bc).bc)
+	$(LLVMLINK) $$^ -o $$@
 
 endef
 
 
+# .bc -> .ll
 define DIS
 $(eval DIS_DIR = $(2))
 $(eval DIS_MOD = $(3))
@@ -39,6 +64,7 @@ $(DIS_DIR)$(DIS_MOD).ll: $(DIS_DIR)$(DIS_MOD).bc
 endef
 
 
+# opt
 define OPT
 $(eval OPT_DIR = $(2))
 $(eval OPT_IN = $(3))
@@ -50,6 +76,7 @@ $(OPT_DIR)$(OPT_OUT).bc: $(OPT_DIR)$(OPT_IN).bc $(OPT_DIR)$(OPT_IN).ll
 endef
 
 
+# .bc -> .s
 define BC2S
 $(eval BC2S_DIR = $(2))
 $(eval BC2S_IN = $(3))
@@ -61,6 +88,7 @@ $(BC2S_DIR)$(BC2S_OUT).s: $(BC2S_DIR)$(BC2S_IN).bc $(BC2S_DIR)$(BC2S_IN).ll
 endef
 
 
+# .s -> .o
 define S2O
 $(eval S2O_SRCDIR = $(2))
 $(eval S2O_DSTDIR = $(3))
@@ -72,20 +100,20 @@ $(S2O_DSTDIR)$(S2O_MOD).o: $(S2O_SRCDIR)$(S2O_MOD).s
 endef
 
 
-# LINK
-# 1: arch
-# 2: dir/
-# 3: objs
-# 4: output
-# 5: libs
+# *.o -> bin
 define LINK
-$(2)$(4): $(addprefix $(2),$(addsuffix .o,$(3)))
-	cd $(2) && \
-		$$($(1)_LD) -o $(4) $(addsuffix .o,$(3)) $(5)
+$(eval LINK_DIR = $(2))
+$(eval LINK_OBJS = $(3))
+$(eval LINK_OUT = $(4))
+$(eval LINK_LIBS = $(5))
+
+$(LINK_DIR)$(LINK_OUT): $(addprefix $(LINK_DIR),$(addsuffix .o,$(LINK_OBJS)))
+	$($(1)_LD) -o $$@ $$^ $(LINK_LIBS)
 
 endef
 
 
+# *.o -> cbin
 define CLINK
 $(eval CL_SRCDIR = $(2))
 $(eval CL_DSTDIR = $(3))
@@ -100,13 +128,29 @@ $(CL_DSTDIR)$(CL_OUT): $(addprefix $(CL_SRCDIR),$(CL_OBJS))
 endef
 
 
+# *.o -> cbin
+define GCC_LINK
+$(eval CL_SRCDIR = $(2))
+$(eval CL_DSTDIR = $(3))
+$(eval CL_MODS = $(4))
+$(eval CL_OUT = $(5))
+$(eval CL_LIBS = $(6))
+$(eval CL_OBJS = $(addsuffix .o,$(CL_MODS)))
+
+$(CL_DSTDIR)$(CL_OUT): $(addprefix $(CL_SRCDIR),$(CL_OBJS))
+	$($(1)_GCC) $(GCC_CFLAGS) -o $$@ $$^ $(CL_LIBS) -lm
+
+endef
+
+
+# *.s -> cbin
 define CLINKS
 $(eval CL_SRCDIR = $(2))
 $(eval CL_DSTDIR = $(3))
-$(eval CL_OBJS = $(4))
+$(eval CL_INS = $(4))
 $(eval CL_OUT = $(5))
 $(eval CL_LIBS = $(6))
-$(eval CL_SRCS = $(addsuffix .s,$(CL_OBJS)))
+$(eval CL_SRCS = $(addsuffix .s,$(CL_INS)))
 
 $(CL_DSTDIR)$(CL_OUT): $(addprefix $(CL_SRCDIR),$(CL_SRCS))
 	$($(1)_GCC) $(GCC_CFLAGS) -o $$@ $$^ $(CL_LIBS) -lm
@@ -114,184 +158,203 @@ $(CL_DSTDIR)$(CL_OUT): $(addprefix $(CL_SRCDIR),$(CL_SRCS))
 endef
 
 
-# C2O
-# 1: arch
-# 2: source dir/
-# 3: out dir/
-# 4: input (.c)
-# 5: output (.o)
-define GCC_C2O
-$(3)$(5).o: $(2)$(4).c
-	cd $(3) && \
-		$($(1)_GCC) $(GCC_CFLAGS) $(BUILD_CFLAGS) -c $(2)$(4).c -o $(5).o
-
-endef
-
-
-# GCC_LINK
-# 1: arch
-# 2: dir/
-# 3: objs
-# 4: output
-# 5: libs
-define GCC_LINK
-$(eval CL_OBJS = $(addsuffix .o,$(3)))
-
-$(2)$(4): $(addprefix $(2),$(CL_OBJS))
-	cd $(2) && \
-		$($(1)_GCC) $(GCC_CFLAGS) -o $(4) $(CL_OBJS) $(5) -lm
-
-endef
-
-
-# CLEAN
-# 1: dir
-# 2: module
-# 3: clean .s?
+# clean
 define CLEAN
-clean-$(2):
+$(eval CLEAN_DIR = $(1))
+$(eval CLEAN_MOD = $(2))
+$(eval CLEAN_S = $(3))
+
+clean-$(CLEAN_MOD):
 	@echo $$@:
-	cd $(1) && \
-		rm -f $(2) $(2).o $(if $(3),$(2).s,) $(2).bc $(2).ll \
-			$(2).opt.bc $(2).opt.ll $(2).opt2.bc $(2).opt2.ll $(2).out
+	cd $(CLEAN_DIR) && \
+		rm -f $(CLEAN_MOD) \
+		$(CLEAN_MOD).o \
+		$(if $(CLEAN_S),$(CLEAN_MOD).s,) \
+		$(CLEAN_MOD).bc $(CLEAN_MOD).ll \
+		$(CLEAN_MOD).opt.bc $(CLEAN_MOD).opt.ll \
+		$(CLEAN_MOD).opt2.bc $(CLEAN_MOD).opt2.ll \
+		$(CLEAN_MOD).out
 
 endef
 
 
-# RUN
-# 1: arch
-# 2: dir/
-# 3: program
-# 4: save output?
+# run
 define RUN
-run-$(3): $(2)$(3)
+$(eval RUN_DIR = $(2))
+$(eval RUN_PROG = $(3))
+$(eval RUN_SAVE = $(4))
+
+run-$(RUN_PROG): $(RUN_DIR)$(RUN_PROG)
 	@echo $$@:
-  ifeq ($(4),)
-	$$($(1)_RUN) $(2)$(3)
+  ifeq ($(RUN_SAVE),)
+	$($(1)_RUN) $(RUN_DIR)$(RUN_PROG)
   else
-	$$($(1)_RUN) $(2)$(3) | tee $(2)$(3).out
+	$($(1)_RUN) $(RUN_DIR)$(RUN_PROG) | tee $(RUN_DIR)$(RUN_PROG).out
   endif
 
 endef
 
 
-# ALIAS
-# 1: out dir/
-# 2: bin
+# alias
 define ALIAS
-ifneq ($(1),./)
-.PHONY: $(2)
-$(2): $(1) $(1)$(2)
+$(eval ALIAS_DIR = $(1))
+$(eval ALIAS_BIN = $(2))
+
+ifneq ($(ALIAS_DIR),./)
+.PHONY: $(ALIAS_BIN)
+$(ALIAS_BIN): $(ALIAS_DIR) $(ALIAS_DIR)$(ALIAS_BIN)
 endif
 
 endef
 
 
-# TEST
-# 1: host arch
-# 2: dir/
-# 3: module
-define TEST
-$(eval TEST_RV32 = $(RV32_PREFIX)-$(3))
-$(eval TEST_TRANS = $(RV32_PREFIX)-$($(1)_PREFIX)-$(3))
-
-test-$(3): run-$(TEST_RV32) run-$(TEST_TRANS)
-	diff $(2)$(TEST_RV32).out $(2)$(TEST_TRANS).out
-
-endef
-
-
-# BUILD*
-# 1: arch
-# 2: source dir/
-# 3: out dir/
-# 4: input files (.c)
-# 5: output file (bin)
-# 6: libs
-
-define C2BCNDIS
+# .c -> .bc && .bc -> .ll
+define _C2BCNDIS
 $(call C2BC,$(1),$(2),$(3),$(4),$(5))
 $(call DIS,$(1),$(3),$(5))
 endef
 
+
+# path -> dir/prefix-file
 # 1: prefix
 # 2: path
-define ADD_PREFIX
+define _ADD_PREFIX
 $(dir $(2))$(1)-$(notdir $(2))
 endef
 
-# multi C2BC and link
-define BUILD2
+
+# *.c -> *.bc -> .bc
+define _BUILD2
 $(eval BUILD2_PREFIX = $($(1)_PREFIX))
+$(eval BUILD2_SRCDIR = $(2))
+$(eval BUILD2_DSTDIR = $(3))
+$(eval BUILD2_INS = $(4))
+$(eval BUILD2_OUT = $(5))
+$(eval BUILD2_LIBS = $(6))
 
-ifeq ($(words $(4)),1)
-$(call C2BC,$(1),$(2),$(3),$(4),$(5))
+ifeq ($(words $(BUILD2_INS)),1)
+$(call C2BC,$(1),$(BUILD2_SRCDIR),$(BUILD2_DSTDIR),$(BUILD2_INS),$(BUILD2_OUT))
 else
-$(foreach c,$(4),\
-$(call C2BCNDIS,$(1),$(2),$(3),$(c),$(call ADD_PREFIX,$(BUILD2_PREFIX),$(c)_bc1)))
+$(foreach c,$(BUILD2_INS),\
+$(call _C2BCNDIS,$(1),$(BUILD2_SRCDIR),$(BUILD2_DSTDIR),$(c),\
+$(call _ADD_PREFIX,$(BUILD2_PREFIX),$(c)_bc1)))
 
-$(call LLLINK,$(1),$(3),$(foreach bc,$(4),$(call ADD_PREFIX,$(BUILD2_PREFIX),$(bc)_bc1)),$(5))
+$(call LLLINK,$(1),$(BUILD2_DSTDIR),$(foreach bc,$(BUILD2_INS),\
+$(call _ADD_PREFIX,$(BUILD2_PREFIX),$(bc)_bc1)),$(BUILD2_OUT))
 endif
 
-$(call DIS,$(1),$(3),$(5))
+$(call DIS,$(1),$(BUILD2_DSTDIR),$(BUILD2_OUT))
 endef
 
-# OPT/DIS x2 then BC2S
-define BUILD3
-$(call OPT,$(1),$(3),$(5),$(5).opt)
-$(call DIS,$(1),$(3),$(5).opt)
-$(call OPT,$(1),$(3),$(5).opt,$(5).opt2)
-$(call DIS,$(1),$(3),$(5).opt2)
-$(call BC2S,$(1),$(3),$(5).opt2,$(5))
+
+# opt; dis; opt; dis; .bc -> .s
+define _BUILD3
+$(eval BUILD3_DSTDIR = $(3))
+$(eval BUILD3_OUT = $(5))
+
+$(call OPT,$(1),$(BUILD3_DSTDIR),$(BUILD3_OUT),$(BUILD3_OUT).opt)
+$(call DIS,$(1),$(BUILD3_DSTDIR),$(BUILD3_OUT).opt)
+$(call OPT,$(1),$(BUILD3_DSTDIR),$(BUILD3_OUT).opt,$(BUILD3_OUT).opt2)
+$(call DIS,$(1),$(BUILD3_DSTDIR),$(BUILD3_OUT).opt2)
+$(call BC2S,$(1),$(BUILD3_DSTDIR),$(BUILD3_OUT).opt2,$(BUILD3_OUT))
 endef
 
-define BUILD1
-$(call BUILD2,$(1),$(2),$(3),$(4),$(5),$(6))
-$(call BUILD3,$(1),$(2),$(3),$(4),$(5),$(6))
+
+# *.c -> .s
+define _BUILD1
+$(eval BUILD1_SRCDIR = $(2))
+$(eval BUILD1_DSTDIR = $(3))
+$(eval BUILD1_INS = $(4))
+$(eval BUILD1_OUT = $(5))
+$(eval BUILD1_LIBS = $(6))
+
+$(call _BUILD2,$(1),$(BUILD1_SRCDIR),$(BUILD1_DSTDIR),$(BUILD1_INS),$(BUILD1_OUT),$(BUILD1_LIBS))
+$(call _BUILD3,$(1),$(BUILD1_SRCDIR),$(BUILD1_DSTDIR),$(BUILD1_INS),$(BUILD1_OUT),$(BUILD1_LIBS))
 endef
 
+
+# .s -> bin
 define BUILDS
-$(call S2O,$(1),$(2),$(3),$(5))
-$(call LINK,$(1),$(3),$(5),$(5),$(6))
-$(call RUN,$(1),$(3),$(5),save-run.out)
-$(call ALIAS,$(3),$(5))
+$(eval BUILDS_SRCDIR = $(2))
+$(eval BUILDS_DSTDIR = $(3))
+$(eval BUILDS_INS = $(4))
+$(eval BUILDS_OUT = $(5))
+$(eval BUILDS_LIBS = $(6))
+
+$(call S2O,$(1),$(BUILDS_SRCDIR),$(BUILDS_DSTDIR),$(BUILDS_OUT))
+$(call LINK,$(1),$(BUILDS_DSTDIR),$(BUILDS_OUT),$(BUILDS_OUT),$(BUILDS_LIBS))
+$(call RUN,$(1),$(BUILDS_DSTDIR),$(BUILDS_OUT),save-run.out)
+$(call ALIAS,$(BUILDS_DSTDIR),$(BUILDS_OUT))
 endef
 
+
+# .s -> cbin
 define CBUILDS
-$(call CLINKS,$(1),$(2),$(3),$(5),$(5),$(6))
-$(call RUN,$(1),$(3),$(5),save-run.out)
-$(call ALIAS,$(3),$(5))
+$(eval CBUILDS_SRCDIR = $(2))
+$(eval CBUILDS_DSTDIR = $(3))
+$(eval CBUILDS_INS = $(4))
+$(eval CBUILDS_OUT = $(5))
+$(eval CBUILDS_LIBS = $(6))
+
+$(call CLINKS,$(1),$(CBUILDS_SRCDIR),$(CBUILDS_DSTDIR),$(CBUILDS_OUT),$(CBUILDS_OUT),$(CBUILDS_LIBS))
+$(call RUN,$(1),$(CBUILDS_DSTDIR),$(CBUILDS_OUT),save-run.out)
+$(call ALIAS,$(CBUILDS_DSTDIR),$(CBUILDS_OUT))
 endef
 
+
+# *.c -> cbin
 define BUILD
-$(call BUILD1,$(1),$(2),$(3),$(4),$(5),$(6))
-$(call CBUILDS,$(1),$(3),$(3),$(5),$(5),$(6))
+$(eval BUILD_SRCDIR = $(2))
+$(eval BUILD_DSTDIR = $(3))
+$(eval BUILD_INS = $(4))
+$(eval BUILD_OUT = $(5))
+$(eval BUILD_LIBS = $(6))
+
+$(call _BUILD1,$(1),$(BUILD_SRCDIR),$(BUILD_DSTDIR),$(BUILD_INS),$(BUILD_OUT),$(BUILD_LIBS))
+$(call CBUILDS,$(1),$(BUILD_DSTDIR),$(BUILD_DSTDIR),$(BUILD_OUT),$(BUILD_OUT),$(BUILD_LIBS))
 endef
 
+
+# *.c -> cbin
 define GCC_BUILD
 $(eval BUILD_PREFIX = $($(1)_PREFIX))
-$(eval $(foreach c,$(4),\
-$(call GCC_C2O,$(1),$(2),$(3),$(c),$(call ADD_PREFIX,$(BUILD_PREFIX),$(c)))))
+$(eval BUILD_SRCDIR = $(2))
+$(eval BUILD_DSTDIR = $(3))
+$(eval BUILD_INS = $(4))
+$(eval BUILD_OUT = $(5))
+$(eval BUILD_LIBS = $(6))
 
-$(call GCC_LINK,$(1),$(3),\
-$(foreach o,$(4),$(call ADD_PREFIX,$(BUILD_PREFIX),$(o))),$(5),)
+$(eval $(foreach c,$(BUILD_INS),\
+$(call GCC_C2O,$(1),$(BUILD_SRCDIR),$(BUILD_DSTDIR),$(c),\
+$(call _ADD_PREFIX,$(BUILD_PREFIX),$(c)))))
 
-$(call RUN,$(1),$(3),$(5),save-run.out)
-$(call ALIAS,$(3),$(5))
+$(call GCC_LINK,$(1),$(BUILD_DSTDIR),$(BUILD_DSTDIR),\
+$(foreach o,$(BUILD_INS),$(call _ADD_PREFIX,$(BUILD_PREFIX),$(o))),$(BUILD_OUT),)
+
+$(call RUN,$(1),$(BUILD_DSTDIR),$(BUILD_OUT),save-run.out)
+$(call ALIAS,$(BUILD_DSTDIR),$(BUILD_OUT))
 endef
 
-# build object file
-# optimize only one time
+
+# *.c -> .o
+# (optimize only one time)
 define BUILDO
-$(call C2BC,$(1),$(2),$(3),$(4),$(5))
-$(call DIS,$(1),$(3),$(5))
-$(call OPT,$(1),$(3),$(5),$(5).opt)
-$(call DIS,$(1),$(3),$(5).opt)
-$(call BC2S,$(1),$(3),$(5).opt,$(5))
-$(call S2O,$(1),$(3),$(3),$(5))
+$(eval BUILD_PREFIX = $($(1)_PREFIX))
+$(eval BUILD_SRCDIR = $(2))
+$(eval BUILD_DSTDIR = $(3))
+$(eval BUILD_INS = $(4))
+$(eval BUILD_OUT = $(5))
+
+$(call C2BC,$(1),$(BUILD_SRCDIR),$(BUILD_DSTDIR),$(BUILD_INS),$(BUILD_OUT))
+$(call DIS,$(1),$(BUILD_DSTDIR),$(BUILD_OUT))
+$(call OPT,$(1),$(BUILD_DSTDIR),$(BUILD_OUT),$(BUILD_OUT).opt)
+$(call DIS,$(1),$(BUILD_DSTDIR),$(BUILD_OUT).opt)
+$(call BC2S,$(1),$(BUILD_DSTDIR),$(BUILD_OUT).opt,$(BUILD_OUT))
+$(call S2O,$(1),$(BUILD_DSTDIR),$(BUILD_DSTDIR),$(BUILD_OUT))
 endef
 
 
+# *.c -> .o
 # build object file for translation
 # (don't use sysroot, use native header/libraries instead)
 define BUILDO4SBT
@@ -302,6 +365,7 @@ $(eval $(1)_CLANG_FLAGS = $(BUILDO4SBT_$(1)_CLANG_FLAGS))
 endef
 
 
+# .o -> .bc
 define TRANSLATE_OBJ
 $(eval TO_DIR = $(2))
 $(eval TO_IN = $(3))
@@ -313,29 +377,50 @@ $(TO_DIR)$(TO_OUT).bc: $(TO_DIR)$(TO_IN).o
 endef
 
 
-# TRANSLATE C object file
-# 1: arch
-# 2: source dir/
-# 3: out dir/
-# 4: input file (.o)
-# 5: output file (bin)
-# 6: libs
+# .o -> .s
+define _TRANSLATE1
+$(eval TRANSLATE1_SRCDIR = $(2))
+$(eval TRANSLATE1_DSTDIR = $(3))
+$(eval TRANSLATE1_IN = $(4))
+$(eval TRANSLATE1_OUT = $(5))
+$(eval TRANSLATE1_LIBS = $(6))
 
-define TRANSLATE1
-$(call TRANSLATE_OBJ,$(1),$(3),$(4),$(5))
-$(call DIS,$(1),$(3),$(5))
-$(call OPT,$(1),$(3),$(5),$(5).opt)
-$(call DIS,$(1),$(3),$(5).opt)
-$(call BC2S,$(1),$(3),$(5).opt,$(5))
+$(call TRANSLATE_OBJ,$(1),$(TRANSLATE1_DSTDIR),$(TRANSLATE1_IN),$(TRANSLATE1_OUT))
+$(call DIS,$(1),$(TRANSLATE1_DSTDIR),$(TRANSLATE1_OUT))
+$(call OPT,$(1),$(TRANSLATE1_DSTDIR),$(TRANSLATE1_OUT),$(TRANSLATE1_OUT).opt)
+$(call DIS,$(1),$(TRANSLATE1_DSTDIR),$(TRANSLATE1_OUT).opt)
+$(call BC2S,$(1),$(TRANSLATE1_DSTDIR),$(TRANSLATE1_OUT).opt,$(TRANSLATE1_OUT))
 endef
 
+
+# .o -> cbin
 define TRANSLATE
-$(call TRANSLATE1,$(1),$(2),$(3),$(4),$(5),$(6))
-$(call CBUILDS,$(1),$(3),$(3),$(5),$(5),$(6) $(X86_SYSCALL_O))
+$(eval TRANSLATE_SRCDIR = $(2))
+$(eval TRANSLATE_DSTDIR = $(3))
+$(eval TRANSLATE_IN = $(4))
+$(eval TRANSLATE_OUT = $(5))
+$(eval TRANSLATE_LIBS = $(6))
+
+$(call _TRANSLATE1,$(1),$(TRANSLATE_SRCDIR),$(TRANSLATE_DSTDIR),\
+$(TRANSLATE_IN),$(TRANSLATE_OUT),$(TRANSLATE_LIBS))
+
+$(call CBUILDS,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_DSTDIR),$(TRANSLATE_OUT),\
+$(TRANSLATE_OUT),$(TRANSLATE_LIBS) $(X86_SYSCALL_O))
 endef
 
+
+# .o -> bin
 define TRANSLATE_ASM
-$(call TRANSLATE1,$(1),$(2),$(3),$(4),$(5),$(6))
-$(call BUILDS,$(1),$(3),$(3),$(5),$(5),$(6) $(X86_SYSCALL_O))
+$(eval TRANSLATE_SRCDIR = $(2))
+$(eval TRANSLATE_DSTDIR = $(3))
+$(eval TRANSLATE_IN = $(4))
+$(eval TRANSLATE_OUT = $(5))
+$(eval TRANSLATE_LIBS = $(6))
+
+$(call _TRANSLATE1,$(1),$(TRANSLATE_SRCDIR),$(TRANSLATE_DSTDIR),\
+$(TRANSLATE_IN),$(TRANSLATE_OUT),$(TRANSLATE_LIBS))
+
+$(call BUILDS,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_DSTDIR),$(TRANSLATE_OUT),\
+$(TRANSLATE_OUT),$(TRANSLATE_LIBS) $(X86_SYSCALL_O))
 endef
 
