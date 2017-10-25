@@ -255,7 +255,7 @@ llvm::Error Instruction::translate()
         case RISCV::FENCE:
             err = translateFence(false);
             break;
-        case RISCV::FENCEI:
+        case RISCV::FENCE_I:
             err = translateFence(true);
             break;
 

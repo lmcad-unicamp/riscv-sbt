@@ -84,6 +84,9 @@ $(eval BC2S_OUT = $(4))
 
 $(BC2S_DIR)$(BC2S_OUT).s: $(BC2S_DIR)$(BC2S_IN).bc $(BC2S_DIR)$(BC2S_IN).ll
 	$(LLC) $(LLC_FLAGS) $($(1)_LLC_FLAGS) $$< -o $$@
+ifeq ($(1),RV32)
+	sed -i "1i.option norelax" $$@
+endif
 
 endef
 
