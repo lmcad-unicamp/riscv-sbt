@@ -51,7 +51,8 @@ public:
         _name(name),
         _sec(sec),
         _addr(addr),
-        _end(end)
+        _end(end),
+        _localRegs(_ctx->opts->regs() == Options::Regs::LOCALS)
     {}
 
     /**
@@ -231,8 +232,11 @@ public:
      */
     XRegister& getReg(size_t i)
     {
-        xassert(_regs);
-        return _regs->getReg(i);
+        if (_localRegs) {
+            xassert(_regs);
+            return _regs->getReg(i);
+        } else
+            return _ctx->x->getReg(i);
     }
 
     /**
@@ -256,6 +260,7 @@ private:
     SBTSection* _sec;
     uint64_t _addr;
     uint64_t _end;
+    bool _localRegs;
 
     llvm::Function* _f = nullptr;
     // address of next basic block

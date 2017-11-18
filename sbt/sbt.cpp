@@ -43,6 +43,7 @@ void SBT::finish()
 SBT::SBT(
     const llvm::cl::list<std::string>& inputFilesList,
     const std::string& outputFile,
+    const Options& opts,
     llvm::Error& err)
     :
     _outputFile(outputFile),
@@ -174,6 +175,11 @@ int main(int argc, char* argv[])
             "o",
             cl::desc("output filename"));
 
+    cl::opt<std::string> regsOpt(
+            "regs",
+            cl::desc("register translation mode: globals|locals"));
+    sbt::Options::Regs regs = sbt::Options::Regs::GLOBALS;
+
     cl::opt<bool> testOpt("test");
 
     // -debug is used by LLVM already
@@ -193,7 +199,17 @@ int main(int argc, char* argv[])
     } else {
         if (inputFiles.empty()) {
             llvm::errs() << c.BIN_NAME << ": no input files\n";
-            return 1;
+            return EXIT_FAILURE;
+        }
+
+        // -regs
+        if (regsOpt.empty() || regsOpt == "globals")
+            ;
+        else if (regsOpt == "locals")
+            regs = sbt::Options::Regs::LOCALS;
+        else {
+            llvm::errs() << c.BIN_NAME << ": invalid -regs value\n";
+            return EXIT_FAILURE;
         }
     }
 
@@ -211,7 +227,8 @@ int main(int argc, char* argv[])
     sbt::SBTFinish fini;
 
     // create SBT
-    auto exp = sbt::create<sbt::SBT>(inputFiles, outputFile);
+    sbt::Options opts(regs);
+    auto exp = sbt::create<sbt::SBT>(inputFiles, outputFile, opts);
     if (!exp)
         sbt::handleError(exp.takeError());
     sbt::SBT& sbt = exp.get();

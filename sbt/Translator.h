@@ -24,6 +24,7 @@ namespace sbt {
 
 class Syscall;
 
+
 class Translator
 {
 public:
@@ -47,6 +48,11 @@ public:
     void setOutputFile(const std::string& file)
     {
         _outputFile = file;
+    }
+
+    void setOpts(const Options& opts)
+    {
+        _opts = opts;
     }
 
     // translate input files
@@ -94,6 +100,7 @@ private:
     // data
 
     // set by ctor
+    Options _opts;
     Context* _ctx;
 
     // set by sbt

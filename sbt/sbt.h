@@ -12,6 +12,7 @@
 namespace sbt {
 
 class Translator;
+class Options;
 
 class SBT
 {
@@ -24,6 +25,7 @@ public:
   SBT(
     const llvm::cl::list<std::string>& inputFiles,
     const std::string& outputFile,
+    const Options& opts,
     llvm::Error& err);
 
   // allow move only

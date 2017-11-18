@@ -34,9 +34,17 @@
 
 namespace sbt {
 
+static Context* setOpts(Context* ctx, Options* opts)
+{
+    // opts
+    ctx->opts = opts;
+    return ctx;
+}
+
+
 Translator::Translator(Context* ctx)
     :
-    _ctx(ctx),
+    _ctx(sbt::setOpts(ctx, &_opts)),
     _iCaller(_ctx, "rv32_icaller"),
     _isExternal(_ctx, "rv32_isExternal")
 {

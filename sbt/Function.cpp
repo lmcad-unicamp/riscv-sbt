@@ -88,7 +88,8 @@ llvm::Error Function::startMain()
     bld->setInsertBlock(newBB(_addr));
 
     // create local register file
-    _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
+    if (_localRegs)
+        _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
 
     copyArgv();
 
@@ -112,7 +113,8 @@ llvm::Error Function::start()
     _ctx->bld->setInsertBlock(ptr);
 
     // create local register file
-    _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
+    if (_localRegs)
+        _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
     loadRegisters();
 
     return llvm::Error::success();
@@ -161,6 +163,9 @@ llvm::Error Function::finish()
 
 void Function::cleanRegs()
 {
+    if (!_localRegs)
+        return;
+
     for (size_t i = 1; i < XRegisters::NUM; i++) {
         XRegister& x = _regs->getReg(i);
         if (!x.hasAccess()) {
@@ -368,6 +373,9 @@ void Function::transferBBs(uint64_t from, Function* to)
 
 void Function::loadRegisters()
 {
+    if (!_localRegs)
+        return;
+
     Builder* bld = _ctx->bld;
     xassert(bld);
 
@@ -383,6 +391,9 @@ void Function::loadRegisters()
 
 void Function::storeRegisters()
 {
+    if (!_localRegs)
+        return;
+
     Builder* bld = _ctx->bld;
     xassert(bld);
 

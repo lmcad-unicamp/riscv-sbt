@@ -3,6 +3,7 @@
 
 #include "Constants.h"
 #include "Map.h"
+#include "Options.h"
 #include "Pointer.h"
 #include "Types.h"
 #include "Utils.h"
@@ -67,6 +68,7 @@ public:
   llvm::IRBuilder<>* builder;
   // translator
   Translator* translator = nullptr;
+  const Options* opts = nullptr;
   // disassembler
   Disassembler* disasm = nullptr;
   // constants
