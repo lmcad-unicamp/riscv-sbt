@@ -9,7 +9,7 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # clone main repo
-RUN unbuffer git clone https://github.com/OpenISA/riscv-sbt.git
+RUN unbuffer git clone --recursive https://github.com/OpenISA/riscv-sbt.git
 
 WORKDIR /riscv-sbt
 
@@ -37,15 +37,12 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # riscv-gnu-toolchain
-RUN unbuffer git submodule update --recursive --init submodules/riscv-gnu-toolchain
-RUN ["/bin/bash", "-c", ". scripts/env.sh && make riscv-gnu-toolchain"]
-RUN ["/bin/bash", "-c", ". scripts/env.sh && make riscv-gnu-toolchain-linux"]
+RUN /bin/bash -c \
+    ". scripts/env.sh && make riscv-gnu-toolchain && rm -rf build"
+RUN /bin/bash -c \
+    ". scripts/env.sh && make riscv-gnu-toolchain-linux && rm -rf build"
 
 # LLVM/clang
-RUN unbuffer git submodule update --recursive --init submodules/llvm
-RUN unbuffer git submodule update --recursive --init submodules/clang
-RUN unbuffer git submodule update --recursive --init submodules/lowrisc-llvm
-
 RUN apt-get update \
     && apt-get install -y \
     cmake \
@@ -54,22 +51,20 @@ RUN apt-get update \
     python3 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN ["/bin/bash", "-c", ". scripts/env.sh && make MAKE_OPTS=-j4 lowrisc-llvm-debug"]
+RUN /bin/bash -c \
+    ". scripts/env.sh && make MAKE_OPTS=-j4 lowrisc-llvm-debug && rm -rf build"
 
 # SBT
-RUN ["/bin/bash", "-c", ". scripts/env.sh && make sbt-debug"]
+RUN /bin/bash -c \
+    ". scripts/env.sh && make sbt-debug && rm -rf build"
 
-# riscv emulators
-RUN git submodule update --recursive --init submodules/riscv-fesvr
-RUN git submodule update --recursive --init submodules/riscv-isa-sim
-RUN git submodule update --recursive --init submodules/riscv-pk
-
-RUN ["/bin/bash", "-c", ". scripts/env.sh && make riscv-isa-sim"]
-RUN ["/bin/bash", "-c", ". scripts/env.sh && make riscv-pk-32"]
+# spike
+RUN /bin/bash -c \
+    ". scripts/env.sh && make riscv-isa-sim && rm -rf build"
+RUN /bin/bash -c \
+    ". scripts/env.sh && make riscv-pk-32 && rm -rf build"
 
 # qemu
-RUN git submodule update --recursive --init submodules/riscv-qemu
-
 RUN apt-get update \
     && apt-get install -y \
     python \
@@ -77,7 +72,8 @@ RUN apt-get update \
     libglib2.0-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN ["/bin/bash", "-c", ". scripts/env.sh && make qemu-user"]
+RUN /bin/bash -c \
+    ". scripts/env.sh && make qemu-user && rm -rf build"
 
 # needed by test-system
 #RUN apt-get update \
