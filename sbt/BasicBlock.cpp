@@ -74,7 +74,7 @@ BasicBlockPtr BasicBlock::split(uint64_t addr)
 
             bld->saveInsertBlock();
             BasicBlock tmpBB(_ctx, *it, 0);
-            bld->setInsertPoint(tmpBB);
+            bld->setInsertBlock(&tmpBB);
             bld->retVoid();
             bld->restoreInsertBlock();
         }
@@ -84,7 +84,7 @@ BasicBlockPtr BasicBlock::split(uint64_t addr)
     llvm::Instruction* instr = nullptr;
     if (!term) {
         bld->saveInsertBlock();
-        bld->setInsertPoint(this);
+        bld->setInsertBlock(this);
         instr = bld->retVoid();
         bld->restoreInsertBlock();
     }

@@ -36,20 +36,20 @@ private:
     // all flags vector
     using BSR = object::BasicSymbolRef;
     std::vector<std::pair<uint32_t, StringRef>> _allFlags = {
-        { BSR::SF_Undefined,    "undefined" },            // Symbol is defined in another object file
-        { BSR::SF_Global,         "global" },                 // Global symbol
-        { BSR::SF_Weak,             "weak" },                     // Weak symbol
-        { BSR::SF_Absolute,     "absolute" },             // Absolute symbol
-        { BSR::SF_Common,         "common" },                 // Symbol has common linkage
-        { BSR::SF_Indirect,     "indirect" },             // Symbol is an alias to another symbol
-        { BSR::SF_Exported,     "exported" },             // Symbol is visible to other DSOs
+        { BSR::SF_Undefined,      "undefined" },      // Symbol is defined in another object file
+        { BSR::SF_Global,         "global" },         // Global symbol
+        { BSR::SF_Weak,           "weak" },           // Weak symbol
+        { BSR::SF_Absolute,       "absolute" },       // Absolute symbol
+        { BSR::SF_Common,         "common" },         // Symbol has common linkage
+        { BSR::SF_Indirect,       "indirect" },       // Symbol is an alias to another symbol
+        { BSR::SF_Exported,       "exported" },       // Symbol is visible to other DSOs
         { BSR::SF_FormatSpecific, "formatSpecific" }, // Specific to the object file format
-                                                                                            // (e.g. section symbols)
-        { BSR::SF_Thumb,            "thumb" },                    // Thumb symbol in a 32-bit ARM binary
-        { BSR::SF_Hidden,         "hidden" },                 // Symbol has hidden visibility
-        { BSR::SF_Const,            "const" },                    // Symbol value is constant
-        { BSR::SF_Executable, "executable" },         // Symbol points to an executable section
-                                                                                            // (IR only)
+                                                      // (e.g. section symbols)
+        { BSR::SF_Thumb,          "thumb" },          // Thumb symbol in a 32-bit ARM binary
+        { BSR::SF_Hidden,         "hidden" },         // Symbol has hidden visibility
+        { BSR::SF_Const,          "const" },          // Symbol value is constant
+        { BSR::SF_Executable,     "executable" },     // Symbol points to an executable section
+                                                      // (IR only)
     };
 };
 

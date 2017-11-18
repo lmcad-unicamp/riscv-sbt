@@ -26,6 +26,7 @@ all: \
 	riscv-isa-sim \
 	riscv-pk-32 \
 	qemu-user \
+	riscv-gnu-toolchain-linux
 
 
 include $(TOPDIR)/make/rules.mk

@@ -32,6 +32,7 @@
 #   define xunreachable(msg) \
         xassert(false && msg)
 
+// global dynamic debug flag
 namespace sbt {
 extern bool g_debug;
 }

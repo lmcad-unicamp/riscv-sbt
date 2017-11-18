@@ -52,3 +52,6 @@ alias qemu64=qemu-riscv64
 alias linux_spike="spike --isa=RV64IMAFDC $BBL"
 alias linux_qemu="qemu-system-riscv64 -kernel $BBL -m 2048M -nographic"
 alias git_status_all="git status --ignore-submodules=none"
+
+ulimit -c unlimited
+# echo core > /proc/sys/kernel/core_pattern

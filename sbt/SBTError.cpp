@@ -41,4 +41,13 @@ void SBTError::log(llvm::raw_ostream& os) const
   }
 }
 
+
+std::string SBTError::msg() const
+{
+    std::string s;
+    llvm::raw_string_ostream ss(s);
+    log(ss);
+    return s;
+}
+
 } // sbt

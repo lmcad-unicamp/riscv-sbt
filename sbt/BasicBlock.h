@@ -95,7 +95,7 @@ public:
      * @param addr instruction address
      * @param instr instruction
      */
-    void operator()(uint64_t addr, llvm::Instruction* instr)
+    void addInstr(uint64_t addr, llvm::Instruction* instr)
     {
         _instrMap(addr, std::move(instr));
     }
@@ -119,13 +119,23 @@ public:
         return name;
     }
 
+    /**
+     * Has this BB been terminated already?
+     */
     bool terminated() const;
 
+    /**
+     * Do we care about this BB? Or is it used just to hold only auxiliary
+     * code?
+     */
     bool untracked() const
     {
         return _untracked;
     }
 
+    /**
+     * Set/reset untracked flag.
+     */
     void untracked(bool v)
     {
         _untracked = v;

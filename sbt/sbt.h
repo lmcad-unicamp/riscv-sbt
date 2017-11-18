@@ -29,6 +29,8 @@ public:
   // allow move only
   SBT(SBT&&) = default;
   SBT(const SBT&) = delete;
+  SBT& operator=(const SBT&) = delete;
+  SBT& operator=(SBT&&) = delete;
 
   // translate binaries
   llvm::Error run();

@@ -25,8 +25,8 @@ llvm::Error SBTSection::translate()
         elfOffset = _section->getELFOffset();
 
     // print section info
-    DBGS << llvm::formatv("section {0}: addr={1:X+4}, elfOffs={2:X+4}, "
-        "size={3:X+4}\n",
+    DBGF("section {0}: addr={1:X+4}, elfOffs={2:X+4}, "
+        "size={3:X+4}",
         _section->name(), addr, elfOffset, size);
 
     // get relocations
@@ -59,7 +59,7 @@ llvm::Error SBTSection::translate()
     } state = OUTSIDE_FUNC;
 
     // for each symbol
-    volatile uint64_t end;    // XXX gcc bug: need to make it volatile
+    uint64_t end;
     for (size_t i = 0; i < n; ++i) {
         ConstSymbolPtr sym = symbols[i];
 
@@ -94,7 +94,7 @@ llvm::Error SBTSection::translate()
                 // last symbol? get out
                 if (i == n - 1)
                     state = OUTSIDE_FUNC;
-                // start next functio
+                // start next function
                 else {
                     func.name = symname;
                     func.start = symaddr;
@@ -129,7 +129,7 @@ llvm::Error SBTSection::translate(const Func& func)
 llvm::Error SBTSection::translate(Function* func)
 {
     _ctx->f = func;
-    updateNextFuncAddr(func->addr() + Instruction::SIZE);
+    updateNextFuncAddr(func->addr() + Constants::INSTRUCTION_SIZE);
     if (auto err = func->translate())
         return err;
     _ctx->f = nullptr;

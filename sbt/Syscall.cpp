@@ -88,7 +88,7 @@ void Syscall::genHandler()
 
     // default case: call exit(99)
     BasicBlock bbDfl(_ctx, bbPrefix + "default", _fRVSC);
-    bld->setInsertPoint(bbDfl);
+    bld->setInsertBlock(&bbDfl);
     args.clear();
     args.reserve(2);
     args.push_back(c.i32(X86_SYS_EXIT));
@@ -98,7 +98,7 @@ void Syscall::genHandler()
 
     // switch (RISC-V syscall#)
 
-    bld->setInsertPoint(bbEntry);
+    bld->setInsertBlock(&bbEntry);
     llvm::SwitchInst *sw1 = bld->sw(&sc, bbDfl);
 
     auto setArgs = [this, &args](llvm::Value* sc, size_t n) {
@@ -119,7 +119,7 @@ void Syscall::genHandler()
         ss << "case_" << s.rv;
 
         BasicBlock bb(_ctx, ss.str(), _fRVSC, bbDfl.bb());
-        bld->setInsertPoint(bb);
+        bld->setInsertBlock(&bb);
         DBGF("processing syscall: args={0}, rv={1}, x86={2}",
             s.args, s.rv, s.x86);
         setArgs(c.i32(s.x86), s.args);

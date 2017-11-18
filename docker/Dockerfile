@@ -84,4 +84,12 @@ RUN /bin/bash -c \
 #RUN ["/bin/bash", "-c",
 # ". scripts/env.sh && ./scripts/setmsr.sh && make test-system"]
 
+# run basic tests
+RUN /bin/bash -c \
+    ". scripts/env.sh && cd test && make run clean"
+
+# run SBT tests
+#RUN /bin/bash -c \
+#    ". scripts/env.sh && cd sbt/test && make elf run-x86-test-syscall run-tests clean"
+
 CMD ["/bin/bash"]

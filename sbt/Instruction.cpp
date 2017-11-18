@@ -58,35 +58,27 @@ llvm::Error Instruction::translate()
     // disasm
     size_t size;
     if (auto err = _ctx->disasm->disasm(_addr, _rawInst, _inst, size)) {
-#if 0
         // handle invalid encoding
         llvm::Error err2 = llvm::handleErrors(std::move(err),
-            [&](const InvalidInstructionEncoding& serr) {
+            [&](const InvalidInstructionEncoding& serr) -> llvm::Error {
                 *_os << llvm::formatv("invalid({0:X+8})", _rawInst);
-                // replace by nop
-                // ADDI ZERO, ZERO, 0
-                // imm[12]         rs1[5]  funct3[3]  rd[5]   opcode[7]
-                // 0000 0000 0000  0000 0  000        0000 0  001 0011
-                // _rawInst = 0x0000013;
-                // if (auto err = _ctx->disasm->
-                //        disasm(_addr, _rawInst, _inst, size))
-                //    return err;
 
-                _bld->nop();
-                _ctx->reloc->skipRelocation(_addr);
-                dbgprint();
-                // return llvm::Error::success();
+                // handle all zero "instructions", that sometimes appear
+                // because of alignment, replacing it by nop
+                if (_rawInst == 0) {
+                    _bld->nop();
+                    _ctx->reloc->skipRelocation(_addr);
+                    dbgprint();
+                    return llvm::Error::success();
+                } else
+                    return error(InvalidInstructionEncoding(serr.msg()));
             });
 
         if (err2)
             return err2;
         else
             return llvm::Error::success();
-#else
-        return err;
-#endif
     }
-
 
     llvm::Error err = noError();
 
@@ -334,7 +326,7 @@ llvm::Expected<llvm::Value*> Instruction::getRegOrImm(int op)
         return getReg(op);
     else if (o.isImm())
         return getImm(op);
-    xassert(false && "operand is neither a register nor immediate");
+    xunreachable("operand is neither a register nor immediate");
 }
 
 
@@ -680,7 +672,7 @@ llvm::Error Instruction::translateFence(bool fi)
 
 llvm::Error Instruction::translateCSR(CSROp op, bool imm)
 {
-# define assert_nowr(cond) \
+#define assert_nowr(cond) \
         xassert(cond && "no CSR write support for base I instructions!")
 
     switch (op) {
@@ -745,7 +737,7 @@ llvm::Error Instruction::translateCSR(CSROp op, bool imm)
     _bld->store(v, rd);
 
     return llvm::Error::success();
-# undef assert_nowr
+#undef assert_nowr
 }
 
 
@@ -999,7 +991,7 @@ void Instruction::link(unsigned linkReg)
         return;
 
     // link
-    const uint64_t nextInstrAddr = _addr + Instruction::SIZE;
+    const uint64_t nextInstrAddr = _addr + Constants::INSTRUCTION_SIZE;
     _bld->store(_c->i32(nextInstrAddr), linkReg);
 }
 
@@ -1024,7 +1016,7 @@ llvm::Error Instruction::handleCall(uint64_t target, unsigned linkReg)
 llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
 {
     DBGF("linkReg={1}", linkReg);
-    const bool alwaysSync = false;
+    const bool alwaysSync = true;
 
     // prepare
     Translator* translator = _ctx->translator;
@@ -1056,14 +1048,14 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
         _bld->condBr(ext, bbICall, bbSaveRegs);
 
         // save regs
-        _bld->setInsertPoint(bbSaveRegs);
+        _bld->setInsertBlock(bbSaveRegs);
     }
 
     f->storeRegisters();
 
     if (!alwaysSync) {
         _bld->br(bbICall);
-        _bld->setInsertPoint(bbICall);
+        _bld->setInsertBlock(bbICall);
     }
 
     // set args
@@ -1095,11 +1087,11 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
         BasicBlock *bbICallEnd = f->newUBB(_addr, "icall_end");
         _bld->condBr(ext, bbICallEnd, bbRestoreRegs);
 
-        _bld->setInsertPoint(bbRestoreRegs);
+        _bld->setInsertBlock(bbRestoreRegs);
         f->loadRegisters();
         _bld->br(bbICallEnd);
 
-        _bld->setInsertPoint(bbICallEnd);
+        _bld->setInsertBlock(bbICallEnd);
     }
     _bld->store(v, XRegister::A0);
 
@@ -1145,7 +1137,7 @@ llvm::Error Instruction::handleJumpToOffs(
 
     const bool isCall = linkReg != XRegister::ZERO;
     const bool needNextBB = !isCall;
-    const uint64_t nextInstrAddr = _addr + Instruction::SIZE;
+    const uint64_t nextInstrAddr = _addr + Constants::INSTRUCTION_SIZE;
     Function* func;
     BasicBlock* targetBB;
 
@@ -1195,7 +1187,7 @@ llvm::Error Instruction::handleJumpToOffs(
 
             // switch
             if (switchToTargetBB)
-                _bld->setInsertPoint(targetBB);
+                _bld->setInsertBlock(targetBB);
         }
     }
 

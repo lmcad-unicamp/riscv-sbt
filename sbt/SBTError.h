@@ -54,6 +54,8 @@ public:
         return *this;
     }
 
+    std::string msg() const;
+
     // used by ErrorInfo::classID.
     static char ID;
 

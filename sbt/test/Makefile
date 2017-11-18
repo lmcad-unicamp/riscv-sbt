@@ -5,7 +5,10 @@ include $(TOPDIR)/make/config.mk
 SRC_DIR     := $(shell pwd)/
 SBT_OUT_DIR := $(BUILD_DIR)/sbt/$(BUILD_TYPE_DIR)/test/
 
-TESTS := hello
+TESTS := \
+	hello \
+	argv \
+	mm
 
 all: elf
 
@@ -48,31 +51,36 @@ $(eval $(call CBUILDS,X86,$(SRC_DIR),$(SBT_OUT_DIR),x86-test-syscall,x86-test-sy
 $(eval $(call BUILD,X86,$(SRC_DIR),$(SBT_OUT_DIR),argv,x86-argv))
 .PHONY: test-x86-argv
 test-x86-argv: $(SBT_OUT_DIR)x86-argv
-	$< one two three
+	$< one two three; [ $$? -eq 123 ]
 
 $(eval $(call BUILDO,RV32,$(SRC_DIR),$(SBT_OUT_DIR),argv,rv32-argv))
 $(eval $(call TRANSLATE,X86,$(SRC_DIR),$(SBT_OUT_DIR),rv32-argv,rv32-x86-argv))
 $(eval $(call CLEAN,$(SBT_OUT_DIR),rv32-x86-argv,clean.s))
 .PHONY: test-rv32-x86-argv
 test-rv32-x86-argv: $(SBT_OUT_DIR)rv32-x86-argv
-	$< one two three
+	$< one two three; [ $$? -eq 123 ]
+
+.PHONY: test-argv
+test-argv: test-x86-argv test-rv32-x86-argv
 
 
 ### mm (matrix multiply) ###
 
-$(eval $(call BUILDO,RV32,$(SRC_DIR),$(SBT_OUT_DIR),mm,rv32-mm))
+DIM := 5
+
+$(eval $(call BUILDO,RV32,$(SRC_DIR),$(SBT_OUT_DIR),mm,rv32-mm,-DROWS=$(DIM)))
 $(eval $(call CLINK,RV32,$(SBT_OUT_DIR),$(SBT_OUT_DIR),rv32-mm,rv32-mm))
 $(eval $(call RUN,RV32,$(SBT_OUT_DIR),rv32-mm,save-run.out))
 $(eval $(call ALIAS,$(SBT_OUT_DIR),rv32-mm))
 $(eval $(call TRANSLATE,X86,$(SRC_DIR),$(SBT_OUT_DIR),rv32-mm,rv32-x86-mm))
 
-$(eval $(call BUILD,X86,$(SRC_DIR),$(SBT_OUT_DIR),mm,x86-mm))
+$(eval $(call BUILD,X86,$(SRC_DIR),$(SBT_OUT_DIR),mm,x86-mm,,-DROWS=$(DIM)))
 
 .PHONY: mm
 mm: rv32-mm x86-mm rv32-x86-mm
 
 
-#### RV32 Translator unit tests ###
+### RV32 Translator unit tests ###
 
 define UTEST
 $(eval UTEST_SRCDIR = $(1))
@@ -128,8 +136,8 @@ test-$(3): run-$(TEST_RV32) run-$(TEST_TRANS)
 endef
 
 
-$(foreach test,$(TESTS),\
-    $(eval $(call TEST,X86,$(SBT_OUT_DIR),$(test))))
+$(foreach test,hello,\
+$(eval $(call TEST,X86,$(SBT_OUT_DIR),$(test))))
 
 .PHONY: tests
 tests: rv32-hello x86-hello rv32-x86-hello

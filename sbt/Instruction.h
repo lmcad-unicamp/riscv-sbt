@@ -21,8 +21,6 @@ class Types;
 class Instruction
 {
 public:
-    static const std::size_t SIZE = 4;
-
     /**
      * ctor.
      *

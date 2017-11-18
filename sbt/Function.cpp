@@ -85,7 +85,7 @@ llvm::Error Function::startMain()
         llvm::Function::ExternalLinkage, _name, _ctx->module);
 
     // first bb
-    bld->setInsertPoint(newBB(_addr));
+    bld->setInsertBlock(newBB(_addr));
 
     // create local register file
     _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
@@ -109,7 +109,7 @@ llvm::Error Function::start()
     BasicBlock* ptr = findBB(_addr);
     if (!ptr)
         ptr = newBB(_addr);
-    _ctx->bld->setInsertPoint(ptr);
+    _ctx->bld->setInsertBlock(ptr);
 
     // create local register file
     _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
@@ -198,7 +198,7 @@ void Function::cleanRegs()
 
 llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
 {
-    DBGS << __FUNCTION__ << llvm::formatv("({0:X+4}, {1:X+4})\n", st, end);
+    DBGF("({0:X+4}, {1:X+4})", st, end);
 
     ConstSectionPtr section = _sec->section();
     const llvm::ArrayRef<uint8_t> bytes = _sec->bytes();
@@ -210,14 +210,14 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
     for (uint64_t addr = st; addr < end; addr += size) {
         _ctx->addr = addr;
 
-        // disasm
+        // get raw instruction
         const uint8_t* rawBytes = &bytes[addr];
         uint32_t rawInst = *reinterpret_cast<const uint32_t*>(rawBytes);
 
         // check if we need to switch to a new function
         // (calling a target with no global/function symbol info
         //    introduces a new function)
-        // (don't switch to self)
+        // (but don't switch to self)
         if (addr != st && addr == _sec->getNextFuncAddr()) {
             _nextf = _ctx->funcByAddr(addr);
             DBGF("switching to function {0} at address {1:X+8}", _nextf->name(), addr);
@@ -240,7 +240,7 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
             // then branch from previous BB to current one
             if (!bld->getInsertBlock()->terminated())
                 bld->br(bbptr);
-            bld->setInsertPoint(*bbptr);
+            bld->setInsertBlock(bbptr);
 
             // set next BB pointer
             uint64_t nextBB = nextBBAddr(addr);
@@ -267,17 +267,7 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
             xassert(bb->bb() == fbb);
         }
 
-        /*
-        if (bb->bb() != first->getParent()) {
-            DBGF("bb:");
-            bb->bb()->dump();
-            DBGF("first's bb:");
-            first->getParent()->dump();
-            DBGS.flush();
-            xunreachable("first instruction is in wrong BB!");
-        }
-        */
-        (*bb)(addr, std::move(first));
+        bb->addInstr(addr, std::move(first));
 
         // If last instruction terminated this basicblock
         // switch to a new one. This is needed in case the
@@ -303,7 +293,6 @@ Function* Function::getByAddr(Context* ctx, uint64_t addr)
         return fp;
 
     // get symbol by offset
-    // FIXME need to change this to be able to find functions in other modules
     ConstSymbolPtr sym = ctx->sec->section()->lookup(addr);
     // XXX lookup by symbol name
     if (!sym)

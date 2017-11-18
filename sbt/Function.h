@@ -29,7 +29,7 @@ class Function
 {
 public:
     /**
-     * Construct instruction.
+     * ctor.
      *
      * @param ctx
      * @param name
@@ -86,10 +86,14 @@ public:
         return _addr;
     }
 
-    //
+    // BB helpers
 
-    // BB
-
+    /**
+     * Create a new BB inside this function and add it to the map.
+     *
+     * @param addr BB start address
+     * @param beforeBB place new BB before another one, or at the end if null.
+     */
     BasicBlock* newBB(uint64_t addr, BasicBlock* beforeBB = nullptr)
     {
         _bbMap(addr, BasicBlockPtr(
@@ -98,12 +102,22 @@ public:
         return &**_bbMap[addr];
     }
 
+    /**
+     * Add BB to map.
+     */
     BasicBlock* addBB(uint64_t addr, BasicBlockPtr&& bb)
     {
         _bbMap(addr, std::move(bb));
         return &**_bbMap[addr];
     }
 
+    /**
+     * Create a new untracked BB.
+     *
+     * @param addr BB address. This will be part of its name and is also used
+     *             to place it correctly among other untracked BBs.
+     * @param name BB name suffix
+     */
     BasicBlock* newUBB(uint64_t addr, const std::string& name)
     {
         const std::string bbname = BasicBlock::getBBName(addr) + "_" + name;
@@ -124,6 +138,9 @@ public:
         return bb;
     }
 
+    /**
+     * Lookup BB by address.
+     */
     BasicBlock* findBB(uint64_t addr)
     {
         BasicBlockPtr* ptr = _bbMap[addr];
@@ -132,6 +149,9 @@ public:
         return &**ptr;
     }
 
+    /**
+     * Get lower bound BB.
+     */
     BasicBlock* lowerBoundBB(uint64_t addr)
     {
         auto it = _bbMap.lower_bound(addr);
@@ -140,6 +160,9 @@ public:
         return &*it->val;
     }
 
+    /**
+     * Get back edge BB.
+     */
     BasicBlock* getBackBB(uint64_t addr)
     {
         auto it = _bbMap.lower_bound(addr);
@@ -159,6 +182,9 @@ public:
         return &*it->val;
     }
 
+    /**
+     * Get the address of the next BB.
+     */
     uint64_t nextBBAddr(uint64_t curAddr)
     {
         auto it = _bbMap.lower_bound(curAddr + Constants::INSTRUCTION_SIZE);
@@ -174,13 +200,19 @@ public:
             _nextBB = addr;
     }
 
-    // BB end
-
+    // set/update BB end
     void setEnd(uint64_t end)
     {
         _end = end;
     }
 
+    /**
+     * Transfer BBs to another function.
+     *
+     * @param from transfer BBs from this address until the end of the
+     *             function.
+     * @param to function to transfer the BBs to.
+     */
     void transferBBs(uint64_t from, Function* to);
 
     /**
@@ -194,18 +226,25 @@ public:
     // was function terminated?
     bool terminated() const;
 
+    /**
+     * Get local register.
+     */
     XRegister& getReg(size_t i)
     {
         xassert(_regs);
         return _regs->getReg(i);
     }
 
+    /**
+     * Erase unused local registers.
+     */
     void cleanRegs();
 
     // sync local register file
     void loadRegisters();
     void storeRegisters();
 
+    // setup argc/argv
     void copyArgv();
 
     // look up function by address

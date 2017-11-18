@@ -293,11 +293,11 @@ void Translator::genICaller()
     BasicBlock bbDfl(_ctx, "default", ic);
 
     // begin: switch
-    bld->setInsertPoint(bbBeg);
+    bld->setInsertBlock(&bbBeg);
     llvm::SwitchInst* sw = bld->sw(&target, bbDfl, _funMap.size());
 
     // default: abort
-    bld->setInsertPoint(bbDfl);
+    bld->setInsertBlock(&bbDfl);
     bld->call(_sbtabort->func());
     bld->ret(c.ZERO);
 
@@ -331,12 +331,12 @@ void Translator::genICaller()
 
         // BB
         BasicBlock dest(_ctx, caseStr, ic, bbDfl.bb());
-        bld->setInsertPoint(dest);
+        bld->setInsertBlock(&dest);
 
         // XXX skip main for now
         if (f->name() == "main") {
             bld->br(bbDfl);
-            bld->setInsertPoint(bbBeg);
+            bld->setInsertBlock(&bbBeg);
             sw->addCase(c.i32(addr), dest.bb());
             continue;
         }
@@ -383,7 +383,7 @@ void Translator::genICaller()
         }
         bld->ret(ret);
 
-        bld->setInsertPoint(bbBeg);
+        bld->setInsertBlock(&bbBeg);
         sw->addCase(c.i32(addr), dest.bb());
     }
 }
@@ -408,14 +408,14 @@ void Translator::genIsExternal()
     BasicBlock bbTrue(_ctx, "ie_true", ie);
     BasicBlock bbFalse(_ctx, "ie_false", ie);
 
-    bld->setInsertPoint(bbEntry);
+    bld->setInsertBlock(&bbEntry);
     llvm::Value* cond = bld->uge(&target, c.u32(FIRST_EXT_FUNC_ADDR));
     bld->condBr(cond, &bbTrue, &bbFalse);
 
-    bld->setInsertPoint(bbTrue);
+    bld->setInsertBlock(&bbTrue);
     bld->ret(c.i32(1));
 
-    bld->setInsertPoint(bbFalse);
+    bld->setInsertBlock(&bbFalse);
     bld->ret(c.ZERO);
 }
 

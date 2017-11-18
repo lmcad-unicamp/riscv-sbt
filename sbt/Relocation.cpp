@@ -37,7 +37,7 @@ void SBTRelocation::next(uint64_t addr, bool hadNext)
 {
     // increment relocation iterator until it reaches a different address
     _rlast = _ri;
-    uint64_t reladdr = hadNext? addr - Instruction::SIZE : addr;
+    uint64_t reladdr = hadNext? addr - Constants::INSTRUCTION_SIZE : addr;
     do {
         ++_ri;
     } while (_ri != _re && (**_ri).offset() == reladdr);
@@ -108,7 +108,8 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             break;
 
         case llvm::ELF::R_RISCV_LO12_I:
-            DBGF("LO12_I");
+        case llvm::ELF::R_RISCV_LO12_S:
+            DBGF("LO12");
             isLO = true;
             break;
 
@@ -154,7 +155,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     }
 
     if (isNextToo)
-        _next = addr + Instruction::SIZE;
+        _next = addr + Constants::INSTRUCTION_SIZE;
     else
         next(addr, hadNext);
 
