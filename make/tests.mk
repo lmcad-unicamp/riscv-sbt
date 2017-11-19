@@ -22,6 +22,7 @@ SBT_OUT_DIR := $(BUILD_DIR)/sbt/$(BUILD_TYPE_DIR)/test/
 .PHONY: test-system
 test-system: sbt
 	rm -f log.txt $(SBT_OUT_DIR)rv32-*system*
+	sudo ./scripts/setmsr.sh
 	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) test-system
 
 ### QEMU tests
