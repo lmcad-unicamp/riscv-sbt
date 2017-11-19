@@ -151,7 +151,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             ssym.val += reloc->addend();
     } else if (ssym.sec) {
         xassert(ssym.addr < ssym.sec->size() && "out of bounds relocation");
-        ssym.val += ssym.sec->shadowOffs();
+        ssym.val += ssym.sec->shadowOffs() + reloc->addend();
     }
 
     if (isNextToo)
@@ -167,7 +167,10 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
         mask = 0xFFFFF000;
         *os << "%hi(";
     }
-    *os << ssym.name << ") = " << ssym.addr;
+    *os << ssym.name;
+    if (reloc->addend())
+        *os << "+" << reloc->addend();
+    *os << ") = " << (ssym.addr + reloc->addend());
 
     llvm::Value* v = nullptr;
 

@@ -79,6 +79,9 @@ $(eval $(call BUILD,X86,$(SRC_DIR),$(SBT_OUT_DIR),mm,x86-mm,,-DROWS=$(DIM)))
 .PHONY: mm
 mm: rv32-mm x86-mm rv32-x86-mm
 
+.PHONY: test-mm
+test-mm: mm run-rv32-mm run-x86-mm run-rv32-x86-mm
+	diff $(SBT_OUT_DIR)rv32-mm.out $(SBT_OUT_DIR)rv32-x86-mm.out
 
 ### RV32 Translator unit tests ###
 
