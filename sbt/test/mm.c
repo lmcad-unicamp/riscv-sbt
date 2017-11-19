@@ -49,6 +49,10 @@ int main()
     print('A', A);
     print('B', B);
 
+    printf("Hello\n");
+    return 0;
+
+
     for (i = 0; i < ROWS; i++)
         for (j = 0; j < COLS; j++)
             for (k = 0; k < COLS; k++)

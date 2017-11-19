@@ -11,8 +11,11 @@ public:
         LOCALS
     };
 
-    Options(Regs regs = Regs::GLOBALS)
-        : _regs(regs)
+    Options(
+        Regs regs = Regs::GLOBALS,
+        bool useLibC = true)
+        : _regs(regs),
+          _useLibC(useLibC)
     {
     }
 
@@ -21,8 +24,16 @@ public:
         return _regs;
     }
 
+    bool useLibC() const
+    {
+        return _useLibC;
+    }
+
+    void dump() const;
+
 private:
     Regs _regs;
+    bool _useLibC;
 };
 
 }

@@ -56,13 +56,12 @@ SBT::SBT(
     _translator->setOutputFile(outputFile);
     for (const auto& file : inputFilesList) {
         if (!llvm::sys::fs::exists(file)) {
-            SBTError serr(file);
-            serr << "no such file.";
-            err = error(serr);
+            err = ERRORF("file not found: {0}", file);
             return;
         }
         _translator->addInputFile(file);
     }
+    _translator->setOpts(opts);
 }
 
 
@@ -74,10 +73,8 @@ llvm::Error SBT::run()
     // check if generated bitcode is valid
     // (this outputs very helpful messages about the invalid bitcode parts)
     if (llvm::verifyModule(*_module, &DBGS)) {
-        InvalidBitcode serr;
-        serr << "translation produced invalid bitcode!";
         _module->dump();
-        return error(serr);
+        return ERROR2(InvalidBitcode, "translation produced invalid bitcode!");
     }
 
     return llvm::Error::success();
@@ -176,13 +173,18 @@ int main(int argc, char* argv[])
             cl::desc("output filename"));
 
     cl::opt<std::string> regsOpt(
-            "regs",
-            cl::desc("register translation mode: globals|locals"));
-    sbt::Options::Regs regs = sbt::Options::Regs::GLOBALS;
+        "regs",
+        cl::desc("Register translation mode: globals|locals (default=globals)"),
+        cl::init("globals"));
+
+    cl::opt<bool> dontUseLibCOpt(
+        "dont-use-libc",
+        cl::desc("Disallow the SBT to use libC for extended features"));
 
     cl::opt<bool> testOpt("test");
 
-    // -debug is used by LLVM already
+    // enable debug code
+    // (-debug is used by LLVM already)
     cl::opt<bool> debugOpt("x");
 
     // parse args
@@ -201,16 +203,17 @@ int main(int argc, char* argv[])
             llvm::errs() << c.BIN_NAME << ": no input files\n";
             return EXIT_FAILURE;
         }
+    }
 
-        // -regs
-        if (regsOpt.empty() || regsOpt == "globals")
-            ;
-        else if (regsOpt == "locals")
-            regs = sbt::Options::Regs::LOCALS;
-        else {
-            llvm::errs() << c.BIN_NAME << ": invalid -regs value\n";
-            return EXIT_FAILURE;
-        }
+    // -regs
+    sbt::Options::Regs regs;
+    if (regsOpt == "globals")
+        regs = sbt::Options::Regs::GLOBALS;
+    else if (regsOpt == "locals")
+        regs = sbt::Options::Regs::LOCALS;
+    else {
+        llvm::errs() << c.BIN_NAME << ": invalid -regs value\n";
+        return EXIT_FAILURE;
     }
 
     // set output file
@@ -227,7 +230,7 @@ int main(int argc, char* argv[])
     sbt::SBTFinish fini;
 
     // create SBT
-    sbt::Options opts(regs);
+    sbt::Options opts(regs, !dontUseLibCOpt);
     auto exp = sbt::create<sbt::SBT>(inputFiles, outputFile, opts);
     if (!exp)
         sbt::handleError(exp.takeError());

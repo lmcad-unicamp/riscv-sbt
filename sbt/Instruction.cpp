@@ -53,7 +53,7 @@ llvm::Error Instruction::translate()
     _bld->reset();
 
     // print address
-    *_os << llvm::formatv("{0:X-4}:\t", _addr);
+    *_os << llvm::formatv("{0:X-8}:\t", _addr);
 
     // disasm
     size_t size;
@@ -272,11 +272,8 @@ llvm::Error Instruction::translate()
             break;
 
         // unknown
-        default: {
-            SBTError serr;
-            serr << "unknown instruction opcode: " << _inst.getOpcode();
-            return error(serr);
-        }
+        default:
+            return ERRORF("unknown instruction opcode: {0}", _inst.getOpcode());
     }
 
     if (err)
@@ -344,7 +341,7 @@ llvm::Expected<llvm::Value*> Instruction::getImm(int op)
     // case 2: absolute immediate value
     int64_t imm = _inst.getOperand(op).getImm();
     v = _c->i32(imm);
-    *_os << llvm::formatv("0x{0:X-4}", uint32_t(imm));
+    *_os << llvm::formatv("0x{0:X-8}", uint32_t(imm));
     return v;
 }
 
@@ -702,7 +699,7 @@ llvm::Error Instruction::translateCSR(CSROp op, bool imm)
         src = getRegNum(2);
         assert_nowr(src == XRegister::ZERO);
     }
-    *_os << llvm::formatv("0x{0:X-4} = ", csr);
+    *_os << llvm::formatv("0x{0:X-8} = ", csr);
 
     Translator* translator = _ctx->translator;
     translator->initCounters();

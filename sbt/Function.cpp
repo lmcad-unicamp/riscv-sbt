@@ -203,7 +203,7 @@ void Function::cleanRegs()
 
 llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
 {
-    DBGF("({0:X+4}, {1:X+4})", st, end);
+    DBGF("({0:X+8}, {1:X+8})", st, end);
 
     ConstSectionPtr section = _sec->section();
     const llvm::ArrayRef<uint8_t> bytes = _sec->bytes();

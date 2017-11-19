@@ -8,6 +8,8 @@
 #ifndef SBT_DEBUG_H
 #define SBT_DEBUG_H
 
+#include <string>
+
 // define xassert: like assert, but enabled by SBT_DEBUG instead of NDEBUG,
 // in order to make it possible to enable asserts only in SBT, but not in
 // LLVM
@@ -37,6 +39,19 @@ namespace sbt {
 extern bool g_debug;
 }
 
+static inline std::string methodName(const std::string& prettyFunc)
+{
+    size_t end = prettyFunc.find("(");
+    size_t begin = prettyFunc.substr(0, end).rfind(" ") + 1;
+    if (begin == std::string::npos)
+        return prettyFunc;
+    size_t len = end == std::string::npos? end : end - begin;
+
+    return prettyFunc.substr(begin, len);
+}
+
+#define __METHOD_NAME__ methodName(__PRETTY_FUNCTION__)
+
 #endif
 
 // "dynamic" part
@@ -51,7 +66,7 @@ extern bool g_debug;
 #   define DBGF(...) \
         do { \
             if (g_debug) { \
-                DBGS << __FUNCTION__ << "(): " << llvm::formatv(__VA_ARGS__) << '\n'; \
+                DBGS << __METHOD_NAME__ << "(): " << llvm::formatv(__VA_ARGS__) << '\n'; \
                 DBGS.flush(); \
             } \
         } while (0)

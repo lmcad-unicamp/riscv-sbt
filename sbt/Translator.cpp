@@ -99,60 +99,44 @@ llvm::Error Translator::start()
 
 llvm::Error Translator::startTarget()
 {
-    SBTError serr;
-
     // get target
     llvm::Triple triple("riscv32-unknown-elf");
     std::string tripleName = triple.getTriple();
 
     std::string strError;
     _target = llvm::TargetRegistry::lookupTarget(tripleName, strError);
-    if (!_target) {
-        serr << "target not found: " << tripleName;
-        return error(serr);
-    }
+    if (!_target)
+        return ERROR(llvm::formatv("target not found: {0}", tripleName));
 
     _mri.reset(_target->createMCRegInfo(tripleName));
-    if (!_mri) {
-        serr << "no register info for target " << tripleName;
-        return error(serr);
-    }
+    if (!_mri)
+        return ERROR(llvm::formatv("no register info for target {0}", tripleName));
 
     // set up disassembler.
     _asmInfo.reset(_target->createMCAsmInfo(*_mri, tripleName));
-    if (!_asmInfo) {
-        serr << "no assembly info for target " << tripleName;
-        return error(serr);
-    }
+    if (!_asmInfo)
+        return ERROR(llvm::formatv("no assembly info for target {0}", tripleName));
 
     llvm::SubtargetFeatures features("+m");
     _sti.reset(
-            _target->createMCSubtargetInfo(tripleName, "", features.getString()));
-    if (!_sti) {
-        serr << "no subtarget info for target " << tripleName;
-        return error(serr);
-    }
+        _target->createMCSubtargetInfo(tripleName, "", features.getString()));
+    if (!_sti)
+        return ERROR(llvm::formatv("no subtarget info for target {0}", tripleName));
 
     _mofi.reset(new llvm::MCObjectFileInfo);
     _mc.reset(new llvm::MCContext(_asmInfo.get(), _mri.get(), _mofi.get()));
     _disAsm.reset(_target->createMCDisassembler(*_sti, *_mc));
-    if (!_disAsm) {
-        serr << "no disassembler for target " << tripleName;
-        return error(serr);
-    }
+    if (!_disAsm)
+        return ERROR(llvm::formatv("no disassembler for target {0}", tripleName));
 
     _mii.reset(_target->createMCInstrInfo());
-    if (!_mii) {
-        serr << "no instruction info for target " << tripleName;
-        return error(serr);
-    }
+    if (!_mii)
+        return ERROR(llvm::formatv("no instruction info for target {0}",tripleName));
 
     _instPrinter.reset(
         _target->createMCInstPrinter(triple, 0, *_asmInfo, *_mii, *_mri));
-    if (!_instPrinter) {
-        serr << "no instruction printer for target " << tripleName;
-        return error(serr);
-    }
+    if (!_instPrinter)
+        return ERROR(llvm::formatv("no instruction printer for target {0}", tripleName));
 
     return llvm::Error::success();
 }
@@ -202,6 +186,7 @@ void Translator::initCounters()
 
 llvm::Error Translator::translate()
 {
+    _opts.dump();
     DBGS << "input files:";
     for (const auto& f : _inputFiles)
         DBGS << ' ' << f;
@@ -232,11 +217,8 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
     // load libc module
     if (!_lcModule) {
         const auto& libcBC = _ctx->c.libCBC();
-        if (libcBC.empty()) {
-            SBTError serr;
-            serr << "libc.bc file not found";
-            return error(serr);
-        }
+        if (libcBC.empty())
+            return ERROR("libc.bc file not found");
 
         auto res = llvm::MemoryBuffer::getFile(libcBC);
         if (!res)
@@ -252,11 +234,9 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
 
     // lookup function
     llvm::Function* lf = _lcModule->getFunction(func);
-    if (!lf) {
-        FunctionNotFound serr;
-        serr << __FUNCTION__ << "(): function not found: " << func;
-        return error(serr);
-    }
+    if (!lf)
+        return ERROR2(FunctionNotFound,
+            llvm::formatv("function not found: {0}", func));
     llvm::FunctionType* ft = lf->getFunctionType();
 
     xassert(ft->getNumParams() < 9 &&
@@ -305,7 +285,38 @@ void Translator::genICaller()
     llvm::SwitchInst* sw = bld->sw(&target, bbDfl, _funMap.size());
 
     // default: abort
+
     bld->setInsertBlock(&bbDfl);
+
+    // print error msg
+    if (_opts.useLibC()) {
+        // declare printf
+        llvm::FunctionType* ft_printf =
+            llvm::FunctionType::get(_ctx->t.i32, { _ctx->t.i8ptr }, VAR_ARG);
+        FunctionPtr f_printf(new Function(_ctx, "printf"));
+        f_printf->create(ft_printf);
+
+        // args
+        std::vector<llvm::Value*> args;
+        // fmt
+        std::string fmt = "FATAL ERROR: at icaller: function not found: %d\n";
+        llvm::ArrayRef<uint8_t> fmtA(
+        reinterpret_cast<const uint8_t*>(fmt.data()), fmt.size());
+        llvm::Constant* fmtC = llvm::ConstantDataArray::get(*_ctx->ctx, fmtA);
+        auto fmtGV = new llvm::GlobalVariable(
+            *_ctx->module, fmtC->getType(), CONSTANT,
+            llvm::GlobalValue::InternalLinkage, fmtC, "icaller_error_fmt");
+        // get pointer to fmt
+        llvm::Value* v = bld->gep(fmtGV, { c.ZERO, c.ZERO });
+        args.push_back(v);
+        // target
+        args.push_back(&target);
+
+        // call it
+        bld->call(f_printf->func(), args);
+    }
+
+    // abort
     bld->call(_sbtabort->func());
     bld->ret(c.ZERO);
 
@@ -374,13 +385,6 @@ void Translator::genICaller()
         llvm::PointerType* ty = llft->getPointerTo();
         llvm::Value* fptr = bld->bitOrPointerCast(sym, ty);
         llvm::Value* ret;
-        /*
-        DBGF("ft:");
-        llft->dump();
-        DBGF("args:");
-        for (auto arg : args)
-            arg->dump();
-        */
         if (llft->getReturnType()->isVoidTy()) {
             bld->call(fptr, args);
             ret = _ctx->c.ZERO;

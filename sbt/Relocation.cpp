@@ -66,7 +66,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             return nullptr;
     }
 
-    DBGS << __FUNCTION__ << llvm::formatv("({0:X+4})\n", addr);
+    DBGS << __METHOD_NAME__ << llvm::formatv("({0:X+8})\n", addr);
 
     ConstSymbolPtr sym = reloc->symbol();
     uint64_t type = reloc->type();
@@ -134,7 +134,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     // set symbol relocation info
     SBTSymbol ssym(realSym->address(), realSym->address(),
         realSym->name(), realSym->section(), addr);
-    DBGF("addr={0:X+4}, val={1:X+4}, name={2}, section={3}, addend={4:X+8}",
+    DBGF("addr={0:X+8}, val={1:X+8}, name={2}, section={3}, addend={4:X+8}",
         ssym.addr, ssym.val, ssym.name,
         ssym.sec? ssym.sec->name() : "null",
         reloc->addend());
@@ -214,7 +214,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
         Builder* bld = _ctx->bld;
 
         // get char* to memory
-        DBGF("reloc={0:X+4}\n", ssym.val);
+        DBGF("reloc={0:X+8}", ssym.val);
         std::vector<llvm::Value*> idx = { _ctx->c.ZERO, _ctx->c.i32(ssym.val) };
         v = bld->gep(_ctx->shadowImage, idx);
 

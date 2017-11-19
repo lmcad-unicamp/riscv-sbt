@@ -11,29 +11,29 @@
 namespace sbt {
 
 Stack::Stack(Context* ctx, size_t sz)
-  :
-  _size(sz)
+    :
+    _size(sz)
 {
-  std::string bytes(_size, 'S');
+    std::string bytes(_size, 'S');
 
-  llvm::ArrayRef<uint8_t> byteArray(
-    reinterpret_cast<const uint8_t*>(bytes.data()), _size);
+    llvm::ArrayRef<uint8_t> byteArray(
+        reinterpret_cast<const uint8_t*>(bytes.data()), _size);
 
-  llvm::Constant* cda = llvm::ConstantDataArray::get(*ctx->ctx, byteArray);
+    llvm::Constant* cda = llvm::ConstantDataArray::get(*ctx->ctx, byteArray);
 
-  _stack = new llvm::GlobalVariable(
-    *ctx->module, cda->getType(), !CONSTANT,
-      llvm::GlobalValue::ExternalLinkage, cda, "Stack");
+    _stack = new llvm::GlobalVariable(
+        *ctx->module, cda->getType(), !CONSTANT,
+            llvm::GlobalValue::ExternalLinkage, cda, "Stack");
 
-  // set stack end pointer
+    // set stack end pointer
 
-  const Constants& c = ctx->c;
-  Builder bldi(ctx, NO_FIRST);
-  Builder* bld(&bldi);
+    const Constants& c = ctx->c;
+    Builder bldi(ctx, NO_FIRST);
+    Builder* bld(&bldi);
 
-  std::vector<llvm::Value*> idx = { c.ZERO, c.i32(_size) };
-  llvm::Value *v = bld->gep(_stack, idx);
-  _end = bld->i8PtrToI32(v);
+    std::vector<llvm::Value*> idx = { c.ZERO, c.i32(_size) };
+    llvm::Value* v = bld->gep(_stack, idx);
+    _end = bld->i8PtrToI32(v);
 }
 
 }

@@ -6,13 +6,11 @@
 
 #include <algorithm>
 
-using namespace llvm;
-
 namespace sbt {
 
 // for now, only ELF 32 LE object files are supported
-using ELFObj = object::ELFObjectFile<
-    object::ELFType<support::little, false /*is64*/>>;
+using ELFObj = llvm::object::ELFObjectFile<
+    llvm::object::ELFType<llvm::support::little, false /*is64*/>>;
 
 // symbol flags
 class Flags
@@ -34,8 +32,8 @@ public:
 
 private:
     // all flags vector
-    using BSR = object::BasicSymbolRef;
-    std::vector<std::pair<uint32_t, StringRef>> _allFlags = {
+    using BSR = llvm::object::BasicSymbolRef;
+    std::vector<std::pair<uint32_t, llvm::StringRef>> _allFlags = {
         { BSR::SF_Undefined,      "undefined" },      // Symbol is defined in another object file
         { BSR::SF_Global,         "global" },         // Global symbol
         { BSR::SF_Weak,           "weak" },           // Weak symbol
@@ -65,12 +63,12 @@ static std::string getTypeStr(Symbol::Type type)
     std::string typeStr;
     switch (type) {
         default:
-        case SR::ST_Unknown:     typeStr = "unk";    break;
-        case SR::ST_Data:            typeStr = "data"; break;
-        case SR::ST_Debug:         typeStr = "dbg";    break;
-        case SR::ST_File:            typeStr = "file"; break;
-        case SR::ST_Function:    typeStr = "func"; break;
-        case SR::ST_Other:         typeStr = "oth";    break;
+        case SR::ST_Unknown:    typeStr = "unk";    break;
+        case SR::ST_Data:       typeStr = "data";   break;
+        case SR::ST_Debug:      typeStr = "dbg";    break;
+        case SR::ST_File:       typeStr = "file";   break;
+        case SR::ST_Function:   typeStr = "func";   break;
+        case SR::ST_Other:      typeStr = "oth";    break;
     }
     return typeStr;
 }
@@ -105,27 +103,24 @@ void CommonSection::symbols(ConstSymbolPtrVec&& s)
 
 LLVMSection::LLVMSection(
     ConstObjectPtr obj,
-    object::SectionRef sec,
-    Error& err)
+    llvm::object::SectionRef sec,
+    llvm::Error& err)
     :
     Section(obj, ""),
     _sec(sec)
 {
     // get section name
-    StringRef nameRef;
-    if (_sec.getName(nameRef)) {
-        SBTError serr;
-        serr << "failed to get section name";
-        err = error(serr);
-        return;
-    } else
+    llvm::StringRef nameRef;
+    if (_sec.getName(nameRef))
+        err = ERROR("failed to get section name");
+    else
         _name = nameRef;
 }
 
 
 uint64_t LLVMSection::getELFOffset() const
 {
-    object::DataRefImpl Impl = _sec.getRawDataRefImpl();
+    llvm::object::DataRefImpl Impl = _sec.getRawDataRefImpl();
     auto ei = reinterpret_cast<ELFObj::Elf_Shdr*>(Impl.p);
     return ei->sh_offset;
 }
@@ -147,8 +142,8 @@ ConstSymbolPtr Section::lookup(uint64_t addr) const
 
 Symbol::Symbol(
     ConstObjectPtr obj,
-    object::SymbolRef sym,
-    Error& err)
+    llvm::object::SymbolRef sym,
+    llvm::Error& err)
     :
     _obj(obj),
     _sym(sym)
@@ -156,9 +151,7 @@ Symbol::Symbol(
     // get name
     auto expSymName = _sym.getName();
     if (!expSymName) {
-        SBTError serr;
-        serr << "failed to get symbol name";
-        err = error(serr);
+        err = ERROR("failed to get symbol name");
         return;
     }
     _name = std::move(expSymName.get());
@@ -167,24 +160,21 @@ Symbol::Symbol(
     std::string prefix("symbol(");
     prefix += _name;
     prefix += ")";
-    SBTError serr(prefix);
 
     // get section
     auto expSecI = sym.getSection();
     if (!expSecI) {
-        serr << "could not get section";
-        err = error(serr);
+        err = ERRORF("{0}: could not get section", prefix);
         return;
     }
-    object::section_iterator sit = expSecI.get();
+    llvm::object::section_iterator sit = expSecI.get();
     if (sit != _obj->sectionEnd())
         _sec = _obj->lookupSection(*sit);
 
     // address
     auto expAddr = _sym.getAddress();
     if (!expAddr) {
-        serr << "could not get address";
-        err = error(serr);
+        err = ERRORF("{0}: could not get address", prefix);
         return;
     }
     _address = expAddr.get();
@@ -192,8 +182,7 @@ Symbol::Symbol(
     // type
     auto expType = _sym.getType();
     if (!expType) {
-        serr << "could not get type";
-        err = error(serr);
+        err = ERRORF("{0}: could not get type", prefix);
         return;
     }
     _type = expType.get();
@@ -218,14 +207,14 @@ std::string Symbol::str() const
 
 Relocation::Relocation(
     ConstObjectPtr obj,
-    object::RelocationRef reloc,
-    Error& err)
+    llvm::object::RelocationRef reloc,
+    llvm::Error& err)
     :
     _obj(obj),
     _reloc(reloc)
 {
     // symbol
-    object::symbol_iterator it = _reloc.getSymbol();
+    llvm::object::symbol_iterator it = _reloc.getSymbol();
     if (it != _obj->symbolEnd())
         _sym = _obj->lookupSymbol(*it);
 }
@@ -234,7 +223,7 @@ Relocation::Relocation(
 std::string Relocation::str() const
 {
     std::string s;
-    raw_string_ostream ss(s);
+    llvm::raw_string_ostream ss(s);
     ss    << "reloc{"
             << " offs=[" << offset()
             << "], type=[" << typeName();
@@ -276,15 +265,15 @@ void Object::finish()
 
 
 Object::Object(
-    const StringRef& filePath,
-    Error& err)
+    const llvm::StringRef& filePath,
+    llvm::Error& err)
 {
-    SBTError serr(filePath);
-
     // atempt to open the binary
     auto expObj = llvm::object::createBinary(filePath);
     if (!expObj) {
-        serr << expObj.takeError() << "failed to open binary file";
+        auto serr = SERROR(
+            llvm::formatv("failed to open binary file {0}", filePath));
+        serr << expObj.takeError();
         err = error(serr);
         return;
     }
@@ -292,8 +281,7 @@ Object::Object(
     llvm::object::Binary* bin = &*_bin.first;
 
     if (!ELFObj::classof(bin)) {
-        serr << "unsupported file type";
-        err = error(serr);
+        err = ERROR("unsupported file type");
         return;
     }
 }
@@ -314,11 +302,10 @@ llvm::Error Object::readSymbols()
     _obj = llvm::dyn_cast<llvm::object::ObjectFile>(bin);
     _fileName = _obj->getFileName();
 
-    SBTError serr(_fileName);
     SectionPtrVec sections;
 
     // read sections
-    for (const object::SectionRef& s : _obj->sections()) {
+    for (const llvm::object::SectionRef& s : _obj->sections()) {
         auto expSec = create<LLVMSection*>(this, s);
         if (!expSec)
             return expSec.takeError();
@@ -337,15 +324,15 @@ llvm::Error Object::readSymbols()
     uint64_t commonOffs = 0;
 
     // read symbols
-    Map<StringRef, ConstSymbolPtrVec> sectionToSymbols;
-    for (const object::SymbolRef& s : _obj->symbols()) {
+    Map<llvm::StringRef, ConstSymbolPtrVec> sectionToSymbols;
+    for (const llvm::object::SymbolRef& s : _obj->symbols()) {
         auto expSym = create<Symbol*>(this, s);
         if (!expSym)
             return expSym.takeError();
         Symbol* sym = expSym.get();
         ConstSymbolPtr ptr(sym);
         // skip debug symbols
-        if (sym->type() == object::SymbolRef::ST_Debug)
+        if (sym->type() == llvm::object::SymbolRef::ST_Debug)
             continue;
         // add to maps
         _ptrToSymbol(s.getRawDataRefImpl().p, ConstSymbolPtr(ptr));
@@ -363,7 +350,7 @@ llvm::Error Object::readSymbols()
             sec = sym->section();
 
         if (sec) {
-            StringRef sectionName = sec->name();
+            llvm::StringRef sectionName = sec->name();
             ConstSymbolPtrVec *p = sectionToSymbols[sectionName];
             // new section
             if (!p)
@@ -376,7 +363,7 @@ llvm::Error Object::readSymbols()
 
     // set symbols in sections
     for (SectionPtr sec : sections) {
-        StringRef sectionName = sec->name();
+        llvm::StringRef sectionName = sec->name();
         ConstSymbolPtrVec *vec = sectionToSymbols[sectionName];
         if (vec) {
             // sort symbols by address
@@ -389,12 +376,12 @@ llvm::Error Object::readSymbols()
     }
 
     // relocs
-    for (const object::SectionRef& s : _obj->sections()) {
+    for (const llvm::object::SectionRef& s : _obj->sections()) {
         for (auto rb = s.relocations().begin(),
                  re = s.relocations().end();
                  rb != re; ++rb)
         {
-            const object::RelocationRef& r = *rb;
+            const llvm::object::RelocationRef& r = *rb;
             auto expRel = create<Relocation*>(this, r);
             if (!expRel)
                 return expRel.takeError();
@@ -404,13 +391,13 @@ llvm::Error Object::readSymbols()
         }
     }
 
-    return Error::success();
+    return llvm::Error::success();
 }
 
 
 void Object::dump() const
 {
-    raw_ostream &os = outs();
+    llvm::raw_ostream &os = llvm::outs();
 
     // basic info
     os << "fileName: " << fileName() << "\n";
@@ -418,8 +405,8 @@ void Object::dump() const
 
     // sections
     os << "sections:\n";
-    for (ConstSectionPtr Sec : sections())
-        os << Sec->str() << "\n";
+    for (ConstSectionPtr sec : sections())
+        os << sec->str() << "\n";
 
     // relocations
     os << "relocations:\n";

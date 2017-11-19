@@ -96,6 +96,7 @@ add_executable (riscv-sbt
     Instruction.cpp
     Module.cpp
     Object.cpp
+    Options.cpp
     Relocation.cpp
     SBTError.cpp
     Section.cpp

@@ -12,10 +12,12 @@ namespace sbt {
 class SBTError : public llvm::ErrorInfo<SBTError>
 {
 public:
-    // ctor
-    // fileName - name of the input file that was being processed
-    //                        when the error happened
-    SBTError(const std::string& fileName = "");
+    /**
+     * ctor.
+     *
+     * @param msg
+     */
+    SBTError(const std::string& msg = "");
 
     // disallow copy
     SBTError(const SBTError&) = delete;
@@ -36,7 +38,7 @@ public:
     // stream insertion overloads to make it easy
     // to build the error message
     template <typename T>
-    llvm::raw_string_ostream& operator<<(const T&& val)
+    llvm::raw_string_ostream& operator<<(const T& val)
     {
         *_ss << val;
         return *_ss;
@@ -77,7 +79,6 @@ static inline llvm::Error error(SBTError& err)
     return error(std::move(err));
 }
 
-
 // translation generated invalid bitcode
 class InvalidBitcode : public SBTError
 {
@@ -98,6 +99,27 @@ class FunctionNotFound : public SBTError
 public:
     using SBTError::SBTError;
 };
+
+// verbose error
+
+template <typename E>
+static inline E vserror(const std::string& meth, const std::string& msg)
+{
+    return E(meth + "(): " + msg);
+}
+
+template <typename E>
+static inline llvm::Error verror(const std::string& meth, const std::string& msg)
+{
+    return error(vserror<E>(meth, msg));
+}
+
+#define SERROR(msg) vserror<SBTError>(__METHOD_NAME__, msg)
+#define ERROR2(E, msg) verror<E>(__METHOD_NAME__, msg)
+#define ERROR(msg) ERROR2(SBTError, msg)
+
+#define ERROR2F(E, msg, ...) ERROR2(E, llvm::formatv(msg, __VA_ARGS__))
+#define ERRORF(msg, ...) ERROR2F(SBTError, msg, __VA_ARGS__)
 
 } // sbt
 

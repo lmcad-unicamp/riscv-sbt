@@ -123,7 +123,8 @@ $(if $(DEBUG_RULES),$(warning "S2O(SRCDIR=$(S2O_SRCDIR),\
 DSTDIR=$(S2O_DSTDIR),\
 MOD=$(S2O_MOD))"),)
 
-$(S2O_DSTDIR)$(S2O_MOD).o: $(S2O_SRCDIR)$(S2O_MOD).s
+$(S2O_DSTDIR)$(S2O_MOD).o: $(S2O_SRCDIR)$(S2O_MOD).s \
+							$(if $(subst ./,,$(S2O_DSTDIR)),$(S2O_DSTDIR),)
 	@echo $$@: $$<
 	$$($(1)_AS) -o $$@ -c $$<
 
@@ -448,9 +449,10 @@ define TRANSLATE_OBJ
 $(eval TO_DIR = $(2))
 $(eval TO_IN = $(3))
 $(eval TO_OUT = $(4))
+$(eval TO_FLAGS = $(5))
 
 $(TO_DIR)$(TO_OUT).bc: $(TO_DIR)$(TO_IN).o
-	riscv-sbt $(SBTFLAGS) -o $$@ $$^ &> $(TOPDIR)/sbt.log
+	riscv-sbt $(SBTFLAGS) $(TO_FLAGS) -o $$@ $$^ &> $(TOPDIR)/sbt.log
 
 endef
 
@@ -462,8 +464,10 @@ $(eval TRANSLATE1_DSTDIR = $(3))
 $(eval TRANSLATE1_IN = $(4))
 $(eval TRANSLATE1_OUT = $(5))
 $(eval TRANSLATE1_LIBS = $(6))
+$(eval TRANSLATE1_FLAGS = $(7))
 
-$(call TRANSLATE_OBJ,$(1),$(TRANSLATE1_DSTDIR),$(TRANSLATE1_IN),$(TRANSLATE1_OUT))
+$(call TRANSLATE_OBJ,$(1),$(TRANSLATE1_DSTDIR),$(TRANSLATE1_IN),\
+$(TRANSLATE1_OUT),$(TRANSLATE1_FLAGS))
 $(call DIS,$(1),$(TRANSLATE1_DSTDIR),$(TRANSLATE1_OUT))
 $(call OPT,$(1),$(TRANSLATE1_DSTDIR),$(TRANSLATE1_OUT),$(TRANSLATE1_OUT).opt)
 $(call DIS,$(1),$(TRANSLATE1_DSTDIR),$(TRANSLATE1_OUT).opt)
@@ -496,7 +500,7 @@ $(eval TRANSLATE_OUT = $(5))
 $(eval TRANSLATE_LIBS = $(6))
 
 $(call _TRANSLATE1,$(1),$(TRANSLATE_SRCDIR),$(TRANSLATE_DSTDIR),\
-$(TRANSLATE_IN),$(TRANSLATE_OUT),$(TRANSLATE_LIBS))
+$(TRANSLATE_IN),$(TRANSLATE_OUT),$(TRANSLATE_LIBS),-dont-use-libc)
 
 $(call BUILDS,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_DSTDIR),$(TRANSLATE_OUT),\
 $(TRANSLATE_OUT),$(TRANSLATE_LIBS) $(X86_SYSCALL_O))

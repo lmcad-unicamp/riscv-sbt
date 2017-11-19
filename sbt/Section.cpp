@@ -8,6 +8,10 @@
 
 #include <llvm/Support/FormatVariadic.h>
 
+#undef ENABLE_DBGS
+#define ENABLE_DBGS 1
+#include "Debug.h"
+
 namespace sbt {
 
 llvm::Error SBTSection::translate()
@@ -25,9 +29,11 @@ llvm::Error SBTSection::translate()
         elfOffset = _section->getELFOffset();
 
     // print section info
-    DBGF("section {0}: addr={1:X+4}, elfOffs={2:X+4}, "
-        "size={3:X+4}",
+    DBGF("section {0}: addr={1:X+8}, elfOffs={2:X+8}, "
+        "size={3:X+8}",
         _section->name(), addr, elfOffset, size);
+
+    DBGF("{0}", _section->str());
 
     // get relocations
     ConstObjectPtr obj = _section->object();
@@ -41,11 +47,8 @@ llvm::Error SBTSection::translate()
 
     // get section bytes
     llvm::StringRef bytesStr;
-    if (_section->contents(bytesStr)) {
-        SBTError serr;
-        serr << "failed to get section contents";
-        return error(serr);
-    }
+    if (_section->contents(bytesStr))
+        return ERROR("failed to get section contents");
     _bytes = llvm::ArrayRef<uint8_t>(
         reinterpret_cast<const uint8_t *>(bytesStr.data()), bytesStr.size());
 
@@ -73,40 +76,35 @@ llvm::Error SBTSection::translate()
         std::string symname = sym->name();
         bool isValid = SBTSymbol::isFunction(sym) ||
             SBTSymbol::isGlobal(sym);
-        // first: use a fake symbol if none available
-        if (!isValid && i == 0) {
-            xassert(symaddr == 0);
-            symname = "rv32_init";
-            isValid = true;
-        }
+
+        DBGF("symname=[{0}], symaddr={1:X+8}, isValid={2}",
+            symname, symaddr, isValid);
+
         if (isValid) {
+            // function end
+            if (state == INSIDE_FUNC) {
+                func.end = symaddr;
+                DBGF("function end: {0}@{1:X+8}", func.name, func.end);
+                // translate
+                if (auto err = translate(func))
+                    return err;
+                state = OUTSIDE_FUNC;
+            }
             // function start
             if (state == OUTSIDE_FUNC) {
                 func.name = symname;
                 func.start = symaddr;
                 state = INSIDE_FUNC;
-            // function end
-            } else {
-                func.end = symaddr;
-                // translate
-                if (auto err = translate(func))
-                    return err;
-                // last symbol? get out
-                if (i == n - 1)
-                    state = OUTSIDE_FUNC;
-                // start next function
-                else {
-                    func.name = symname;
-                    func.start = symaddr;
-                    state = INSIDE_FUNC;
-                }
+                DBGF("function start: {0}@{1:X+8}", func.name, func.start);
             }
-        }
+        } else
+            DBGF("skipping non-function symbol @{0:X+8}: [{1}]", symaddr, symname);
     }
 
     // finish last function
     if (state == INSIDE_FUNC) {
         func.end = end;
+        DBGF("last function end: {0}@{1:X+8}", func.name, func.end);
         if (auto err = translate(func))
             return err;
     }
