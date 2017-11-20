@@ -76,20 +76,34 @@ RUN /bin/bash -c \
     ". scripts/env.sh && make qemu-user && rm -rf build"
 
 # needed by test-system
-#RUN apt-get update \
-#    && apt-get install -y \
-#    msr-tools \
-#    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get install -y \
+    msr-tools \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+### XXX: time saving hack! ###
+# (remove it later)
+# BEGIN hack
 #
-#RUN ["/bin/bash", "-c",
-# ". scripts/env.sh && ./scripts/setmsr.sh && make test-system"]
+#RUN git pull && \
+#    git submodule update --recursive
+#
+# SBT
+#RUN /bin/bash -c \
+#    ". scripts/env.sh && make sbt-debug && rm -rf build"
+# END hack
 
 # run basic tests
 RUN /bin/bash -c \
-    ". scripts/env.sh && cd test && make run clean"
+    ". scripts/env.sh && make tests"
 
-# run SBT tests
-#RUN /bin/bash -c \
-#    ". scripts/env.sh && cd sbt/test && make elf run-x86-test-syscall run-tests clean"
+# test-system
+RUN /bin/bash -c \
+    ". scripts/env.sh && make test-system"
+
+# qemu-tests
+RUN /bin/bash -c \
+    ". scripts/env.sh && make rv32tests"
 
 CMD ["/bin/bash"]
