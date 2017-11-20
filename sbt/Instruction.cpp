@@ -354,7 +354,7 @@ llvm::Error Instruction::translateALUOp(ALUOp op, uint32_t flags)
     switch (op) {
         case ADD: *_os << "add";    break;
         case AND: *_os << "and";    break;
-        case OR:    *_os << "or";     break;
+        case OR:  *_os << "or";     break;
         case SLL: *_os << "sll";    break;
         case SLT: *_os << "slt";    break;
         case SRA: *_os << "sra";    break;
@@ -395,7 +395,9 @@ llvm::Error Instruction::translateALUOp(ALUOp op, uint32_t flags)
             break;
 
         case SLL:
-            v = _bld->sll(o1, o2);
+            // Note: only the bottom 5 bits are valid on shifts
+            v = _bld->_and(o2, _c->i32(0x1F));
+            v = _bld->sll(o1, v);
             break;
 
         case SLT:
@@ -407,11 +409,13 @@ llvm::Error Instruction::translateALUOp(ALUOp op, uint32_t flags)
             break;
 
         case SRA:
-            v = _bld->sra(o1, o2);
+            v = _bld->_and(o2, _c->i32(0x1F));
+            v = _bld->sra(o1, v);
             break;
 
         case SRL:
-            v = _bld->srl(o1, o2);
+            v = _bld->_and(o2, _c->i32(0x1F));
+            v = _bld->srl(o1, v);
             break;
 
         case SUB:

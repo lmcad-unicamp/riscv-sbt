@@ -166,12 +166,16 @@ clean:
 QEMU_TESTS_BUILD := $(BUILD_DIR)/riscv-qemu-tests
 OUT_DIR := $(QEMU_TESTS_BUILD)/rv32i/
 
-RV32_TESTS := add addi and andi aiupc \
+RV32_TESTS := \
+    add addi and andi \
+    aiupc \
     beq bge bgeu blt bltu bne \
     jal jalr \
-    lui lb lbu lhu lw sb sw or ori \
-    slli slt slti sltiu sltu srai srli sub xor xori
-RV32_TESTS_FAILING := sll sra srl
+    lui lb lbu lhu lw sb sw \
+    or ori \
+    sll slli slt slti sltiu sltu sra srai srl srli \
+    sub xor xori
+RV32_TESTS_FAILING :=
 RV32_TESTS_MISSING := csrrw csrrs csrrc csrrwi csrrsi csrrci \
     ecall ebreak fence fence.i lh sh
 
@@ -184,7 +188,11 @@ $(eval TEST2_TRANS = rv32-x86-$(2))
 .PHONY: test-$(2)
 test-$(2):
 	$(RV32_RUN) $(1)$(TEST2_RV32)
-	$(1)$(TEST2_TRANS)
+	$(1)$(TEST2_TRANS); rc=$$$$?; \
+	if [ "$$$$rc" -ne 0 ]; then \
+		echo $$$$rc; \
+		false; \
+	fi
 
 endef
 
