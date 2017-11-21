@@ -86,13 +86,14 @@ RUN apt-get update \
 # (remove it later)
 # BEGIN hack
 #
-#RUN git pull && \
-#    git submodule update --recursive
+RUN git pull && \
+    git submodule update --recursive
 #
 # SBT
-#RUN /bin/bash -c \
-#    ". scripts/env.sh && make sbt-debug && rm -rf build"
-# END hack
+RUN /bin/bash -c \
+    ". scripts/env.sh && make sbt-debug && rm -rf build"
+#
+### END hack
 
 # run basic tests
 RUN /bin/bash -c \

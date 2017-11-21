@@ -10,10 +10,10 @@ lc:
 SBT_TEST_DIR := $(TOPDIR)/sbt/test
 
 .PHONY: tests
-tests: sbt
+tests: sbt-debug
 	rm -f log.txt
 	$(LOG) $(MAKE) -C $(TOPDIR)/test clean all run
-	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) clean run-alltests
+	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) clean elf run-alltests
 
 ### rv32-system test
 
