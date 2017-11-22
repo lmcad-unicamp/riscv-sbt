@@ -86,8 +86,12 @@ RUN apt-get update \
 # (remove it later)
 # BEGIN hack
 #
-RUN git pull && \
+RUN echo "rebuild 1" && \
+    git pull && \
     git submodule update --recursive
+#
+#ADD make/ make/
+#ADD make/Makefile .
 #
 # SBT
 RUN /bin/bash -c \

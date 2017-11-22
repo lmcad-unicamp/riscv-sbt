@@ -13,7 +13,8 @@ SBT_DEBUG_CONFIGURE := \
              -DCMAKE_INSTALL_PREFIX=$(TOOLCHAIN_DEBUG) \
              $(TOPDIR)/sbt
 SBT_DEBUG_ALIAS := sbt-debug
-SBT_DEBUG_DEPS := $(LOWRISC_LLVM_DEBUG_TOOLCHAIN)
+SBT_DEBUG_DEPS := $(if $(shell test -L $(LOWRISC_LLVM_DEBUG_TOOLCHAIN) && echo 1),\
+                       ,$(LOWRISC_LLVM_DEBUG_TOOLCHAIN))
 
 .PHONY: sbt
 sbt: $(SBT)-build $(SBT)-install
