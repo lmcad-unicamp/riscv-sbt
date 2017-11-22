@@ -26,7 +26,7 @@ $$($(1)_ALIAS)-build:
 $$($(1)_ALIAS)-build1:
 	$(MAKE) -C $$($(1)_BUILD)
 
-#### build only when MAKEFILE changes
+### build only when MAKEFILE changes
 $$($(1)_OUT): $$($(1)_MAKEFILE)
 	$(MAKE) $$($(1)_ALIAS)-build
 	touch $$@

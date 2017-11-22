@@ -2,17 +2,16 @@
 ### riscv-gnu-toolchain
 ###
 
-RISCV_GNU_TOOLCHAIN_PREFIX := $(TOOLCHAIN_RELEASE)/opt/riscv
+RISCV_GNU_TOOLCHAIN_PREFIX  := $(TOOLCHAIN_RELEASE)/opt/riscv
+RISCV_GNU_TOOLCHAIN_BUILD   := $(BUILD_DIR)/riscv-gnu-toolchain/newlib32
 
-RISCV_GNU_TOOLCHAIN_BUILD := $(BUILD_DIR)/riscv-gnu-toolchain/newlib32
-RISCV_GNU_TOOLCHAIN_DEPS := $(RISCV_GNU_TOOLCHAIN_BUILD)
+RISCV_GNU_TOOLCHAIN_PREPARE := \
+    mkdir -p $(BUILD_DIR)/riscv-gnu-toolchain && \
+    cp -a $(SUBMODULES_DIR)/riscv-gnu-toolchain $(RISCV_GNU_TOOLCHAIN_BUILD)
 
-$(RISCV_GNU_TOOLCHAIN_BUILD):
-	mkdir -p $(BUILD_DIR)/riscv-gnu-toolchain
-	cp -a $(SUBMODULES_DIR)/riscv-gnu-toolchain $@
-
-RISCV_GNU_TOOLCHAIN_MAKEFILE := $(RISCV_GNU_TOOLCHAIN_BUILD)/Makefile
-RISCV_GNU_TOOLCHAIN_CONFIGURE := ./configure \
+RISCV_GNU_TOOLCHAIN_MAKEFILE  := $(RISCV_GNU_TOOLCHAIN_BUILD)/Makefile
+RISCV_GNU_TOOLCHAIN_CONFIGURE := $(RISCV_GNU_TOOLCHAIN_PREPARE) && \
+                                 ./configure \
                                  --prefix=$(RISCV_GNU_TOOLCHAIN_PREFIX) \
                                  --with-arch=rv32gc \
                                  --with-abi=ilp32d
@@ -35,15 +34,15 @@ $(eval $(call RULE_CLEAN,RISCV_GNU_TOOLCHAIN))
 ### riscv-gnu-toolchain-linux
 ###
 
-RISCV_GNU_TOOLCHAIN_LINUX_BUILD := $(BUILD_DIR)/riscv-gnu-toolchain/linux
-RISCV_GNU_TOOLCHAIN_LINUX_DEPS := $(RISCV_GNU_TOOLCHAIN_LINUX_BUILD)
+RISCV_GNU_TOOLCHAIN_LINUX_BUILD   := $(BUILD_DIR)/riscv-gnu-toolchain/linux
 
-$(RISCV_GNU_TOOLCHAIN_LINUX_BUILD):
-	mkdir -p $(BUILD_DIR)/riscv-gnu-toolchain
-	cp -a $(SUBMODULES_DIR)/riscv-gnu-toolchain $@
+RISCV_GNU_TOOLCHAIN_LINUX_PREPARE := \
+    mkdir -p $(BUILD_DIR)/riscv-gnu-toolchain && \
+    cp -a $(SUBMODULES_DIR)/riscv-gnu-toolchain $(RISCV_GNU_TOOLCHAIN_LINUX_BUILD)
 
 RISCV_GNU_TOOLCHAIN_LINUX_MAKEFILE := $(RISCV_GNU_TOOLCHAIN_LINUX_BUILD)/Makefile
-RISCV_GNU_TOOLCHAIN_LINUX_CONFIGURE := ./configure \
+RISCV_GNU_TOOLCHAIN_LINUX_CONFIGURE := $(RISCV_GNU_TOOLCHAIN_LINUX_PREPARE) && \
+                                       ./configure \
                                        --prefix=$(RISCV_GNU_TOOLCHAIN_PREFIX) \
                                        --enable-multilib
 RISCV_GNU_TOOLCHAIN_LINUX_TOOLCHAIN := $(RISCV_GNU_TOOLCHAIN_PREFIX)/bin/riscv-gnu-linux-gcc

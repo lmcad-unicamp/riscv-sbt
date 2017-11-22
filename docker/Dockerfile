@@ -97,14 +97,14 @@ RUN /bin/bash -c \
 
 # run basic tests
 RUN /bin/bash -c \
-    ". scripts/env.sh && make tests"
+    ". scripts/env.sh && make tests && rm -rf build"
 
 # test-system
 RUN /bin/bash -c \
-    ". scripts/env.sh && make test-system"
+    ". scripts/env.sh && make test-system && rm -rf build"
 
 # qemu-tests
 RUN /bin/bash -c \
-    ". scripts/env.sh && make rv32tests"
+    ". scripts/env.sh && make run-rv32tests rv32tests-clean"
 
 CMD ["/bin/bash"]
