@@ -203,17 +203,19 @@ $(eval S2O_SRCDIR = $(2))
 $(eval S2O_DSTDIR = $(3))
 $(eval S2O_IN = $(4))
 $(eval S2O_OUT = $(5))
+$(eval S2O_FLAGS = $(6))
 
 $(if $(DEBUG_RULES),$(warning "S2O($(1),\
 SRCDIR=$(S2O_SRCDIR),\
 DSTDIR=$(S2O_DSTDIR),\
 IN=$(S2O_IN),\
-OUT=$(S2O_OUT))"),)
+OUT=$(S2O_OUT),\
+FLAGS=$(S2O_FLAGS))"),)
 
 $(S2O_DSTDIR)$(S2O_OUT).o: $(S2O_SRCDIR)$(S2O_IN).s \
 							| $(if $(subst ./,,$(S2O_DSTDIR)),$(S2O_DSTDIR),)
 	@echo $$@: $$<
-	$$($(1)_AS) -o $$@ -c $$<
+	$$($(1)_AS) $(S2O_FLAGS) -o $$@ -c $$<
 
 endef
 
@@ -224,17 +226,19 @@ $(eval S2OS_SRCDIR = $(2))
 $(eval S2OS_DSTDIR = $(3))
 $(eval S2OS_INS = $(4))
 $(eval S2OS_OUT = $(5))
+$(eval S2OS_FLAGS = $(6))
 
 $(if $(DEBUG_RULES),$(warning "S2OS($(1),\
 SRCDIR=$(S2OS_SRCDIR),\
 DSTDIR=$(S2OS_DSTDIR),\
 INS=$(S2OS_INS),\
-OUT=$(S2OS_OUT))"),)
+OUT=$(S2OS_OUT),\
+FLAGS=$(S2OS_FLAGS))"),)
 
 $(if $(subst 1,,$(words $(S2OS_INS))),\
 $(foreach in,$(S2OS_INS),\
-$(call _S2O,$(1),$(S2OS_SRCDIR),$(S2OS_DSTDIR),$(in))),\
-$(call _S2O,$(1),$(S2OS_SRCDIR),$(S2OS_DSTDIR),$(S2OS_INS),$(S2OS_OUT)))
+$(call _S2O,$(1),$(S2OS_SRCDIR),$(S2OS_DSTDIR),$(in),$(in),$(S2OS_FLAGS))),\
+$(call _S2O,$(1),$(S2OS_SRCDIR),$(S2OS_DSTDIR),$(S2OS_INS),$(S2OS_OUT),$(S2OS_FLAGS)))
 endef
 
 
@@ -283,7 +287,8 @@ LIBS=$(SNLINK_LIBS),\
 FLAGS=$(SNLINK_FLAGS),\
 C=$(SNLINK_C))"),)
 
-$(call _S2OS,$(1),$(SNLINK_SRCDIR),$(SNLINK_DSTDIR),$(SNLINK_INS),$(SNLINK_OUT))
+$(call _S2OS,$(1),$(SNLINK_SRCDIR),$(SNLINK_DSTDIR),$(SNLINK_INS),\
+$(SNLINK_OUT),$(SNLINK_FLAGS))
 
 $(call _LINK,$(1),$(SNLINK_DSTDIR),$(SNLINK_DSTDIR),\
 $(if $(subst 1,,$(words $(SNLINK_INS))),$(SNLINK_INS),$(SNLINK_OUT)),\
@@ -475,4 +480,93 @@ $(call BUILD,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_DSTDIR),\
 $(TRANSLATE_OUT),$(TRANSLATE_OUT),\
 $(TRANSLATE_LIBS) $(TRANSLATE_NAT_OBJS),$(NOFLAGS),\
 $(ASM),$(TRANSLATE_C),$(TRANSLATE_RUNARGS))
+endef
+
+
+### sbt test ###
+
+MODES        := globals locals
+# NARCHS = native archs to build bins to
+TEST_NARCHS  := RV32 X86
+UTEST_NARCHS := RV32
+ADD_ASM_SRC_PREFIX := 1
+
+
+define NBUILD
+$(eval N_ARCH = $(1))
+$(eval N_SRCDIR = $(2))
+$(eval N_DSTDIR = $(3))
+$(eval N_NAME = $(4))
+$(eval N_LIBS = $(5))
+$(eval N_FLAGS = $(6))
+$(eval N_ASM = $(7))
+$(eval N_C = $(8))
+$(eval N_ARGS = $(9))
+
+$(eval N_PREFIX = $($(N_ARCH)_PREFIX))
+$(eval N_IN = $(if $(and $(ADD_ASM_SRC_PREFIX),$(N_ASM)),$(N_PREFIX)-,)$(N_NAME))
+$(eval N_OUT = $(N_PREFIX)-$(N_NAME))
+
+# native bins
+$(call BUILD,$(N_ARCH),$(N_SRCDIR),$(N_DSTDIR),$(N_IN),$(N_OUT),\
+$(N_LIBS),$(N_FLAGS),$(N_ASM),$(N_C),$(N_ARGS))
+
+endef
+
+
+define SBT_TEST1
+$(eval TEST1_DSTARCH = $(1))
+$(eval TEST1_DSTDIR = $(2))
+$(eval TEST1_NAME = $(3))
+$(eval TEST1_MODE = $(4))
+$(eval TEST1_LIBS = $(5))
+$(eval TEST1_C = $(6))
+$(eval TEST1_ARGS = $(7))
+
+$(eval TEST1_TGT = $(TEST1_NAME)-$(TEST1_MODE))
+$(eval TEST1_IN = $(RV32_PREFIX)-$(TEST1_NAME))
+$(eval TEST1_OUT = $(RV32_PREFIX)-$($(TEST1_DSTARCH)_PREFIX)-$(TEST1_TGT))
+$(eval TEST1_NAT = $($(TEST1_DSTARCH)_PREFIX)-$(TEST1_NAME))
+
+$(call TRANSLATE,$(TEST1_DSTARCH),$(TEST1_DSTDIR),$(TEST1_DSTDIR),\
+$(TEST1_IN),$(TEST1_OUT),$(TEST1_LIBS),-regs=$(TEST1_MODE),\
+$(TEST1_C),$(TEST1_ARGS))
+
+.PHONY: $(TEST1_TGT)
+$(TEST1_TGT): $(TEST1_DSTDIR)$(TEST1_OUT)
+
+test-$(TEST1_TGT): $(TEST1_TGT) run-$(TEST1_OUT)
+	diff $(TEST1_DSTDIR)$(TEST1_IN).out $(TEST1_DSTDIR)$(TEST1_OUT).out
+
+endef
+
+
+define SBT_TEST
+$(eval TEST_ARCHS = $(1))
+$(eval TEST_SRCDIR = $(2))
+$(eval TEST_DSTDIR = $(3))
+$(eval TEST_NAME = $(4))
+$(eval TEST_LIBS = $(5))
+$(eval TEST_FLAGS = $(6))
+$(eval TEST_ASM = $(7))
+$(eval TEST_C = $(8))
+$(eval TEST_ARGS = $(9))
+
+# native bins
+$(foreach ARCH,$(TEST_ARCHS),\
+$(call NBUILD,$(ARCH),$(TEST_SRCDIR),$(TEST_DSTDIR),\
+$(TEST_NAME),$(TEST_LIBS),$(TEST_FLAGS),$(TEST_ASM),$(TEST_C),$(TEST_ARGS)))
+
+# translated bins
+$(foreach mode,$(MODES),\
+$(call SBT_TEST1,X86,$(TEST_DSTDIR),$(TEST_NAME),$(mode),\
+$(TEST_LIBS),$(TEST_C),$(TEST_ARGS)))
+
+.PHONY: $(TEST_NAME)
+$(TEST_NAME): $(foreach ARCH,$(TEST_ARCHS),$($(ARCH)_PREFIX)-$(TEST_NAME)) \
+				$(foreach mode,$(MODES),$(TEST_NAME)-$(mode))
+
+test-$(TEST_NAME): $(foreach ARCH,$(TEST_ARCHS),run-$($(ARCH)_PREFIX)-$(TEST_NAME)) \
+					$(foreach mode,$(MODES),test-$(TEST_NAME)-$(mode))
+
 endef

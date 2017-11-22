@@ -1,10 +1,13 @@
 #!/usr/bin/python3
 
+import argparse
+import os
 import subprocess
 import sys
 import time
 
 TARGETS = [ 'x86' ]
+MODES = None
 
 class TestData:
     def __init__(self, bin):
@@ -37,10 +40,12 @@ class Test:
 
 
     def run(self):
-        def prep(td):
-            print("measuring", td.bin)
+        def prep(td, mode=None):
+            print("measuring", td.bin, "mode:", mode)
 
             path = self.dir + '/' + td.bin
+            if mode:
+                path = path + '-' + mode
             args = [path]
             args.extend(self.args)
             print(" ".join(args))
@@ -59,37 +64,38 @@ class Test:
             ntimes.append(t)
 
         # translated
-        td = self.rv32
-        args = prep(td)
+        for mode in MODES:
+            td = self.rv32
+            args = prep(td, mode)
 
-        ttimes = []
-        for i in range(n):
-            t = self.run1(args, td, i)
-            ttimes.append(t)
+            ttimes = []
+            for i in range(n):
+                t = self.run1(args, td, i)
+                ttimes.append(t)
 
-        # compare outputs
-        for i in range(n):
-            rc = subprocess.call(["diff", self.native.out(i), self.rv32.out(i)])
-            if rc:
-                sys.exit("ERROR: translated output differs from native (run #"
-                         + str(i) + ")")
+            # compare outputs
+            for i in range(n):
+                rc = subprocess.call(["diff", self.native.out(i), self.rv32.out(i)])
+                if rc:
+                    sys.exit("ERROR: translated output differs from native (run #"
+                             + str(i) + ")")
 
-        def median(vals):
-            vals.sort()
-            n = len(vals)
-            if n % 2 == 0:
-                v1 = vals[n//2 -1]
-                v2 = vals[n//2]
-                return (v1 + v2) / 2
-            else:
-                return vals[n//2 +1]
+            def median(vals):
+                vals.sort()
+                n = len(vals)
+                if n % 2 == 0:
+                    v1 = vals[n//2 -1]
+                    v2 = vals[n//2]
+                    return (v1 + v2) / 2
+                else:
+                    return vals[n//2 +1]
 
-        nt = median(ntimes)
-        tt = median(ttimes)
-        oh = (tt - nt) / nt
-        print("native time     =", nt)
-        print("translated time =", tt)
-        print("overhead        =", oh)
+            nt = median(ntimes)
+            tt = median(ttimes)
+            oh = (tt - nt) / nt
+            print("native time     =", nt)
+            print("translated time =", tt)
+            print("overhead        =", oh)
 
 
 def measure(target, dir, test_name, args):
@@ -99,12 +105,22 @@ def measure(target, dir, test_name, args):
 
 # dir test arg
 def main(args):
-    if len(args) < 3:
-        raise RuntimeError("wrong number of args")
-    dir = args[1]
-    test = args[2]
-    print("measuring", test)
+    parser = argparse.ArgumentParser(description='Measure translation overhead')
+    parser.add_argument('dir', type=str)
+    parser.add_argument('test', type=str)
+    parser.add_argument('args', metavar='arg', type=str, nargs='*')
+
+    args = parser.parse_args()
+
+    print("measuring", args.test)
+
+    global MODES
+    if not MODES:
+        MODES = os.environ["MODES"].split(" ")
+    if not MODES:
+        raise Exception("MODES not defined!")
+
     for target in TARGETS:
-        measure(target, dir, test, args[3:])
+        measure(target, args.dir, args.test, args.args)
 
 main(sys.argv)

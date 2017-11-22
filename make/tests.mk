@@ -27,11 +27,53 @@ test-system: sbt-debug
 
 ### QEMU tests
 
+$(eval ADD_ASM_SRC_PREFIX =)
+RV32TESTS_INCDIR   := $(TOPDIR)/riscv-qemu-tests
+RV32TESTS_SRCDIR   := $(TOPDIR)/riscv-qemu-tests/rv32i/
+RV32TESTS_DSTDIR   := $(BUILD_DIR)/riscv-qemu-tests/rv32i/
+
+$(RV32TESTS_DSTDIR):
+	mkdir -p $@
+
+RV32_TESTS := \
+    add addi and andi \
+    aiupc \
+    beq bge bgeu blt bltu bne \
+    jal jalr \
+    lui lb lbu lhu lw sb sw \
+    or ori \
+    sll slli slt slti sltiu sltu sra srai srl srli \
+    sub xor xori
+RV32_TESTS_FAILING :=
+RV32_TESTS_MISSING := \
+    csrrw csrrs csrrc csrrwi csrrsi csrrci \
+    ecall ebreak fence fence.i lh sh
+
+.PHONY: rv32tests_status
+rv32tests_status:
+	@echo passing: `echo $(RV32_TESTS) | wc -w`
+	@echo $(RV32_TESTS)
+	@echo failing: `echo $(RV32_TESTS_FAILING) | wc -w`
+	@echo $(RV32_TESTS_FAILING)
+	@echo missing: `echo $(RV32_TESTS_MISSING) | wc -w`
+	@echo $(RV32_TESTS_MISSING)
+	@echo total: \
+		`echo $(RV32_TESTS) $(RV32_TESTS_FAILING) $(RV32_TESTS_MISSING) | wc -w`
+
+$(foreach test,$(RV32_TESTS),\
+$(eval $(call SBT_TEST,$(UTEST_NARCHS),$(RV32TESTS_SRCDIR),\
+$(RV32TESTS_DSTDIR),$(test),$(NOLIBS),-I $(RV32TESTS_INCDIR),$(ASM),$(NOC))))
+
 .PHONY: rv32tests
-rv32tests: qemu-tests-reset $(QEMU_TESTS_TOOLCHAIN) sbt
-	rm -f log.txt
-	$(MAKE) -C $(QEMU_TESTS_BUILD)/rv32i clean all
-	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) rv32tests
+rv32tests: sbt-debug $(RV32_TESTS)
+
+run-rv32tests: rv32tests $(addprefix test-,$(RV32_TESTS))
+	@echo "All rv32tests passed!"
+
+rv32tests-clean:
+	rm -rf $(RV32TESTS_DSTDIR)
+
+clean-run-rv32tests: rv32tests-clean run-rv32tests
 
 ###
 ### matrix multiply test
@@ -40,7 +82,7 @@ rv32tests: qemu-tests-reset $(QEMU_TESTS_TOOLCHAIN) sbt
 TARGETS := rv32 x86 rv32-x86
 
 mmm:
-	$(LOG) $(TOPDIR)/scripts/measure.py $(SBT_OUT_DIR) mm
+	MODES="globals locals" $(LOG) $(TOPDIR)/scripts/measure.py $(SBT_OUT_DIR) mm
 
 .PHONY: mmtest
 mmtest: sbt
