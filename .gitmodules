@@ -4,11 +4,11 @@
 [submodule "llvm"]
 	path = submodules/llvm
 	url = https://github.com/OpenISA/llvm
-	branch = lowrisc2
+	branch = lowrisc
 [submodule "clang"]
 	path = submodules/clang
 	url = https://github.com/OpenISA/clang
-	branch = lowrisc2
+	branch = lowrisc
 [submodule "lowrisc-llvm"]
 	path = submodules/lowrisc-llvm
 	url = https://github.com/lowRISC/riscv-llvm

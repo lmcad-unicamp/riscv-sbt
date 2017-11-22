@@ -10,7 +10,7 @@ lc:
 SBT_TEST_DIR := $(TOPDIR)/sbt/test
 
 .PHONY: tests
-tests: sbt-debug
+tests:
 	rm -f log.txt
 	$(LOG) $(MAKE) -C $(TOPDIR)/test clean all run
 	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) clean run-alltests
@@ -20,7 +20,7 @@ tests: sbt-debug
 SBT_OUT_DIR := $(BUILD_DIR)/sbt/$(BUILD_TYPE_DIR)/test/
 
 .PHONY: test-system
-test-system: sbt-debug
+test-system:
 	rm -f log.txt $(SBT_OUT_DIR)rv32-*system*
 	sudo ./scripts/setmsr.sh
 	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) test-system
@@ -65,7 +65,7 @@ $(eval $(call SBT_TEST,$(UTEST_NARCHS),$(RV32TESTS_SRCDIR),\
 $(RV32TESTS_DSTDIR),$(test),$(NOLIBS),-I $(RV32TESTS_INCDIR),$(ASM),$(NOC))))
 
 .PHONY: rv32tests
-rv32tests: sbt-debug $(RV32_TESTS)
+rv32tests: $(RV32_TESTS)
 
 run-rv32tests: rv32tests $(addprefix test-,$(RV32_TESTS))
 	@echo "All rv32tests passed!"

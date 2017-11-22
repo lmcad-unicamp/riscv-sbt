@@ -338,14 +338,16 @@ CLEAN_S=$(CLEAN_S))"),)
 
 clean-$(CLEAN_MOD):
 	@echo $$@:
-	cd $(CLEAN_DIR) && \
+	if [ -d $(CLEAN_DIR) ]; then \
+		cd $(CLEAN_DIR) && \
 		rm -f $(CLEAN_MOD) \
 		$(CLEAN_MOD).o \
 		$(if $(CLEAN_S),$(CLEAN_MOD).s,) \
 		$(CLEAN_MOD).bc $(CLEAN_MOD).ll \
 		$(CLEAN_MOD).opt.bc $(CLEAN_MOD).opt.ll \
 		$(CLEAN_MOD).opt2.bc $(CLEAN_MOD).opt2.ll \
-		$(CLEAN_MOD).out
+		$(CLEAN_MOD).out; \
+	fi
 
 endef
 
@@ -440,7 +442,7 @@ FLAGS=$(TO_FLAGS))"),)
 
 $(TO_DIR)$(TO_OUT).bc: $(TO_DIR)$(TO_IN).o
 	@echo $$@: $$<
-	riscv-sbt $(SBTFLAGS) $(TO_FLAGS) -o $$@ $$^ &> $(TOPDIR)/sbt.log
+	riscv-sbt $(SBTFLAGS) $(TO_FLAGS) -o $$@ $$^ >$(TOPDIR)/sbt.log 2>&1
 
 endef
 
