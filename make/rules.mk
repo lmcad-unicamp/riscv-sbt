@@ -2,6 +2,14 @@
 
 # DEBUG_RULES := 1
 
+# constants
+NOLIBS :=
+NOFLAGS :=
+ASM := ASM
+NOASM :=
+C := C
+NOC :=
+
 # .c -> .bc
 define _C2BC
 $(eval C2BC_SRCDIR = $(2))
@@ -237,7 +245,7 @@ $(eval LINK_DSTDIR = $(3))
 $(eval LINK_INS = $(4))
 $(eval LINK_OUT = $(5))
 $(eval LINK_LIBS = $(6))
-$(eval LINK_ASM = $(7))
+$(eval LINK_C = $(7))
 $(eval LINK_OBJS = $(addsuffix .o,$(LINK_INS)))
 
 $(if $(DEBUG_RULES),$(warning "LINK($(1),\
@@ -246,12 +254,12 @@ DSTDIR=$(LINK_DSTDIR),\
 INS=$(LINK_INS),\
 OUT=$(LINK_OUT),\
 LIBS=$(LINK_LIBS),\
-ASM=$(LINK_ASM))"),)
+C=$(LINK_C))"),)
 
 $(LINK_DSTDIR)$(LINK_OUT): $(addprefix $(LINK_SRCDIR),$(LINK_OBJS))
 	@echo $$@: $$^
-	$(if $(LINK_ASM),$($(1)_LD),$($(1)_GCC) $(GCC_CFLAGS)) -o $$@ $$^ $(LINK_LIBS) \
-		$(if $(LINK_ASM),,-lm)
+	$(if $(LINK_C),$($(1)_GCC) $(GCC_CFLAGS),$($(1)_LD)) -o $$@ $$^ $(LINK_LIBS) \
+		$(if $(LINK_C),-lm,)
 
 endef
 
@@ -264,6 +272,7 @@ $(eval SNLINK_INS = $(4))
 $(eval SNLINK_OUT = $(5))
 $(eval SNLINK_LIBS = $(6))
 $(eval SNLINK_FLAGS = $(7))
+$(eval SNLINK_C = $(8))
 
 $(if $(DEBUG_RULES),$(warning "SNLINK($(1),\
 SRCDIR=$(SNLINK_SRCDIR),\
@@ -271,13 +280,14 @@ DSTDIR=$(SNLINK_DSTDIR),\
 INS=$(SNLINK_INS),\
 OUT=$(SNLINK_OUT),\
 LIBS=$(SNLINK_LIBS),\
-FLAGS=$(SNLINK_FLAGS))"),)
+FLAGS=$(SNLINK_FLAGS),\
+C=$(SNLINK_C))"),)
 
 $(call _S2OS,$(1),$(SNLINK_SRCDIR),$(SNLINK_DSTDIR),$(SNLINK_INS),$(SNLINK_OUT))
 
 $(call _LINK,$(1),$(SNLINK_DSTDIR),$(SNLINK_DSTDIR),\
 $(if $(subst 1,,$(words $(SNLINK_INS))),$(SNLINK_INS),$(SNLINK_OUT)),\
-$(SNLINK_OUT),$(SNLINK_LIBS),asm)
+$(SNLINK_OUT),$(SNLINK_LIBS),$(SNLINK_C))
 endef
 
 
@@ -289,6 +299,7 @@ $(eval CNLINK_INS = $(4))
 $(eval CNLINK_OUT = $(5))
 $(eval CNLINK_LIBS = $(6))
 $(eval CNLINK_FLAGS = $(7))
+$(eval CNLINK_C = $(8))
 
 $(if $(DEBUG_RULES),$(warning "CNLINK($(1),\
 SRCDIR=$(CNLINK_SRCDIR),\
@@ -296,7 +307,8 @@ DSTDIR=$(CNLINK_DSTDIR),\
 INS=$(CNLINK_INS),\
 OUT=$(CNLINK_OUT),\
 LIBS=$(CNLINK_LIBS),\
-FLAGS=$(CNLINK_FLAGS))"),)
+FLAGS=$(CNLINK_FLAGS),\
+C=$(CNLINK_C))"),)
 
 $(call _C2S,$(1),$(CNLINK_SRCDIR),$(CNLINK_DSTDIR),$(CNLINK_INS),\
 $(CNLINK_OUT),$(CNLINK_LIBS),$(CNLINK_FLAGS))
@@ -305,7 +317,7 @@ $(call _S2O,$(1),$(CNLINK_DSTDIR),$(CNLINK_DSTDIR),\
 $(CNLINK_OUT),$(CNLINK_OUT))
 
 $(call _LINK,$(1),$(CNLINK_DSTDIR),$(CNLINK_DSTDIR),\
-$(CNLINK_OUT),$(CNLINK_OUT),$(CNLINK_LIBS),)
+$(CNLINK_OUT),$(CNLINK_OUT),$(CNLINK_LIBS),$(CNLINK_C))
 endef
 
 
@@ -338,18 +350,17 @@ define _RUN
 $(eval RUN_DIR = $(2))
 $(eval RUN_PROG = $(3))
 $(eval RUN_SAVE = $(4))
+$(eval RUN_ARGS = $(5))
 
 $(if $(DEBUG_RULES),$(warning "RUN(DIR=$(RUN_DIR),\
 PROG=$(RUN_PROG),\
-SAVE=$(RUN_SAVE))"),)
+SAVE=$(RUN_SAVE),\
+ARGS=$(RUN_ARGS))"),)
 
 run-$(RUN_PROG): $(RUN_DIR)$(RUN_PROG)
 	@echo $$@:
-  ifeq ($(RUN_SAVE),)
-	$($(1)_RUN) $(RUN_DIR)$(RUN_PROG)
-  else
-	$($(1)_RUN) $(RUN_DIR)$(RUN_PROG) | tee $(RUN_DIR)$(RUN_PROG).out
-  endif
+	$(if $(RUN_SAVE),$(RUN_SH) -o $(RUN_DIR)$(RUN_PROG).out,) \
+		$($(1)_RUN) $(RUN_DIR)$(RUN_PROG) $(RUN_ARGS)
 
 endef
 
@@ -379,6 +390,8 @@ $(eval BUILD_OUT = $(5))
 $(eval BUILD_LIBS = $(6))
 $(eval BUILD_FLAGS = $(7))
 $(eval BUILD_ASM = $(8))
+$(eval BUILD_C = $(9))
+$(eval BUILD_RUNARGS = $(10))
 
 $(if $(DEBUG_RULES),$(warning "BUILD($(1),\
 SRCDIR=$(BUILD_SRCDIR),\
@@ -386,7 +399,10 @@ DSTDIR=$(BUILD_DSTDIR),\
 INS=$(BUILD_INS),\
 OUT=$(BUILD_OUT),\
 LIBS=$(BUILD_LIBS),\
-FLAGS=$(BUILD_FLAGS))"),)
+FLAGS=$(BUILD_FLAGS),\
+ASM=$(BUILD_ASM),\
+C=$(BUILD_C),\
+RUNARGS=$(BUILD_RUNARGS))"),)
 
 # BUILDO: (optimize only one time)
 
@@ -396,10 +412,10 @@ FLAGS=$(BUILD_FLAGS))"),)
 
 $(call $(if $(BUILD_ASM),_SNLINK,_CNLINK)\
 ,$(1),$(BUILD_SRCDIR),$(BUILD_DSTDIR),$(BUILD_INS),\
-$(BUILD_OUT),$(BUILD_LIBS),$(BUILD_FLAGS))
+$(BUILD_OUT),$(BUILD_LIBS),$(BUILD_FLAGS),$(BUILD_C))
 
-$(call _CLEAN,$(BUILD_DSTDIR),$(BUILD_OUT),$(if $(BUILD_ASM),,clean.s))
-$(call _RUN,$(1),$(BUILD_DSTDIR),$(BUILD_OUT),save.out)
+$(call _CLEAN,$(BUILD_DSTDIR),$(BUILD_OUT),$(if $(BUILD_C),,clean.s))
+$(call _RUN,$(1),$(BUILD_DSTDIR),$(BUILD_OUT),save.out,$(BUILD_RUNARGS))
 $(call _ALIAS,$(BUILD_DSTDIR),$(BUILD_OUT))
 endef
 
@@ -410,6 +426,12 @@ $(eval TO_DIR = $(2))
 $(eval TO_IN = $(3))
 $(eval TO_OUT = $(4))
 $(eval TO_FLAGS = $(5))
+
+$(if $(DEBUG_RULES),$(warning "TRANSLATE_OBJ($(1),\
+DIR=$(TO_DIR),\
+IN=$(TO_IN),\
+OUT=$(TO_OUT),\
+FLAGS=$(TO_FLAGS))"),)
 
 $(TO_DIR)$(TO_OUT).bc: $(TO_DIR)$(TO_IN).o
 	@echo $$@: $$<
@@ -426,17 +448,31 @@ $(eval TRANSLATE_IN = $(4))
 $(eval TRANSLATE_OUT = $(5))
 $(eval TRANSLATE_LIBS = $(6))
 $(eval TRANSLATE_FLAGS = $(7))
-$(eval TRANSLATE_ASM = $(8))
+$(eval TRANSLATE_C = $(8))
+$(eval TRANSLATE_RUNARGS = $(9))
+
+$(eval TRANSLATE_NAT_OBJS = $(foreach obj,$(SBT_NAT_OBJS),$($(1)_$(obj)_O)))
+
+$(if $(DEBUG_RULES),$(warning "TRANSLATE($(1),\
+SRCDIR=$(TRANSLATE_SRCDIR),\
+DSTDIR=$(TRANSLATE_DSTDIR),\
+IN=$(TRANSLATE_IN),\
+OUT=$(TRANSLATE_OUT),\
+LIBS=$(TRANSLATE_LIBS),\
+FLAGS=$(TRANSLATE_FLAGS),\
+C=$(TRANSLATE_C),\
+RUNARGS=$(TRANSLATE_RUNARGS))"),)
 
 $(call _TRANSLATE_OBJ,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_IN),\
-$(TRANSLATE_OUT),$(TRANSLATE_FLAGS)\
-$(if $(TRANSLATE_ASM), -dont-use-libc,))
+$(TRANSLATE_OUT),$(TRANSLATE_FLAGS) $(if $(TRANSLATE_C),,-dont-use-libc))
 
 $(call _DIS,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_OUT))
 $(call _OPT,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_OUT),$(TRANSLATE_OUT).opt)
 $(call _DIS,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_OUT).opt)
 $(call _BC2S,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_OUT).opt,$(TRANSLATE_OUT))
 
-$(call BUILD,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_DSTDIR),$(TRANSLATE_OUT),\
-$(TRANSLATE_OUT),$(TRANSLATE_LIBS) $(X86_SYSCALL_O))
+$(call BUILD,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_DSTDIR),\
+$(TRANSLATE_OUT),$(TRANSLATE_OUT),\
+$(TRANSLATE_LIBS) $(TRANSLATE_NAT_OBJS),$(NOFLAGS),\
+$(ASM),$(TRANSLATE_C),$(TRANSLATE_RUNARGS))
 endef

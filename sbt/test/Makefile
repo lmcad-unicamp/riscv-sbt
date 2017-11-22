@@ -10,7 +10,7 @@ TESTS := \
 	argv \
 	mm
 
-all: elf
+all: elf tests
 
 include $(TOPDIR)/make/rules.mk
 
@@ -34,181 +34,134 @@ $(SBT_OUT_DIR)elf: $(SBT_OUT_DIR) $(SBT_OUT_DIR)elf.o
 elf: $(SBT_OUT_DIR)elf
 
 
+### x86-test-syscall ###
+
+$(eval $(call BUILD,X86,$(SRC_DIR),$(SBT_OUT_DIR),\
+x86-test-syscall,x86-test-syscall,$(X86_SYSCALL_O),$(NOFLAGS),$(ASM),$(C)))
+
+
 ### sbt test ###
+
+MODES        := globals locals
+# NARCHS = native archs to build bins to
+TEST_NARCHS  := RV32 X86
+UTEST_NARCHS := RV32
+
+
+define NBUILD
+$(eval N_ARCH = $(1))
+$(eval N_SRCDIR = $(2))
+$(eval N_DSTDIR = $(3))
+$(eval N_NAME = $(4))
+$(eval N_LIBS = $(5))
+$(eval N_FLAGS = $(6))
+$(eval N_ASM = $(7))
+$(eval N_C = $(8))
+$(eval N_ARGS = $(9))
+
+$(eval N_PREFIX = $($(N_ARCH)_PREFIX))
+$(eval N_IN = $(if $(N_ASM),$(N_PREFIX)-,)$(N_NAME))
+$(eval N_OUT = $(N_PREFIX)-$(N_NAME))
+
+# native bins
+$(call BUILD,$(N_ARCH),$(N_SRCDIR),$(N_DSTDIR),$(N_IN),$(N_OUT),\
+$(N_LIBS),$(N_FLAGS),$(N_ASM),$(N_C),$(N_ARGS))
+
+endef
+
 
 define SBT_TEST1
 $(eval TEST1_DSTARCH = $(1))
 $(eval TEST1_DSTDIR = $(2))
 $(eval TEST1_NAME = $(3))
 $(eval TEST1_MODE = $(4))
-$(eval TEST1_ASM = $(5))
+$(eval TEST1_LIBS = $(5))
+$(eval TEST1_C = $(6))
+$(eval TEST1_ARGS = $(7))
+
 $(eval TEST1_TGT = $(TEST1_NAME)-$(TEST1_MODE))
-$(eval TEST1_IN = rv32-$(TEST1_NAME))
-$(eval TEST1_OUT = rv32-$($(TEST1_DSTARCH)_PREFIX)-$(TEST1_TGT))
+$(eval TEST1_IN = $(RV32_PREFIX)-$(TEST1_NAME))
+$(eval TEST1_OUT = $(RV32_PREFIX)-$($(TEST1_DSTARCH)_PREFIX)-$(TEST1_TGT))
 $(eval TEST1_NAT = $($(TEST1_DSTARCH)_PREFIX)-$(TEST1_NAME))
 
-$(call $(if $(TEST1_ASM),TRANSLATE_ASM,TRANSLATE),\
-$(TEST1_DSTARCH),$(TEST1_DSTDIR),$(TEST1_DSTDIR),\
-$(TEST1_IN),$(TEST1_OUT),,-regs=$(TEST1_MODE))
+$(call TRANSLATE,$(TEST1_DSTARCH),$(TEST1_DSTDIR),$(TEST1_DSTDIR),\
+$(TEST1_IN),$(TEST1_OUT),$(TEST1_LIBS),-regs=$(TEST1_MODE),\
+$(TEST1_C),$(TEST1_ARGS))
 
 .PHONY: $(TEST1_TGT)
 $(TEST1_TGT): $(TEST1_DSTDIR)$(TEST1_OUT)
 
-test-$(TEST1_TGT): run-$(TEST1_OUT)
+test-$(TEST1_TGT): $(TEST1_TGT) run-$(TEST1_OUT)
 	diff $(TEST1_DSTDIR)$(TEST1_IN).out $(TEST1_DSTDIR)$(TEST1_OUT).out
-	diff $(TEST1_DSTDIR)$(TEST1_NAT).out $(TEST1_DSTDIR)$(TEST1_OUT).out
 
 endef
 
-define SBT_BUILD
-$(eval SBTB_ARCH = $(1))
-$(eval SBTB_SRCDIR = $(2))
-$(eval SBTB_DSTDIR = $(3))
-$(eval SBTB_NAME = $(4))
-$(eval SBTB_ASM = $(5))
-
-endef
 
 define SBT_TEST
-$(eval TEST_SRCDIR = $(1))
-$(eval TEST_DSTDIR = $(2))
-$(eval TEST_NAME = $(3))
-$(eval TEST_ASM = $(4))
+$(eval TEST_ARCHS = $(1))
+$(eval TEST_SRCDIR = $(2))
+$(eval TEST_DSTDIR = $(3))
+$(eval TEST_NAME = $(4))
+$(eval TEST_LIBS = $(5))
+$(eval TEST_FLAGS = $(6))
+$(eval TEST_ASM = $(7))
+$(eval TEST_C = $(8))
+$(eval TEST_ARGS = $(9))
 
-# rv32 bin
-$(eval $(call BUILDS,RV32,$(TEST_SRCDIR),$(TEST_DSTDIR),rv32-$(TEST_NAME),rv32-$(TEST_NAME)))
+# native bins
+$(foreach ARCH,$(TEST_ARCHS),\
+$(call NBUILD,$(ARCH),$(TEST_SRCDIR),$(TEST_DSTDIR),\
+$(TEST_NAME),$(TEST_LIBS),$(TEST_FLAGS),$(TEST_ASM),$(TEST_C),$(TEST_ARGS)))
 
-# x86 bin
-$(eval $(call BUILDS,RV32,$(TEST_SRCDIR),$(TEST_DSTDIR),x86-$(TEST_NAME),x86-$(TEST_NAME)))
+# translated bins
+$(foreach mode,$(MODES),\
+$(call SBT_TEST1,X86,$(TEST_DSTDIR),$(TEST_NAME),$(mode),\
+$(TEST_LIBS),$(TEST_C),$(TEST_ARGS)))
 
-$(foreach mode,globals locals,\
-$(call SBT_TEST1,X86,$(TEST_DSTDIR),$(TEST_NAME),$(mode),$(TEST_ASM)))
+.PHONY: $(TEST_NAME)
+$(TEST_NAME): $(foreach ARCH,$(TEST_ARCHS),$($(ARCH)_PREFIX)-$(TEST_NAME)) \
+				$(foreach mode,$(MODES),$(TEST_NAME)-$(mode))
+
+test-$(TEST_NAME): $(foreach ARCH,$(TEST_ARCHS),run-$($(ARCH)_PREFIX)-$(TEST_NAME)) \
+					$(foreach mode,$(MODES),test-$(TEST_NAME)-$(mode))
 
 endef
 
 
 ### hello ###
 
-$(eval $(call SBT_TEST,$(SRC_DIR),$(SBT_OUT_DIR),hello,asm))
-
-
-# translated binaries
-
-define HELLO_TEST
-$(eval HELLO_DSTDIR = $(1))
-$(eval HELLO_NAME = $(2))
-$(eval HELLO_FLAGS = $(3))
-$(eval HELLO_RV32_X86 = rv32-x86-$(HELLO_NAME))
-
-$(eval $(call TRANSLATE_ASM,X86,$(HELLO_DSTDIR),$(HELLO_DSTDIR),\
-rv32-hello,$(HELLO_RV32_X86),,$(HELLO_FLAGS)))
-
-.PHONY: $(HELLO_NAME)
-$(HELLO_NAME): $(HELLO_DSTDIR)$(HELLO_RV32_X86)
-
-test-$(HELLO_NAME): run-$(HELLO_RV32_X86)
-	diff $(HELLO_DSTDIR)rv32-hello.out $(HELLO_DSTDIR)$(HELLO_RV32_X86).out
-	diff $(HELLO_DSTDIR)x86-hello.out $(HELLO_DSTDIR)$(HELLO_RV32_X86).out
-
-endef
-
-# globals
-$(eval $(call HELLO_TEST,$(SBT_OUT_DIR),hello-globals,-regs=globals))
-# locals
-$(eval $(call HELLO_TEST,$(SBT_OUT_DIR),hello-locals,-regs=locals))
-
-.PHONY: hello
-hello: $(foreach bin,rv32-hello x86-hello,$(SBT_OUT_DIR)$(bin)) \
-		hello-locals hello-globals
-
-.PHONY: test-hello
-test-hello: run-rv32-hello run-x86-hello test-hello-globals test-hello-locals
-
-
-### x86-test-syscall ###
-
-$(eval $(call CBUILDS,X86,$(SRC_DIR),$(SBT_OUT_DIR),x86-test-syscall,x86-test-syscall,$(X86_SYSCALL_O)))
-
+$(eval $(call SBT_TEST,$(TEST_NARCHS),$(SRC_DIR),$(SBT_OUT_DIR),hello,\
+$(NOLIBS),$(NOFLAGS),$(ASM),$(NOC)))
 
 ### argc/argv ###
 
-$(eval $(call SBT_TEST,$(SRC_DIR),$(SBT_OUT_DIR),argv))
-
-$(eval $(call BUILD,X86,$(SRC_DIR),$(SBT_OUT_DIR),argv,x86-argv))
-.PHONY: test-x86-argv
-test-x86-argv: $(SBT_OUT_DIR)x86-argv
-	$< one two three; [ $$? -eq 123 ]
-
-$(eval $(call BUILDO,RV32,$(SRC_DIR),$(SBT_OUT_DIR),argv,rv32-argv))
-$(eval $(call TRANSLATE,X86,$(SRC_DIR),$(SBT_OUT_DIR),rv32-argv,rv32-x86-argv))
-$(eval $(call CLEAN,$(SBT_OUT_DIR),rv32-x86-argv,clean.s))
-.PHONY: test-rv32-x86-argv
-test-rv32-x86-argv: $(SBT_OUT_DIR)rv32-x86-argv
-	$< one two three; [ $$? -eq 123 ]
-
-.PHONY: test-argv
-test-argv: test-x86-argv test-rv32-x86-argv
-
+$(eval $(call SBT_TEST,$(TEST_NARCHS),$(SRC_DIR),$(SBT_OUT_DIR),argv,\
+$(NOLIBS),$(NOFLAGS),$(NOASM),$(C),one two three))
 
 ### mm (matrix multiply) ###
 
 DIM := 5
-
-$(eval $(call BUILDO,RV32,$(SRC_DIR),$(SBT_OUT_DIR),mm,rv32-mm,-DROWS=$(DIM)))
-$(eval $(call CLINK,RV32,$(SBT_OUT_DIR),$(SBT_OUT_DIR),rv32-mm,rv32-mm))
-$(eval $(call RUN,RV32,$(SBT_OUT_DIR),rv32-mm,save-run.out))
-$(eval $(call ALIAS,$(SBT_OUT_DIR),rv32-mm))
-$(eval $(call TRANSLATE,X86,$(SRC_DIR),$(SBT_OUT_DIR),rv32-mm,rv32-x86-mm))
-
-$(eval $(call BUILD,X86,$(SRC_DIR),$(SBT_OUT_DIR),mm,x86-mm,,-DROWS=$(DIM)))
-
-.PHONY: mm
-mm: rv32-mm x86-mm rv32-x86-mm
-
-.PHONY: test-mm
-test-mm: mm run-rv32-mm run-x86-mm run-rv32-x86-mm
-	diff $(SBT_OUT_DIR)rv32-mm.out $(SBT_OUT_DIR)rv32-x86-mm.out
-
+$(eval $(call SBT_TEST,$(TEST_NARCHS),$(SRC_DIR),$(SBT_OUT_DIR),mm,\
+$(NOLIBS),-DROWS=$(DIM),$(NOASM),$(C)))
 
 ### tests targets ###
 
 .PHONY: tests
-tests: $(TESTS)
+tests: x86-test-syscall $(TESTS)
 
 .PHONY: run-tests
-run-tests: tests $(foreach test,$(TESTS),test-$(test))
+run-tests: tests run-x86-test-syscall $(foreach test,$(TESTS),test-$(test))
 
 
 ### RV32 Translator unit tests ###
 
-define UTEST
-$(eval UTEST_SRCDIR = $(1))
-$(eval UTEST_DSTDIR = $(2))
-$(eval UTEST_NAME = $(3))
-$(eval UTEST_RV32NAME = rv32-$(UTEST_NAME))
-$(eval UTEST_X86NAME = rv32-x86-$(UTEST_NAME))
-
-$(call S2O,RV32,$(UTEST_SRCDIR),$(UTEST_DSTDIR),$(UTEST_RV32NAME),$(UTEST_RV32NAME))
-$(call CLINK,RV32,$(UTEST_DSTDIR),$(UTEST_DSTDIR),$(UTEST_RV32NAME),$(UTEST_RV32NAME))
-$(call RUN,RV32,$(UTEST_DSTDIR),$(UTEST_RV32NAME),save-run.out)
-
-$(call TRANSLATE,X86,$(UTEST_DSTDIR),$(UTEST_DSTDIR),$(UTEST_RV32NAME),$(UTEST_X86NAME),$(X86_COUNTERS_O))
-
-.PHONY: $(UTEST_NAME)
-$(UTEST_NAME): $(UTEST_DSTDIR) $(addprefix $(UTEST_DSTDIR),$(UTEST_RV32NAME) $(UTEST_X86NAME))
-
-.PHONY: test-$(UTEST_NAME)
-test-$(UTEST_NAME): $(UTEST_NAME) run-$(UTEST_RV32NAME) run-$(UTEST_X86NAME)
-	diff $(UTEST_DSTDIR)$(UTEST_RV32NAME).out $(UTEST_DSTDIR)$(UTEST_X86NAME).out
-
-endef
-
 UTESTS := load-store alu-ops branch fence system m
-RV32_UTESTS := $(foreach test,$(UTESTS),rv32-$(test))
-RV32_X86_UTESTS := $(foreach test,$(UTESTS),rv32-x86-$(test))
+
+$(eval SBT_NAT_OBJS = $(SBT_NAT_OBJS) COUNTERS)
 
 $(foreach test,$(UTESTS),\
-$(eval $(call UTEST,$(SRC_DIR),$(SBT_OUT_DIR),$(test))))
+$(eval $(call SBT_TEST,$(UTEST_NARCHS),$(SRC_DIR),$(SBT_OUT_DIR),$(test),\
+$(NOLIBS),$(NOFLAGS),$(ASM),$(C))))
 
 .PHONY: utests
 utests: $(UTESTS)
@@ -221,68 +174,68 @@ run-utests: utests $(foreach test,$(filter-out system,$(UTESTS)),test-$(test))
 ###
 
 .PHONY: alltests
-alltests: tests utests x86-test-syscall
+alltests: tests utests
 
 .PHONY: run-alltests
-run-alltests: run-tests run-utests run-x86-test-syscall
+run-alltests: alltests run-tests run-utests
 
 clean:
 	rm -rf $(SBT_OUT_DIR)
 
-###
-### QEMU tests
-###
-
-QEMU_TESTS_BUILD := $(BUILD_DIR)/riscv-qemu-tests
-OUT_DIR := $(QEMU_TESTS_BUILD)/rv32i/
-
-RV32_TESTS := \
-    add addi and andi \
-    aiupc \
-    beq bge bgeu blt bltu bne \
-    jal jalr \
-    lui lb lbu lhu lw sb sw \
-    or ori \
-    sll slli slt slti sltiu sltu sra srai srl srli \
-    sub xor xori
-RV32_TESTS_FAILING :=
-RV32_TESTS_MISSING := csrrw csrrs csrrc csrrwi csrrsi csrrci \
-    ecall ebreak fence fence.i lh sh
-
-RV32_TESTS_TARGETS := $(addprefix rv32-x86-,$(RV32_TESTS))
-
-define TEST2
-$(eval TEST2_RV32  = $(2))
-$(eval TEST2_TRANS = rv32-x86-$(2))
-
-.PHONY: test-$(2)
-test-$(2):
-	$(RV32_RUN) $(1)$(TEST2_RV32)
-	$(1)$(TEST2_TRANS); rc=$$$$?; \
-	if [ "$$$$rc" -ne 0 ]; then \
-		echo $$$$rc; \
-		false; \
-	fi
-
-endef
-
-$(foreach test,$(RV32_TESTS),\
-    $(eval $(call TEST2,$(OUT_DIR),$(test))))
-
-$(foreach test,$(RV32_TESTS),\
-    $(eval $(call TRANSLATE_ASM,X86,$(OUT_DIR),$(OUT_DIR),$(test),rv32-x86-$(test))))
-
-.PHONY: rv32tests_status
-rv32tests_status:
-	@echo passing: `echo $(RV32_TESTS) | wc -w`
-	@echo $(RV32_TESTS)
-	@echo failing: `echo $(RV32_TESTS_FAILING) | wc -w`
-	@echo $(RV32_TESTS_FAILING)
-	@echo missing: `echo $(RV32_TESTS_MISSING) | wc -w`
-	@echo $(RV32_TESTS_MISSING)
-	@echo total: \
-		`echo $(RV32_TESTS) $(RV32_TESTS_FAILING) $(RV32_TESTS_MISSING) | wc -w`
-
-.PHONY: rv32tests
-rv32tests:
-	$(MAKE) $(RV32_TESTS_TARGETS) $(foreach test,$(RV32_TESTS),test-$(test))
+####
+#### QEMU tests
+####
+#
+#QEMU_TESTS_BUILD := $(BUILD_DIR)/riscv-qemu-tests
+#OUT_DIR := $(QEMU_TESTS_BUILD)/rv32i/
+#
+#RV32_TESTS := \
+#    add addi and andi \
+#    aiupc \
+#    beq bge bgeu blt bltu bne \
+#    jal jalr \
+#    lui lb lbu lhu lw sb sw \
+#    or ori \
+#    sll slli slt slti sltiu sltu sra srai srl srli \
+#    sub xor xori
+#RV32_TESTS_FAILING :=
+#RV32_TESTS_MISSING := csrrw csrrs csrrc csrrwi csrrsi csrrci \
+#    ecall ebreak fence fence.i lh sh
+#
+#RV32_TESTS_TARGETS := $(addprefix rv32-x86-,$(RV32_TESTS))
+#
+#define TEST2
+#$(eval TEST2_RV32  = $(2))
+#$(eval TEST2_TRANS = rv32-x86-$(2))
+#
+#.PHONY: test-$(2)
+#test-$(2):
+#	$(RV32_RUN) $(1)$(TEST2_RV32)
+#	$(1)$(TEST2_TRANS); rc=$$$$?; \
+#	if [ "$$$$rc" -ne 0 ]; then \
+#		echo $$$$rc; \
+#		false; \
+#	fi
+#
+#endef
+#
+#$(foreach test,$(RV32_TESTS),\
+#    $(eval $(call TEST2,$(OUT_DIR),$(test))))
+#
+#$(foreach test,$(RV32_TESTS),\
+#    $(eval $(call TRANSLATE_ASM,X86,$(OUT_DIR),$(OUT_DIR),$(test),rv32-x86-$(test))))
+#
+#.PHONY: rv32tests_status
+#rv32tests_status:
+#	@echo passing: `echo $(RV32_TESTS) | wc -w`
+#	@echo $(RV32_TESTS)
+#	@echo failing: `echo $(RV32_TESTS_FAILING) | wc -w`
+#	@echo $(RV32_TESTS_FAILING)
+#	@echo missing: `echo $(RV32_TESTS_MISSING) | wc -w`
+#	@echo $(RV32_TESTS_MISSING)
+#	@echo total: \
+#		`echo $(RV32_TESTS) $(RV32_TESTS_FAILING) $(RV32_TESTS_MISSING) | wc -w`
+#
+#.PHONY: rv32tests
+#rv32tests:
+#	$(MAKE) $(RV32_TESTS_TARGETS) $(foreach test,$(RV32_TESTS),test-$(test))

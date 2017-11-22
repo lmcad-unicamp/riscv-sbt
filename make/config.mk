@@ -35,10 +35,12 @@ CFLAGS         := -fno-rtti -fno-exceptions
 # SBT
 #
 
-SBTFLAGS        = -x
-SBT_SHARE_DIR  := $(TOOLCHAIN_DIR)/share/riscv-sbt
-X86_SYSCALL_O  := $(SBT_SHARE_DIR)/x86-syscall.o
-X86_COUNTERS_O := $(SBT_SHARE_DIR)/x86-counters.o
+SBTFLAGS           = -x
+SBT_SHARE_DIR     := $(TOOLCHAIN_DIR)/share/riscv-sbt
+
+SBT_NAT_OBJS      := SYSCALL
+X86_SYSCALL_O     := $(SBT_SHARE_DIR)/x86-syscall.o
+X86_COUNTERS_O    := $(SBT_SHARE_DIR)/x86-counters.o
 
 #
 # tools
@@ -46,7 +48,8 @@ X86_COUNTERS_O := $(SBT_SHARE_DIR)/x86-counters.o
 
 CMAKE             := cmake
 
-LOG               := $(SCRIPTS_DIR)/run.sh
+LOG               := $(SCRIPTS_DIR)/run.sh --log
+RUN_SH            := $(SCRIPTS_DIR)/run.sh
 
 RV32_TRIPLE       := riscv32-unknown-elf
 RV64_LINUX_TRIPLE := riscv64-unknown-linux-gnu

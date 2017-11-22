@@ -13,14 +13,14 @@ SBT_TEST_DIR := $(TOPDIR)/sbt/test
 tests: sbt-debug
 	rm -f log.txt
 	$(LOG) $(MAKE) -C $(TOPDIR)/test clean all run
-	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) clean elf run-alltests
+	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) clean run-alltests
 
 ### rv32-system test
 
 SBT_OUT_DIR := $(BUILD_DIR)/sbt/$(BUILD_TYPE_DIR)/test/
 
 .PHONY: test-system
-test-system: sbt
+test-system: sbt-debug
 	rm -f log.txt $(SBT_OUT_DIR)rv32-*system*
 	sudo ./scripts/setmsr.sh
 	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) test-system
