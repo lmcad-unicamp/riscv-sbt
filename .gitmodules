@@ -21,9 +21,6 @@
 [submodule "riscv-pk"]
 	path = submodules/riscv-pk
 	url = https://github.com/riscv/riscv-pk
-[submodule "riscv-qemu"]
-	path = submodules/riscv-qemu
-	url = https://github.com/riscv/riscv-qemu
 [submodule "riscv-qemu-tests"]
 	path = submodules/riscv-qemu-tests
 	url = https://github.com/arsv/riscv-qemu-tests
