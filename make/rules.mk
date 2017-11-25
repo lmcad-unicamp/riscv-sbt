@@ -451,7 +451,7 @@ FLAGS=$(TO_FLAGS))"),)
 
 $(TO_DIR)$(TO_OUT).bc: $(TO_DIR)$(TO_IN).o
 	@echo $$@: $$<
-	riscv-sbt $(SBTFLAGS) $(TO_FLAGS) -o $$@ $$^ >$(TOPDIR)/sbt.log 2>&1
+	riscv-sbt $(SBTFLAGS) $(TO_FLAGS) -o $$@ $$^ >$(TOPDIR)/junk/$(TO_OUT).log 2>&1
 
 endef
 

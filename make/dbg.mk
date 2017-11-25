@@ -1,9 +1,13 @@
+TESTDIR   := $(BUILD_DIR)/mibench/network/dijkstra
+TESTBIN   := $(TESTDIR)/rv32-x86-dijkstra-globals
+TEST_ARGS := /mnt/ssd/riscv-sbt/mibench/network/dijkstra/input.dat
+
 .PHONY: test
-test:
-	make -C $(TOPDIR)/sbt/test clean mm
-	$(BUILD_DIR)/sbt/debug/test/x86-mm
-	$(BUILD_DIR)/sbt/debug/test/rv32-x86-mm
+test: sbt
+	cd $(TESTDIR) && \
+	riscv-sbt -x -regs=globals -o rv32-x86-dijkstra-globals.bc rv32-dijkstra.o >/mnt/ssd/riscv-sbt/junk/rv32-x86-dijkstra-globals.log 2>&1 && \
+	$(TESTBIN) $(TEST_ARGS)
 
 .PHONY: dbg
 dbg:
-	gdb $(TESTBIN)
+	gdb $(TESTBIN) $(TESTDIR)/core

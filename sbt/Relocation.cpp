@@ -60,8 +60,14 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
         if (_ri == _re)
             return nullptr;
 
-        // check if there is a relocation for current address
         reloc = *_ri;
+
+        // check if we skipped some addresses and now need to
+        // advance the iterator
+        if (addr > reloc->offset())
+            next(addr, hadNext);
+
+        // check if there is a relocation for current address
         if (reloc->offset() != addr)
             return nullptr;
     }
