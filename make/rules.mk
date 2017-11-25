@@ -9,6 +9,7 @@ ASM := ASM
 NOASM :=
 C := C
 NOC :=
+NOSYSROOT := NOSYSROOT
 
 # .c -> .bc
 define _C2BC
@@ -17,7 +18,6 @@ $(eval C2BC_DSTDIR = $(3))
 $(eval C2BC_IN = $(4))
 $(eval C2BC_OUT = $(5))
 $(eval C2BC_FLAGS = $(6))
-$(eval C2BC_CLANG_FLAGS = $($(1)_CLANG_FLAGS))
 
 $(if $(DEBUG_RULES),$(warning "C2BC(SRCDIR=$(C2BC_SRCDIR),\
 DSTDIR=$(C2BC_DSTDIR),\
@@ -25,11 +25,20 @@ IN=$(C2BC_IN),\
 OUT=$(C2BC_OUT),\
 FLAGS=$(C2BC_FLAGS))"),)
 
+$(eval C2BC_SETSYSROOT = $(if $(findstring $(NOSYSROOT),$(C2BC_FLAGS)),,1))
+$(eval C2BC_FLAGS = $(subst $(NOSYSROOT),,$(C2BC_FLAGS)))
+$(eval C2BC_CLANG_FLAGS = $($(1)_CLANG_FLAGS))
+$(eval C2BC_FLAGS = $(C2BC_CLANG_FLAGS)\
+$(if $(C2BC_SETSYSROOT),$($(1)_SYSROOT_FLAG),) $(C2BC_FLAGS))
+
+$(if $(DEBUG_RULES),$(warning "C2BC_DBG(SETSYSROOT=$(C2BC_SETSYSROOT),\
+SYSROOT_FLAG=$($(1)_SYSROOT_FLAG),\
+FLAGS=$(C2BC_FLAGS))"),)
+
 $(C2BC_DSTDIR)$(C2BC_OUT).bc: $(C2BC_SRCDIR)$(C2BC_IN).c \
 							| $(if $(subst ./,,$(C2BC_DSTDIR)),$(C2BC_DSTDIR),)
 	@echo $$@: $$<
-	$($(1)_CLANG) $(C2BC_CLANG_FLAGS) $(C2BC_FLAGS) \
-		$(EMITLLVM) $$< -o $$@
+	$($(1)_CLANG) $(C2BC_FLAGS) $(EMITLLVM) $$< -o $$@
 
 endef
 
@@ -336,7 +345,7 @@ $(if $(DEBUG_RULES),$(warning "CLEAN(DIR=$(CLEAN_DIR),\
 MOD=$(CLEAN_MOD),\
 CLEAN_S=$(CLEAN_S))"),)
 
-clean-$(CLEAN_MOD):
+$(CLEAN_MOD)-clean:
 	@echo $$@:
 	if [ -d $(CLEAN_DIR) ]; then \
 		cd $(CLEAN_DIR) && \
@@ -364,7 +373,7 @@ PROG=$(RUN_PROG),\
 SAVE=$(RUN_SAVE),\
 ARGS=$(RUN_ARGS))"),)
 
-run-$(RUN_PROG): $(RUN_DIR)$(RUN_PROG)
+$(RUN_PROG)-run: $(RUN_DIR)$(RUN_PROG)
 	@echo $$@:
 	$(if $(RUN_SAVE),$(RUN_SH) -o $(RUN_DIR)$(RUN_PROG).out,) \
 		$($(1)_RUN) $(RUN_DIR)$(RUN_PROG) $(RUN_ARGS)
@@ -498,19 +507,32 @@ define NBUILD
 $(eval N_ARCH = $(1))
 $(eval N_SRCDIR = $(2))
 $(eval N_DSTDIR = $(3))
-$(eval N_NAME = $(4))
-$(eval N_LIBS = $(5))
-$(eval N_FLAGS = $(6))
-$(eval N_ASM = $(7))
-$(eval N_C = $(8))
-$(eval N_ARGS = $(9))
+$(eval N_INS = $(4))
+$(eval N_OUT = $(5))
+$(eval N_LIBS = $(6))
+$(eval N_FLAGS = $(7))
+$(eval N_ASM = $(8))
+$(eval N_C = $(9))
+$(eval N_ARGS = $(10))
 
 $(eval N_PREFIX = $($(N_ARCH)_PREFIX))
-$(eval N_IN = $(if $(and $(ADD_ASM_SRC_PREFIX),$(N_ASM)),$(N_PREFIX)-,)$(N_NAME))
-$(eval N_OUT = $(N_PREFIX)-$(N_NAME))
+$(eval N_INS = $(if $(and $(ADD_ASM_SRC_PREFIX),$(N_ASM)),\
+$(addprefix $(N_PREFIX)-,$(N_INS)),$(N_INS)))
+$(eval N_OUT = $(N_PREFIX)-$(N_OUT))
+
+$(if $(DEBUG_RULES),$(warning "NBUILD($(1),\
+SRCDIR=$(N_DSTDIR),\
+DSTDIR=$(N_DSTDIR),\
+INS=$(N_INS),\
+OUT=$(N_OUT),\
+LIBS=$(N_LIBS),\
+FLAGS=$(N_FLAGS),\
+ASM=$(N_ASM),\
+C=$(N_C),\
+ARGS=$(N_ARGS))"),)
 
 # native bins
-$(call BUILD,$(N_ARCH),$(N_SRCDIR),$(N_DSTDIR),$(N_IN),$(N_OUT),\
+$(call BUILD,$(N_ARCH),$(N_SRCDIR),$(N_DSTDIR),$(N_INS),$(N_OUT),\
 $(N_LIBS),$(N_FLAGS),$(N_ASM),$(N_C),$(N_ARGS))
 
 endef
@@ -530,6 +552,14 @@ $(eval TEST1_IN = $(RV32_PREFIX)-$(TEST1_NAME))
 $(eval TEST1_OUT = $(RV32_PREFIX)-$($(TEST1_DSTARCH)_PREFIX)-$(TEST1_TGT))
 $(eval TEST1_NAT = $($(TEST1_DSTARCH)_PREFIX)-$(TEST1_NAME))
 
+$(if $(DEBUG_RULES),$(warning "SBT_TEST1($(1),\
+DSTDIR=$(TEST1_DSTDIR),\
+NAME=$(TEST1_NAME),\
+MODE=$(TEST1_MODE),\
+LIBS=$(TEST1_LIBS),\
+C=$(TEST1_C),\
+ARGS=$(TEST1_ARGS))"),)
+
 $(call TRANSLATE,$(TEST1_DSTARCH),$(TEST1_DSTDIR),$(TEST1_DSTDIR),\
 $(TEST1_IN),$(TEST1_OUT),$(TEST1_LIBS),-regs=$(TEST1_MODE),\
 $(TEST1_C),$(TEST1_ARGS))
@@ -537,7 +567,7 @@ $(TEST1_C),$(TEST1_ARGS))
 .PHONY: $(TEST1_TGT)
 $(TEST1_TGT): $(TEST1_DSTDIR)$(TEST1_OUT)
 
-test-$(TEST1_TGT): $(TEST1_TGT) run-$(TEST1_OUT)
+$(TEST1_TGT)-test: $(TEST1_TGT) $(TEST1_OUT)-run
 	diff $(TEST1_DSTDIR)$(TEST1_IN).out $(TEST1_DSTDIR)$(TEST1_OUT).out
 
 endef
@@ -547,28 +577,42 @@ define SBT_TEST
 $(eval TEST_ARCHS = $(1))
 $(eval TEST_SRCDIR = $(2))
 $(eval TEST_DSTDIR = $(3))
-$(eval TEST_NAME = $(4))
-$(eval TEST_LIBS = $(5))
-$(eval TEST_FLAGS = $(6))
-$(eval TEST_ASM = $(7))
-$(eval TEST_C = $(8))
-$(eval TEST_ARGS = $(9))
+$(eval TEST_INS = $(4))
+$(eval TEST_OUT = $(5))
+$(eval TEST_LIBS = $(6))
+$(eval TEST_FLAGS = $(7))
+$(eval TEST_ASM = $(8))
+$(eval TEST_C = $(9))
+$(eval TEST_ARGS = $(10))
+
+$(if $(DEBUG_RULES),$(warning "SBT_TEST($(1),\
+SRCDIR=$(TEST_SRCDIR),\
+DSTDIR=$(TEST_DSTDIR),\
+INS=$(TEST_INS),\
+OUT=$(TEST_OUT),\
+LIBS=$(TEST_LIBS),\
+FLAGS=$(TEST_FLAGS),\
+ASM=$(TEST_ASM),\
+C=$(TEST_C),\
+ARGS=$(TEST_ARGS))"),)
 
 # native bins
 $(foreach ARCH,$(TEST_ARCHS),\
 $(call NBUILD,$(ARCH),$(TEST_SRCDIR),$(TEST_DSTDIR),\
-$(TEST_NAME),$(TEST_LIBS),$(TEST_FLAGS),$(TEST_ASM),$(TEST_C),$(TEST_ARGS)))
+$(TEST_INS),$(TEST_OUT),$(TEST_LIBS),\
+$(if $(findstring RV32_LINUX,$(ARCH)),$(NOSYSROOT) $(X86_SYSROOT_FLAG),) $(TEST_FLAGS),\
+$(TEST_ASM),$(TEST_C),$(TEST_ARGS)))
 
 # translated bins
 $(foreach mode,$(MODES),\
-$(call SBT_TEST1,X86,$(TEST_DSTDIR),$(TEST_NAME),$(mode),\
+$(call SBT_TEST1,X86,$(TEST_DSTDIR),$(TEST_OUT),$(mode),\
 $(TEST_LIBS),$(TEST_C),$(TEST_ARGS)))
 
-.PHONY: $(TEST_NAME)
-$(TEST_NAME): $(foreach ARCH,$(TEST_ARCHS),$($(ARCH)_PREFIX)-$(TEST_NAME)) \
-				$(foreach mode,$(MODES),$(TEST_NAME)-$(mode))
+.PHONY: $(TEST_OUT)
+$(TEST_OUT): $(foreach ARCH,$(TEST_ARCHS),$($(ARCH)_PREFIX)-$(TEST_OUT)) \
+             $(foreach mode,$(MODES),$(TEST_OUT)-$(mode))
 
-test-$(TEST_NAME): $(foreach ARCH,$(TEST_ARCHS),run-$($(ARCH)_PREFIX)-$(TEST_NAME)) \
-					$(foreach mode,$(MODES),test-$(TEST_NAME)-$(mode))
+$(TEST_OUT)-test: $(foreach ARCH,$(TEST_ARCHS),$($(ARCH)_PREFIX)-$(TEST_OUT)-run) \
+                  $(foreach mode,$(MODES),$(TEST_OUT)-$(mode)-test)
 
 endef

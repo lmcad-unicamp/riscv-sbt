@@ -137,10 +137,10 @@ RUN /bin/bash -c \
 
 ### SBT ###
 
-# test-system
+# system-test
 # DISABLED: msr.ko not easily available
 #
-# test-system reqs
+# system-test reqs
 #RUN apt-get update \
 #    && apt-get install -y \
 #    kmod \
@@ -163,12 +163,12 @@ RUN /bin/bash -c \
 RUN /bin/bash -c \
     ". scripts/env.sh && make tests && rm -rf build"
 
-# test-system
+# system-test
 #RUN /bin/bash -c \
-#    ". scripts/env.sh && make test-system && rm -rf build"
+#    ". scripts/env.sh && make system-test && rm -rf build"
 
 # qemu-tests
 RUN /bin/bash -c \
-    ". scripts/env.sh && make run-rv32tests rv32tests-clean"
+    ". scripts/env.sh && make rv32tests-run rv32tests-clean"
 
 CMD ["/bin/bash"]

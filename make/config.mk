@@ -95,11 +95,14 @@ X86_CLANG         := $(CLANG) --target=x86_64-unknown-linux-gnu -m32
 
 RV32_SYSROOT            := $(TOOLCHAIN_RELEASE)/opt/riscv/$(RV32_TRIPLE)
 RV32_SYSROOT_FLAG       := -isysroot $(RV32_SYSROOT) -isystem $(RV32_SYSROOT)/include
-RV32_CLANG_FLAGS         = $(RV32_SYSROOT_FLAG)
+RV32_CLANG_FLAGS        :=
 
 RV64_LINUX_SYSROOT      := $(TOOLCHAIN_RELEASE)/opt/riscv/sysroot
 RV64_LINUX_SYSROOT_FLAG := -isysroot $(RV64_LINUX_SYSROOT) -isystem $(RV64_LINUX_SYSROOT)/usr/include
-RV32_LINUX_CLANG_FLAGS   = $(RV64_LINUX_SYSROOT_FLAG) -D__riscv_xlen=32
+RV32_LINUX_SYSROOT_FLAG := $(RV64_LINUX_SYSROOT_FLAG)
+RV32_LINUX_CLANG_FLAGS  := -D__riscv_xlen=32
+
+X86_SYSROOT_FLAG  := -isysroot / -isystem /usr/include
 
 EMITLLVM          := -emit-llvm -c $(_O) -mllvm -disable-llvm-optzns
 

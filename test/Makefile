@@ -26,6 +26,6 @@ $(NOLIBS),$(NOFLAGS),$(NOASM),$(C)))
 
 # run/clean
 
-run: $(foreach prog,$(BINS),run-$(prog))
+run: $(foreach prog,$(BINS),$(prog)-run)
 
-clean: $(foreach prog,$(BINS),clean-$(prog))
+clean: $(foreach prog,$(BINS),$(prog)-clean)

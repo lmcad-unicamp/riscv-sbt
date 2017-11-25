@@ -35,34 +35,34 @@ elf: $(SBT_OUT_DIR)elf
 
 $(eval ADD_ASM_SRC_PREFIX = 1)
 
-### x86-test-syscall ###
+### x86-syscall-test ###
 
 $(eval $(call BUILD,X86,$(SRC_DIR),$(SBT_OUT_DIR),\
-x86-test-syscall,x86-test-syscall,$(X86_SYSCALL_O),$(NOFLAGS),$(ASM),$(C)))
+x86-syscall-test,x86-syscall-test,$(X86_SYSCALL_O),$(NOFLAGS),$(ASM),$(C)))
 
 ### hello ###
 
-$(eval $(call SBT_TEST,$(TEST_NARCHS),$(SRC_DIR),$(SBT_OUT_DIR),hello,\
+$(eval $(call SBT_TEST,$(TEST_NARCHS),$(SRC_DIR),$(SBT_OUT_DIR),hello,hello,\
 $(NOLIBS),$(NOFLAGS),$(ASM),$(NOC)))
 
 ### argc/argv ###
 
-$(eval $(call SBT_TEST,$(TEST_NARCHS),$(SRC_DIR),$(SBT_OUT_DIR),argv,\
+$(eval $(call SBT_TEST,$(TEST_NARCHS),$(SRC_DIR),$(SBT_OUT_DIR),argv,argv,\
 $(NOLIBS),$(NOFLAGS),$(NOASM),$(C),one two three))
 
 ### mm (matrix multiply) ###
 
 DIM := 5
-$(eval $(call SBT_TEST,$(TEST_NARCHS),$(SRC_DIR),$(SBT_OUT_DIR),mm,\
+$(eval $(call SBT_TEST,$(TEST_NARCHS),$(SRC_DIR),$(SBT_OUT_DIR),mm,mm,\
 $(NOLIBS),-DROWS=$(DIM),$(NOASM),$(C)))
 
 ### tests targets ###
 
 .PHONY: tests
-tests: x86-test-syscall $(TESTS)
+tests: x86-syscall-test $(TESTS)
 
-.PHONY: run-tests
-run-tests: tests run-x86-test-syscall $(foreach test,$(TESTS),test-$(test))
+.PHONY: tests-run
+tests-run: tests x86-syscall-test-run $(foreach test,$(TESTS),$(test)-test)
 
 
 ### RV32 Translator unit tests ###
@@ -72,15 +72,15 @@ UTESTS := load-store alu-ops branch fence system m
 $(eval SBT_NAT_OBJS = $(SBT_NAT_OBJS) COUNTERS)
 
 $(foreach test,$(UTESTS),\
-$(eval $(call SBT_TEST,$(UTEST_NARCHS),$(SRC_DIR),$(SBT_OUT_DIR),$(test),\
-$(NOLIBS),$(NOFLAGS),$(ASM),$(C))))
+$(eval $(call SBT_TEST,$(UTEST_NARCHS),$(SRC_DIR),$(SBT_OUT_DIR),\
+$(test),$(test),$(NOLIBS),$(NOFLAGS),$(ASM),$(C))))
 
 .PHONY: utests
 utests: $(UTESTS)
 
 # NOTE removed system from utests to run (need MSR access and performance
 # counters support (not always available in VMs))
-run-utests: utests $(foreach test,$(filter-out system,$(UTESTS)),test-$(test))
+utests-run: utests $(foreach test,$(filter-out system,$(UTESTS)),$(test)-test)
 	@echo "All unit tests passed!"
 
 ###
@@ -88,8 +88,8 @@ run-utests: utests $(foreach test,$(filter-out system,$(UTESTS)),test-$(test))
 .PHONY: alltests
 alltests: tests utests
 
-.PHONY: run-alltests
-run-alltests: alltests run-tests run-utests
+.PHONY: alltests-run
+alltests-run: alltests tests-run utests-run
 
 clean:
 	rm -rf $(SBT_OUT_DIR)

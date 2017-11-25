@@ -13,17 +13,17 @@ SBT_TEST_DIR := $(TOPDIR)/sbt/test
 tests:
 	rm -f log.txt
 	$(LOG) $(MAKE) -C $(TOPDIR)/test clean all run
-	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) clean run-alltests
+	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) clean alltests-run
 
 ### rv32-system test
 
 SBT_OUT_DIR := $(BUILD_DIR)/sbt/$(BUILD_TYPE_DIR)/test/
 
-.PHONY: test-system
-test-system:
+.PHONY: system-test
+system-test:
 	rm -f log.txt $(SBT_OUT_DIR)rv32-*system*
 	sudo ./scripts/setmsr.sh
-	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) test-system
+	$(LOG) $(MAKE) -C $(SBT_TEST_DIR) system-test
 
 ### QEMU tests
 
@@ -61,19 +61,19 @@ rv32tests_status:
 		`echo $(RV32_TESTS) $(RV32_TESTS_FAILING) $(RV32_TESTS_MISSING) | wc -w`
 
 $(foreach test,$(RV32_TESTS),\
-$(eval $(call SBT_TEST,$(UTEST_NARCHS),$(RV32TESTS_SRCDIR),\
-$(RV32TESTS_DSTDIR),$(test),$(NOLIBS),-I $(RV32TESTS_INCDIR),$(ASM),$(NOC))))
+$(eval $(call SBT_TEST,$(UTEST_NARCHS),$(RV32TESTS_SRCDIR),$(RV32TESTS_DSTDIR),\
+$(test),$(test),$(NOLIBS),-I $(RV32TESTS_INCDIR),$(ASM),$(NOC))))
 
 .PHONY: rv32tests
 rv32tests: $(RV32_TESTS)
 
-run-rv32tests: rv32tests $(addprefix test-,$(RV32_TESTS))
+rv32tests-run: rv32tests $(addsuffix -test,$(RV32_TESTS))
 	@echo "All rv32tests passed!"
 
 rv32tests-clean:
 	rm -rf $(RV32TESTS_DSTDIR)
 
-clean-run-rv32tests: rv32tests-clean run-rv32tests
+rv32tests-clean-run: rv32tests-clean rv32tests-run
 
 ###
 ### matrix multiply test
