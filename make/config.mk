@@ -48,8 +48,11 @@ X86_COUNTERS_O    := $(SBT_SHARE_DIR)/x86-counters.o
 
 CMAKE             := cmake
 
-LOG               := $(SCRIPTS_DIR)/run.sh --log
 RUN_SH            := $(SCRIPTS_DIR)/run.sh
+LOG               := $(RUN_SH) --log
+LOG_CLEAN         := rm -f log.txt
+LOG0              := $(LOG_CLEAN); $(LOG)
+MEASURE           := $(LOG_CLEAN); MODES="globals locals" $(LOG) $(SCRIPTS_DIR)/measure.py
 
 RV32_TRIPLE       := riscv32-unknown-elf
 RV64_LINUX_TRIPLE := riscv64-unknown-linux-gnu
@@ -81,8 +84,7 @@ X86_GCC        := gcc -m32
 _O             := -O3
 
 GCC_CFLAGS     := -static $(_O) $(CFLAGS)
-# debug
-# GCC_CFLAGS     := -static -O0 -g
+GCC_DBG_CFLAGS := -static -O0 -g
 
 #
 # clang
@@ -108,6 +110,7 @@ EMITLLVM          := -emit-llvm -c $(_O) -mllvm -disable-llvm-optzns
 
 LLC               := llc
 LLC_FLAGS         := -relocation-model=static $(_O) #-stats
+LLC_DBG_FLAGS     := -relocation-model=static -O0
 RV32_LLC_FLAGS    := -march=$(RV32_MARCH) -mattr=+m
 RV32_LINUX_LLC_FLAGS := $(RV32_LLC_FLAGS)
 X86_LLC_FLAGS     := -march=$(X86_MARCH) -mattr=avx #-mattr=avx2
@@ -125,7 +128,7 @@ LLVMLINK          := llvm-link
 RV32_AS           := $(RV32_TRIPLE)-as
 RV64_LINUX_AS     := $(RV64_LINUX_TRIPLE)-as
 RV32_LINUX_AS     := $(RV64_LINUX_AS) -march=rv32g -mabi=$(RV32_LINUX_ABI)
-X86_AS            := $(X86_64_TRIPLE)-as --32 #-g
+X86_AS            := $(X86_64_TRIPLE)-as --32
 
 #
 # LD

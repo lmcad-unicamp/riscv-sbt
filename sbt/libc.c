@@ -20,3 +20,7 @@ F(perror)
 F(printf)
 F(putchar)
 F(puts)
+
+// x86 libc stuff
+int __isoc99_fscanf(FILE *__restrict, const char *__restrict, ...);
+F(__isoc99_fscanf)

@@ -6,7 +6,7 @@
 
 usage()
 {
-    echo "usage: $0 (--log|-o output) <command> <arg>*"
+    echo "usage: $0 (--log|-o output) [--no-tee] <command> <arg>*"
 }
 
 if [ "$1" == "--log" ]; then
@@ -20,14 +20,24 @@ elif [ "$1" == "-o" ]; then
     out=$1
     shift
     cmd=$1
+    if [ "$cmd" == "--no-tee" ]; then
+        notee=1
+        shift
+        cmd=$1
+    fi
 
     if [ ! "$out" -o ! "$cmd" ]; then
         usage
         exit 1
     fi
 
-    eval "$@" |& tee $out
-    exit ${PIPESTATUS[0]}
+    if [ "$notee" ]; then
+        eval "$@" >$out 2>&1
+        exit $?
+    else
+        eval "$@" |& tee $out
+        exit ${PIPESTATUS[0]}
+    fi
 
 else
     usage

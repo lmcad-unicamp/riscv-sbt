@@ -3,13 +3,16 @@
 # DEBUG_RULES := 1
 
 # constants
-NOLIBS :=
-NOFLAGS :=
-ASM := ASM
-NOASM :=
-C := C
-NOC :=
+NOLIBS    :=
+NOFLAGS   :=
+ASM       := ASM
+NOASM     :=
+C         := C
+NOC       :=
 NOSYSROOT := NOSYSROOT
+DEBUG     := DEBUG
+SAVE_OUT  := SAVE_OUT
+NOTEE     := NOTEE
 
 # .c -> .bc
 define _C2BC
@@ -151,15 +154,21 @@ define _BC2S
 $(eval BC2S_DIR = $(2))
 $(eval BC2S_IN = $(3))
 $(eval BC2S_OUT = $(4))
+$(eval BC2S_FLAGS = $(5))
 
 $(if $(DEBUG_RULES),$(warning "BC2S($(1),\
 DIR=$(BC2S_DIR),\
 IN=$(BC2S_IN),\
-OUT=$(BC2S_OUT))"),)
+OUT=$(BC2S_OUT),\
+FLAGS=$(BC2S_FLAGS))"),)
+
+$(eval BC2S_DEBUG = $(findstring $(DEBUG),$(BC2S_FLAGS)))
+$(eval BC2S_FLAGS = $(subst $(DEBUG),,$(BC2S_FLAGS)))
+$(eval BC2S_FLAGS = $(if $(BC2S_DEBUG),$(LLC_DBG_FLAGS),$(LLC_FLAGS)))
 
 $(BC2S_DIR)$(BC2S_OUT).s: $(BC2S_DIR)$(BC2S_IN).bc $(BC2S_DIR)$(BC2S_IN).ll
 	@echo $$@: $$<
-	$(LLC) $(LLC_FLAGS) $($(1)_LLC_FLAGS) $$< -o $$@
+	$(LLC) $(BC2S_FLAGS) $($(1)_LLC_FLAGS) $$< -o $$@
 ifeq ($(1),RV32)
 	sed -i "1i.option norelax" $$@
 endif
@@ -167,19 +176,38 @@ endif
 endef
 
 
+# opt; dis; .bc -> .s
+define _OPT1NBC2S
+$(eval OPT1NBC2S_DSTDIR = $(3))
+$(eval OPT1NBC2S_OUT = $(5))
+$(eval OPT1NBC2S_FLAGS = $(6))
+
+$(if $(DEBUG_RULES),$(warning "OPT1NBC2S(DSTDIR=$(OPT1NBC2S_DSTDIR),\
+OUT=$(OPT1NBC2S_OUT))"),)
+
+$(call _OPT,$(1),$(OPT1NBC2S_DSTDIR),$(OPT1NBC2S_OUT),$(OPT1NBC2S_OUT).opt)
+$(call _DIS,$(1),$(OPT1NBC2S_DSTDIR),$(OPT1NBC2S_OUT).opt)
+
+$(call _BC2S,$(1),$(OPT1NBC2S_DSTDIR),$(OPT1NBC2S_OUT).opt,\
+$(OPT1NBC2S_OUT),$(OPT1NBC2S_FLAGS))
+endef
+
+
 # opt; dis; opt; dis; .bc -> .s
-define _OPTNBC2S
-$(eval OPTNBC2S_DSTDIR = $(3))
-$(eval OPTNBC2S_OUT = $(5))
+define _OPT2NBC2S
+$(eval OPT2NBC2S_DSTDIR = $(3))
+$(eval OPT2NBC2S_OUT = $(5))
+$(eval OPT2NBC2S_FLAGS = $(6))
 
-$(if $(DEBUG_RULES),$(warning "OPTNBC2S(DSTDIR=$(OPTNBC2S_DSTDIR),\
-OUT=$(OPTNBC2S_OUT))"),)
+$(if $(DEBUG_RULES),$(warning "OPT2NBC2S(DSTDIR=$(OPT2NBC2S_DSTDIR),\
+OUT=$(OPT2NBC2S_OUT))"),)
 
-$(call _OPT,$(1),$(OPTNBC2S_DSTDIR),$(OPTNBC2S_OUT),$(OPTNBC2S_OUT).opt)
-$(call _DIS,$(1),$(OPTNBC2S_DSTDIR),$(OPTNBC2S_OUT).opt)
-$(call _OPT,$(1),$(OPTNBC2S_DSTDIR),$(OPTNBC2S_OUT).opt,$(OPTNBC2S_OUT).opt2)
-$(call _DIS,$(1),$(OPTNBC2S_DSTDIR),$(OPTNBC2S_OUT).opt2)
-$(call _BC2S,$(1),$(OPTNBC2S_DSTDIR),$(OPTNBC2S_OUT).opt2,$(OPTNBC2S_OUT))
+$(call _OPT,$(1),$(OPT2NBC2S_DSTDIR),$(OPT2NBC2S_OUT),$(OPT2NBC2S_OUT).opt)
+$(call _DIS,$(1),$(OPT2NBC2S_DSTDIR),$(OPT2NBC2S_OUT).opt)
+$(call _OPT,$(1),$(OPT2NBC2S_DSTDIR),$(OPT2NBC2S_OUT).opt,$(OPT2NBC2S_OUT).opt2)
+$(call _DIS,$(1),$(OPT2NBC2S_DSTDIR),$(OPT2NBC2S_OUT).opt2)
+$(call _BC2S,$(1),$(OPT2NBC2S_DSTDIR),$(OPT2NBC2S_OUT).opt2,\
+$(OPT2NBC2S_OUT),$(OPT2NBC2S_FLAGS))
 endef
 
 
@@ -201,8 +229,8 @@ FLAGS=$(C2S_FLAGS))"),)
 
 $(call _C2LBC,$(1),$(C2S_SRCDIR),$(C2S_DSTDIR),\
 $(C2S_INS),$(C2S_OUT),$(C2S_LIBS),$(C2S_FLAGS))
-$(call _OPTNBC2S,$(1),$(C2S_SRCDIR),$(C2S_DSTDIR),\
-$(C2S_INS),$(C2S_OUT),$(C2S_LIBS))
+$(call _OPT2NBC2S,$(1),$(C2S_SRCDIR),$(C2S_DSTDIR),\
+$(C2S_INS),$(C2S_OUT),$(C2S_FLAGS))
 endef
 
 
@@ -220,6 +248,9 @@ DSTDIR=$(S2O_DSTDIR),\
 IN=$(S2O_IN),\
 OUT=$(S2O_OUT),\
 FLAGS=$(S2O_FLAGS))"),)
+
+$(eval S2O_DBG = $(findstring $(DEBUG),$(S2O_FLAGS)))
+$(eval S2O_FLAGS = $(subst $(DEBUG),-g,$(S2O_FLAGS)))
 
 $(S2O_DSTDIR)$(S2O_OUT).o: $(S2O_SRCDIR)$(S2O_IN).s \
 							| $(if $(subst ./,,$(S2O_DSTDIR)),$(S2O_DSTDIR),)
@@ -258,7 +289,8 @@ $(eval LINK_DSTDIR = $(3))
 $(eval LINK_INS = $(4))
 $(eval LINK_OUT = $(5))
 $(eval LINK_LIBS = $(6))
-$(eval LINK_C = $(7))
+$(eval LINK_FLAGS = $(7))
+$(eval LINK_C = $(8))
 $(eval LINK_OBJS = $(addsuffix .o,$(LINK_INS)))
 
 $(if $(DEBUG_RULES),$(warning "LINK($(1),\
@@ -269,9 +301,12 @@ OUT=$(LINK_OUT),\
 LIBS=$(LINK_LIBS),\
 C=$(LINK_C))"),)
 
+$(eval LINK_DBG = $(findstring $(DEBUG),$(LINK_FLAGS)))
+$(eval LINK_CFLAGS = $(if $(LINK_DBG),$(GCC_DBG_CFLAGS),$(GCC_CFLAGS)))
+
 $(LINK_DSTDIR)$(LINK_OUT): $(addprefix $(LINK_SRCDIR),$(LINK_OBJS))
 	@echo $$@: $$^
-	$(if $(LINK_C),$($(1)_GCC) $(GCC_CFLAGS),$($(1)_LD)) -o $$@ $$^ $(LINK_LIBS) \
+	$(if $(LINK_C),$($(1)_GCC) $(LINK_CFLAGS),$($(1)_LD)) -o $$@ $$^ $(LINK_LIBS) \
 		$(if $(LINK_C),-lm,)
 
 endef
@@ -296,12 +331,14 @@ LIBS=$(SNLINK_LIBS),\
 FLAGS=$(SNLINK_FLAGS),\
 C=$(SNLINK_C))"),)
 
+$(eval SNLINK_LDFLAGS = $(findstring $(DEBUG),$(SNLINK_FLAGS)))
+
 $(call _S2OS,$(1),$(SNLINK_SRCDIR),$(SNLINK_DSTDIR),$(SNLINK_INS),\
 $(SNLINK_OUT),$(SNLINK_FLAGS))
 
 $(call _LINK,$(1),$(SNLINK_DSTDIR),$(SNLINK_DSTDIR),\
 $(if $(subst 1,,$(words $(SNLINK_INS))),$(SNLINK_INS),$(SNLINK_OUT)),\
-$(SNLINK_OUT),$(SNLINK_LIBS),$(SNLINK_C))
+$(SNLINK_OUT),$(SNLINK_LIBS),$(SNLINK_LDFLAGS),$(SNLINK_C))
 endef
 
 
@@ -324,6 +361,8 @@ LIBS=$(CNLINK_LIBS),\
 FLAGS=$(CNLINK_FLAGS),\
 C=$(CNLINK_C))"),)
 
+$(eval CNLINK_LDFLAGS = $(findstring $(DEBUG),$(CNLINK_FLAGS)))
+
 $(call _C2S,$(1),$(CNLINK_SRCDIR),$(CNLINK_DSTDIR),$(CNLINK_INS),\
 $(CNLINK_OUT),$(CNLINK_LIBS),$(CNLINK_FLAGS))
 
@@ -331,7 +370,7 @@ $(call _S2O,$(1),$(CNLINK_DSTDIR),$(CNLINK_DSTDIR),\
 $(CNLINK_OUT),$(CNLINK_OUT))
 
 $(call _LINK,$(1),$(CNLINK_DSTDIR),$(CNLINK_DSTDIR),\
-$(CNLINK_OUT),$(CNLINK_OUT),$(CNLINK_LIBS),$(CNLINK_C))
+$(CNLINK_OUT),$(CNLINK_OUT),$(CNLINK_LIBS),$(CNLINK_LDFLAGS),$(CNLINK_C))
 endef
 
 
@@ -365,17 +404,21 @@ endef
 define _RUN
 $(eval RUN_DIR = $(2))
 $(eval RUN_PROG = $(3))
-$(eval RUN_SAVE = $(4))
+$(eval RUN_FLAGS = $(4))
 $(eval RUN_ARGS = $(5))
+
+$(eval RUN_SAVE_OUT = $(findstring $(SAVE_OUT),$(RUN_FLAGS)))
+$(eval RUN_NOTEE = $(findstring $(NOTEE),$(RUN_FLAGS)))
 
 $(if $(DEBUG_RULES),$(warning "RUN(DIR=$(RUN_DIR),\
 PROG=$(RUN_PROG),\
-SAVE=$(RUN_SAVE),\
+FLAGS=$(RUN_FLAGS),\
 ARGS=$(RUN_ARGS))"),)
 
 $(RUN_PROG)-run: $(RUN_DIR)$(RUN_PROG)
 	@echo $$@:
-	$(if $(RUN_SAVE),$(RUN_SH) -o $(RUN_DIR)$(RUN_PROG).out,) \
+	$(if $(RUN_SAVE_OUT),$(RUN_SH) -o $(RUN_DIR)$(RUN_PROG).out,) \
+		$(subst $(NOTEE),--no-tee,$(RUN_NOTEE)) \
 		$($(1)_RUN) $(RUN_DIR)$(RUN_PROG) $(RUN_ARGS)
 
 endef
@@ -420,18 +463,15 @@ ASM=$(BUILD_ASM),\
 C=$(BUILD_C),\
 RUNARGS=$(BUILD_RUNARGS))"),)
 
-# BUILDO: (optimize only one time)
-
-# BUILDO4SBT:
-# build object file for translation
-# (don't use sysroot, use native header/libraries instead)
+$(eval BUILD_RUNFLAGS = $(BUILD_FLAGS) $(SAVE_OUT))
+$(eval BUILD_FLAGS = $(subst $(NOTEE),,$(BUILD_FLAGS)))
 
 $(call $(if $(BUILD_ASM),_SNLINK,_CNLINK)\
 ,$(1),$(BUILD_SRCDIR),$(BUILD_DSTDIR),$(BUILD_INS),\
 $(BUILD_OUT),$(BUILD_LIBS),$(BUILD_FLAGS),$(BUILD_C))
 
 $(call _CLEAN,$(BUILD_DSTDIR),$(BUILD_OUT),$(if $(BUILD_C),,clean.s))
-$(call _RUN,$(1),$(BUILD_DSTDIR),$(BUILD_OUT),save.out,$(BUILD_RUNARGS))
+$(call _RUN,$(1),$(BUILD_DSTDIR),$(BUILD_OUT),$(BUILD_RUNFLAGS),$(BUILD_RUNARGS))
 $(call _ALIAS,$(BUILD_DSTDIR),$(BUILD_OUT))
 endef
 
@@ -479,17 +519,26 @@ FLAGS=$(TRANSLATE_FLAGS),\
 C=$(TRANSLATE_C),\
 RUNARGS=$(TRANSLATE_RUNARGS))"),)
 
+$(eval TRANSLATE_DBG = $(findstring $(DEBUG),$(TRANSLATE_FLAGS)))
+$(eval TRANSLATE_TFLAGS = $(subst $(DEBUG),,$(TRANSLATE_FLAGS)))
+$(eval TRANSLATE_TFLAGS = $(subst $(NOTEE),,$(TRANSLATE_FLAGS)))
+$(eval TRANSLATE_FLAGS = $(patsubst -regs=%,,$(TRANSLATE_FLAGS)))
+
 $(call _TRANSLATE_OBJ,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_IN),\
-$(TRANSLATE_OUT),$(TRANSLATE_FLAGS) $(if $(TRANSLATE_C),,-dont-use-libc))
+$(TRANSLATE_OUT),$(TRANSLATE_TFLAGS) $(if $(TRANSLATE_C),,-dont-use-libc))
 
 $(call _DIS,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_OUT))
-$(call _OPT,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_OUT),$(TRANSLATE_OUT).opt)
-$(call _DIS,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_OUT).opt)
-$(call _BC2S,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_OUT).opt,$(TRANSLATE_OUT))
+
+$(if $(TRANSLATE_DBG),\
+$(call _BC2S,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_OUT),$(TRANSLATE_OUT),\
+$(DEBUG)),\
+$(call _OPT1NBC2S,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_DSTDIR),\
+$(TRANSLATE_OUT),$(TRANSLATE_OUT),$(TRANSLATE_FLAGS)))
 
 $(call BUILD,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_DSTDIR),\
 $(TRANSLATE_OUT),$(TRANSLATE_OUT),\
-$(TRANSLATE_LIBS) $(TRANSLATE_NAT_OBJS),$(NOFLAGS),\
+$(TRANSLATE_LIBS) $(TRANSLATE_NAT_OBJS),\
+$(if $(TRANSLATE_DBG),$(DEBUG),) $(TRANSLATE_FLAGS),\
 $(ASM),$(TRANSLATE_C),$(TRANSLATE_RUNARGS))
 endef
 
@@ -503,7 +552,7 @@ UTEST_NARCHS := RV32
 ADD_ASM_SRC_PREFIX := 1
 
 
-define NBUILD
+define _NBUILD
 $(eval N_ARCH = $(1))
 $(eval N_SRCDIR = $(2))
 $(eval N_DSTDIR = $(3))
@@ -538,14 +587,15 @@ $(N_LIBS),$(N_FLAGS),$(N_ASM),$(N_C),$(N_ARGS))
 endef
 
 
-define SBT_TEST1
+define _SBT_TEST1
 $(eval TEST1_DSTARCH = $(1))
 $(eval TEST1_DSTDIR = $(2))
 $(eval TEST1_NAME = $(3))
 $(eval TEST1_MODE = $(4))
 $(eval TEST1_LIBS = $(5))
-$(eval TEST1_C = $(6))
-$(eval TEST1_ARGS = $(7))
+$(eval TEST1_FLAGS = $(6))
+$(eval TEST1_C = $(7))
+$(eval TEST1_ARGS = $(8))
 
 $(eval TEST1_TGT = $(TEST1_NAME)-$(TEST1_MODE))
 $(eval TEST1_IN = $(RV32_PREFIX)-$(TEST1_NAME))
@@ -557,11 +607,12 @@ DSTDIR=$(TEST1_DSTDIR),\
 NAME=$(TEST1_NAME),\
 MODE=$(TEST1_MODE),\
 LIBS=$(TEST1_LIBS),\
+FLAGS=$(TEST1_FLAGS),\
 C=$(TEST1_C),\
 ARGS=$(TEST1_ARGS))"),)
 
 $(call TRANSLATE,$(TEST1_DSTARCH),$(TEST1_DSTDIR),$(TEST1_DSTDIR),\
-$(TEST1_IN),$(TEST1_OUT),$(TEST1_LIBS),-regs=$(TEST1_MODE),\
+$(TEST1_IN),$(TEST1_OUT),$(TEST1_LIBS),$(TEST1_FLAGS) -regs=$(TEST1_MODE),\
 $(TEST1_C),$(TEST1_ARGS))
 
 .PHONY: $(TEST1_TGT)
@@ -597,16 +648,18 @@ C=$(TEST_C),\
 ARGS=$(TEST_ARGS))"),)
 
 # native bins
+$(eval TEST_NFLAGS = $(subst $(DEBUG),,$(TEST_FLAGS)))
+
 $(foreach ARCH,$(TEST_ARCHS),\
-$(call NBUILD,$(ARCH),$(TEST_SRCDIR),$(TEST_DSTDIR),\
+$(call _NBUILD,$(ARCH),$(TEST_SRCDIR),$(TEST_DSTDIR),\
 $(TEST_INS),$(TEST_OUT),$(TEST_LIBS),\
-$(if $(findstring RV32_LINUX,$(ARCH)),$(NOSYSROOT) $(X86_SYSROOT_FLAG),) $(TEST_FLAGS),\
+$(if $(findstring RV32_LINUX,$(ARCH)),$(NOSYSROOT) $(X86_SYSROOT_FLAG),) $(TEST_NFLAGS),\
 $(TEST_ASM),$(TEST_C),$(TEST_ARGS)))
 
 # translated bins
 $(foreach mode,$(MODES),\
-$(call SBT_TEST1,X86,$(TEST_DSTDIR),$(TEST_OUT),$(mode),\
-$(TEST_LIBS),$(TEST_C),$(TEST_ARGS)))
+$(call _SBT_TEST1,X86,$(TEST_DSTDIR),$(TEST_OUT),$(mode),\
+$(TEST_LIBS),$(TEST_FLAGS),$(TEST_C),$(TEST_ARGS)))
 
 .PHONY: $(TEST_OUT)
 $(TEST_OUT): $(foreach ARCH,$(TEST_ARCHS),$($(ARCH)_PREFIX)-$(TEST_OUT)) \

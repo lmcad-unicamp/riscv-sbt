@@ -16,6 +16,7 @@ endif
 
 include $(TOPDIR)/make/config.mk
 
+MIBENCH_DEBUG   := #$(DEBUG)
 MIBENCH_SRCDIR  := $(TOPDIR)/mibench
 MIBENCH_DSTDIR  := $(BUILD_DIR)/mibench
 
@@ -213,7 +214,6 @@ include $(TOPDIR)/make/rules.mk
 $(MIBENCH_DSTDIR)/$(LAME_DIR)/mpglib:
 	mkdir -p $@
 
-
 # main mibench macro
 define MBENCH
 $(eval MBENCH_BENCH = $(1))
@@ -238,8 +238,12 @@ $(MBENCH_DSTDIR):
 $(MBENCH_NAME)-clean:
 	rm -rf $(MBENCH_DSTDIR)
 
+$(MBENCH_NAME)-measure:
+	$(MEASURE) $(MBENCH_DSTDIR) $(MBENCH_NAME) $(MBENCH_ARGS)
+
 $(call SBT_TEST,$(ARCHS),$(MBENCH_SRCDIR),$(MBENCH_DSTDIR),\
-$(MBENCH_MODS),$(MBENCH_NAME),$(NOLIBS),$(NOFLAGS),$(NOASM),$(C),$(MBENCH_ARGS))
+$(MBENCH_MODS),$(MBENCH_NAME),$(NOLIBS),\
+$(MIBENCH_DEBUG) $(NOTEE),$(NOASM),$(C),$(MBENCH_ARGS))
 endef
 
 
