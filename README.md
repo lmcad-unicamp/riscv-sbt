@@ -1,42 +1,27 @@
-RISC-V Static Binary Translator
--------------------------------
+RISC-V Static Binary Translator (SBT)
+-------------------------------------
 
 How to Build
 ------------
 
-Release:
 ```bash
-. scripts/setenv.sh release
-make
-```
-Debug:
-```bash
-. scripts/setenv.sh
+. scripts/env.sh
 make
 ```
 
 The result files will be placed on 'toolchain' directory.
 
-Tests
------
+Note that several tools are required to build the SBT.
+The best place to find them is to look at docker/Dockerfile.
 
-There are two kinds of tests: unit tests, that automatically check and report errors,
-and other tests, whose output must be manually verified. But even for unchecked tests,
-if they compile and run without errors/crashes, it is already a good signal.
 
-The rv32-system test requires enabling RDPMC fixed counters in user mode to be able to emulate
-the RDINSTRET CSR correctly:
+Docker build
+------------
+
+Alternatively, a docker image can be built and used instead:
+
 ```bash
-sudo modprobe msr
-sudo scripts/setmsr.sh
+make -C docker
 ```
 
-Running the unit tests:
-```bash
-make -C sbt/tests run-utests
-```
-
-Running all tests:
-```bash
-make tests
-```
+In this case, the Dockerfile takes care of all build pre-requisites.
