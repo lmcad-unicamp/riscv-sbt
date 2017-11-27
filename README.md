@@ -12,7 +12,7 @@ make
 The result files will be placed on 'toolchain' directory.
 
 Note that several tools are required to build the SBT.
-The best place to find them is to look at docker/Dockerfile.
+The best way to find them is to look at docker/Dockerfile.
 
 
 Docker build
