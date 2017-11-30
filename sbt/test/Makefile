@@ -52,7 +52,7 @@ $(NOLIBS),$(NOFLAGS),$(NOASM),$(C),one two three))
 
 ### mm (matrix multiply) ###
 
-DIM := 5
+DIM := 4
 $(eval $(call SBT_TEST,$(TEST_NARCHS),$(SRC_DIR),$(SBT_OUT_DIR),mm,mm,\
 $(NOLIBS),-DROWS=$(DIM),$(NOASM),$(C)))
 
