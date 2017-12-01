@@ -6,19 +6,20 @@ import os
 ### config ###
 
 # flags
-MAKE_OPTS           = os.getenv("MAKE_OPTS", "-j9")
-CFLAGS              = "-fno-rtti -fno-exceptions"
-_O                  = "-O3"
-EMITLLVM            = "-emit-llvm -c " + _O + " -mllvm -disable-llvm-optzns"
+MAKE_OPTS       = os.getenv("MAKE_OPTS", "-j9")
+CFLAGS          = "-fno-rtti -fno-exceptions"
+_O              = "-O3"
 
-RV32_TRIPLE         = "riscv32-unknown-elf"
+EMITLLVM        = "-emit-llvm -c {} -mllvm -disable-llvm-optzns".format(_O)
+RV32_TRIPLE     = "riscv32-unknown-elf"
+
 
 class Dir:
     def __init__(self):
-        top = os.environ["TOPDIR"]
-        build_type  = os.getenv("BUILD_TYPE", "Debug")
-        build_type_dir = build_type.lower()
-        toolchain = top + "/toolchain"
+        top             = os.environ["TOPDIR"]
+        build_type      = os.getenv("BUILD_TYPE", "Debug")
+        build_type_dir  = build_type.lower()
+        toolchain       = top + "/toolchain"
 
         self.top                = top
         self.log                = top + "/junk"
@@ -40,7 +41,7 @@ class Sbt:
         self.share_dir = DIR.toolchain + "/share/riscv-sbt"
         self.nat_objs = ["syscall", "counters"]
         self.nat_obj  = lambda arch, name: \
-            self.share_dir + "/" + arch + "-" + name + ".o"
+            "{}/{}-{}.o".format(self.share_dir, arch, name)
 
 SBT = Sbt()
 
@@ -51,8 +52,8 @@ class Tools:
         self.run_sh     = DIR.scripts + "/run.sh"
         self.log        = self.run_sh + " --log"
         self.log_clean  = "rm -f log.txt"
-        self.measure    = self.log_clean + '; MODES="globals locals" ' + \
-                          self.log + DIR.scripts + "/measure.py"
+        self.measure    = '{}; MODES="globals locals" {} {}/measure.py'.format(
+            self.log_clean, self.log, DIR.scripts)
         self.opt        = "opt"
         self.opt_flags  = _O #-stats
         self.dis        = "llvm-dis"
@@ -64,7 +65,7 @@ TOOLS = Tools()
 class Arch:
     def __init__(self, prefix, triple, run, march, gcc_flags,
             clang_flags, sysroot, isysroot, llc_flags, as_flags,
-            ld_flags, dbg=False):
+            ld_flags):
 
         self.prefix = prefix
         self.triple = triple
@@ -72,20 +73,23 @@ class Arch:
         self.march = march
         # gcc
         self.gcc = triple + "-gcc"
-        self.gcc_flags = "-static " + ("-O0 -g" if dbg else _O) + " " + \
-            CFLAGS + " " + gcc_flags
+        self.gcc_flags = lambda opts: \
+            "-static {} {} {}".format(
+                ("-O0 -g" if opts.dbg else _O),
+                CFLAGS,
+                gcc_flags)
         # clang
         self.clang = "clang"
-        self.clang_flags = CFLAGS + " " + clang_flags
+        self.clang_flags = "{} {}".format(CFLAGS, clang_flags)
         self.sysroot = sysroot
         self.isysroot = isysroot
-        self.sysroot_flag = "-isysroot " + sysroot + " -isystem " + isysroot
+        self.sysroot_flag = "-isysroot {} -isystem {}".format(
+            sysroot, isysroot)
         # llc
         self.llc = "llc"
-        if dbg:
-            self.llc_flags = "-relocation-model=static -O0"
-        else:
-            self.llc_flags = "-relocation-model=static " + _O #-stats"
+        self.llc_flags = lambda opts: \
+            "-relocation-model=static " + \
+            ("-O0" if opts.dbg else _O)
         # as
         self._as = triple + "-as"
         self.as_flags = as_flags
@@ -102,8 +106,8 @@ RV32_LLC_FLAGS  = "-march=" + RV32_MARCH + " -mattr=+m"
 RV32 = Arch(
         "rv32",
         RV32_TRIPLE,
-        "LD_LIBRARY_PATH=" + DIR.toolchain_release +
-            "/lib spike " + PK32,
+        "LD_LIBRARY_PATH={}/lib spike {}".format(
+            DIR.toolchain_release, PK32),
         RV32_MARCH,
         "",
         "--target=riscv32",
@@ -147,20 +151,31 @@ X86 = Arch(
         "-m elf_i386")
 
 
+class Opts:
+    def __init__(self):
+        self.dbg = False
+        self.cflags = ""
+        self.sflags = ""
+        self.libs = ""
+        self.setsysroot = True
+        self.clink = True
+
+
 ### rules ###
 
-DEBUG_RULES         = False
-
 # .c -> .bc
-def _c2bc(arch, srcdir, dstdir, _in, out, flags, setsysroot=True):
-    if setsysroot:
-        flags = flags + arch.sysroot_flag
+def _c2bc(arch, srcdir, dstdir, _in, out, opts):
+    flags = "{} {}{} {}".format(
+        arch.clang_flags,
+        (arch.sysroot_flag + " " if opts.setsysroot else ""),
+        opts.cflags,
+        EMITLLVM)
 
-    opath = dstdir + "/" + out + ".bc"
     ipath = srcdir + "/" + _in + ".c"
+    opath = dstdir + "/" + out + ".bc"
 
-    cmd = "{0} {1} {2} {3} -o {4}".format(
-        arch.clang, arch.clang_flags, EMITLLVM, ipath, opath)
+    cmd = "{} {} {} -o {}".format(
+        arch.clang, flags, ipath, opath)
     print(cmd)
 
 
@@ -174,7 +189,7 @@ def _lllink(arch, dir, ins, out):
         ipaths = ipaths + " " + ipath(i)
     ipaths = ipaths.strip()
 
-    cmd = "{0} {1} -o {2}".format(
+    cmd = "{} {} -o {}".format(
         TOOLS.link, ipaths, opath)
     print(cmd)
 
@@ -184,7 +199,7 @@ def _dis(arch, dir, mod):
     ipath = dir + "/" + mod + ".bc"
     opath = dir + "/" + mod + ".ll"
 
-    cmd = "{0} {1} -o {2}".format(
+    cmd = "{} {} -o {}".format(
         TOOLS.dis, ipath, opath)
     print(cmd)
 
@@ -194,67 +209,49 @@ def _opt(arch, dir, _in, out):
     ipath = dir + "/" + _in + ".bc"
     opath = dir + "/" + out + ".bc"
 
-    cmd = "{0} {1} {2} -o {3}".format(
+    cmd = "{} {} {} -o {}".format(
         TOOLS.opt, TOOLS.opt_flags, ipath, opath)
     print(cmd)
 
 
-# path -> dir/prefix-file
-# 1: prefix
-# 2: path
-#define _ADD_PREFIX
-#$(dir $(2))$(1)-$(notdir $(2))
-#endef
-
-
 # *.c -> *.bc -> .bc
 # (C2LBC: C to linked BC)
-def _c2lbc(arch, srcdir, dstdir, ins, out, libs, flags):
+def _c2lbc(arch, srcdir, dstdir, ins, out, opts):
     if len(ins) > 1:
         ins2 = []
         for c in ins:
             o = c + "_bc1"
             ins2.append(o)
 
-            _c2bc(arch, srcdir, dstdir, c, o, flags)
+            _c2bc(arch, srcdir, dstdir, c, o, opts)
             _dis(arch, dstdir, o)
 
         _lllink(arch, dstdir, ins2, out)
     else:
-        _c2bc(arch, srcdir, dstdir, ins[0], out, flags)
+        _c2bc(arch, srcdir, dstdir, ins[0], out, opts)
     _dis(arch, dstdir, out)
 
 
-"""
 # .bc -> .s
-define _BC2S
-$(eval BC2S_DIR = $(2))
-$(eval BC2S_IN = $(3))
-$(eval BC2S_OUT = $(4))
-$(eval BC2S_FLAGS = $(5))
+def _bc2s(arch, dir, _in, out, opts):
+    ipath = dir + "/" + _in + ".bc"
+    opath = dir + "/" + out + ".s"
 
-$(if $(DEBUG_RULES),$(warning "BC2S($(1),\
-DIR=$(BC2S_DIR),\
-IN=$(BC2S_IN),\
-OUT=$(BC2S_OUT),\
-FLAGS=$(BC2S_FLAGS))"),)
+    flags = "{} {}".format(
+        arch.llc_flags, opts.sflags)
+    flags = flags.strip()
 
-$(eval BC2S_DEBUG = $(findstring $(DEBUG),$(BC2S_FLAGS)))
-$(eval BC2S_FLAGS = $(subst $(DEBUG),,$(BC2S_FLAGS)))
-$(eval BC2S_FLAGS = $(if $(BC2S_DEBUG),$(LLC_DBG_FLAGS),$(LLC_FLAGS)))
-
-$(BC2S_DIR)$(BC2S_OUT).s: $(BC2S_DIR)$(BC2S_IN).bc $(BC2S_DIR)$(BC2S_IN).ll
-	@echo $$@: $$<
-	$(LLC) $(BC2S_FLAGS) $($(1)_LLC_FLAGS) $$< -o $$@
-ifeq ($(1),RV32)
-	sed -i "1i.option norelax" $$@
-endif
-
-endef
+    cmd = "{} {} {} -o {}".format(
+        arch.llc, flags, ipath, opath)
+    print(cmd)
+    if arch == RV32:
+        cmd = 'sed -i "1i.option norelax" ' + opath
+        print(cmd)
 
 
+"""
 # opt; dis; .bc -> .s
-define _OPT1NBC2S
+def _opt1NBC2S
 $(eval OPT1NBC2S_DSTDIR = $(3))
 $(eval OPT1NBC2S_OUT = $(5))
 $(eval OPT1NBC2S_FLAGS = $(6))
@@ -270,87 +267,39 @@ $(OPT1NBC2S_OUT),$(OPT1NBC2S_FLAGS))
 endef
 
 
-# opt; dis; opt; dis; .bc -> .s
-define _OPT2NBC2S
-$(eval OPT2NBC2S_DSTDIR = $(3))
-$(eval OPT2NBC2S_OUT = $(5))
-$(eval OPT2NBC2S_FLAGS = $(6))
-
-$(if $(DEBUG_RULES),$(warning "OPT2NBC2S(DSTDIR=$(OPT2NBC2S_DSTDIR),\
-OUT=$(OPT2NBC2S_OUT))"),)
-
-$(call _OPT,$(1),$(OPT2NBC2S_DSTDIR),$(OPT2NBC2S_OUT),$(OPT2NBC2S_OUT).opt)
-$(call _DIS,$(1),$(OPT2NBC2S_DSTDIR),$(OPT2NBC2S_OUT).opt)
-$(call _OPT,$(1),$(OPT2NBC2S_DSTDIR),$(OPT2NBC2S_OUT).opt,$(OPT2NBC2S_OUT).opt2)
-$(call _DIS,$(1),$(OPT2NBC2S_DSTDIR),$(OPT2NBC2S_OUT).opt2)
-$(call _BC2S,$(1),$(OPT2NBC2S_DSTDIR),$(OPT2NBC2S_OUT).opt2,\
-$(OPT2NBC2S_OUT),$(OPT2NBC2S_FLAGS))
-endef
+"""
 
 
 # *.c -> .s
-define _C2S
-$(eval C2S_SRCDIR = $(2))
-$(eval C2S_DSTDIR = $(3))
-$(eval C2S_INS = $(4))
-$(eval C2S_OUT = $(5))
-$(eval C2S_LIBS = $(6))
-$(eval C2S_FLAGS = $(7))
+def _c2s(arch, srcdir, dstdir, ins, out, opts):
+    _c2lbc(arch, srcdir, dstdir, ins, out, opts)
 
-$(if $(DEBUG_RULES),$(warning "C2S(SRCDIR=$(C2S_SRCDIR),\
-DSTDIR=$(C2S_DSTDIR),\
-INS=$(C2S_INS),\
-OUT=$(C2S_OUT),\
-LIBS=$(C2S_LIBS),\
-FLAGS=$(C2S_FLAGS))"),)
+    opt1 = out + ".opt"
+    opt2 = out + ".opt2"
 
-$(call _C2LBC,$(1),$(C2S_SRCDIR),$(C2S_DSTDIR),\
-$(C2S_INS),$(C2S_OUT),$(C2S_LIBS),$(C2S_FLAGS))
-$(call _OPT2NBC2S,$(1),$(C2S_SRCDIR),$(C2S_DSTDIR),\
-$(C2S_INS),$(C2S_OUT),$(C2S_FLAGS))
-endef
+    # opt; dis; opt; dis; .bc -> .s
+    _opt(arch, dstdir, out, opt1)
+    _dis(arch, dstdir, opt1)
+    _opt(arch, dstdir, opt1, opt2)
+    _dis(arch, dstdir, opt2)
+    _bc2s(arch, dstdir, opt2, out, opts)
 
 
 # .s -> .o
-define _S2O
-$(eval S2O_SRCDIR = $(2))
-$(eval S2O_DSTDIR = $(3))
-$(eval S2O_IN = $(4))
-$(eval S2O_OUT = $(5))
-$(eval S2O_FLAGS = $(6))
+def _s2o(arch, srcdir, dstdir, _in, out, opts):
+    ipath = srcdir + "/" + _in + ".s"
+    opath = dstdir + "/" + out + ".o"
 
-$(if $(DEBUG_RULES),$(warning "S2O($(1),\
-SRCDIR=$(S2O_SRCDIR),\
-DSTDIR=$(S2O_DSTDIR),\
-IN=$(S2O_IN),\
-OUT=$(S2O_OUT),\
-FLAGS=$(S2O_FLAGS))"),)
+    flags = "{} {}".format(arch.as_flags, opts.sflags)
+    flags = flags.strip()
 
-$(eval S2O_DBG = $(findstring $(DEBUG),$(S2O_FLAGS)))
-$(eval S2O_FLAGS = $(subst $(DEBUG),-g,$(S2O_FLAGS)))
-
-$(S2O_DSTDIR)$(S2O_OUT).o: $(S2O_SRCDIR)$(S2O_IN).s \
-							| $(if $(subst ./,,$(S2O_DSTDIR)),$(S2O_DSTDIR),)
-	@echo $$@: $$<
-	$$($(1)_AS) $(S2O_FLAGS) -o $$@ -c $$<
-
-endef
+    cmd = "{} {} -c {} -o {}".format(
+        arch._as, flags, ipath, opath)
+    print(cmd)
 
 
 # *.s -> *.o
-define _S2OS
-$(eval S2OS_SRCDIR = $(2))
-$(eval S2OS_DSTDIR = $(3))
-$(eval S2OS_INS = $(4))
-$(eval S2OS_OUT = $(5))
-$(eval S2OS_FLAGS = $(6))
-
-$(if $(DEBUG_RULES),$(warning "S2OS($(1),\
-SRCDIR=$(S2OS_SRCDIR),\
-DSTDIR=$(S2OS_DSTDIR),\
-INS=$(S2OS_INS),\
-OUT=$(S2OS_OUT),\
-FLAGS=$(S2OS_FLAGS))"),)
+def _s2os():
 
 $(if $(subst 1,,$(words $(S2OS_INS))),\
 $(foreach in,$(S2OS_INS),\
@@ -360,110 +309,48 @@ endef
 
 
 # *.o -> bin
-define _LINK
-$(eval LINK_SRCDIR = $(2))
-$(eval LINK_DSTDIR = $(3))
-$(eval LINK_INS = $(4))
-$(eval LINK_OUT = $(5))
-$(eval LINK_LIBS = $(6))
-$(eval LINK_FLAGS = $(7))
-$(eval LINK_C = $(8))
-$(eval LINK_OBJS = $(addsuffix .o,$(LINK_INS)))
+def _link(arch, srcdir, dstdir, ins, out, opts):
+    libs = opts.libs
+    if opts.clink:
+        tool = arch.gcc
+        flags = arch.gcc_flags(opts)
+        libs = libs + " -lm"
+    else:
+        tool = arch.ld
+        flags = arch.ld_flags
+    flags = flags + " " + opts.ldflags
+    flags = flags.strip()
+    libs = libs.strip()
 
-$(if $(DEBUG_RULES),$(warning "LINK($(1),\
-SRCDIR=$(LINK_SRCDIR),\
-DSTDIR=$(LINK_DSTDIR),\
-INS=$(LINK_INS),\
-OUT=$(LINK_OUT),\
-LIBS=$(LINK_LIBS),\
-C=$(LINK_C))"),)
-
-$(eval LINK_DBG = $(findstring $(DEBUG),$(LINK_FLAGS)))
-$(eval LINK_CFLAGS = $(if $(LINK_DBG),$(GCC_DBG_CFLAGS),$(GCC_CFLAGS)))
-
-$(LINK_DSTDIR)$(LINK_OUT): $(addprefix $(LINK_SRCDIR),$(LINK_OBJS))
-	@echo $$@: $$^
-	$(if $(LINK_C),$($(1)_GCC) $(LINK_CFLAGS),$($(1)_LD)) -o $$@ $$^ $(LINK_LIBS) \
-		$(if $(LINK_C),-lm,)
-
-endef
+    ipaths = [srcdir + "/" + i + ".o" for i in ins]
+    opath = dstdir + "/" + out
+    cmd = "{} {} {} -o {} {}".format(
+        tool, flags, " ".join(ipaths), out, libs)
 
 
 # *.s -> bin
-define _SNLINK
-$(eval SNLINK_SRCDIR = $(2))
-$(eval SNLINK_DSTDIR = $(3))
-$(eval SNLINK_INS = $(4))
-$(eval SNLINK_OUT = $(5))
-$(eval SNLINK_LIBS = $(6))
-$(eval SNLINK_FLAGS = $(7))
-$(eval SNLINK_C = $(8))
-
-$(if $(DEBUG_RULES),$(warning "SNLINK($(1),\
-SRCDIR=$(SNLINK_SRCDIR),\
-DSTDIR=$(SNLINK_DSTDIR),\
-INS=$(SNLINK_INS),\
-OUT=$(SNLINK_OUT),\
-LIBS=$(SNLINK_LIBS),\
-FLAGS=$(SNLINK_FLAGS),\
-C=$(SNLINK_C))"),)
-
-$(eval SNLINK_LDFLAGS = $(findstring $(DEBUG),$(SNLINK_FLAGS)))
-
-$(call _S2OS,$(1),$(SNLINK_SRCDIR),$(SNLINK_DSTDIR),$(SNLINK_INS),\
-$(SNLINK_OUT),$(SNLINK_FLAGS))
-
-$(call _LINK,$(1),$(SNLINK_DSTDIR),$(SNLINK_DSTDIR),\
-$(if $(subst 1,,$(words $(SNLINK_INS))),$(SNLINK_INS),$(SNLINK_OUT)),\
-$(SNLINK_OUT),$(SNLINK_LIBS),$(SNLINK_LDFLAGS),$(SNLINK_C))
-endef
+def _snlink(arch, srcdir, dstdir, ins, out, opts):
+    if len(ins) == 1:
+        _s2o(arch, srcdir, dstdir, ins[0], out, opts)
+        _link(arch, dstdir, dstdir, out, out, opts)
+    else:
+        for i in ins:
+            _s2o(arch, srcdir, dstdir, i, i, opts)
+        _link(arch, dstdir, dstdir, ins, out, opts)
 
 
 # *.c -> bin
-define _CNLINK
-$(eval CNLINK_SRCDIR = $(2))
-$(eval CNLINK_DSTDIR = $(3))
-$(eval CNLINK_INS = $(4))
-$(eval CNLINK_OUT = $(5))
-$(eval CNLINK_LIBS = $(6))
-$(eval CNLINK_FLAGS = $(7))
-$(eval CNLINK_C = $(8))
-
-$(if $(DEBUG_RULES),$(warning "CNLINK($(1),\
-SRCDIR=$(CNLINK_SRCDIR),\
-DSTDIR=$(CNLINK_DSTDIR),\
-INS=$(CNLINK_INS),\
-OUT=$(CNLINK_OUT),\
-LIBS=$(CNLINK_LIBS),\
-FLAGS=$(CNLINK_FLAGS),\
-C=$(CNLINK_C))"),)
-
-$(eval CNLINK_LDFLAGS = $(findstring $(DEBUG),$(CNLINK_FLAGS)))
-
-$(call _C2S,$(1),$(CNLINK_SRCDIR),$(CNLINK_DSTDIR),$(CNLINK_INS),\
-$(CNLINK_OUT),$(CNLINK_LIBS),$(CNLINK_FLAGS))
-
-$(call _S2O,$(1),$(CNLINK_DSTDIR),$(CNLINK_DSTDIR),\
-$(CNLINK_OUT),$(CNLINK_OUT))
-
-$(call _LINK,$(1),$(CNLINK_DSTDIR),$(CNLINK_DSTDIR),\
-$(CNLINK_OUT),$(CNLINK_OUT),$(CNLINK_LIBS),$(CNLINK_LDFLAGS),$(CNLINK_C))
-endef
+def _cnlink(arch, srcdir, dstdir, ins, out, opts):
+    _c2s(arch, srcdir, dstdir, ins, out, opts)
+    _s2o(arch, dstdir, dstdir, out, out)
+    _link(arch, dstdir, dstdir, out, out, opts)
 
 
 # clean
-define _CLEAN
-$(eval CLEAN_DIR = $(1))
-$(eval CLEAN_MOD = $(2))
-$(eval CLEAN_S = $(3))
+def _clean(dir, mod, clean_s):
+    if os.path.isdir(dir) and os.path.exists(dir):
+        suf =
 
-$(if $(DEBUG_RULES),$(warning "CLEAN(DIR=$(CLEAN_DIR),\
-MOD=$(CLEAN_MOD),\
-CLEAN_S=$(CLEAN_S))"),)
-
-$(CLEAN_MOD)-clean:
-	@echo $$@:
-	if [ -d $(CLEAN_DIR) ]; then \
 		cd $(CLEAN_DIR) && \
 		rm -f $(CLEAN_MOD) \
 		$(CLEAN_MOD).o \
@@ -788,7 +675,6 @@ $(TRANSLATE_LIBS) $(TRANSLATE_NAT_OBJS),\
 $(if $(TRANSLATE_DBG),$(DEBUG),) $(TRANSLATE_FLAGS),\
 $(ASM),$(TRANSLATE_C),$(TRANSLATE_RUNARGS))
 endef
-"""
 
 
 def main():
