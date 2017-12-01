@@ -2,6 +2,8 @@
 
 import argparse
 import os
+import subprocess
+import sys
 
 ### config ###
 
@@ -154,20 +156,41 @@ X86 = Arch(
 class Opts:
     def __init__(self):
         self.dbg = False
+        self.clink = True
+        # flags
+        self.setsysroot = True
         self.cflags = ""
         self.sflags = ""
+        self.ldflags = ""
+        self.sbtflags = ""
         self.libs = ""
-        self.setsysroot = True
-        self.clink = True
+        self.runargs = ""
 
+
+###
+
+def shell(cmd):
+    print(cmd)
+    subprocess.run(cmd, shell=True, check=True)
 
 ### rules ###
 
+def _cat(*args):
+    out = ""
+    for arg in args:
+        if len(arg) > 0:
+            if len(out) == 0:
+                out = arg
+            else:
+                out = out + " " + arg
+    return out
+
+
 # .c -> .bc
 def _c2bc(arch, srcdir, dstdir, _in, out, opts):
-    flags = "{} {}{} {}".format(
+    flags = _cat(
         arch.clang_flags,
-        (arch.sysroot_flag + " " if opts.setsysroot else ""),
+        (arch.sysroot_flag if opts.setsysroot else ""),
         opts.cflags,
         EMITLLVM)
 
@@ -176,7 +199,7 @@ def _c2bc(arch, srcdir, dstdir, _in, out, opts):
 
     cmd = "{} {} {} -o {}".format(
         arch.clang, flags, ipath, opath)
-    print(cmd)
+    shell(cmd)
 
 
 # *.bc -> .bc
@@ -191,7 +214,7 @@ def _lllink(arch, dir, ins, out):
 
     cmd = "{} {} -o {}".format(
         TOOLS.link, ipaths, opath)
-    print(cmd)
+    shell(cmd)
 
 
 # .bc -> .ll
@@ -201,7 +224,7 @@ def _dis(arch, dir, mod):
 
     cmd = "{} {} -o {}".format(
         TOOLS.dis, ipath, opath)
-    print(cmd)
+    shell(cmd)
 
 
 # opt
@@ -211,7 +234,7 @@ def _opt(arch, dir, _in, out):
 
     cmd = "{} {} {} -o {}".format(
         TOOLS.opt, TOOLS.opt_flags, ipath, opath)
-    print(cmd)
+    shell(cmd)
 
 
 # *.c -> *.bc -> .bc
@@ -237,37 +260,14 @@ def _bc2s(arch, dir, _in, out, opts):
     ipath = dir + "/" + _in + ".bc"
     opath = dir + "/" + out + ".s"
 
-    flags = "{} {}".format(
-        arch.llc_flags, opts.sflags)
-    flags = flags.strip()
+    flags = _cat(arch.llc_flags(opts), opts.sflags)
 
     cmd = "{} {} {} -o {}".format(
         arch.llc, flags, ipath, opath)
-    print(cmd)
+    shell(cmd)
     if arch == RV32:
         cmd = 'sed -i "1i.option norelax" ' + opath
-        print(cmd)
-
-
-"""
-# opt; dis; .bc -> .s
-def _opt1NBC2S
-$(eval OPT1NBC2S_DSTDIR = $(3))
-$(eval OPT1NBC2S_OUT = $(5))
-$(eval OPT1NBC2S_FLAGS = $(6))
-
-$(if $(DEBUG_RULES),$(warning "OPT1NBC2S(DSTDIR=$(OPT1NBC2S_DSTDIR),\
-OUT=$(OPT1NBC2S_OUT))"),)
-
-$(call _OPT,$(1),$(OPT1NBC2S_DSTDIR),$(OPT1NBC2S_OUT),$(OPT1NBC2S_OUT).opt)
-$(call _DIS,$(1),$(OPT1NBC2S_DSTDIR),$(OPT1NBC2S_OUT).opt)
-
-$(call _BC2S,$(1),$(OPT1NBC2S_DSTDIR),$(OPT1NBC2S_OUT).opt,\
-$(OPT1NBC2S_OUT),$(OPT1NBC2S_FLAGS))
-endef
-
-
-"""
+        shell(cmd)
 
 
 # *.c -> .s
@@ -290,22 +290,10 @@ def _s2o(arch, srcdir, dstdir, _in, out, opts):
     ipath = srcdir + "/" + _in + ".s"
     opath = dstdir + "/" + out + ".o"
 
-    flags = "{} {}".format(arch.as_flags, opts.sflags)
-    flags = flags.strip()
+    flags = _cat(arch.as_flags, opts.sflags)
 
-    cmd = "{} {} -c {} -o {}".format(
-        arch._as, flags, ipath, opath)
-    print(cmd)
-
-
-# *.s -> *.o
-def _s2os():
-
-$(if $(subst 1,,$(words $(S2OS_INS))),\
-$(foreach in,$(S2OS_INS),\
-$(call _S2O,$(1),$(S2OS_SRCDIR),$(S2OS_DSTDIR),$(in),$(in),$(S2OS_FLAGS))),\
-$(call _S2O,$(1),$(S2OS_SRCDIR),$(S2OS_DSTDIR),$(S2OS_INS),$(S2OS_OUT),$(S2OS_FLAGS)))
-endef
+    cmd = _cat(arch._as, flags, "-c", ipath, "-o", opath)
+    shell(cmd)
 
 
 # *.o -> bin
@@ -314,25 +302,23 @@ def _link(arch, srcdir, dstdir, ins, out, opts):
     if opts.clink:
         tool = arch.gcc
         flags = arch.gcc_flags(opts)
-        libs = libs + " -lm"
+        libs = _cat(libs, "-lm")
     else:
         tool = arch.ld
         flags = arch.ld_flags
-    flags = flags + " " + opts.ldflags
-    flags = flags.strip()
-    libs = libs.strip()
+    flags = _cat(flags, opts.ldflags)
 
     ipaths = [srcdir + "/" + i + ".o" for i in ins]
     opath = dstdir + "/" + out
-    cmd = "{} {} {} -o {} {}".format(
-        tool, flags, " ".join(ipaths), out, libs)
+    cmd = _cat(tool, flags, " ".join(ipaths), "-o", opath, libs)
+    shell(cmd)
 
 
 # *.s -> bin
 def _snlink(arch, srcdir, dstdir, ins, out, opts):
     if len(ins) == 1:
         _s2o(arch, srcdir, dstdir, ins[0], out, opts)
-        _link(arch, dstdir, dstdir, out, out, opts)
+        _link(arch, dstdir, dstdir, [out], out, opts)
     else:
         for i in ins:
             _s2o(arch, srcdir, dstdir, i, i, opts)
@@ -342,342 +328,145 @@ def _snlink(arch, srcdir, dstdir, ins, out, opts):
 # *.c -> bin
 def _cnlink(arch, srcdir, dstdir, ins, out, opts):
     _c2s(arch, srcdir, dstdir, ins, out, opts)
-    _s2o(arch, dstdir, dstdir, out, out)
-    _link(arch, dstdir, dstdir, out, out, opts)
-
-
-# clean
-def _clean(dir, mod, clean_s):
-    if os.path.isdir(dir) and os.path.exists(dir):
-        suf =
-
-		cd $(CLEAN_DIR) && \
-		rm -f $(CLEAN_MOD) \
-		$(CLEAN_MOD).o \
-		$(if $(CLEAN_S),$(CLEAN_MOD).s,) \
-		$(CLEAN_MOD).bc $(CLEAN_MOD).ll \
-		$(CLEAN_MOD).opt.bc $(CLEAN_MOD).opt.ll \
-		$(CLEAN_MOD).opt2.bc $(CLEAN_MOD).opt2.ll \
-		$(CLEAN_MOD).out; \
-	fi
-
-endef
-
-
-# run
-define _RUN
-$(eval RUN_DIR = $(2))
-$(eval RUN_PROG = $(3))
-$(eval RUN_FLAGS = $(4))
-$(eval RUN_ARGS = $(5))
-
-$(eval RUN_SAVE_OUT = $(findstring $(SAVE_OUT),$(RUN_FLAGS)))
-$(eval RUN_NOTEE = $(findstring $(NOTEE),$(RUN_FLAGS)))
-
-$(if $(DEBUG_RULES),$(warning "RUN(DIR=$(RUN_DIR),\
-PROG=$(RUN_PROG),\
-FLAGS=$(RUN_FLAGS),\
-ARGS=$(RUN_ARGS))"),)
-
-$(RUN_PROG)-run: $(RUN_DIR)$(RUN_PROG)
-	@echo $$@:
-	$(if $(RUN_SAVE_OUT),$(RUN_SH) -o $(RUN_DIR)$(RUN_PROG).out,) \
-		$(subst $(NOTEE),--no-tee,$(RUN_NOTEE)) \
-		$($(1)_RUN) $(RUN_DIR)$(RUN_PROG) $(RUN_ARGS)
-
-endef
-
-
-# alias
-define _ALIAS
-$(eval ALIAS_DIR = $(1))
-$(eval ALIAS_BIN = $(2))
-
-$(if $(DEBUG_RULES),$(warning "ALIAS(DIR=$(ALIAS_DIR),\
-BIN=$(ALIAS_BIN))"),)
-
-ifneq ($(ALIAS_DIR),./)
-.PHONY: $(ALIAS_BIN)
-$(ALIAS_BIN): $(ALIAS_DIR) $(ALIAS_DIR)$(ALIAS_BIN)
-endif
-
-endef
+    _s2o(arch, dstdir, dstdir, out, out, opts)
+    _link(arch, dstdir, dstdir, [out], out, opts)
 
 
 # *.c/s -> bin
-define BUILD
-$(eval BUILD_SRCDIR = $(2))
-$(eval BUILD_DSTDIR = $(3))
-$(eval BUILD_INS = $(4))
-$(eval BUILD_OUT = $(5))
-$(eval BUILD_LIBS = $(6))
-$(eval BUILD_FLAGS = $(7))
-$(eval BUILD_ASM = $(8))
-$(eval BUILD_C = $(9))
-$(eval BUILD_RUNARGS = $(10))
+def build(arch, srcdir, dstdir, ins, out, opts):
+    if opts.clink:
+        _cnlink(arch, srcdir, dstdir, ins, out, opts)
+    else:
+        _snlink(arch, srcdir, dstdir, ins, out, opts)
 
-$(if $(DEBUG_RULES),$(warning "BUILD($(1),\
-SRCDIR=$(BUILD_SRCDIR),\
-DSTDIR=$(BUILD_DSTDIR),\
-INS=$(BUILD_INS),\
-OUT=$(BUILD_OUT),\
-LIBS=$(BUILD_LIBS),\
-FLAGS=$(BUILD_FLAGS),\
-ASM=$(BUILD_ASM),\
-C=$(BUILD_C),\
-RUNARGS=$(BUILD_RUNARGS))"),)
 
-$(eval BUILD_RUNFLAGS = $(BUILD_FLAGS) $(SAVE_OUT))
-$(eval BUILD_FLAGS = $(subst $(NOTEE),,$(BUILD_FLAGS)))
+# run
+def run(arch, dir, prog, opts):
+    path = dir + "/" + prog
 
-$(call $(if $(BUILD_ASM),_SNLINK,_CNLINK)\
-,$(1),$(BUILD_SRCDIR),$(BUILD_DSTDIR),$(BUILD_INS),\
-$(BUILD_OUT),$(BUILD_LIBS),$(BUILD_FLAGS),$(BUILD_C))
+    cmd = _cat(arch.run, path, opts.runargs)
+    shell(cmd)
 
-$(call _CLEAN,$(BUILD_DSTDIR),$(BUILD_OUT),$(if $(BUILD_C),,clean.s))
-$(call _RUN,$(1),$(BUILD_DSTDIR),$(BUILD_OUT),$(BUILD_RUNFLAGS),$(BUILD_RUNARGS))
-$(call _ALIAS,$(BUILD_DSTDIR),$(BUILD_OUT))
-endef
+
+# clean
+def clean(dir, mod, clean_s):
+    if os.path.isdir(dir) and os.path.exists(dir):
+        os.chdir(dir)
+
+        s = ("{0} {0}.o {1}{0}.ll {0}.opt.bc {0}.opt.ll " + \
+            "{0}.opt2.bc {0}.opt2.ll {0}.out").format(
+                dir + "/" + mod, dir + "/" + mod + ".s " if clean_s else "")
+        files = s.split()
+        for f in files:
+            if os.path.exists(f):
+                print("rm " + f)
+                os.remove(f)
 
 
 # .o -> .bc
-define _TRANSLATE_OBJ
-$(eval TO_DIR = $(2))
-$(eval TO_IN = $(3))
-$(eval TO_OUT = $(4))
-$(eval TO_FLAGS = $(5))
+def _translate_obj(dir, _in, out, opts):
+    flags = "".format(SBT.flags, opts.sbtflags)
 
-$(if $(DEBUG_RULES),$(warning "TRANSLATE_OBJ($(1),\
-DIR=$(TO_DIR),\
-IN=$(TO_IN),\
-OUT=$(TO_OUT),\
-FLAGS=$(TO_FLAGS))"),)
+    ipath = dir + "/" + _in + ".o"
+    opath = dir + "/" + out + ".bc"
+    log = DIR.top + "/junk/" + out + ".log"
 
-$(TO_DIR)$(TO_OUT).bc: $(TO_DIR)$(TO_IN).o
-	@echo $$@: $$<
-	riscv-sbt $(SBTFLAGS) $(TO_FLAGS) -o $$@ $$^ >$(TOPDIR)/junk/$(TO_OUT).log 2>&1
-
-endef
+    cmd = "riscv-sbt {} {} -o {}".format(
+        flags, ipath, opath)
+    shell(cmd)
 
 
 # .o -> bin
-define TRANSLATE
-$(eval TRANSLATE_SRCDIR = $(2))
-$(eval TRANSLATE_DSTDIR = $(3))
-$(eval TRANSLATE_IN = $(4))
-$(eval TRANSLATE_OUT = $(5))
-$(eval TRANSLATE_LIBS = $(6))
-$(eval TRANSLATE_FLAGS = $(7))
-$(eval TRANSLATE_C = $(8))
-$(eval TRANSLATE_RUNARGS = $(9))
+def translate(arch, srcdir, dstdir, _in, out, opts):
+    _translate_obj(dstdir, _in, out, opts)
 
-$(eval TRANSLATE_NAT_OBJS = $(foreach obj,$(SBT_NAT_OBJS),$($(1)_$(obj)_O)))
+    _dis(arch, dstdir, out)
 
-$(if $(DEBUG_RULES),$(warning "TRANSLATE($(1),\
-SRCDIR=$(TRANSLATE_SRCDIR),\
-DSTDIR=$(TRANSLATE_DSTDIR),\
-IN=$(TRANSLATE_IN),\
-OUT=$(TRANSLATE_OUT),\
-LIBS=$(TRANSLATE_LIBS),\
-FLAGS=$(TRANSLATE_FLAGS),\
-C=$(TRANSLATE_C),\
-RUNARGS=$(TRANSLATE_RUNARGS))"),)
+    if opts.dbg:
+        _bc2s(arch, dstdir, out, out, opts)
+    else:
+        opt1 = out + ".opt"
+        _opt(arch, dstdir, out, opt1)
+        _dis(arch, dstdir, opt1)
+        _bc2s(arch, dstdir, opt1, out, opts)
 
-$(eval TRANSLATE_DBG = $(findstring $(DEBUG),$(TRANSLATE_FLAGS)))
-$(eval TRANSLATE_TFLAGS = $(subst $(DEBUG),,$(TRANSLATE_FLAGS)))
-$(eval TRANSLATE_TFLAGS = $(subst $(NOTEE),,$(TRANSLATE_FLAGS)))
-$(eval TRANSLATE_FLAGS = $(patsubst -regs=%,,$(TRANSLATE_FLAGS)))
-
-$(call _TRANSLATE_OBJ,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_IN),\
-$(TRANSLATE_OUT),$(TRANSLATE_TFLAGS) $(if $(TRANSLATE_C),,-dont-use-libc))
-
-$(call _DIS,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_OUT))
-
-$(if $(TRANSLATE_DBG),\
-$(call _BC2S,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_OUT),$(TRANSLATE_OUT),\
-$(DEBUG)),\
-$(call _OPT1NBC2S,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_DSTDIR),\
-$(TRANSLATE_OUT),$(TRANSLATE_OUT),$(TRANSLATE_FLAGS)))
-
-$(call BUILD,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_DSTDIR),\
-$(TRANSLATE_OUT),$(TRANSLATE_OUT),\
-$(TRANSLATE_LIBS) $(TRANSLATE_NAT_OBJS),\
-$(if $(TRANSLATE_DBG),$(DEBUG),) $(TRANSLATE_FLAGS),\
-$(ASM),$(TRANSLATE_C),$(TRANSLATE_RUNARGS))
-endef
+    build(arch, dstdir, dstdir, out, out, opts)
 
 
 ### sbt test ###
 
-MODES        := globals locals
-# NARCHS = native archs to build bins to
-TEST_NARCHS  := RV32 X86
-UTEST_NARCHS := RV32
-ADD_ASM_SRC_PREFIX := 1
+MODES       = ["globals", "locals"]
+
+def _check(dstdir, t1, t2):
+    path1 = dstdir + "/" + t1 + ".out"
+    path2 = dstdir + "/" + t2 + ".out"
+
+    cmd = "diff {} {}".format(t1, t2)
+    shell(cmd)
 
 
-define _NBUILD
-$(eval N_ARCH = $(1))
-$(eval N_SRCDIR = $(2))
-$(eval N_DSTDIR = $(3))
-$(eval N_INS = $(4))
-$(eval N_OUT = $(5))
-$(eval N_LIBS = $(6))
-$(eval N_FLAGS = $(7))
-$(eval N_ASM = $(8))
-$(eval N_C = $(9))
-$(eval N_ARGS = $(10))
+def sbt_test(archs, srcdir, dstdir, ins, out, opts=Opts()):
+    for arch in archs:
+        if arch == RV32_LINUX:
+            opts.setsysroot = False
+            opts.cflags = opts.cflags + " " + X86.sysroot_flag
+        build(arch, srcdir, dstdir, ins, out, opts)
 
-$(eval N_PREFIX = $($(N_ARCH)_PREFIX))
-$(eval N_INS = $(if $(and $(ADD_ASM_SRC_PREFIX),$(N_ASM)),\
-$(addprefix $(N_PREFIX)-,$(N_INS)),$(N_INS)))
-$(eval N_OUT = $(N_PREFIX)-$(N_OUT))
+    for mode in MODES:
+        tgt = "{}-{}".format(out, mode)
+        tin = "{}-{}".format(RV32.prefix, out)
+        tout = "{}-{}-{}".format(RV32.prefix, X86.prefix, tgt)
+        tnat = "{}-{}".format(X86.prefix, out)
 
-$(if $(DEBUG_RULES),$(warning "NBUILD($(1),\
-SRCDIR=$(N_DSTDIR),\
-DSTDIR=$(N_DSTDIR),\
-INS=$(N_INS),\
-OUT=$(N_OUT),\
-LIBS=$(N_LIBS),\
-FLAGS=$(N_FLAGS),\
-ASM=$(N_ASM),\
-C=$(N_C),\
-ARGS=$(N_ARGS))"),)
-
-# native bins
-$(call BUILD,$(N_ARCH),$(N_SRCDIR),$(N_DSTDIR),$(N_INS),$(N_OUT),\
-$(N_LIBS),$(N_FLAGS),$(N_ASM),$(N_C),$(N_ARGS))
-
-endef
-
-
-define _SBT_TEST1
-$(eval TEST1_DSTARCH = $(1))
-$(eval TEST1_DSTDIR = $(2))
-$(eval TEST1_NAME = $(3))
-$(eval TEST1_MODE = $(4))
-$(eval TEST1_LIBS = $(5))
-$(eval TEST1_FLAGS = $(6))
-$(eval TEST1_C = $(7))
-$(eval TEST1_ARGS = $(8))
-
-$(eval TEST1_TGT = $(TEST1_NAME)-$(TEST1_MODE))
-$(eval TEST1_IN = $(RV32_PREFIX)-$(TEST1_NAME))
-$(eval TEST1_OUT = $(RV32_PREFIX)-$($(TEST1_DSTARCH)_PREFIX)-$(TEST1_TGT))
-$(eval TEST1_NAT = $($(TEST1_DSTARCH)_PREFIX)-$(TEST1_NAME))
-
-$(if $(DEBUG_RULES),$(warning "SBT_TEST1($(1),\
-DSTDIR=$(TEST1_DSTDIR),\
-NAME=$(TEST1_NAME),\
-MODE=$(TEST1_MODE),\
-LIBS=$(TEST1_LIBS),\
-FLAGS=$(TEST1_FLAGS),\
-C=$(TEST1_C),\
-ARGS=$(TEST1_ARGS))"),)
-
-$(call TRANSLATE,$(TEST1_DSTARCH),$(TEST1_DSTDIR),$(TEST1_DSTDIR),\
-$(TEST1_IN),$(TEST1_OUT),$(TEST1_LIBS),$(TEST1_FLAGS) -regs=$(TEST1_MODE),\
-$(TEST1_C),$(TEST1_ARGS))
-
-.PHONY: $(TEST1_TGT)
-$(TEST1_TGT): $(TEST1_DSTDIR)$(TEST1_OUT)
-
-$(TEST1_TGT)-test: $(TEST1_TGT) $(TEST1_OUT)-run
-	diff $(TEST1_DSTDIR)$(TEST1_IN).out $(TEST1_DSTDIR)$(TEST1_OUT).out
-
-endef
-
-
-define SBT_TEST
-$(eval TEST_ARCHS = $(1))
-$(eval TEST_SRCDIR = $(2))
-$(eval TEST_DSTDIR = $(3))
-$(eval TEST_INS = $(4))
-$(eval TEST_OUT = $(5))
-$(eval TEST_LIBS = $(6))
-$(eval TEST_FLAGS = $(7))
-$(eval TEST_ASM = $(8))
-$(eval TEST_C = $(9))
-$(eval TEST_ARGS = $(10))
-
-$(if $(DEBUG_RULES),$(warning "SBT_TEST($(1),\
-SRCDIR=$(TEST_SRCDIR),\
-DSTDIR=$(TEST_DSTDIR),\
-INS=$(TEST_INS),\
-OUT=$(TEST_OUT),\
-LIBS=$(TEST_LIBS),\
-FLAGS=$(TEST_FLAGS),\
-ASM=$(TEST_ASM),\
-C=$(TEST_C),\
-ARGS=$(TEST_ARGS))"),)
-
-# native bins
-$(eval TEST_NFLAGS = $(subst $(DEBUG),,$(TEST_FLAGS)))
-
-$(foreach ARCH,$(TEST_ARCHS),\
-$(call _NBUILD,$(ARCH),$(TEST_SRCDIR),$(TEST_DSTDIR),\
-$(TEST_INS),$(TEST_OUT),$(TEST_LIBS),\
-$(if $(findstring RV32_LINUX,$(ARCH)),$(NOSYSROOT) $(X86_SYSROOT_FLAG),) $(TEST_NFLAGS),\
-$(TEST_ASM),$(TEST_C),$(TEST_ARGS)))
-
-# translated bins
-$(foreach mode,$(MODES),\
-$(call _SBT_TEST1,X86,$(TEST_DSTDIR),$(TEST_OUT),$(mode),\
-$(TEST_LIBS),$(TEST_FLAGS),$(TEST_C),$(TEST_ARGS)))
-
-.PHONY: $(TEST_OUT)
-$(TEST_OUT): $(foreach ARCH,$(TEST_ARCHS),$($(ARCH)_PREFIX)-$(TEST_OUT)) \
-             $(foreach mode,$(MODES),$(TEST_OUT)-$(mode))
-
-$(TEST_OUT)-test: $(foreach ARCH,$(TEST_ARCHS),$($(ARCH)_PREFIX)-$(TEST_OUT)-run) \
-                  $(foreach mode,$(MODES),$(TEST_OUT)-$(mode)-test)
-
-endef
-
-# .o -> .bc
-def translate_obj(dir, in, out, flags):
-    print("translate_obj(dir={0}, in={1}, out={2}, flags={3})".format(dir, in, out, flags))
-
-    opath = dir + out + ".bc"
-    ipath = dir + in + ".o"
-    log = LOG_DIR + "/" + out + ".log"
-
-    print("{0}: {1}".format(opath, ipath))
-    cmd = "riscv-sbt {0} {1} -o {2} {3} >{4} 2>&1".format(
-        SBTFLAGS, flags, opath, ipath, log)
-
-
-# .o -> bin
-def translate(arch, srcdir, dstdir, in, out, libs, flags, c, runargs='',
-        dbg=False):
-    print(("translate(arch={0}, srcdir={1}, dstdir={2}, in={3}, out={4}, " + \
-        "libs={5}, flags={6}, c={7}, runargs={8})").format(
-        arch, srcdir, dstdir, in, out, libs, flags, c, runargs))
-
-    nat_objs = 
-
-    translate_obj(dstdir, in, out, flags, (c? "-dont-use-libc" : ""))
-    dis(arch, dstdir, out)
-
-$(eval TRANSLATE_NAT_OBJS = $(foreach obj,$(SBT_NAT_OBJS),$($(1)_$(obj)_O)))
-
-$(call _DIS,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_OUT))
-
-$(if $(TRANSLATE_DBG),\
-$(call _BC2S,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_OUT),$(TRANSLATE_OUT),\
-$(DEBUG)),\
-$(call _OPT1NBC2S,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_DSTDIR),\
-$(TRANSLATE_OUT),$(TRANSLATE_OUT),$(TRANSLATE_FLAGS)))
-
-$(call BUILD,$(1),$(TRANSLATE_DSTDIR),$(TRANSLATE_DSTDIR),\
-$(TRANSLATE_OUT),$(TRANSLATE_OUT),\
-$(TRANSLATE_LIBS) $(TRANSLATE_NAT_OBJS),\
-$(if $(TRANSLATE_DBG),$(DEBUG),) $(TRANSLATE_FLAGS),\
-$(ASM),$(TRANSLATE_C),$(TRANSLATE_RUNARGS))
-endef
+        opts.sbtflags = "-regs=" + mode
+        translate(X86, dstdir, dstdir, tin, tout, opts)
 
 
 def main():
-    _c2lbc(RV32, "srcdir", "dstdir", ["hello1", "hello2"], "hello", "", "-DROWS=3")
+    parser = argparse.ArgumentParser(description="build/run programs")
+    parser.add_argument("--asm", action='store_true', help="treat inputs as assembly")
+    parser.set_defaults(cmd=None)
+    subparsers = parser.add_subparsers(help="sub-command help")
+
+    build_parser = subparsers.add_parser("build", help="build program")
+    build_parser.add_argument("arch")
+    build_parser.add_argument("srcdir")
+    build_parser.add_argument("dstdir")
+    build_parser.add_argument("out")
+    build_parser.add_argument("ins", nargs="+", metavar="in")
+    build_parser.set_defaults(cmd="build")
+
+    run_parser = subparsers.add_parser("run", help="run program")
+    run_parser.add_argument("arch")
+    run_parser.add_argument("dir")
+    run_parser.add_argument("prog")
+    run_parser.set_defaults(cmd="run")
+
+    clean_parser = subparsers.add_parser("clean", help="clean build output files")
+    clean_parser.add_argument("dir")
+    clean_parser.add_argument("mod")
+    clean_parser.set_defaults(cmd="clean")
+
+    args = parser.parse_args()
+
+    if not args.cmd:
+        sys.exit("ERROR: no sub-command specified")
+
+    arch = {
+        "rv32"          : RV32,
+        "rv32-linux"    : RV32_LINUX,
+        "x86"           : X86,
+    }
+
+    opts = Opts()
+    opts.clink = not args.asm
+
+    if args.cmd == "build":
+        build(arch[args.arch], args.srcdir, args.dstdir, args.ins, args.out, opts)
+    elif args.cmd == "run":
+        run(arch[args.arch], args.dir, args.prog, opts)
+    elif args.cmd == "clean":
+        clean(args.dir, args.mod, not args.asm)
+
 
 main()

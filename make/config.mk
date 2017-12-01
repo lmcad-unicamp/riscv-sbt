@@ -53,6 +53,7 @@ LOG               := $(RUN_SH) --log
 LOG_CLEAN         := rm -f log.txt
 LOG0              := $(LOG_CLEAN); $(LOG)
 MEASURE           := $(LOG_CLEAN); MODES="globals locals" $(LOG) $(SCRIPTS_DIR)/measure.py
+BUILD_PY          := $(SCRIPTS_DIR)/build.py
 
 RV32_TRIPLE       := riscv32-unknown-elf
 RV64_LINUX_TRIPLE := riscv64-unknown-linux-gnu
