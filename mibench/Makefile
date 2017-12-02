@@ -20,9 +20,6 @@ MIBENCH_DEBUG   := #$(DEBUG)
 MIBENCH_SRCDIR  := $(TOPDIR)/mibench
 MIBENCH_DSTDIR  := $(BUILD_DIR)/mibench
 
-RV32_ARCH       := RV32_LINUX
-ARCHS           := $(RV32_ARCH) X86
-
 ## 01- BASICMATH
 # rv32: OK (soft-float)
 
@@ -218,32 +215,31 @@ $(MIBENCH_DSTDIR)/$(LAME_DIR)/mpglib:
 define MBENCH
 $(eval MBENCH_BENCH = $(1))
 $(eval MBENCH_DIR = $($(1)_DIR))
-$(eval MBENCH_SRCDIR = $(MIBENCH_SRCDIR)/$(MBENCH_DIR)/)
-$(eval MBENCH_DSTDIR = $(MIBENCH_DSTDIR)/$(MBENCH_DIR)/)
+$(eval MBENCH_SRCDIR = $(MIBENCH_SRCDIR)/$(MBENCH_DIR))
+$(eval MBENCH_DSTDIR = $(MIBENCH_DSTDIR)/$(MBENCH_DIR))
 $(eval MBENCH_NAME = $($(1)_NAME))
 $(eval MBENCH_MODS = $($(1)_MODS))
 $(eval MBENCH_ARGS = $($(1)_ARGS))
 
-$(if $(DEBUG_RULES),$(warning "MBENCH($(1),\
-SRCDIR=$(MBENCH_SRCDIR),\
-DSTDIR=$(MBENCH_DSTDIR),\
-NAME=$(MBENCH_NAME),\
-DIR=$(MBENCH_DIR),\
-MODS=$(MBENCH_MODS),\
-ARGS=$(MBENCH_ARGS))"),)
-
-$(MBENCH_DSTDIR):
-	mkdir -p $$@
-
-$(MBENCH_NAME)-clean:
-	rm -rf $(MBENCH_DSTDIR)
-
 $(MBENCH_NAME)-measure:
-	$(MEASURE) $(MBENCH_DSTDIR) $(MBENCH_NAME) $(MBENCH_ARGS)
+	$(MEASURE_PY) $(MBENCH_DSTDIR) $(MBENCH_NAME) $(MBENCH_ARGS)
 
-$(call SBT_TEST,$(ARCHS),$(MBENCH_SRCDIR),$(MBENCH_DSTDIR),\
-$(MBENCH_MODS),$(MBENCH_NAME),$(NOLIBS),\
-$(MIBENCH_DEBUG) $(NOTEE),$(NOASM),$(C),$(MBENCH_ARGS))
+$(eval GFLAGS = )
+$(eval LFLAGS = )
+$(eval RFLAGS = --save-output)
+$(eval TGFLAGS = )
+$(eval TLFLAGS = )
+
+$(foreach ARCH,rv32-linux x86,\
+$(call TGT,$(ARCH),$(MBENCH_SRCDIR),$(MBENCH_DSTDIR),\
+$(MBENCH_MODS),$(filter-out)-$(MBENCH_NAME),\
+$(GFLAGS),$(LFLAGS),$(RFLAGS))
+
+$(call TRANSLATE,x86,$(DSTDIR),rv32-$(UT),rv32-x86-$(UT),\
+$(TGFLAGS),$(TLFLAGS),$(RFLAGS))
+
+$(call TEST,$(UT),rv32-$(UT) rv32-x86-$(UT),$(DSTDIR))
+
 endef
 
 

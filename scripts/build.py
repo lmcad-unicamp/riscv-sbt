@@ -269,7 +269,7 @@ def _bc2s(arch, dir, _in, out, opts):
     ipath = dir + "/" + _in + ".bc"
     opath = dir + "/" + out + ".s"
 
-    flags = _cat(arch.llc_flags(opts), opts.sflags)
+    flags = arch.llc_flags(opts)
 
     cmd = "{} {} {} -o {}".format(
         arch.llc, flags, ipath, opath)
@@ -344,9 +344,7 @@ def _cnlink(arch, srcdir, dstdir, ins, out, opts):
 # *.c/s -> bin
 def build(arch, srcdir, dstdir, ins, out, opts):
     # create dstdir if needed
-    if not os.path.exists(dstdir):
-        print("mkdir", dstdir)
-        os.mkdir(dstdir)
+    shell("mkdir -p " + dstdir)
 
     if opts.asm:
         _snlink(arch, srcdir, dstdir, ins, out, opts)
@@ -426,6 +424,7 @@ def main():
     build_parser.set_defaults(cmd="build")
     build_parser.add_argument("--libs")
     build_parser.add_argument("--cflags")
+    build_parser.add_argument("--sflags")
     build_parser.add_argument("--syscall", action="store_true",
         help="link with syscall translation obj")
     build_parser.add_argument("--counters", action="store_true",
@@ -474,14 +473,16 @@ def main():
     if args.cmd == "build":
         arch = arch[args.arch]
         libs = args.libs
-        # syscall
-        if args.syscall:
-            libs = _cat(libs, SBT.nat_obj(arch, "syscall"))
-        # counters
-        if args.counters:
-            libs = _cat(libs, SBT.nat_obj(arch, "counters"))
+        if arch != RV32 and arch != RV32_LINUX:
+            # syscall
+            if args.syscall:
+                libs = _cat(libs, SBT.nat_obj(arch, "syscall"))
+            # counters
+            if args.counters:
+                libs = _cat(libs, SBT.nat_obj(arch, "counters"))
 
         opts.cflags = _cat(opts.cflags, args.cflags)
+        opts.sflags = _cat(opts.sflags, args.sflags)
         opts.libs = libs
 
         build(arch, args.srcdir, args.dstdir, args.ins, args.out, opts)

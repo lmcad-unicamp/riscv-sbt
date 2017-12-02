@@ -7,7 +7,7 @@ import sys
 import time
 
 TARGETS = [ 'x86' ]
-MODES = None
+MODES   = ['globals', 'locals']
 
 class TestData:
     def __init__(self, bin):
@@ -113,12 +113,6 @@ def main(args):
     args = parser.parse_args()
 
     print("measuring", args.test)
-
-    global MODES
-    if not MODES:
-        MODES = os.environ["MODES"].split(" ")
-    if not MODES:
-        raise Exception("MODES not defined!")
 
     for target in TARGETS:
         measure(target, args.dir, args.test, args.args)

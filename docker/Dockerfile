@@ -14,7 +14,8 @@ RUN apt-get update && \
 ### get sources ###
 
 # clone main repo
-RUN unbuffer git clone --depth 1 https://github.com/OpenISA/riscv-sbt.git
+RUN unbuffer git clone https://github.com/OpenISA/riscv-sbt.git
+RUN git checkout xxx
 
 WORKDIR /riscv-sbt
 
@@ -109,7 +110,7 @@ RUN apt-get update \
 ### build srcs ###
 
 # XXX
-RUN git pull
+#RUN git pull
 
 # build riscv-gnu-toolchain - newlib version
 RUN /bin/bash -c \
