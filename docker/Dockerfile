@@ -1,7 +1,5 @@
 FROM debian:stretch
 
-RUN echo "build #1"
-
 # install git and unbuffer (expect) to perform the clone, showing
 # its progress
 RUN apt-get update && \
@@ -15,9 +13,8 @@ RUN apt-get update && \
 
 # clone main repo
 RUN unbuffer git clone https://github.com/OpenISA/riscv-sbt.git
-RUN git checkout xxx
-
 WORKDIR /riscv-sbt
+RUN git checkout aae63754a71617ea6ba8cfee4a42288a97de7eab
 
 # get riscv-gnu-toolchain
 RUN cd submodules \
@@ -162,7 +159,7 @@ RUN /bin/bash -c \
 
 # run basic tests
 RUN /bin/bash -c \
-    ". scripts/env.sh && make tests && rm -rf build"
+    ". scripts/env.sh && mkdir -p junk && make tests && rm -rf build"
 
 # system-test
 #RUN /bin/bash -c \

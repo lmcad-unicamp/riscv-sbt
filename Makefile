@@ -56,6 +56,9 @@ patch-llvm:
 
 ###
 
+docker-img:
+	$(MAKE) -C docker
+
 ### MIBENCH ###
 
 .PHONY: mibench
