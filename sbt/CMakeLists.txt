@@ -121,6 +121,7 @@ set (LIBC_C ${PROJECT_SOURCE_DIR}/libc.c)
 add_custom_command(OUTPUT libc.bc
     COMMAND clang
         --target=riscv32
+        -isysroot / -isystem /usr/include
         -emit-llvm -c -O3 -mllvm -disable-llvm-optzns
         ${LIBC_C}
         MAIN_DEPENDENCY ${LIBC_C})

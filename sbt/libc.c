@@ -21,6 +21,8 @@ F(printf)
 F(putchar)
 F(puts)
 
+F(_IO_getc)
+
 // x86 libc stuff
-int __isoc99_fscanf(FILE *__restrict, const char *__restrict, ...);
-F(__isoc99_fscanf)
+//int __isoc99_fscanf(FILE *__restrict, const char *__restrict, ...);
+//F(__isoc99_fscanf)

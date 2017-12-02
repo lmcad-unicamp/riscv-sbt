@@ -412,6 +412,7 @@ def main():
     parser = argparse.ArgumentParser(description="build/run programs")
     parser.add_argument("-C", action='store_false', help="don't link with C libs")
     parser.add_argument("--asm", action='store_true', help="treat inputs as assembly")
+    parser.add_argument("--dbg", action='store_true')
     parser.set_defaults(cmd=None)
     subparsers = parser.add_subparsers(help="sub-command help")
 
@@ -468,6 +469,7 @@ def main():
     opts = Opts()
     opts.clink = args.C
     opts.asm = args.asm
+    opts.dbg = args.dbg
 
     # build
     if args.cmd == "build":

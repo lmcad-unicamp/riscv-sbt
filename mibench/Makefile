@@ -16,7 +16,6 @@ endif
 
 include $(TOPDIR)/make/config.mk
 
-MIBENCH_DEBUG   := #$(DEBUG)
 MIBENCH_SRCDIR  := $(TOPDIR)/mibench
 MIBENCH_DSTDIR  := $(BUILD_DIR)/mibench
 
@@ -114,7 +113,7 @@ RAWDAUDIO_NO_TEE := 1
 CRC32_NAME      := crc32
 CRC32_DIR       := telecomm/CRC32
 CRC32_MODS      := crc_32
-CRC32_ARGS      := $(MIBENCH)/telecomm/adpcm/data/large.pcm
+CRC32_ARGS      := $(MIBENCH_SRCDIR)/telecomm/adpcm/data/large.pcm
 
 ## 12- FFT
 # rv32: OK (soft-float)
@@ -184,6 +183,9 @@ LAME_ARGS := notests
 
 BENCHS := \
     DIJKSTRA \
+    CRC32 \
+
+
     #BASICMATH \
     BITCOUNT \
     SUSAN \
@@ -253,3 +255,8 @@ endef
 $(foreach bench,$(BENCHS),\
 $(eval $(call MBENCH,$(bench))))
 
+.PHONY: test
+test: $(foreach bench,$(BENCHS),$($(bench)_NAME)-test)
+
+.PHONY: measure
+measure: $(foreach bench,$(BENCHS),$($(bench)_NAME)-measure)

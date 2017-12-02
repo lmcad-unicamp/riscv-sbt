@@ -119,6 +119,11 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             isLO = true;
             break;
 
+        case llvm::ELF::R_RISCV_JAL:
+            DBGF("JAL");
+            isLO = true;
+            break;
+
         // ignored
         case llvm::ELF::R_RISCV_ALIGN:
             DBGF("ALIGN: ignored: type={0}", type);

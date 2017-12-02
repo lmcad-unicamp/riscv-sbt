@@ -68,6 +68,11 @@ mibench: sbt
 mibench-clean:
 	$(MAKE) -C $(TOPDIR)/mibench clean
 
+mibench-test:
+	$(MAKE) -C $(TOPDIR)/mibench test
+
+mibench-measure:
+	$(MAKE) -C $(TOPDIR)/mibench measure
 
 ###
 ### generate all rules
