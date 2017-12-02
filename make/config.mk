@@ -35,7 +35,8 @@ CFLAGS         := -fno-rtti -fno-exceptions
 # SBT
 #
 
-SBTFLAGS           = -x
+SBTFLAGS          := -x
+MODES             := globals locals
 SBT_SHARE_DIR     := $(TOOLCHAIN_DIR)/share/riscv-sbt
 
 SBT_NAT_OBJS      := SYSCALL

@@ -2,21 +2,14 @@ include $(TOPDIR)/make/config.mk
 
 ### config ####
 
-SRC_DIR     := $(shell pwd)/
-SBT_OUT_DIR := $(BUILD_DIR)/sbt/$(BUILD_TYPE_DIR)/test/
+SRCDIR := $(shell pwd)
+DSTDIR := $(BUILD_DIR)/sbt/$(BUILD_TYPE_DIR)/test
 
-TESTS := \
-	hello \
-	argv \
-	mm
+TESTS  := hello argv mm
 
 all: elf tests
 
 include $(TOPDIR)/make/rules.mk
-
-$(SBT_OUT_DIR):
-	mkdir -p $@
-
 
 ### elf ###
 
@@ -24,37 +17,90 @@ CXX      = g++
 CXXFLAGS = -m32 -Wall -Werror -g -std=c++11 -pedantic
 LDFLAGS  = -m32
 
-$(SBT_OUT_DIR)elf.o: elf.cpp elf.hpp
+$(DSTDIR):
+	mkdir -p $@
+
+$(DSTDIR)/elf.o: elf.cpp elf.hpp
 	$(CXX) $(CXXFLAGS) -o $@ -c $<
 
-$(SBT_OUT_DIR)elf: $(SBT_OUT_DIR) $(SBT_OUT_DIR)elf.o
-	$(CXX) $(LDFLAGS) -o $@ $(SBT_OUT_DIR)elf.o
+$(DSTDIR)/elf: $(DSTDIR) $(DSTDIR)/elf.o
+	$(CXX) $(LDFLAGS) -o $@ $(DSTDIR)/elf.o
 
 .PHONY: elf
-elf: $(SBT_OUT_DIR)elf
-
-$(eval ADD_ASM_SRC_PREFIX = 1)
+elf: $(DSTDIR)/elf
 
 ### x86-syscall-test ###
 
-$(eval $(call BUILD,X86,$(SRC_DIR),$(SBT_OUT_DIR),\
-x86-syscall-test,x86-syscall-test,$(X86_SYSCALL_O),$(NOFLAGS),$(ASM),$(C)))
+$(eval $(call TGT,x86,$(SRCDIR),$(DSTDIR),x86-syscall-test,x86-syscall-test,\
+--asm,--libs="$(X86_SYSCALL_O)"))
+
+###
+
+define TEST
+$(eval TEST_NAME = $(1))
+$(eval TEST_TGTS = $(2))
+$(eval TEST_DIR = $(3))
+
+.PHONY: $(TEST_NAME)
+$(TEST_NAME): $(TEST_TGTS)
+.PHONY: $(TEST_NAME)-run
+$(TEST_NAME)-run: $(addsuffix -run,$(TEST_TGTS))
+
+$(eval T1 = $(word 1,$(TEST_TGTS)))
+$(eval T2 = $(word 2,$(TEST_TGTS)))
+$(eval T3G = $(word 3,$(TEST_TGTS))-globals)
+$(eval T3L = $(word 3,$(TEST_TGTS))-locals)
+
+.PHONY: $(TEST_NAME)-test
+$(TEST_NAME)-test: $(TEST_NAME)-run
+	diff $(TEST_DIR)/$(T1).out $(TEST_DIR)/$(T3G).out
+	diff $(TEST_DIR)/$(T2).out $(TEST_DIR)/$(T3G).out
+	diff $(TEST_DIR)/$(T1).out $(TEST_DIR)/$(T3L).out
+	diff $(TEST_DIR)/$(T2).out $(TEST_DIR)/$(T3L).out
+
+endef
 
 ### hello ###
 
-$(eval $(call SBT_TEST,$(TEST_NARCHS),$(SRC_DIR),$(SBT_OUT_DIR),hello,hello,\
-$(NOLIBS),$(NOFLAGS),$(ASM),$(NOC)))
+GFLAGS := --asm -C
+LFLAGS :=
+RFLAGS := --save-output
+
+$(eval $(call TGT,rv32,$(SRCDIR),$(DSTDIR),rv32-hello,rv32-hello,\
+$(GFLAGS),$(LFLAGS),$(RFLAGS)))
+$(eval $(call TGT,x86,$(SRCDIR),$(DSTDIR),x86-hello,x86-hello,\
+$(GFLAGS),$(LFLAGS),$(RFLAGS)))
+$(eval $(call TRANSLATE,x86,$(DSTDIR),rv32-hello,rv32-x86-hello,\
+-C,$(RFLAGS)))
+$(eval $(call TEST,hello,rv32-hello x86-hello rv32-x86-hello,$(DSTDIR)))
 
 ### argc/argv ###
 
-$(eval $(call SBT_TEST,$(TEST_NARCHS),$(SRC_DIR),$(SBT_OUT_DIR),argv,argv,\
-$(NOLIBS),$(NOFLAGS),$(NOASM),$(C),one two three))
+ARGS   := one two three
+GFLAGS :=
+RFLAGS := $(ARGS) --save-output
+
+$(eval $(call TGT,rv32,$(SRCDIR),$(DSTDIR),argv,rv32-argv,\
+$(GFLAGS),$(LFLAGS),$(RFLAGS)))
+$(eval $(call TGT,x86,$(SRCDIR),$(DSTDIR),argv,x86-argv,\
+$(GFLAGS),$(LFLAGS),$(RFLAGS)))
+$(eval $(call TRANSLATE,x86,$(DSTDIR),rv32-argv,rv32-x86-argv,\
+$(GFLAGS),$(RFLAGS)))
+$(eval $(call TEST,argv,rv32-argv x86-argv rv32-x86-argv,$(DSTDIR)))
 
 ### mm (matrix multiply) ###
 
-DIM := 4
-$(eval $(call SBT_TEST,$(TEST_NARCHS),$(SRC_DIR),$(SBT_OUT_DIR),mm,mm,\
-$(NOLIBS),-DROWS=$(DIM),$(NOASM),$(C)))
+DIM    := 4
+LFLAGS := --cflags="-DROWS=$(DIM)"
+RFLAGS := --save-output
+
+$(eval $(call TGT,rv32,$(SRCDIR),$(DSTDIR),mm,rv32-mm,\
+$(GFLAGS),$(LFLAGS),$(RFLAGS)))
+$(eval $(call TGT,x86,$(SRCDIR),$(DSTDIR),mm,x86-mm,\
+$(GFLAGS),$(LFLAGS),$(RFLAGS)))
+$(eval $(call TRANSLATE,x86,$(DSTDIR),rv32-mm,rv32-x86-mm,\
+$(GFLAGS),$(RFLAGS)))
+$(eval $(call TEST,mm,rv32-mm x86-mm rv32-x86-mm,$(DSTDIR)))
 
 ### tests targets ###
 
@@ -92,4 +138,4 @@ alltests: tests utests
 alltests-run: alltests tests-run utests-run
 
 clean:
-	rm -rf $(SBT_OUT_DIR)
+	rm -rf $(DSTDIR)

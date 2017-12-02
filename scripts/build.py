@@ -43,7 +43,7 @@ class Sbt:
         self.share_dir = DIR.toolchain + "/share/riscv-sbt"
         self.nat_objs = ["syscall", "counters"]
         self.nat_obj  = lambda arch, name: \
-            "{}/{}-{}.o".format(self.share_dir, arch, name)
+            "{}/{}-{}.o".format(self.share_dir, arch.prefix, name)
 
 SBT = Sbt()
 
@@ -90,8 +90,9 @@ class Arch:
         # llc
         self.llc = "llc"
         self.llc_flags = lambda opts: \
-            "-relocation-model=static " + \
-            ("-O0" if opts.dbg else _O)
+            _cat("-relocation-model=static",
+                ("-O0" if opts.dbg else _O),
+                llc_flags)
         # as
         self._as = triple + "-as"
         self.as_flags = as_flags
@@ -156,6 +157,7 @@ X86 = Arch(
 class Opts:
     def __init__(self):
         self.dbg = False
+        self.asm = False
         self.clink = True
         # flags
         self.setsysroot = True
@@ -164,21 +166,28 @@ class Opts:
         self.ldflags = ""
         self.sbtflags = ""
         self.libs = ""
-        self.runargs = ""
 
 
 ###
 
-def shell(cmd):
+def shell(cmd, save_out=False):
     print(cmd)
-    subprocess.run(cmd, shell=True, check=True)
+    if save_out:
+        cp = subprocess.run(cmd, shell=True, check=True,
+            universal_newlines=True,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        return cp.stdout
+    else:
+        subprocess.run(cmd, shell=True, check=True)
 
 ### rules ###
 
 def _cat(*args):
     out = ""
     for arg in args:
-        if len(arg) > 0:
+        if not arg:
+            pass
+        elif len(arg) > 0:
             if len(out) == 0:
                 out = arg
             else:
@@ -334,18 +343,26 @@ def _cnlink(arch, srcdir, dstdir, ins, out, opts):
 
 # *.c/s -> bin
 def build(arch, srcdir, dstdir, ins, out, opts):
-    if opts.clink:
-        _cnlink(arch, srcdir, dstdir, ins, out, opts)
-    else:
+    # create dstdir if needed
+    if not os.path.exists(dstdir):
+        print("mkdir", dstdir)
+        os.mkdir(dstdir)
+
+    if opts.asm:
         _snlink(arch, srcdir, dstdir, ins, out, opts)
+    else:
+        _cnlink(arch, srcdir, dstdir, ins, out, opts)
 
 
 # run
-def run(arch, dir, prog, opts):
+def run(arch, dir, prog, args, save_out):
     path = dir + "/" + prog
 
-    cmd = _cat(arch.run, path, opts.runargs)
-    shell(cmd)
+    cmd = _cat(arch.run, path, " ".join(args))
+    out = shell(cmd, save_out)
+    if save_out:
+        with open(path + ".out", "w") as f:
+            f.write(out)
 
 
 # clean
@@ -364,21 +381,21 @@ def clean(dir, mod, clean_s):
 
 
 # .o -> .bc
-def _translate_obj(dir, _in, out, opts):
-    flags = "".format(SBT.flags, opts.sbtflags)
+def _translate_obj(arch, dir, _in, out, opts):
+    flags = _cat(SBT.flags, opts.sbtflags)
 
     ipath = dir + "/" + _in + ".o"
     opath = dir + "/" + out + ".bc"
     log = DIR.top + "/junk/" + out + ".log"
 
-    cmd = "riscv-sbt {} {} -o {}".format(
-        flags, ipath, opath)
+    cmd = "riscv-sbt {} {} -o {} >{} 2>&1".format(
+        flags, ipath, opath, log)
     shell(cmd)
 
 
 # .o -> bin
 def translate(arch, srcdir, dstdir, _in, out, opts):
-    _translate_obj(dstdir, _in, out, opts)
+    _translate_obj(arch, dstdir, _in, out, opts)
 
     _dis(arch, dstdir, out)
 
@@ -390,40 +407,12 @@ def translate(arch, srcdir, dstdir, _in, out, opts):
         _dis(arch, dstdir, opt1)
         _bc2s(arch, dstdir, opt1, out, opts)
 
-    build(arch, dstdir, dstdir, out, out, opts)
-
 
 ### sbt test ###
 
-MODES       = ["globals", "locals"]
-
-def _check(dstdir, t1, t2):
-    path1 = dstdir + "/" + t1 + ".out"
-    path2 = dstdir + "/" + t2 + ".out"
-
-    cmd = "diff {} {}".format(t1, t2)
-    shell(cmd)
-
-
-def sbt_test(archs, srcdir, dstdir, ins, out, opts=Opts()):
-    for arch in archs:
-        if arch == RV32_LINUX:
-            opts.setsysroot = False
-            opts.cflags = opts.cflags + " " + X86.sysroot_flag
-        build(arch, srcdir, dstdir, ins, out, opts)
-
-    for mode in MODES:
-        tgt = "{}-{}".format(out, mode)
-        tin = "{}-{}".format(RV32.prefix, out)
-        tout = "{}-{}-{}".format(RV32.prefix, X86.prefix, tgt)
-        tnat = "{}-{}".format(X86.prefix, out)
-
-        opts.sbtflags = "-regs=" + mode
-        translate(X86, dstdir, dstdir, tin, tout, opts)
-
-
 def main():
     parser = argparse.ArgumentParser(description="build/run programs")
+    parser.add_argument("-C", action='store_false', help="don't link with C libs")
     parser.add_argument("--asm", action='store_true', help="treat inputs as assembly")
     parser.set_defaults(cmd=None)
     subparsers = parser.add_subparsers(help="sub-command help")
@@ -435,11 +424,19 @@ def main():
     build_parser.add_argument("out")
     build_parser.add_argument("ins", nargs="+", metavar="in")
     build_parser.set_defaults(cmd="build")
+    build_parser.add_argument("--libs")
+    build_parser.add_argument("--cflags")
+    build_parser.add_argument("--syscall", action="store_true",
+        help="link with syscall translation obj")
+    build_parser.add_argument("--counters", action="store_true",
+        help="link with counters translation obj")
 
     run_parser = subparsers.add_parser("run", help="run program")
     run_parser.add_argument("arch")
     run_parser.add_argument("dir")
     run_parser.add_argument("prog")
+    run_parser.add_argument("args", nargs="*", metavar="arg")
+    run_parser.add_argument("--save-output", action="store_true")
     run_parser.set_defaults(cmd="run")
 
     clean_parser = subparsers.add_parser("clean", help="clean build output files")
@@ -447,26 +444,71 @@ def main():
     clean_parser.add_argument("mod")
     clean_parser.set_defaults(cmd="clean")
 
+    translate_parser = subparsers.add_parser("translate", help="translate obj")
+    translate_parser.add_argument("arch")
+    translate_parser.add_argument("srcdir")
+    translate_parser.add_argument("dstdir")
+    translate_parser.add_argument("out")
+    translate_parser.add_argument("_in")
+    translate_parser.add_argument("flags", nargs="*", metavar="flag")
+    translate_parser.set_defaults(cmd="translate")
+
     args = parser.parse_args()
 
     if not args.cmd:
         sys.exit("ERROR: no sub-command specified")
 
+    # arch map
     arch = {
         "rv32"          : RV32,
         "rv32-linux"    : RV32_LINUX,
         "x86"           : X86,
     }
 
+    # global opts
     opts = Opts()
-    opts.clink = not args.asm
+    opts.clink = args.C
+    opts.asm = args.asm
 
+    # build
     if args.cmd == "build":
-        build(arch[args.arch], args.srcdir, args.dstdir, args.ins, args.out, opts)
+        arch = arch[args.arch]
+        libs = args.libs
+        # syscall
+        if args.syscall:
+            libs = _cat(libs, SBT.nat_obj(arch, "syscall"))
+        # counters
+        if args.counters:
+            libs = _cat(libs, SBT.nat_obj(arch, "counters"))
+
+        opts.cflags = _cat(opts.cflags, args.cflags)
+        opts.libs = libs
+
+        build(arch, args.srcdir, args.dstdir, args.ins, args.out, opts)
+
+    # run
     elif args.cmd == "run":
-        run(arch[args.arch], args.dir, args.prog, opts)
+        save = args.save_output
+        run(arch[args.arch], args.dir, args.prog, args.args, save)
+
+    # clean
     elif args.cmd == "clean":
         clean(args.dir, args.mod, not args.asm)
 
+    # translate
+    elif args.cmd == "translate":
+        arch = arch[args.arch]
+        # libc
+        flags = " ".join(args.flags)
+        o = "-dont-use-libc"
+        if not opts.clink and flags.find(o) == -1:
+            flags = _cat(flags, o)
+
+        # set flags
+        opts.sbtflags = flags
+
+        # translate
+        translate(arch, args.srcdir, args.dstdir, args._in,
+                args.out, opts)
 
 main()
