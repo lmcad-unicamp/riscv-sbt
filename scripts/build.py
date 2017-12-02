@@ -132,7 +132,7 @@ RV32_LINUX = Arch(
         "-march=rv32g -mabi=" + RV32_LINUX_ABI,
         "--target=riscv32 -D__riscv_xlen=32",
         RV32_LINUX_SYSROOT,
-        RV32_LINUX_SYSROOT + "/include",
+        RV32_LINUX_SYSROOT + "/usr/include",
         RV32_LLC_FLAGS,
         "-march=rv32g -mabi=" + RV32_LINUX_ABI,
         "-m elf32lriscv")

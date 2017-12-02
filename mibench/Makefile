@@ -208,9 +208,6 @@ clean:
 
 include $(TOPDIR)/make/rules.mk
 
-$(MIBENCH_DSTDIR)/$(LAME_DIR)/mpglib:
-	mkdir -p $@
-
 # main mibench macro
 define MBENCH
 $(eval MBENCH_BENCH = $(1))
@@ -221,25 +218,33 @@ $(eval MBENCH_NAME = $($(1)_NAME))
 $(eval MBENCH_MODS = $($(1)_MODS))
 $(eval MBENCH_ARGS = $($(1)_ARGS))
 
+$(MBENCH_NAME)-clean:
+	rm -rf $(MBENCH_DSTDIR)
+
 $(MBENCH_NAME)-measure:
 	$(MEASURE_PY) $(MBENCH_DSTDIR) $(MBENCH_NAME) $(MBENCH_ARGS)
 
+$(eval ARCHS = rv32-linux x86)
 $(eval GFLAGS = )
 $(eval LFLAGS = )
-$(eval RFLAGS = --save-output)
-$(eval TGFLAGS = )
+$(eval RFLAGS = $(MBENCH_ARGS) --save-output)
 $(eval TLFLAGS = )
 
-$(foreach ARCH,rv32-linux x86,\
+# NOTE: if libc translation starts failing it may be
+#       necessary to build for RV32 with X86 sysroot
+
+$(foreach ARCH,$(ARCHS),\
 $(call TGT,$(ARCH),$(MBENCH_SRCDIR),$(MBENCH_DSTDIR),\
-$(MBENCH_MODS),$(filter-out)-$(MBENCH_NAME),\
-$(GFLAGS),$(LFLAGS),$(RFLAGS))
+$(MBENCH_MODS),$(subst -linux,,$(ARCH))-$(MBENCH_NAME),\
+$(GFLAGS),$(LFLAGS),$(RFLAGS)))
 
-$(call TRANSLATE,x86,$(DSTDIR),rv32-$(UT),rv32-x86-$(UT),\
-$(TGFLAGS),$(TLFLAGS),$(RFLAGS))
+$(call TRANSLATE,x86,$(MBENCH_DSTDIR),\
+rv32-$(MBENCH_NAME),rv32-x86-$(MBENCH_NAME),\
+$(GFLAGS),$(LFLAGS),$(RFLAGS),$(TLFLAGS))
 
-$(call TEST,$(UT),rv32-$(UT) rv32-x86-$(UT),$(DSTDIR))
-
+$(call TEST,$(MBENCH_NAME),\
+$(foreach ARCH,$(subst -linux,,$(ARCHS)),$(ARCH)-$(MBENCH_NAME)) \
+rv32-x86-$(MBENCH_NAME),$(MBENCH_DSTDIR))
 endef
 
 

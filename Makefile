@@ -63,8 +63,7 @@ docker-img:
 
 .PHONY: mibench
 mibench: sbt
-	rm -f log.txt
-	$(LOG) $(MAKE) -C $(TOPDIR)/mibench $(MIBENCHS)
+	$(MAKE) -C $(TOPDIR)/mibench $(MIBENCHS)
 
 mibench-clean:
 	$(MAKE) -C $(TOPDIR)/mibench clean
