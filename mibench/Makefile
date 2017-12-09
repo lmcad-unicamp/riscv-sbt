@@ -54,7 +54,7 @@ PATRICIA_ARGS   := $(MIBENCH)/$(PATRICIA_DIR)/large.udp
 
 ## 05- DIJKSTRA
 # rv32: OK
-# sbt: ?
+# sbt: OK
 
 DIJKSTRA_NAME   := dijkstra
 DIJKSTRA_DIR    := network/dijkstra
@@ -184,18 +184,17 @@ LAME_ARGS := notests
 BENCHS := \
     DIJKSTRA \
     CRC32 \
+    RIJNDAEL \
 
 
     #BASICMATH \
     BITCOUNT \
     SUSAN \
     PATRICIA \
-    RIJNDAEL \
     BLOWFISH \
     SHA \
     RAWCAUDIO \
     RAWDAUDIO \
-    CRC32 \
     FFT \
     STRINGSEARCH \
     LAME
@@ -210,6 +209,9 @@ clean:
 
 include $(TOPDIR)/make/rules.mk
 
+
+
+
 # main mibench macro
 define MBENCH
 $(eval MBENCH_BENCH = $(1))
@@ -223,10 +225,6 @@ $(eval MBENCH_ARGS = $($(1)_ARGS))
 $(MBENCH_NAME)-clean:
 	rm -rf $(MBENCH_DSTDIR)
 
-$(MBENCH_NAME)-measure:
-	$(MEASURE_PY) $(MBENCH_DSTDIR) $(MBENCH_NAME) $(MBENCH_ARGS)
-
-$(eval ARCHS = rv32-linux x86)
 $(eval GFLAGS = )
 $(eval LFLAGS = )
 $(eval RFLAGS = $(MBENCH_ARGS) --save-output)
@@ -244,9 +242,7 @@ $(call TRANSLATE,x86,$(MBENCH_DSTDIR),\
 rv32-$(MBENCH_NAME),rv32-x86-$(MBENCH_NAME),\
 $(GFLAGS),$(LFLAGS),$(RFLAGS),$(TLFLAGS))
 
-$(call TEST,$(MBENCH_NAME),\
-$(foreach ARCH,$(subst -linux,,$(ARCHS)),$(ARCH)-$(MBENCH_NAME)) \
-rv32-x86-$(MBENCH_NAME),$(MBENCH_DSTDIR))
+$(if $(findstring notests,$(MBENCH_ARGS)),,$(call MBENCH_TEST))
 endef
 
 
@@ -260,3 +256,26 @@ test: $(foreach bench,$(BENCHS),$($(bench)_NAME)-test)
 
 .PHONY: measure
 measure: $(foreach bench,$(BENCHS),$($(bench)_NAME)-measure)
+
+
+### RIJNDAEL ###
+
+
+RIJNDAEL_SRCDIR := $(MIBENCH_SRCDIR)/$(RIJNDAEL_DIR)
+RIJNDAEL_DSTDIR := $(MIBENCH_DSTDIR)/$(RIJNDAEL_DIR)
+
+$(eval $(call MBENCH_RUN,RIJNDAEL,encode,\
+$(RIJNDAEL_SRCDIR)/input_large.asc \
+$(RIJNDAEL_DSTDIR)/output_large.enc e \
+1234567890abcdeffedcba09876543211234567890abcdeffedcba0987654321,\
+output_large.enc))
+
+$(eval $(call MBENCH_RUN,RIJNDAEL,decode,\
+$(RIJNDAEL_DSTDIR)/output_large.enc \
+$(RIJNDAEL_DSTDIR)/output_large.dec d \
+1234567890abcdeffedcba09876543211234567890abcdeffedcba0987654321,\
+output_large.dec))
+
+.PHONY: $(RIJNDAEL_NAME)-test
+$(RIJNDAEL_NAME)-test: $(foreach rn,encode decode,$(RIJNDAEL_NAME)-$(rn)-run)
+	$(call TT,$(RIJNDAEL_DSTDIR),)

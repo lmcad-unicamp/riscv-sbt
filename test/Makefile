@@ -9,10 +9,10 @@ DSTDIR := $(BUILD_DIR)/test
 
 include $(TOPDIR)/make/rules.mk
 
-$(eval $(call TGT,rv32,$(SRCDIR),$(DSTDIR),rv32-hello,rv32-hello-asm,--asm -C))
-$(eval $(call TGT,rv32,$(SRCDIR),$(DSTDIR),hello,rv32-hello))
-$(eval $(call TGT,x86,$(SRCDIR),$(DSTDIR),hello,x86-hello))
-$(eval $(call TGT,rv32-linux,$(SRCDIR),$(DSTDIR),hello,rv32-linux-hello))
+$(eval $(call BLDNRUN,rv32,$(SRCDIR),$(DSTDIR),rv32-hello,rv32-hello-asm,--asm -C))
+$(eval $(call BLDNRUN,rv32,$(SRCDIR),$(DSTDIR),hello,rv32-hello))
+$(eval $(call BLDNRUN,x86,$(SRCDIR),$(DSTDIR),hello,x86-hello))
+$(eval $(call BLDNRUN,rv32-linux,$(SRCDIR),$(DSTDIR),hello,rv32-linux-hello))
 
 run: $(foreach bin,$(BINS),$(bin)-run)
 

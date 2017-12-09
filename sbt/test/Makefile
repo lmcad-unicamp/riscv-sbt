@@ -31,7 +31,8 @@ elf: $(DSTDIR)/elf
 
 ### x86-syscall-test ###
 
-$(eval $(call TGT,x86,$(SRCDIR),$(DSTDIR),x86-syscall-test,x86-syscall-test,\
+$(eval $(call BLDNRUN,x86,$(SRCDIR),$(DSTDIR),\
+x86-syscall-test,x86-syscall-test,\
 --asm,--syscall))
 
 ### hello ###

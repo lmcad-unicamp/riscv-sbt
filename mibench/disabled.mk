@@ -37,62 +37,6 @@ test2-susan: $(foreach test,smoothing edges corners,test2-susan-$(test))
 test2-gcc-susan: $(foreach test,smoothing edges corners,test2-gcc-susan-$(test))
 
 ###
-### RIJNDAEL TESTS
-###
-
-RIJNDAEL_BIN           := $(RIJNDAEL_NAME)
-RIJNDAEL_SRC_DIR       := $(MIBENCH)/$(RIJNDAEL_DIR)
-RIJNDAEL_OUT_DIR       := $(BUILD_MIBENCH)/$(RIJNDAEL_DIR)
-X86_RIJNDAEL_INPUT_E   := $(RIJNDAEL_SRC_DIR)/input_large.asc
-X86_RIJNDAEL_OUTPUT_E  := $(RIJNDAEL_OUT_DIR)/$(X86_PREFIX)-output_large.enc
-X86_RIJNDAEL_INPUT_D   := $(X86_RIJNDAEL_OUTPUT_E)
-X86_RIJNDAEL_OUTPUT_D  := $(RIJNDAEL_OUT_DIR)/$(X86_PREFIX)-output_large.dec
-X86_RIJNDAEL           := $(X86_PREFIX)-$(RIJNDAEL_BIN)
-
-# 1: test
-# 2: flag
-# 3: gcc-?
-define RIJNDAEL_TEST
-$(eval RIJNDAEL_TEST_SUFFIX = $(shell echo -n $(2) | tr a-z A-Z))
-
-$(eval RV32_RIJNDAEL = $($(RV32_ARCH)_PREFIX)-$(3)$(RIJNDAEL_BIN))
-$(eval RIJNDAEL_BINS = $(RV32_RIJNDAEL) $(X86_RIJNDAEL))
-$(eval RV32_RIJNDAEL_INPUT_E = $(RIJNDAEL_SRC_DIR)/input_large.asc)
-$(eval RV32_RIJNDAEL_OUTPUT_E =\
- $(RIJNDAEL_OUT_DIR)/$($(RV32_ARCH)_PREFIX)-$(3)output_large.enc)
-$(eval RV32_RIJNDAEL_INPUT_D = $(RV32_RIJNDAEL_OUTPUT_E))
-$(eval RV32_RIJNDAEL_OUTPUT_D =\
- $(RIJNDAEL_OUT_DIR)/$($(RV32_ARCH)_PREFIX)-$(3)output_large.dec)
-
-test2-$(3)rijndael-$(1): $(RIJNDAEL_BINS)
-	cd $(RIJNDAEL_OUT_DIR) && \
-		$($(RV32_ARCH)_RUN) $(RV32_RIJNDAEL) \
-		$(RV32_RIJNDAEL_INPUT_$(RIJNDAEL_TEST_SUFFIX)) \
-		$(RV32_RIJNDAEL_OUTPUT_$(RIJNDAEL_TEST_SUFFIX)) \
-		$(2) 1234567890abcdeffedcba09876543211234567890abcdeffedcba0987654321
-	cd $(RIJNDAEL_OUT_DIR) && \
-		./$(X86_RIJNDAEL) \
-		$(X86_RIJNDAEL_INPUT_$(RIJNDAEL_TEST_SUFFIX)) \
-		$(X86_RIJNDAEL_OUTPUT_$(RIJNDAEL_TEST_SUFFIX)) \
-		$(2) 1234567890abcdeffedcba09876543211234567890abcdeffedcba0987654321
-	cd $(RIJNDAEL_OUT_DIR) && \
-		diff \
-		$(RV32_RIJNDAEL_OUTPUT_$(RIJNDAEL_TEST_SUFFIX)) \
-		$(X86_RIJNDAEL_OUTPUT_$(RIJNDAEL_TEST_SUFFIX))
-endef
-
-define RIJNDAEL_TESTS
-$(call RIJNDAEL_TEST,enc,e,$(1))
-$(call RIJNDAEL_TEST,dec,d,$(1))
-endef
-
-$(eval $(call RIJNDAEL_TESTS,))
-$(eval $(call RIJNDAEL_TESTS,gcc-))
-
-test2-rijndael: $(foreach test,enc dec,test2-rijndael-$(test))
-test2-gcc-rijndael: $(foreach test,enc dec,test2-gcc-rijndael-$(test))
-
-###
 ### BLOWFISH TESTS
 ###
 
