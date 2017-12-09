@@ -12,6 +12,7 @@ class BuildOpts:
         self.dbg = None
         self.asm = None
         self.clink = None
+        self.setsysroot = True
         # flags
         self.cflags = None
         self.sflags = None
@@ -84,7 +85,7 @@ def _bc2s(arch, dir, _in, out, opts):
     opath = path(dir, out)
     flags = arch.llc_flags(opts)
 
-    cmd = cat(arch.llc, flags, ipath, opath)
+    cmd = cat(arch.llc, flags, ipath, "-o", opath)
     shell(cmd)
     # workaround for align issue with as
     if arch == RV32 or arch == RV32_LINUX:
@@ -176,7 +177,7 @@ if __name__ == "__main__":
     parser.add_argument("--arch", default="rv32")
     parser.add_argument("--srcdir", default=".")
     parser.add_argument("--dstdir", default=".")
-    parser.add_argument("--o", help="default: 1st in without suffix")
+    parser.add_argument("-o", help="default: 1st in without suffix")
     parser.add_argument("--cflags", help="compiler flags")
     parser.add_argument("--sflags", help="assembler flags")
     parser.add_argument("--ldflags", help="linker flags")

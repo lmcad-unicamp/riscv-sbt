@@ -2,6 +2,8 @@
 
 import os
 
+from utils import *
+
 ### config ###
 
 # flags
@@ -86,7 +88,7 @@ class Arch:
         # llc
         self.llc = "llc"
         self.llc_flags = lambda opts: \
-            _cat("-relocation-model=static",
+            cat("-relocation-model=static",
                 ("-O0" if opts.dbg else _O),
                 llc_flags)
         # as

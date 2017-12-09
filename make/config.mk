@@ -30,8 +30,10 @@ MODES          := globals locals
 # tools
 
 CMAKE             := cmake
-MEASURE_PY        := $(SCRIPTS_DIR)/measure.py
 BUILD_PY          := $(SCRIPTS_DIR)/build.py
+RUN_PY            := $(SCRIPTS_DIR)/run.py
+XLATE_PY          := $(SCRIPTS_DIR)/xlate.py
+MEASURE_PY        := $(SCRIPTS_DIR)/measure.py
 
 RV32_TRIPLE       := riscv32-unknown-elf
 RV64_LINUX_TRIPLE := riscv64-unknown-linux-gnu

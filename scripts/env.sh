@@ -16,11 +16,10 @@ fi
 TC="$TOPDIR/toolchain"
 export TCR=$TC/release
 export TCD=$TC/debug
-export TCX86=$TC/x86
 
-# toolchain: x86
-echo "$PATH" | grep "$TCX86/bin" >/dev/null ||
-export PATH="$TCX86/bin:$PATH"
+# scripts
+echo "$PATH" | grep "$TOPDIR/scripts" >/dev/null ||
+export PATH="$TOPDIR/scripts:$PATH"
 
 # toolchain: riscv release
 echo "$PATH" | grep "$TCR/bin" >/dev/null ||
