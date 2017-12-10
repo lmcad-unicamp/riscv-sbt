@@ -19,6 +19,7 @@ class Dir:
         top             = os.environ["TOPDIR"]
         build_type      = os.getenv("BUILD_TYPE", "Debug")
         build_type_dir  = build_type.lower()
+        self.build_type_dir = build_type_dir
         toolchain       = top + "/toolchain"
 
         self.top                = top
@@ -42,6 +43,7 @@ class Sbt:
         self.nat_obj  = lambda arch, name: \
             "{}/{}-{}.o".format(self.share_dir, arch.prefix, name) \
             if arch != RV32 and arch != RV32_LINUX else ""
+        self.modes = ["globals", "locals"]
 
 SBT = Sbt()
 
@@ -52,7 +54,7 @@ class Tools:
         self.run_sh     = DIR.scripts + "/run.sh"
         self.log        = self.run_sh + " --log"
         self.log_clean  = "rm -f log.txt"
-        self.measure    = '{}; MODES="globals locals" {} {}/measure.py'.format(
+        self.measure    = '{}; {} {}/measure.py'.format(
             self.log_clean, self.log, DIR.scripts)
         self.opt        = "opt"
         self.opt_flags  = _O #-stats

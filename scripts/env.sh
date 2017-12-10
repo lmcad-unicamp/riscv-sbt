@@ -18,8 +18,10 @@ export TCR=$TC/release
 export TCD=$TC/debug
 
 # scripts
-echo "$PATH" | grep "$TOPDIR/scripts" >/dev/null ||
-export PATH="$TOPDIR/scripts:$PATH"
+SCRIPTS_DIR=$TOPDIR/scripts
+export PYTHONPATH=$SCRIPTS_DIR
+echo "$PATH" | grep "$SCRIPTS_DIR" >/dev/null ||
+export PATH="$SCRIPTS_DIR:$PATH"
 
 # toolchain: riscv release
 echo "$PATH" | grep "$TCR/bin" >/dev/null ||

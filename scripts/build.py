@@ -7,7 +7,7 @@ import sys
 from config import *
 from utils import *
 
-class BuildOpts:
+class Opts:
     def __init__(self):
         self.dbg = None
         self.asm = None
@@ -44,7 +44,7 @@ def _lllink(arch, dir, ins, out):
     shell(cmd)
 
 
-def _dis(arch, dir, mod):
+def dis(arch, dir, mod):
     """ .bc -> .ll """
     ipath = path(dir, mod)
     opath = path(dir, chsuf(mod, ".ll"))
@@ -53,7 +53,7 @@ def _dis(arch, dir, mod):
     shell(cmd)
 
 
-def _opt(arch, dir, _in, out):
+def opt(arch, dir, _in, out):
     """ opt """
     ipath = path(dir, _in)
     opath = path(dir, out)
@@ -74,12 +74,12 @@ def _c2lbc(arch, srcdir, dstdir, ins, out, opts):
         for c in ins:
             o = ch2bc1(c)
             _c2bc(arch, srcdir, dstdir, c, o, opts)
-            _dis(arch, dstdir, o)
+            dis(arch, dstdir, o)
         _lllink(arch, dstdir, [ch2bc1(c) for c in ins], out)
-    _dis(arch, dstdir, out)
+    dis(arch, dstdir, out)
 
 
-def _bc2s(arch, dir, _in, out, opts):
+def bc2s(arch, dir, _in, out, opts):
     """ .bc -> .s """
     ipath = path(dir, _in)
     opath = path(dir, out)
@@ -101,11 +101,11 @@ def _c2s(arch, srcdir, dstdir, ins, out, opts):
     opt2 = chsuf(out, ".opt2.bc")
 
     # opt; dis; opt; dis; .bc -> .s
-    _opt(arch, dstdir, out, opt1)
-    _dis(arch, dstdir, opt1)
-    _opt(arch, dstdir, opt1, opt2)
-    _dis(arch, dstdir, opt2)
-    _bc2s(arch, dstdir, opt2, out, opts)
+    opt(arch, dstdir, out, opt1)
+    dis(arch, dstdir, opt1)
+    opt(arch, dstdir, opt1, opt2)
+    dis(arch, dstdir, opt2)
+    bc2s(arch, dstdir, opt2, out, opts)
 
 
 def _s2o(arch, srcdir, dstdir, _in, out, opts):
@@ -197,7 +197,7 @@ if __name__ == "__main__":
     out = args.o if args.o else chsuf(first, '')
 
     # set build opts
-    opts = BuildOpts()
+    opts = Opts()
     opts.clink = args.C
     # use first file's suffix to find out if we need to assemble
     # or compile

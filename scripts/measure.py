@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 
+import * from config
+
 import argparse
 import os
 import subprocess
@@ -7,7 +9,6 @@ import sys
 import time
 
 TARGETS = [ 'x86' ]
-MODES   = ['globals', 'locals']
 
 class TestData:
     def __init__(self, bin):
@@ -64,7 +65,7 @@ class Test:
             ntimes.append(t)
 
         # translated
-        for mode in MODES:
+        for mode in SBT.modes:
             td = self.rv32
             args = prep(td, mode)
 

@@ -40,6 +40,7 @@ $(A_BIN): $(DSTDIR)/$(A_BIN)
 
 $(A_BIN)-run:
 	$(RUN_PY) --arch $(A_ARCH) --dir $(DSTDIR) $(A_BIN)
+
 endef
 
 $(eval $(foreach ARCH,rv32 x86 rv32-linux,$(call BLDNRUN,$(ARCH),hello)))

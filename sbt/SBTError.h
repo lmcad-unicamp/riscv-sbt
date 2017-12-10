@@ -1,6 +1,8 @@
 #ifndef SBT_SBTERROR_H
 #define SBT_SBTERROR_H
 
+#include "Constants.h"
+
 #include <llvm/Support/Error.h>
 
 #include <memory>
@@ -8,8 +10,8 @@
 
 namespace sbt {
 
-// custom error class
-class SBTError : public llvm::ErrorInfo<SBTError>
+template <typename E>
+class SBTErrorBase : public llvm::ErrorInfo<E>
 {
 public:
     /**
@@ -17,17 +19,42 @@ public:
      *
      * @param msg
      */
-    SBTError(const std::string& msg = "");
+    SBTErrorBase(const std::string& msg = "")
+        :
+        _ss(new llvm::raw_string_ostream(_s)),
+        _cause(llvm::Error::success())
+    {
+        // error format: <sbt>: error: prefix: <msg>
+        *_ss << Constants::global().BIN_NAME << ": error: " << msg;
+    }
+
+    // dtor
+    ~SBTErrorBase() override
+    {
+        consumeError(std::move(_cause));
+    }
 
     // disallow copy
-    SBTError(const SBTError&) = delete;
+    SBTErrorBase(const SBTErrorBase&) = delete;
+
     // move
-    SBTError(SBTError&&);
-    // dtor
-    ~SBTError() override;
+    SBTErrorBase(SBTErrorBase&& other)
+        :
+        _s(std::move(other._ss->str())),
+        _ss(new llvm::raw_string_ostream(_s)),
+        _cause(std::move(other._cause))
+    {
+    }
 
     // log error
-    void log(llvm::raw_ostream& os) const override;
+    void log(llvm::raw_ostream& os) const override
+    {
+        os << _ss->str() << nl;
+        if (_cause) {
+            logAllUnhandledErrors(std::move(_cause), os, "cause: ");
+            _cause = llvm::Error::success();
+        }
+    }
 
     // unused error_code conversion compatibility method
     std::error_code convertToErrorCode() const override
@@ -50,13 +77,20 @@ public:
         return *_ss;
     }
 
-    SBTError& operator<<(llvm::Error&& err)
+    SBTErrorBase& operator<<(llvm::Error&& err)
     {
         _cause = std::move(err);
         return *this;
     }
 
-    std::string msg() const;
+    // msg
+    std::string msg() const
+    {
+        std::string s;
+        llvm::raw_string_ostream ss(s);
+        log(ss);
+        return s;
+    }
 
     // used by ErrorInfo::classID.
     static char ID;
@@ -67,38 +101,60 @@ private:
     mutable llvm::Error _cause;
 };
 
-// convert SBTError to llvm::Error
 
-static inline llvm::Error error(SBTError&& err)
+// convert SBTErrorBase to llvm::Error
+
+template <typename E>
+static inline llvm::Error error(SBTErrorBase<E>&& err)
 {
-    return llvm::make_error<SBTError>(std::move(err));
+    return llvm::make_error<SBTErrorBase<E>>(std::move(err));
 }
 
-static inline llvm::Error error(SBTError& err)
+template <typename E>
+static inline llvm::Error error(SBTErrorBase<E>& err)
 {
     return error(std::move(err));
 }
 
+
+// generic SBT error
+class SBTError : public SBTErrorBase<SBTError>
+{
+public:
+    using SBTErrorBase::SBTErrorBase;
+
+    static char ID;
+};
+
+
 // translation generated invalid bitcode
-class InvalidBitcode : public SBTError
+class InvalidBitcode : public SBTErrorBase<InvalidBitcode>
 {
 public:
-    using SBTError::SBTError;
+    using SBTErrorBase::SBTErrorBase;
+
+    static char ID;
 };
 
 
-class InvalidInstructionEncoding : public SBTError
+class InvalidInstructionEncoding :
+    public SBTErrorBase<InvalidInstructionEncoding>
 {
 public:
-    using SBTError::SBTError;
+    using SBTErrorBase::SBTErrorBase;
+
+    static char ID;
 };
 
 
-class FunctionNotFound : public SBTError
+class FunctionNotFound : public SBTErrorBase<FunctionNotFound>
 {
 public:
-    using SBTError::SBTError;
+    using SBTErrorBase::SBTErrorBase;
+
+    static char ID;
 };
+
 
 // verbose error
 

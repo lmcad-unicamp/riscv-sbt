@@ -46,3 +46,14 @@ def path(dir, file):
         return file
     else:
         return dir + "/" + file
+
+
+def mpath(*args):
+    dir = args[0]
+    p1 = args[1]
+
+    out = path(dir, p1)
+
+    for p in args[2:]:
+        out = out + "/" + p
+    return out
