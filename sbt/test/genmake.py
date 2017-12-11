@@ -4,6 +4,8 @@ from config import *
 
 import argparse
 
+
+
 def xarch_brk(xarch):
     dash = xarch.index("-")
     farch = xarch[0 : dash]
@@ -11,7 +13,7 @@ def xarch_brk(xarch):
     return farch, narch
 
 
-OUT = """\
+PROLOGUE = """\
 include $(TOPDIR)/make/config.mk
 
 SRCDIR      := $(shell pwd)
@@ -59,8 +61,6 @@ x86-syscall-test-run:
 ### main ###
 
 def bldnrun(arch, srcdir, dstdir, _in, out, bflags=None, rflags=None):
-    global OUT
-
     fmtdata = {
         "arch":     arch,
         "srcdir":   srcdir,
@@ -71,7 +71,7 @@ def bldnrun(arch, srcdir, dstdir, _in, out, bflags=None, rflags=None):
         "rflags":   " " + rflags if rflags else "",
     }
 
-    OUT = OUT + """\
+    txt = """\
 .PHONY: {out}
 {out}: {dstdir}/{out}
 
@@ -84,10 +84,10 @@ def bldnrun(arch, srcdir, dstdir, _in, out, bflags=None, rflags=None):
 
 """.format(**fmtdata)
 
+    return txt
+
 
 def xlatenrun(arch, srcdir, dstdir, _in, out, mode, xflags=None, rflags=None):
-    global OUT
-
     flags = '--flags " -regs={}"'.format(mode)
     fmtdata = {
         "arch":     arch,
@@ -101,7 +101,7 @@ def xlatenrun(arch, srcdir, dstdir, _in, out, mode, xflags=None, rflags=None):
         "flags":    flags
     }
 
-    OUT = OUT + """\
+    txt = """\
 .PHONY: {out}
 {out}: {dstdir}/{out}
 
@@ -114,10 +114,10 @@ def xlatenrun(arch, srcdir, dstdir, _in, out, mode, xflags=None, rflags=None):
 
 """.format(**fmtdata)
 
+    return txt
+
 
 def test(xarchs, dir, name, ntest=False):
-    global OUT
-
     diffs = []
     def diff(bin1, bin2):
         diff = "\tdiff {0}/{1}.out {0}/{2}.out".format(dir, bin1, bin2)
@@ -152,17 +152,17 @@ def test(xarchs, dir, name, ntest=False):
         "diffs":    "\n".join(diffs)
     }
 
-    OUT = OUT + """\
+    txt = """\
 .PHONY: {name}-test
 {name}-test: {runs}
 {diffs}
 
 """.format(**fmtdata)
 
+    return txt
+
 
 def aliases(narchs, xarchs, mod):
-    global OUT
-
     nmods = [arch + "-" + mod for arch in narchs]
     xmods = [arch + "-" + mod + "-" + mode
             for arch in xarchs
@@ -177,7 +177,7 @@ def aliases(narchs, xarchs, mod):
         "runs":     " ".join(runs),
     }
 
-    OUT = OUT + """\
+    return """\
 .PHONY: {mod}
 {mod}: {nmods} {xmods}
 
@@ -196,13 +196,48 @@ class Module:
         self.rflags = rflags
 
 
+
+def _do_mod(narchs, xarchs, name, src, srcdir, dstdir, xflags, bflags, rflags):
+    srcname = lambda templ, arch: templ.format(arch)
+
+    # module comment
+    txt = "### {} ###\n\n".format(name)
+
+    # native builds
+    for arch in narchs:
+        _in = srcname(src, arch)
+        out = arch + "-" + name
+        txt = txt + \
+            bldnrun(arch, srcdir, dstdir, _in, out, bflags, rflags.format(out))
+
+    # translations
+    for xarch in xarchs:
+        (farch, narch) = xarch_brk(xarch)
+        fmod  = farch + "-" + name
+        nmod  = farch + "-" + narch + "-" + name
+
+        for mode in SBT.modes:
+            txt = txt + xlatenrun(narch, srcdir, dstdir, fmod + ".o", nmod,
+                    mode, xflags, rflags.format(nmod + "-" + mode))
+
+    # tests
+    txt = txt + test(xarchs, dstdir, name, ntest=len(narchs) > 1)
+
+    # aliases
+    txt = txt + aliases(narchs, xarchs, name)
+
+    return txt
+
+
 if __name__ == "__main__":
-    srcdir = "$(SRCDIR)"
-    dstdir = "$(DSTDIR)"
     narchs = ["rv32", "x86"]
     xarchs = ["rv32-x86"]
+    srcdir = "$(SRCDIR)"
+    dstdir = "$(DSTDIR)"
 
-    srcname = lambda templ, arch: templ.format(arch)
+    txt = PROLOGUE
+
+    # tests
 
     rflags = "-o {}.out --tee"
     mods = [
@@ -217,36 +252,13 @@ if __name__ == "__main__":
         xflags = mod.xflags
         bflags = mod.bflags
         rflags = mod.rflags
-
-        # module comment
-        OUT = OUT + "### {} ###\n\n".format(name)
-
-        # native builds
-        for arch in narchs:
-            _in = srcname(src, arch)
-            out = arch + "-" + name
-            bldnrun(arch, srcdir, dstdir, _in, out, bflags, rflags.format(out))
-
-        # translations
-        for xarch in xarchs:
-            (farch, narch) = xarch_brk(xarch)
-            fmod  = farch + "-" + name
-            nmod  = farch + "-" + narch + "-" + name
-
-            for mode in SBT.modes:
-                xlatenrun(narch, srcdir, dstdir, fmod + ".o", nmod,
-                        mode, xflags, rflags.format(nmod + "-" + mode))
-
-        # tests
-        test(xarchs, dstdir, name, ntest=True)
-
-        # aliases
-        aliases(narchs, xarchs, name)
+        txt = txt + _do_mod(narchs, xarchs, name, src,
+                srcdir, dstdir, xflags, bflags, rflags)
 
     names = [mod.name for mod in mods]
     tests = [name + "-test" for name in names]
 
-    OUT = OUT + """\
+    txt = txt + """\
 ### tests targets ###
 
 .PHONY: tests
@@ -258,27 +270,43 @@ tests-run: tests x86-syscall-test-run {tests}
 """.format(**{"names": " ".join(names), "tests": " ".join(tests)})
 
 
-    # write OUT to Makefile
-    with open("Makefile", "w") as f:
-        f.write(OUT)
+    # utests
+
+    txt = txt + "### RV32 Translator unit tests ###\n\n"
+
+    mods = [
+        "load-store",
+        "alu-ops",
+        "branch",
+        "fence",
+        "system",
+        "m"
+    ]
+
+    narchs = ["rv32"]
+    xflags = "--sbtobjs syscall counters"
+    bflags = None
+    for mod in mods:
+        name = mod
+        src = "rv32-" + name + ".s"
+        txt = txt + _do_mod(narchs, xarchs, name, src,
+                srcdir, dstdir, xflags, bflags, rflags)
 
 
-"""
-### RV32 Translator unit tests ###
+    utests = [mod + "-test" for mod in mods if mod != "system"]
 
-UTNARCHS := rv32
-UTESTS   := load-store alu-ops branch fence system m
+    fmtdata = {
+        "mods":     " ".join(mods),
+        "utests":   " ".join(utests),
+    }
 
-$(foreach test,$(UTESTS),$(eval \
-$(call UTEST,$(UTNARCHS),$(test),$(SRCDIR),$(DSTDIR),\
---asm,--counters,--save-output,,add-arch-prefix)))
-
+    txt = txt + """\
 .PHONY: utests
-utests: $(UTESTS)
+utests: {mods}
 
 # NOTE removed system from utests to run (need MSR access and performance
 # counters support (not always available in VMs))
-utests-run: utests $(foreach test,$(filter-out system,$(UTESTS)),$(test)-test)
+utests-run: utests {utests}
 	@echo "All unit tests passed!"
 
 ###
@@ -288,4 +316,9 @@ alltests: tests utests
 
 .PHONY: alltests-run
 alltests-run: alltests tests-run utests-run
-"""
+""".format(**fmtdata)
+
+    # write OUT to Makefile
+    with open("Makefile", "w") as f:
+        f.write(txt)
+
