@@ -131,8 +131,8 @@ rv32tests_status:
     srcdir = path(qtests, "rv32i")
     dstdir = path(DIR.build, "riscv-qemu-tests/rv32i")
 
-    narchs = ["rv32"]
-    xarchs = ["rv32-x86"]
+    narchs = [RV32]
+    xarchs = [(RV32, X86)]
     xflags = "-C"
     bflags = '-C --sflags="-I {}"'.format(incdir)
     rflags = "-o {}.out"

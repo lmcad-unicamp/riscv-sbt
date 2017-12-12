@@ -50,8 +50,8 @@ x86-syscall-test-run:
 
 
 if __name__ == "__main__":
-    narchs = ["rv32", "x86"]
-    xarchs = ["rv32-x86"]
+    narchs = [RV32, X86]
+    xarchs = [(RV32, X86)]
     srcdir = "$(SRCDIR)"
     dstdir = "$(DSTDIR)"
 
@@ -103,7 +103,7 @@ tests-run: tests x86-syscall-test-run {tests}
         "m"
     ]
 
-    narchs = ["rv32"]
+    narchs = [RV32]
     xflags = "--sbtobjs syscall counters"
     bflags = None
     for mod in mods:

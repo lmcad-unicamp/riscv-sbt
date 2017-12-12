@@ -66,10 +66,11 @@ TOOLS = Tools()
 
 
 class Arch:
-    def __init__(self, prefix, triple, run, march, gcc_flags,
+    def __init__(self, name, prefix, triple, run, march, gcc_flags,
             clang_flags, sysroot, isysroot, llc_flags, as_flags,
             ld_flags):
 
+        self.name = name
         self.prefix = prefix
         self.triple = triple
         self.run = run
@@ -102,13 +103,36 @@ class Arch:
         self.ld_flags = ld_flags
 
 
+    def add_prefix(self, s):
+        return self.prefix + "-" + s
+
+
+    def src2objname(self, src):
+        """ objname for source code input file """
+        if src.startswith(self.prefix):
+            name = src
+        else:
+            name = self.add_prefix(src)
+        return chsuf(name, ".o")
+
+
+    def out2objname(self, out):
+        """ objname for output file """
+        if out.startswith(self.prefix):
+            name = out
+        else:
+            name = self.add_prefix(out)
+        return name + ".o"
+
+
+
 PK32 = DIR.toolchain_release + "/" + RV32_TRIPLE + "/bin/pk"
 RV32_SYSROOT    = DIR.toolchain_release + "/opt/riscv/" + RV32_TRIPLE
 RV32_MARCH      = "riscv32"
 RV32_LLC_FLAGS  = "-march=" + RV32_MARCH + " -mattr=+m"
 
 RV32 = Arch(
-        "rv32",
+        "rv32", "rv32",
         RV32_TRIPLE,
         "LD_LIBRARY_PATH={}/lib spike {}".format(
             DIR.toolchain_release, PK32),
@@ -126,7 +150,7 @@ RV32_LINUX_SYSROOT  = DIR.toolchain_release + "/opt/riscv/sysroot"
 RV32_LINUX_ABI      = "ilp32"
 
 RV32_LINUX = Arch(
-        "rv32",
+        "rv32-linux", "rv32",
         "riscv64-unknown-linux-gnu",
         "qemu-riscv32",
         RV32_MARCH,
@@ -142,7 +166,7 @@ RV32_LINUX = Arch(
 X86_MARCH = "x86"
 
 X86 = Arch(
-        "x86",
+        "x86", "x86",
         "x86_64-linux-gnu",
         "",
         X86_MARCH,

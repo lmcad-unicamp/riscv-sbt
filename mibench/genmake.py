@@ -11,16 +11,71 @@ from auto.genmake import *
 # http://vhosts.eecs.umich.edu/mibench//consumer.tar.gz
 
 class Bench:
-    def __init__(self, name, dir, mods, args):
+    narchs = [RV32_LINUX, X86]
+    xarchs = [(RV32_LINUX, X86)]
+    srcdir = path(DIR.top, "mibench")
+    dstdir = path(DIR.build, "mibench")
+    xflags = None
+    bflags = None
+    rflags = "-o {}.out"
+
+    PROLOGUE = """\
+### MIBENCH ###
+
+all: benchs
+
+clean:
+\trm -rf {}
+
+""".format(dstdir)
+
+    def __init__(self, name, dir, ins, args):
         self.name = name
         self.dir = dir
-        self.mods = mods
+        self.ins = ins
         self.args = args
+        self.srcdir = path(srcdir, dir)
+        self.dstdir = path(dstdir, dir)
+        self.rflags = cat(args, Bench.rflags)
+
+
+    def gen(self):
+        name = self.name
+
+        # module comment
+        txt = "### {} ###\n\n".format(name)
+
+        # native builds
+        for arch in self.narchs:
+            out = arch.add_prefix(name)
+            txt = txt + \
+                bldnrun(arch, self.srcdir, self.dstdir, self.ins, out,
+                    self.bflags, self.rflags.format(out))
+
+        # translations
+        for xarch in self.xarchs:
+            (farch, narch) = xarch
+            fmod  = farch.out2objname(name)
+            nmod  = farch.add_prefix(narch.add_prefix(name))
+
+            for mode in SBT.modes:
+                txt = txt + \
+                    xlatenrun(narch, self.srcdir, self.dstdir,
+                        fmod, nmod, mode,
+                        self.xflags, self.rflags.format(nmod + "-" + mode))
+
+        # tests
+        txt = txt + test(self.xarchs, self.dstdir, self.name, ntest=True)
+
+        # aliases
+        txt = txt + aliases(self.narchs, self.xarchs, self.name)
+
+        return txt
 
 
 if __name__ == "__main__":
-    srcdir = path(DIR.top, "mibench")
-    dstdir = path(DIR.build, "mibench")
+    srcdir = Bench.srcdir
+    dstdir = Bench.dstdir
 
     benchs = [
         Bench("dijkstra", "network/dijkstra",
@@ -31,19 +86,20 @@ if __name__ == "__main__":
             path(srcdir, "telecomm/adpcm/data/large.pcm")),
     ]
 
-    txt = ''
-    narchs = ["rv32", "x86"]
-    xarchs = ["rv32-x86"]
-    xflags = None
-    bflags = None
-    rflags = "-o {}.out"
+    txt = Bench.PROLOGUE
     for bench in benchs:
-        name = bench.name
-        dir = bench.dir
-        src = bench.mods[0]
-        txt = txt + do_mod(narchs, xarchs, name, src,
-                path(srcdir, dir), path(dstdir, dir),
-                xflags, bflags, rflags)
+        txt = txt + bench.gen()
+
+    txt = txt + """\
+.PHONY: benchs
+benchs: {}
+
+.PHONY: benchs-test
+benchs-test: benchs {}
+
+""".format(
+        " ".join([b.name for b in benchs]),
+        " ".join([b.name + "-test" for b in benchs]))
 
     # write txt to Makefile
     with open("Makefile", "w") as f:

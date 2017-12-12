@@ -4,12 +4,23 @@ from auto.config import *
 from auto.utils import *
 
 
-def bldnrun(arch, srcdir, dstdir, _in, out, bflags=None, rflags=None):
+def bldnrun(arch, srcdir, dstdir, ins, out, bflags=None, rflags=None):
+    if len(ins) == 1:
+        objs = [arch.out2objname(out)]
+        aobjs = [path(dstdir, objs[0])]
+    else:
+        objs = [arch.src2objname(src) for src in ins]
+        aobjs = [path(dstdir, obj) for obj in objs]
+
+    ains = [path(srcdir, i) for i in ins]
+
     fmtdata = {
-        "arch":     arch,
+        "arch":     arch.name,
+        "aobjs":    " ".join(aobjs),
         "srcdir":   srcdir,
         "dstdir":   dstdir,
-        "in":       _in,
+        "ins":      " ".join(ins),
+        "ains":     " ".join(ains),
         "out":      out,
         "bflags":   " " + bflags if bflags else "",
         "rflags":   " " + rflags if rflags else "",
@@ -21,8 +32,8 @@ def bldnrun(arch, srcdir, dstdir, _in, out, bflags=None, rflags=None):
 .PHONY: {out}
 {out}: {dstdir}/{out}
 
-{dstdir}/{out} {dstdir}/{out}.o: {srcdir}/{in}
-	{build} --arch {arch} --srcdir {srcdir} --dstdir {dstdir} {in} -o {out}{bflags}
+{dstdir}/{out} {aobjs}: {ains}
+	{build} --arch {arch} --srcdir {srcdir} --dstdir {dstdir} {ins} -o {out}{bflags}
 
 .PHONY: {out}-run
 {out}-run: {out}
@@ -35,8 +46,9 @@ def bldnrun(arch, srcdir, dstdir, _in, out, bflags=None, rflags=None):
 
 def xlatenrun(arch, srcdir, dstdir, _in, out, mode, xflags=None, rflags=None):
     flags = '--flags " -regs={}"'.format(mode)
+
     fmtdata = {
-        "arch":     arch,
+        "arch":     arch.name,
         "srcdir":   srcdir,
         "dstdir":   dstdir,
         "in":       _in,
@@ -74,24 +86,26 @@ def test(xarchs, dir, name, ntest=False):
     farchs = []
     narchs = []
     for xarch in xarchs:
-        farch, narch = xarch_brk(xarch)
+        (farch, narch) = xarch
         farchs.append(farch)
         narchs.append(narch)
 
-        fbin = farch + "-" + name
+        fbin = farch.add_prefix(name)
 
         for mode in SBT.modes:
-            xbin = xarch + "-" + name + "-" + mode
+            xbin = farch.add_prefix(narch.add_prefix(name + "-" + mode))
             diff(fbin, xbin)
             if ntest:
-                nbin = narch + "-" + name
+                nbin = narch.add_prefix(name)
                 diff(nbin, xbin)
 
-    runs = [arch + "-" + name + "-run"
+    runs = [arch.add_prefix(name + "-run")
             for arch in farchs + (narchs if ntest else [])]
 
-    runs.extend([arch + "-" + name + "-" + mode + "-run"
-            for arch in xarchs
+    runs.extend(
+        [farch.add_prefix(
+            narch.add_prefix(name + "-" + mode + "-run"))
+            for (farch, narch) in xarchs
             for mode in SBT.modes])
 
     fmtdata = {
@@ -111,9 +125,9 @@ def test(xarchs, dir, name, ntest=False):
 
 
 def aliases(narchs, xarchs, mod):
-    nmods = [arch + "-" + mod for arch in narchs]
-    xmods = [arch + "-" + mod + "-" + mode
-            for arch in xarchs
+    nmods = [arch.add_prefix(mod) for arch in narchs]
+    xmods = [farch.add_prefix(narch.add_prefix(mod)) + "-" + mode
+            for (farch, narch) in xarchs
             for mode in SBT.modes]
 
     runs = [m + "-run" for m in nmods + xmods]
@@ -146,7 +160,7 @@ class Module:
 
 
 def do_mod(narchs, xarchs, name, src, srcdir, dstdir, xflags, bflags, rflags):
-    srcname = lambda templ, arch: templ.format(arch)
+    srcname = lambda templ, arch: templ.format(arch.prefix)
 
     # module comment
     txt = "### {} ###\n\n".format(name)
@@ -154,18 +168,18 @@ def do_mod(narchs, xarchs, name, src, srcdir, dstdir, xflags, bflags, rflags):
     # native builds
     for arch in narchs:
         _in = srcname(src, arch)
-        out = arch + "-" + name
+        out = arch.add_prefix(name)
         txt = txt + \
-            bldnrun(arch, srcdir, dstdir, _in, out, bflags, rflags.format(out))
+            bldnrun(arch, srcdir, dstdir, [_in], out, bflags, rflags.format(out))
 
     # translations
-    for xarch in xarchs:
-        (farch, narch) = xarch_brk(xarch)
-        fmod  = farch + "-" + name
-        nmod  = farch + "-" + narch + "-" + name
+    for (farch, narch) in xarchs:
+        fmod  = farch.out2objname(name)
+        nmod  = farch.add_prefix(narch.add_prefix(name))
 
         for mode in SBT.modes:
-            txt = txt + xlatenrun(narch, srcdir, dstdir, fmod + ".o", nmod,
+            txt = txt + \
+                xlatenrun(narch, srcdir, dstdir, fmod, nmod,
                     mode, xflags, rflags.format(nmod + "-" + mode))
 
     # tests
