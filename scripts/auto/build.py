@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
+from auto.config import *
+from auto.utils import *
+
 import argparse
 import os
 import sys
 
-from config import *
-from utils import *
 
 class Opts:
     def __init__(self):

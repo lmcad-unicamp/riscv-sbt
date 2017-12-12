@@ -20,6 +20,7 @@ REMOTE_DIR     := $(TOPDIR)/remote
 BUILD_DIR      := $(TOPDIR)/build
 PATCHES_DIR    := $(TOPDIR)/patches
 SCRIPTS_DIR    := $(TOPDIR)/scripts
+AUTO_DIR       := $(SCRIPTS_DIR)/auto
 SUBMODULES_DIR := $(TOPDIR)/submodules
 
 # flags
@@ -30,10 +31,10 @@ MODES          := globals locals
 # tools
 
 CMAKE             := cmake
-BUILD_PY          := $(SCRIPTS_DIR)/build.py
-RUN_PY            := $(SCRIPTS_DIR)/run.py
-XLATE_PY          := $(SCRIPTS_DIR)/xlate.py
-MEASURE_PY        := $(SCRIPTS_DIR)/measure.py
+BUILD_PY          := $(AUTO_DIR)/build.py
+RUN_PY            := $(AUTO_DIR)/run.py
+XLATE_PY          := $(AUTO_DIR)/xlate.py
+MEASURE_PY        := $(AUTO_DIR)/measure.py
 
 RV32_TRIPLE       := riscv32-unknown-elf
 RV64_LINUX_TRIPLE := riscv64-unknown-linux-gnu

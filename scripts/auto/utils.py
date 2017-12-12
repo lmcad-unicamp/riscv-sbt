@@ -57,3 +57,10 @@ def mpath(*args):
     for p in args[2:]:
         out = out + "/" + p
     return out
+
+
+def xarch_brk(xarch):
+    dash = xarch.index("-")
+    farch = xarch[0 : dash]
+    narch = xarch[dash + 1 :]
+    return farch, narch

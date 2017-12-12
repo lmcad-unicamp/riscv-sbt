@@ -29,14 +29,12 @@ all: \
 	riscv-gnu-toolchain-linux
 
 
-include $(TOPDIR)/make/rules.mk
 include $(TOPDIR)/make/build_pkg.mk
 include $(TOPDIR)/make/riscv-gnu-toolchain.mk
 include $(TOPDIR)/make/llvm.mk
 include $(TOPDIR)/make/spike.mk
 include $(TOPDIR)/make/qemu.mk
 include $(TOPDIR)/make/sbt.mk
-include $(TOPDIR)/make/tests.mk
 include $(TOPDIR)/make/dbg.mk
 
 ###

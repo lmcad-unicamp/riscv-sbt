@@ -4,3 +4,4 @@ remote
 toolchain
 log.txt
 sbt.log
+__pycache__/

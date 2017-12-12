@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
+from auto.config import *
+from auto.utils import *
+
 import argparse
 import shlex
-
-from config import *
-from utils import *
 
 # run
 def run(arch, dir, prog, args, out, tee):

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
+from auto.build import *
+
 import argparse
 
-from build import *
 
 def _translate_obj(arch, dir, _in, out, opts):
     """ .o -> .bc """

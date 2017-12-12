@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-import os
+from auto.utils import *
 
-from utils import *
+import os
 
 ### config ###
 
@@ -31,6 +31,7 @@ class Dir:
         self.build              = top + "/build"
         self.patches            = top + "/patches"
         self.scripts            = top + "/scripts"
+        self.auto               = self.scripts + "/auto"
         self.submodules         = top + "/submodules"
 
 DIR = Dir()
@@ -51,15 +52,15 @@ SBT = Sbt()
 class Tools:
     def __init__(self):
         self.cmake      = "cmake"
-        self.run_sh     = DIR.scripts + "/run.sh"
-        self.log        = self.run_sh + " --log"
-        self.log_clean  = "rm -f log.txt"
-        self.measure    = '{}; {} {}/measure.py'.format(
-            self.log_clean, self.log, DIR.scripts)
         self.opt        = "opt"
         self.opt_flags  = _O #-stats
         self.dis        = "llvm-dis"
         self.link       = "llvm-link"
+
+        self.build      = path(DIR.auto, "build.py")
+        self.run        = path(DIR.auto, "run.py")
+        self.xlate      = path(DIR.auto, "xlate.py")
+        self.measure    = path(DIR.auto, "measure.py")
 
 TOOLS = Tools()
 

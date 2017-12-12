@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import * from config
+from auto.config import *
 
 import argparse
 import os
