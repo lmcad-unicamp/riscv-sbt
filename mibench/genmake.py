@@ -1,3 +1,7 @@
+#!/usr/bin/env python3
+
+from auto.genmake import *
+
 # Mibench source
 # http://vhosts.eecs.umich.edu/mibench//automotive.tar.gz
 # http://vhosts.eecs.umich.edu/mibench//network.tar.gz
@@ -6,19 +10,47 @@
 # http://vhosts.eecs.umich.edu/mibench//office.tar.gz
 # http://vhosts.eecs.umich.edu/mibench//consumer.tar.gz
 
-ifeq ($(TOPDIR),)
-$(error "TOPDIR not set. Please run '. scripts/env.sh' first.")
-endif
+class Bench:
+    def __init__(self, name, dir, mods, args):
+        self.name = name
+        self.dir = dir
+        self.mods = mods
+        self.args = args
 
-###
-### CONFIG
-###
 
-include $(TOPDIR)/make/config.mk
+if __name__ == "__main__":
+    srcdir = path(DIR.top, "mibench")
+    dstdir = path(DIR.build, "mibench")
 
-MIBENCH_SRCDIR  := $(TOPDIR)/mibench
-MIBENCH_DSTDIR  := $(BUILD_DIR)/mibench
+    benchs = [
+        Bench("dijkstra", "network/dijkstra",
+            ["dijkstra_large.c"],
+            path(srcdir, "network/dijkstra/input.dat")),
+        Bench("crc32", "telecomm/CRC32",
+            ["crc_32.c"],
+            path(srcdir, "telecomm/adpcm/data/large.pcm")),
+    ]
 
+    txt = ''
+    narchs = ["rv32", "x86"]
+    xarchs = ["rv32-x86"]
+    xflags = None
+    bflags = None
+    rflags = "-o {}.out"
+    for bench in benchs:
+        name = bench.name
+        dir = bench.dir
+        src = bench.mods[0]
+        txt = txt + do_mod(narchs, xarchs, name, src,
+                path(srcdir, dir), path(dstdir, dir),
+                xflags, bflags, rflags)
+
+    # write txt to Makefile
+    with open("Makefile", "w") as f:
+        f.write(txt)
+
+
+"""
 ## 01- BASICMATH
 # rv32: OK (soft-float)
 
@@ -51,15 +83,6 @@ PATRICIA_NAME   := patricia
 PATRICIA_DIR    := network/patricia
 PATRICIA_MODS   := patricia patricia_test
 PATRICIA_ARGS   := $(MIBENCH)/$(PATRICIA_DIR)/large.udp
-
-## 05- DIJKSTRA
-# rv32: OK
-# sbt: OK
-
-DIJKSTRA_NAME   := dijkstra
-DIJKSTRA_DIR    := network/dijkstra
-DIJKSTRA_MODS   := dijkstra_large
-DIJKSTRA_ARGS   := $(MIBENCH_SRCDIR)/$(DIJKSTRA_DIR)/input.dat
 
 ## 06- RIJNDAEL
 # rv32: OK
@@ -106,14 +129,6 @@ RAWDAUDIO_ARGS  := < $(MIBENCH)/$(RAWDAUDIO_DIR)/data/large.adpcm
 RAWDAUDIO_SRC_DIR_SUFFIX := /src
 RAWDAUDIO_OUT_DIR_SUFFIX := /rawdaudio
 RAWDAUDIO_NO_TEE := 1
-
-## 11- CRC32
-# rv32: OK
-
-CRC32_NAME      := crc32
-CRC32_DIR       := telecomm/CRC32
-CRC32_MODS      := crc_32
-CRC32_ARGS      := $(MIBENCH_SRCDIR)/telecomm/adpcm/data/large.pcm
 
 ## 12- FFT
 # rv32: OK (soft-float)
@@ -279,3 +294,5 @@ output_large.dec))
 .PHONY: $(RIJNDAEL_NAME)-test
 $(RIJNDAEL_NAME)-test: $(foreach rn,encode decode,$(RIJNDAEL_NAME)-$(rn)-run)
 	$(call TT,$(RIJNDAEL_DSTDIR),)
+"""
+
