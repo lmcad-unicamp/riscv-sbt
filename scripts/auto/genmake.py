@@ -4,7 +4,7 @@ from auto.config import *
 from auto.utils import *
 
 
-def bldnrun(arch, srcdir, dstdir, ins, out, bflags=None, rflags=None):
+def bld(arch, srcdir, dstdir, ins, out, bflags=None):
     if len(ins) == 1:
         objs = [arch.out2objname(out)]
         aobjs = [path(dstdir, objs[0])]
@@ -23,9 +23,7 @@ def bldnrun(arch, srcdir, dstdir, ins, out, bflags=None, rflags=None):
         "ains":     " ".join(ains),
         "out":      out,
         "bflags":   " " + bflags if bflags else "",
-        "rflags":   " " + rflags if rflags else "",
         "build":    TOOLS.build,
-        "run":      TOOLS.run,
     }
 
     txt = """\
@@ -35,16 +33,36 @@ def bldnrun(arch, srcdir, dstdir, ins, out, bflags=None, rflags=None):
 {dstdir}/{out} {aobjs}: {ains}
 	{build} --arch {arch} --srcdir {srcdir} --dstdir {dstdir} {ins} -o {out}{bflags}
 
-.PHONY: {out}-run
-{out}-run: {out}
-	{run} --arch {arch} --dir {dstdir} {out}{rflags}
-
 """.format(**fmtdata)
 
     return txt
 
 
-def xlatenrun(arch, srcdir, dstdir, _in, out, mode, xflags=None, rflags=None):
+def run(arch, dir, out, rflags=None, suffix=""):
+    fmtdata = {
+        "arch":     arch.name,
+        "dir":      dir,
+        "out":      out,
+        "suffix":   suffix,
+        "rflags":   " " + rflags if rflags else "",
+        "run":      TOOLS.run,
+    }
+
+    return """\
+.PHONY: {out}{suffix}-run
+{out}{suffix}-run: {out}
+	{run} --arch {arch} --dir {dir} {out}{rflags}
+
+""".format(**fmtdata)
+
+
+def bldnrun(arch, srcdir, dstdir, ins, out, bflags=None, rflags=None):
+    txt = bld(arch, srcdir, dstdir, ins, out, bflags)
+    txt = txt + run(arch, dstdir, out, rflags)
+    return txt
+
+
+def xlate(arch, srcdir, dstdir, _in, out, mode, xflags=None):
     flags = '--flags " -regs={}"'.format(mode)
 
     fmtdata = {
@@ -53,27 +71,24 @@ def xlatenrun(arch, srcdir, dstdir, _in, out, mode, xflags=None, rflags=None):
         "dstdir":   dstdir,
         "in":       _in,
         "out":      out + "-" + mode,
-        "mode":     mode,
         "xflags":   " " + xflags if xflags else "",
-        "rflags":   " " + rflags if rflags else "",
         "flags":    flags,
         "xlate":    TOOLS.xlate,
-        "run":      TOOLS.run,
     }
 
-    txt = """\
+    return """\
 .PHONY: {out}
 {out}: {dstdir}/{out}
 
 {dstdir}/{out}: {dstdir}/{in}
 	{xlate} --arch {arch} --srcdir {srcdir} --dstdir {dstdir} {in} -o {out}{xflags} {flags}
 
-.PHONY: {out}-run
-{out}-run: {out}
-	{run} --arch {arch} --dir {dstdir} {out}{rflags}
-
 """.format(**fmtdata)
 
+
+def xlatenrun(arch, srcdir, dstdir, _in, out, mode, xflags=None, rflags=None):
+    txt = xlate(arch, srcdir, dstdir, _in, out, mode, xflags)
+    txt = txt + run(arch, dstdir, out + "-" + mode, rflags)
     return txt
 
 

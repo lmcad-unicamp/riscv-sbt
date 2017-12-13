@@ -29,7 +29,7 @@ clean:
 
 """.format(dstdir)
 
-    def __init__(self, name, dir, ins, args):
+    def __init__(self, name, dir, ins, args=None):
         self.name = name
         self.dir = dir
         self.ins = ins
@@ -37,6 +37,22 @@ clean:
         self.srcdir = path(srcdir, dir)
         self.dstdir = path(dstdir, dir)
         self.rflags = cat(args, Bench.rflags)
+
+
+    def _measure(self):
+        fmtdata = {
+            "measure":  TOOLS.measure,
+            "dstdir":   self.dstdir,
+            "name":     self.name,
+            "args":     " " + self.args if self.args else "",
+        }
+
+        return """\
+.PHONY: {name}-measure
+{name}-measure: {name}
+\t{measure} {dstdir} {name}{args}
+
+""".format(**fmtdata)
 
 
     def gen(self):
@@ -70,7 +86,158 @@ clean:
         # aliases
         txt = txt + aliases(self.narchs, self.xarchs, self.name)
 
+        # measure
+        txt = txt + self._measure()
+
         return txt
+
+
+class Rijndael(Bench):
+    def __init__(self, name, dir, ins, args=None):
+        super(Rijndael, self).__init__(name, dir, ins, args)
+
+
+    def _measure(self, suffix, args):
+        fmtdata = {
+            "measure":  TOOLS.measure,
+            "dstdir":   self.dstdir,
+            "name":     self.name,
+            "suffix":   suffix,
+            "args":     " ".join(args),
+        }
+
+        return """\
+.PHONY: {name}{suffix}-measure
+{name}{suffix}-measure: {name}
+\t{measure} {dstdir} {name} {args}
+
+""".format(**fmtdata)
+
+
+    def gen(self):
+        name = self.name
+
+        # module comment
+        txt = "### {} ###\n\n".format(name)
+
+        # native builds
+        for arch in self.narchs:
+            out = arch.add_prefix(name)
+            txt = txt + \
+                bld(arch, self.srcdir, self.dstdir, self.ins, out, self.bflags)
+
+        # translations
+        for xarch in self.xarchs:
+            (farch, narch) = xarch
+            fmod  = farch.out2objname(name)
+            nmod  = farch.add_prefix(narch.add_prefix(name))
+
+            for mode in SBT.modes:
+                txt = txt + \
+                    xlate(narch, self.srcdir, self.dstdir,
+                        fmod, nmod, mode, self.xflags)
+
+        class X:
+            def __init__(self, farch, narch, mode=None):
+                self.farch = farch
+                self.narch = narch
+                self.mode = mode
+
+            def prefix(self, name):
+                if not self.farch:
+                    return self.narch.add_prefix(name)
+                else:
+                    return self.farch.add_prefix(
+                        self.narch.add_prefix(name))
+
+            def out(self, name):
+                if not self.farch:
+                    return self.prefix(name)
+                else:
+                    return self.prefix(name) + "-" + self.mode
+
+        xs = [X(None, arch) for arch in self.narchs]
+        xs.extend(
+            [X(farch, narch, mode)
+            for (farch, narch) in self.xarchs
+            for mode in SBT.modes])
+
+        # run
+        srcdir = self.srcdir
+        dstdir = self.dstdir
+        for x in xs:
+            arch = x.narch
+            out = x.out(name)
+
+            # encode
+            asc = path(srcdir, "input_large.asc")
+            enc = path(dstdir, x.out("output_large") + ".enc")
+            args = [
+                asc,
+                enc,
+                "e",
+                "1234567890abcdeffedcba09876543211234567890abcdeffedcba0987654321"
+            ]
+            suffix = "-encode"
+            rflags = cat(" ".join(args), self.rflags.format(out + suffix))
+            txt = txt + run(arch, dstdir, out, rflags, suffix)
+            txt = txt + self._measure(suffix, args)
+
+            # decode
+            dec = path(dstdir, x.out("output_large") + ".dec")
+            args = [
+                enc,
+                dec,
+                "d",
+                "1234567890abcdeffedcba09876543211234567890abcdeffedcba0987654321"
+            ]
+            suffix = "-decode"
+            rflags = cat(" ".join(args), self.rflags.format(out + suffix))
+            txt = txt + run(arch, dstdir, out, rflags, suffix)
+            txt = txt + self._measure(suffix, args)
+
+            # runs + test + measure
+            suffixes = ["-encode", "-decode"]
+            runs = [out + suffix + "-run" for suffix in suffixes]
+            measures = [out + suffix + "-measure" for suffix in suffixes]
+            txt = txt + """\
+.PHONY: {out}-run
+{out}-run: {runs}
+
+.PHONY: {out}-test
+{out}-test: {runs}
+\tdiff {dec} {asc}
+
+.PHONY: {out}-measure
+{out}-measure: {measures}
+
+""".format(**{
+        "out":  out,
+        "runs": " ".join(runs),
+        "measures": " ".join(measures),
+        "dec":  dec,
+        "asc":  asc,
+    })
+
+        # all tests & measures targets
+        txt = txt + """\
+.PHONY: {name}-test
+{name}-test: {tests}
+
+.PHONY: {name}-measure
+{name}-measure: {measures}
+
+""".format(**{
+        "name":     name,
+        "tests":    " ".join([x.out(name) + "-test" for x in xs]),
+        "measures": " ".join([x.out(name) + "-measure" for x in xs]),
+    })
+
+        # aliases
+        txt = txt + aliases(self.narchs, self.xarchs, self.name)
+
+        return txt
+
 
 
 if __name__ == "__main__":
@@ -84,6 +251,8 @@ if __name__ == "__main__":
         Bench("crc32", "telecomm/CRC32",
             ["crc_32.c"],
             path(srcdir, "telecomm/adpcm/data/large.pcm")),
+        Rijndael("rijndael", "security/rijndael",
+            ["aes.c", "aesxam.c"]),
     ]
 
     txt = Bench.PROLOGUE
@@ -139,14 +308,6 @@ PATRICIA_NAME   := patricia
 PATRICIA_DIR    := network/patricia
 PATRICIA_MODS   := patricia patricia_test
 PATRICIA_ARGS   := $(MIBENCH)/$(PATRICIA_DIR)/large.udp
-
-## 06- RIJNDAEL
-# rv32: OK
-
-RIJNDAEL_NAME   := rijndael
-RIJNDAEL_DIR    := security/rijndael
-RIJNDAEL_MODS   := aes aesxam
-RIJNDAEL_ARGS   := notests
 
 ## 07- BLOWFISH
 # rv32: wrong results
@@ -248,107 +409,5 @@ LAME_CFLAGS := -DLAMEPARSE -DLAMESNDFILE
 LAME_DEPS := $(BUILD_MIBENCH)/$(LAME_DIR)/mpglib
 
 LAME_ARGS := notests
-
-
-### enabled benchmarks
-
-BENCHS := \
-    DIJKSTRA \
-    CRC32 \
-    RIJNDAEL \
-
-
-    #BASICMATH \
-    BITCOUNT \
-    SUSAN \
-    PATRICIA \
-    BLOWFISH \
-    SHA \
-    RAWCAUDIO \
-    RAWDAUDIO \
-    FFT \
-    STRINGSEARCH \
-    LAME
-
-
-### rules
-
-all: $(foreach bench,$(BENCHS),$($(bench)_NAME))
-
-clean:
-	rm -rf $(MIBENCH_DSTDIR)
-
-include $(TOPDIR)/make/rules.mk
-
-
-
-
-# main mibench macro
-define MBENCH
-$(eval MBENCH_BENCH = $(1))
-$(eval MBENCH_DIR = $($(1)_DIR))
-$(eval MBENCH_SRCDIR = $(MIBENCH_SRCDIR)/$(MBENCH_DIR))
-$(eval MBENCH_DSTDIR = $(MIBENCH_DSTDIR)/$(MBENCH_DIR))
-$(eval MBENCH_NAME = $($(1)_NAME))
-$(eval MBENCH_MODS = $($(1)_MODS))
-$(eval MBENCH_ARGS = $($(1)_ARGS))
-
-$(MBENCH_NAME)-clean:
-	rm -rf $(MBENCH_DSTDIR)
-
-$(eval GFLAGS = )
-$(eval LFLAGS = )
-$(eval RFLAGS = $(MBENCH_ARGS) --save-output)
-$(eval TLFLAGS = )
-
-# NOTE: if libc translation starts failing it may be
-#       necessary to build for RV32 with X86 sysroot
-
-$(foreach ARCH,$(ARCHS),\
-$(call TGT,$(ARCH),$(MBENCH_SRCDIR),$(MBENCH_DSTDIR),\
-$(MBENCH_MODS),$(subst -linux,,$(ARCH))-$(MBENCH_NAME),\
-$(GFLAGS),$(LFLAGS),$(RFLAGS)))
-
-$(call TRANSLATE,x86,$(MBENCH_DSTDIR),\
-rv32-$(MBENCH_NAME),rv32-x86-$(MBENCH_NAME),\
-$(GFLAGS),$(LFLAGS),$(RFLAGS),$(TLFLAGS))
-
-$(if $(findstring notests,$(MBENCH_ARGS)),,$(call MBENCH_TEST))
-endef
-
-
-# call MBENCH for each BENCH
-
-$(foreach bench,$(BENCHS),\
-$(eval $(call MBENCH,$(bench))))
-
-.PHONY: test
-test: $(foreach bench,$(BENCHS),$($(bench)_NAME)-test)
-
-.PHONY: measure
-measure: $(foreach bench,$(BENCHS),$($(bench)_NAME)-measure)
-
-
-### RIJNDAEL ###
-
-
-RIJNDAEL_SRCDIR := $(MIBENCH_SRCDIR)/$(RIJNDAEL_DIR)
-RIJNDAEL_DSTDIR := $(MIBENCH_DSTDIR)/$(RIJNDAEL_DIR)
-
-$(eval $(call MBENCH_RUN,RIJNDAEL,encode,\
-$(RIJNDAEL_SRCDIR)/input_large.asc \
-$(RIJNDAEL_DSTDIR)/output_large.enc e \
-1234567890abcdeffedcba09876543211234567890abcdeffedcba0987654321,\
-output_large.enc))
-
-$(eval $(call MBENCH_RUN,RIJNDAEL,decode,\
-$(RIJNDAEL_DSTDIR)/output_large.enc \
-$(RIJNDAEL_DSTDIR)/output_large.dec d \
-1234567890abcdeffedcba09876543211234567890abcdeffedcba0987654321,\
-output_large.dec))
-
-.PHONY: $(RIJNDAEL_NAME)-test
-$(RIJNDAEL_NAME)-test: $(foreach rn,encode decode,$(RIJNDAEL_NAME)-$(rn)-run)
-	$(call TT,$(RIJNDAEL_DSTDIR),)
 """
 
