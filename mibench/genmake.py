@@ -93,6 +93,45 @@ clean:
 
 
 class Rijndael(Bench):
+    class Args:
+        def __init__(self, suffix, args):
+            self.suffix = suffix
+            self._args = args
+
+        def args(self, prefix, mode):
+            fmtdata = {
+                "prefix":   prefix,
+                "mode":     "-" + mode if mode else ''
+            }
+
+            args = self._args
+            args[0] = args[0].format(**fmtdata)
+            args[1] = args[1].format(**fmtdata)
+            return args
+
+
+    class X:
+        """ this class just holds some related data together """
+
+        def __init__(self, farch, narch, mode=None):
+            self.farch = farch
+            self.narch = narch
+            self.mode = mode
+
+        def prefix(self, name=''):
+            if not self.farch:
+                return self.narch.add_prefix(name)
+            else:
+                return self.farch.add_prefix(
+                    self.narch.add_prefix(name))
+
+        def out(self, name):
+            if not self.farch:
+                return self.prefix(name)
+            else:
+                return self.prefix(name) + "-" + self.mode
+
+
     def __init__(self, name, dir, ins, args=None):
         super(Rijndael, self).__init__(name, dir, ins, args)
 
@@ -116,6 +155,8 @@ class Rijndael(Bench):
 
     def gen(self):
         name = self.name
+        srcdir = self.srcdir
+        dstdir = self.dstdir
 
         # module comment
         txt = "### {} ###\n\n".format(name)
@@ -124,7 +165,7 @@ class Rijndael(Bench):
         for arch in self.narchs:
             out = arch.add_prefix(name)
             txt = txt + \
-                bld(arch, self.srcdir, self.dstdir, self.ins, out, self.bflags)
+                bld(arch, srcdir, dstdir, self.ins, out, self.bflags)
 
         # translations
         for xarch in self.xarchs:
@@ -134,72 +175,56 @@ class Rijndael(Bench):
 
             for mode in SBT.modes:
                 txt = txt + \
-                    xlate(narch, self.srcdir, self.dstdir,
+                    xlate(narch, srcdir, dstdir,
                         fmod, nmod, mode, self.xflags)
 
-        class X:
-            def __init__(self, farch, narch, mode=None):
-                self.farch = farch
-                self.narch = narch
-                self.mode = mode
-
-            def prefix(self, name):
-                if not self.farch:
-                    return self.narch.add_prefix(name)
-                else:
-                    return self.farch.add_prefix(
-                        self.narch.add_prefix(name))
-
-            def out(self, name):
-                if not self.farch:
-                    return self.prefix(name)
-                else:
-                    return self.prefix(name) + "-" + self.mode
-
-        xs = [X(None, arch) for arch in self.narchs]
+        # prepare archs and modes
+        xs = [self.X(None, arch) for arch in self.narchs]
         xs.extend(
-            [X(farch, narch, mode)
+            [self.X(farch, narch, mode)
             for (farch, narch) in self.xarchs
             for mode in SBT.modes])
 
-        # run
-        srcdir = self.srcdir
-        dstdir = self.dstdir
-        for x in xs:
-            arch = x.narch
-            out = x.out(name)
-
-            # encode
-            asc = path(srcdir, "input_large.asc")
-            enc = path(dstdir, x.out("output_large") + ".enc")
-            args = [
+        # prepare args
+        asc = path(srcdir, "input_large.asc")
+        enc = path(dstdir, "{prefix}output_large{mode}.enc")
+        dec = path(dstdir, "{prefix}output_large{mode}.dec")
+        args = [
+            self.Args("-encode", [
                 asc,
                 enc,
                 "e",
                 "1234567890abcdeffedcba09876543211234567890abcdeffedcba0987654321"
-            ]
-            suffix = "-encode"
-            rflags = cat(" ".join(args), self.rflags.format(out + suffix))
-            txt = txt + run(arch, dstdir, out, rflags, suffix)
-            txt = txt + self._measure(suffix, args)
-
-            # decode
-            dec = path(dstdir, x.out("output_large") + ".dec")
-            args = [
+            ]),
+            self.Args("-decode", [
                 enc,
                 dec,
                 "d",
                 "1234567890abcdeffedcba09876543211234567890abcdeffedcba0987654321"
-            ]
-            suffix = "-decode"
-            rflags = cat(" ".join(args), self.rflags.format(out + suffix))
-            txt = txt + run(arch, dstdir, out, rflags, suffix)
-            txt = txt + self._measure(suffix, args)
+            ])
+        ]
+        suffixes = [a.suffix for a in args]
 
-            # runs + test + measure
-            suffixes = ["-encode", "-decode"]
+        # runs and tests
+        for x in xs:
+            arch = x.narch
+            prefix = x.prefix()
+            mode = x.mode
+            out = x.out(name)
+            fdec = dec.format(**{
+                "prefix":   prefix + "-",
+                "mode":     "-" + mode if mode else ''
+            })
+
+            for a in args:
+                aargs = a.args(prefix, mode)
+                suffix = a.suffix
+
+                rflags = cat(" ".join(aargs), self.rflags.format(out + suffix))
+                txt = txt + run(arch, dstdir, out, rflags, suffix)
+
+            # runs + test
             runs = [out + suffix + "-run" for suffix in suffixes]
-            measures = [out + suffix + "-measure" for suffix in suffixes]
             txt = txt + """\
 .PHONY: {out}-run
 {out}-run: {runs}
@@ -208,33 +233,36 @@ class Rijndael(Bench):
 {out}-test: {runs}
 \tdiff {dec} {asc}
 
-.PHONY: {out}-measure
-{out}-measure: {measures}
-
 """.format(**{
         "out":  out,
         "runs": " ".join(runs),
-        "measures": " ".join(measures),
-        "dec":  dec,
+        "dec":  fdec,
         "asc":  asc,
     })
+
+
+        # aliases
+        txt = txt + aliases(self.narchs, self.xarchs, self.name)
+
+        # measures
+        for a in args:
+            aargs = a.args('', '')
+            suffix = a.suffix
+            txt = txt + self._measure(suffix, aargs)
 
         # all tests & measures targets
         txt = txt + """\
 .PHONY: {name}-test
 {name}-test: {tests}
 
-.PHONY: {name}-measure
+.PHONY: {name}-measure:
 {name}-measure: {measures}
 
 """.format(**{
         "name":     name,
         "tests":    " ".join([x.out(name) + "-test" for x in xs]),
-        "measures": " ".join([x.out(name) + "-measure" for x in xs]),
+        "measures": " ".join([name + suffix + "-measure" for suffix in suffixes])
     })
-
-        # aliases
-        txt = txt + aliases(self.narchs, self.xarchs, self.name)
 
         return txt
 
