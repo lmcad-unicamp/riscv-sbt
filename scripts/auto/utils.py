@@ -1,6 +1,18 @@
 #!/usr/bin/env python3
 
+import os
 import subprocess
+
+class cd:
+    def __init__(self, dir):
+        self.dir = os.path.expanduser(dir)
+
+    def __enter__(self):
+        self.prev_dir = os.getcwd()
+        os.chdir(self.dir)
+
+    def __exit__(self, etype, value, traceback):
+        os.chdir(self.prev_dir)
 
 
 def shell(cmd, save_out=False):

@@ -4,41 +4,13 @@ endif
 
 include $(TOPDIR)/make/config.mk
 
-# build type for LLVM and SBT (Release or Debug)
-# WARNING: using Release LLVM builds with Debug SBT CAN cause problems!
-ifeq ($(BUILD_TYPE),Debug)
-  SBT := sbt-debug
-else
-  SBT := sbt-release
-endif
+### apply lowrisc patches
 
-ALL := \
-	FESVR \
-	PK32 \
-	QEMU_TESTS \
-	QEMU_USER \
-	SBT_DEBUG \
-	SIM \
+all: sbt
 
-
-all: \
-	$(SBT) \
-	riscv-isa-sim \
-	riscv-pk-32 \
-	qemu-user \
-	riscv-gnu-toolchain-linux
-
-
-include $(TOPDIR)/make/build_pkg.mk
-include $(TOPDIR)/make/riscv-gnu-toolchain.mk
-include $(TOPDIR)/make/llvm.mk
-include $(TOPDIR)/make/spike.mk
-include $(TOPDIR)/make/qemu.mk
-include $(TOPDIR)/make/sbt.mk
-include $(TOPDIR)/make/dbg.mk
-
-###
-# apply lowrisc patches
+.PHONY: sbt
+sbt:
+	@echo TODO
 
 patch-llvm:
 	set -e && \
@@ -52,34 +24,22 @@ patch-llvm:
 			patch -d tools/clang -p1 < $$P; \
 		done
 
-###
+### docke image
 
 docker-img:
 	$(MAKE) -C docker
 
-### MIBENCH ###
-
-.PHONY: mibench
-mibench: sbt
-	$(MAKE) -C $(TOPDIR)/mibench $(MIBENCHS)
-
-mibench-clean:
-	$(MAKE) -C $(TOPDIR)/mibench clean
-
-mibench-test:
-	$(MAKE) -C $(TOPDIR)/mibench test
-
-mibench-measure:
-	$(MAKE) -C $(TOPDIR)/mibench measure
-
-###
-### generate all rules
-###
-
-$(foreach prog,$(ALL),$(eval $(call RULE_ALL,$(prog))))
-
-
-# clean all
-clean: $(foreach prog,$(ALL),$($(prog)_ALIAS)-clean) riscv-pk-unpatch
+clean:
 	rm -rf $(BUILD_DIR)
 	rm -rf $(TOOLCHAIN)/*
+
+###
+
+#include $(TOPDIR)/make/build_pkg.mk
+#include $(TOPDIR)/make/riscv-gnu-toolchain.mk
+#include $(TOPDIR)/make/llvm.mk
+#include $(TOPDIR)/make/spike.mk
+#include $(TOPDIR)/make/qemu.mk
+#include $(TOPDIR)/make/sbt.mk
+#include $(TOPDIR)/make/dbg.mk
+

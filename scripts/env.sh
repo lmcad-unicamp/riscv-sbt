@@ -1,58 +1,56 @@
 #!/bin/bash
 
 # TOPDIR
-export TOPDIR="$PWD"
+export TOPDIR=$PWD
 
 # build type
 if [ $# -eq 1 -a "$1" == "release" ]; then
-  export BUILD_TYPE=Release
-  export BUILD_TYPE_DIR=release
+  BUILD_TYPE=Release
+  BUILD_TYPE_DIR=release
 else
-  export BUILD_TYPE=Debug
-  export BUILD_TYPE_DIR=debug
+  BUILD_TYPE=Debug
+  BUILD_TYPE_DIR=debug
 fi
 
-# TC
-TC="$TOPDIR/toolchain"
-export TCR=$TC/release
-export TCD=$TC/debug
+# toolchains: debug and release
+TC=$TOPDIR/toolchain
+TCR=$TC/release
+TCD=$TC/debug
 
 # scripts
 SCRIPTS_DIR=$TOPDIR/scripts
 export PYTHONPATH=$SCRIPTS_DIR
-echo "$PATH" | grep "$SCRIPTS_DIR" >/dev/null ||
-export PATH="$SCRIPTS_DIR:$PATH"
 
-# toolchain: riscv release
-echo "$PATH" | grep "$TCR/bin" >/dev/null ||
-export PATH="$TCR/bin:$PATH"
+# set PATH
 
-# toolchain: riscv debug
-echo "$PATH" | grep "$TCD/bin" >/dev/null ||
-export PATH="$TCD/bin:$PATH"
+addpath()
+{
+    local path=$1
 
-# toolchain: riscv32-gnu-linux
-echo "$PATH" | grep "$TCR/opt/riscv/bin" >/dev/null ||
-export PATH="$TCR/opt/riscv/bin:$PATH"
+    echo $PATH | grep $path >/dev/null ||
+    PATH=$path:$PATH
+}
 
-# toolchain: lowrisc-llvm
-echo "$PATH" | grep "$TCD/lowrisc-llvm/bin" >/dev/null ||
-export PATH="$TCD/lowrisc-llvm/bin:$PATH"
+addpath $SCRIPTS_DIR
+addpath $TCR/bin
+addpath $TCD/bin
+addpath $TCR/opt/riscv/bin
+addpath $TCD/lowrisc-llvm/bin
+export PATH
 
-export BUILD_DIR=$TOPDIR/build
-export PK32=$TCR/riscv32-unknown-elf/bin/pk
-export PK64=$TCR/riscv64-unknown-elf/bin/pk
-export BBL=$TCR/riscv64-unknown-elf/bin/bbl
-export ROOT_FS=$TCR/share/riscvemu/root.bin
+# enable core dump
+ulimit -c unlimited
+# echo core > /proc/sys/kernel/core_pattern
+
+# aliases (just for convenience)
+
+BUILD_DIR=$TOPDIR/build
+PK32=$TCR/riscv32-unknown-elf/bin/pk
+PK64=$TCR/riscv64-unknown-elf/bin/pk
 
 alias elf="$BUILD_DIR/sbt/$BUILD_TYPE_DIR/test/elf"
 alias spike32="spike $PK32"
 alias spike64="spike --isa=RV64IMAFDC $PK64"
 alias qemu32=qemu-riscv32
 alias qemu64=qemu-riscv64
-alias linux_spike="spike --isa=RV64IMAFDC $BBL"
-alias linux_qemu="qemu-system-riscv64 -kernel $BBL -m 2048M -nographic"
 alias git_status_all="git status --ignore-submodules=none"
-
-ulimit -c unlimited
-# echo core > /proc/sys/kernel/core_pattern
