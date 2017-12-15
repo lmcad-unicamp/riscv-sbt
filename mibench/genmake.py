@@ -100,11 +100,11 @@ class Rijndael(Bench):
 
         def args(self, prefix, mode):
             fmtdata = {
-                "prefix":   prefix,
+                "prefix":   prefix + "-" if prefix else '',
                 "mode":     "-" + mode if mode else ''
             }
 
-            args = self._args
+            args = list(self._args)
             args[0] = args[0].format(**fmtdata)
             args[1] = args[1].format(**fmtdata)
             return args
@@ -118,18 +118,17 @@ class Rijndael(Bench):
             self.narch = narch
             self.mode = mode
 
-        def prefix(self, name=''):
+        def prefix(self):
             if not self.farch:
-                return self.narch.add_prefix(name)
+                return self.narch.prefix
             else:
-                return self.farch.add_prefix(
-                    self.narch.add_prefix(name))
+                return self.farch.add_prefix(self.narch.prefix)
 
         def out(self, name):
             if not self.farch:
-                return self.prefix(name)
+                return self.prefix() + "-" + name
             else:
-                return self.prefix(name) + "-" + self.mode
+                return self.prefix() + "-" + name + "-" + self.mode
 
 
     def __init__(self, name, dir, ins, args=None):
@@ -255,7 +254,7 @@ class Rijndael(Bench):
 .PHONY: {name}-test
 {name}-test: {tests}
 
-.PHONY: {name}-measure:
+.PHONY: {name}-measure
 {name}-measure: {measures}
 
 """.format(**{
