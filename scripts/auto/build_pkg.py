@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from auto.utils import cd, path, shell
+from auto.utils import cat, cd, path, shell
 import auto.gnu_toolchain
 
 import argparse
@@ -15,6 +15,14 @@ class Package:
         self.makefile = makefile
         self._configure = configure
         self.toolchain = toolchain
+        self.make_opts = "-j9"
+
+
+    def clean(self):
+        # safety check
+        if not self.build_dir or len(self.build_dir) < 3:
+            raise Exception("dir to clean doesn't seem right, aborting...")
+        shell("rm -rf " + self.build_dir)
 
 
     def prepare(self):
@@ -38,14 +46,20 @@ class Package:
                 shell(self._configure)
 
 
+    def _make(self, target=None):
+        shell(cat(
+            "make -C",
+            self.build_dir,
+            target,
+            self.make_opts if target != "install" else ''))
+
+
     def build(self):
         if not os.path.exists(path(self.build_dir, self.build_out)):
             self.configure()
 
             print("*** building {} ***".format(self.name))
-            shell('make -C {} {}$(MAKE_OPTS)'
-                .format(self.build_dir,
-                    self.build_target + " " if self.build_target else ''))
+            self._make(self.build_target)
 
 
     def install(self):
@@ -53,7 +67,7 @@ class Package:
             self.build()
 
             print("*** installing {} ***".format(self.name))
-            shell('make -C {} install $(MAKE_OPTS)'.format(self.build_dir))
+            self._make("install")
 
 
     def build_and_install(self):
@@ -66,7 +80,13 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="build packages")
     parser.add_argument("pkg")
+    parser.add_argument("--clean", action="store_true")
     args = parser.parse_args()
+
+    if args.pkg == "list":
+        for p in pkgs:
+            print(p.name)
+        exit()
 
     pkg = None
     for p in pkgs:
@@ -74,5 +94,11 @@ if __name__ == "__main__":
             pkg = p
             break
 
-    print("building", pkg.name)
-    pkg.build_and_install()
+    if not pkg:
+        raise Exception("pkg not found!")
+
+    if args.clean:
+        pkg.clean()
+    else:
+        print("building", pkg.name)
+        pkg.build_and_install()

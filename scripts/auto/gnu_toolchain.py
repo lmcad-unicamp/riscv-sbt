@@ -25,9 +25,7 @@ class GnuToolchain(Package):
             self.configure()
 
             print("*** building and installing " + self.name + " ***")
-            shell('make -C {} {}$(MAKE_OPTS)'
-                .format(self.build_dir,
-                    self.build_target + " " if self.build_target else ''))
+            self._make(self.build_target)
 
 
 def pkgs():
@@ -59,7 +57,7 @@ def pkgs():
        "--enable-multilib"
     )
 
-    toolchain = path(prefix, "bin/riscv-gnu-linux-gcc")
+    toolchain = path(prefix, "bin/riscv64-unknown-linux-gnu-gcc")
 
     pkg2 = GnuToolchain(name, prefix, build_dir,
             configure=configure,
