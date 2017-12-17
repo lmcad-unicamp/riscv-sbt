@@ -4,6 +4,8 @@ import auto.pkg
 import auto.gnu_toolchain
 import auto.llvm
 import auto.spike
+import auto.qemu
+import auto.sbt
 
 import argparse
 
