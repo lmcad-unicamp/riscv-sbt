@@ -30,6 +30,7 @@ MODES          := globals locals
 # tools
 
 BUILD_PY          := $(AUTO_DIR)/build.py
+BUILDPKG_PY       := $(AUTO_DIR)/build_pkg.py
 RUN_PY            := $(AUTO_DIR)/run.py
 XLATE_PY          := $(AUTO_DIR)/xlate.py
 MEASURE_PY        := $(AUTO_DIR)/measure.py

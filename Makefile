@@ -6,7 +6,17 @@ include $(TOPDIR)/make/config.mk
 
 ### apply lowrisc patches
 
-all: sbt
+all: sbt spike
+
+riscv-gnu-toolchain:
+	$(BUILDPKG_PY) $@ $(MAKE_OPTS)
+
+llvm:
+	$(BUILDPKG_PY) $@ $(MAKE_OPTS)
+
+spike:
+	$(BUILDPKG_PY) $(MAKE_OPTS) riscv-isa-sim
+	$(BUILDPKG_PY) $(MAKE_OPTS) riscv-pk-32
 
 .PHONY: sbt
 sbt:
@@ -35,9 +45,6 @@ clean:
 
 ###
 
-#include $(TOPDIR)/make/build_pkg.mk
-#include $(TOPDIR)/make/riscv-gnu-toolchain.mk
-#include $(TOPDIR)/make/llvm.mk
 #include $(TOPDIR)/make/spike.mk
 #include $(TOPDIR)/make/qemu.mk
 #include $(TOPDIR)/make/sbt.mk

@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 
 from auto.config import *
-from auto.build_pkg import Package
+import auto.pkg
 
-class GnuToolchain(Package):
+GNU_TOOLCHAIN_PREFIX = None
+
+class GnuToolchain(auto.pkg.Package):
     def __init__(self, name, prefix, build_dir,
             makefile="Makefile", configure=None, toolchain=None,
             target=None):
         super(GnuToolchain, self).__init__(name, prefix, build_dir,
-            makefile, configure, toolchain)
+            makefile=makefile, configure=configure, toolchain=toolchain)
         self.build_target = target
 
 
@@ -28,10 +30,12 @@ class GnuToolchain(Package):
             self._make(self.build_target)
 
 
-def pkgs():
+def _pkgs():
     # riscv-gnu-toolchain
     name = "riscv-gnu-toolchain"
     prefix = path(DIR.toolchain_release, "opt/riscv")
+    global GNU_TOOLCHAIN_PREFIX
+    GNU_TOOLCHAIN_PREFIX = prefix
     build_dir = path(DIR.build, "riscv-gnu-toolchain/newlib32")
 
     configure = cat(
@@ -65,3 +69,5 @@ def pkgs():
             target="linux")
 
     return [pkg1, pkg2]
+
+auto.pkg.Package.pkgs.extend(_pkgs())
