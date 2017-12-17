@@ -293,9 +293,13 @@ benchs: {}
 .PHONY: benchs-test
 benchs-test: benchs {}
 
+.PHONY: benchs-measure
+benchs-measure: benchs {}
 """.format(
         " ".join([b.name for b in benchs]),
-        " ".join([b.name + "-test" for b in benchs]))
+        " ".join([b.name + "-test" for b in benchs]),
+        " ".join([b.name + "-measure" for b in benchs]),
+    )
 
     # write txt to Makefile
     with open("Makefile", "w") as f:
