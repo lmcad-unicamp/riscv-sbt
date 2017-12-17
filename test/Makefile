@@ -1,9 +1,13 @@
-include $(TOPDIR)/make/config.mk
+ifeq ($(TOPDIR),)
+$(error "TOPDIR not set. Please run '. scripts/env.sh' first.")
+endif
 
-SRCDIR := $(shell pwd)
-DSTDIR := $(BUILD_DIR)/test
+BUILD_PY := $(TOPDIR)/scripts/auto/build.py
+RUN_PY   := $(TOPDIR)/scripts/auto/run.py
+SRCDIR   := $(shell pwd)
+DSTDIR   := $(TOPDIR)/build/test
 
-BINS  := rv32-hello-asm rv32-hello x86-hello rv32-linux-hello
+BINS   := rv32-hello-asm rv32-hello x86-hello rv32-linux-hello
 
 all:  $(BINS)
 run:  $(addsuffix -run,$(BINS))
