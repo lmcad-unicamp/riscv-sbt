@@ -27,7 +27,8 @@ def _pkgs():
         Package(name, prefix, build_dir,
             configure=configure,
             build_out=build_out,
-            toolchain=toolchain))
+            toolchain=toolchain,
+            deps=deps))
 
     return pkgs
 
