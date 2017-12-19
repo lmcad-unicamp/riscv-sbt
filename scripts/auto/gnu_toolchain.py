@@ -32,11 +32,11 @@ class GnuToolchain(auto.pkg.Package):
 
 def _pkgs():
     # riscv-gnu-toolchain
-    name = "riscv-gnu-toolchain"
+    name = "riscv-gnu-toolchain-newlib"
     prefix = path(DIR.toolchain_release, "opt/riscv")
     global GNU_TOOLCHAIN_PREFIX
     GNU_TOOLCHAIN_PREFIX = prefix
-    build_dir = path(DIR.build, "riscv-gnu-toolchain/newlib32")
+    build_dir = path(DIR.build, name)
 
     configure = cat(
         "./configure",
@@ -53,7 +53,7 @@ def _pkgs():
 
     # riscv-gnu-toolchain-linux
     name = "riscv-gnu-toolchain-linux"
-    build_dir = path(DIR.build, "riscv-gnu-toolchain/linux")
+    build_dir = path(DIR.build, name)
 
     configure = cat(
        "./configure",

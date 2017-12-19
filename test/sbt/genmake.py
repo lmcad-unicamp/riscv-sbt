@@ -274,8 +274,11 @@ clean: rv32tests-clean
 	$(MAKE) -C {top}/test clean
 	rm -rf {dstdir}
 
+.PHONY: almost-alltests
+almost-alltests: basic-test tests-run utests-run mmm rv32tests-run
+
 .PHONY: alltests
-alltests: setmsr basic-test tests-run utests-run system-test mmm rv32tests-run
+alltests: setmsr almost-alltests system-test 
 """.format(**fmtdata)
 
 

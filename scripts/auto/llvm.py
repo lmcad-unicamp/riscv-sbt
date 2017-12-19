@@ -33,8 +33,8 @@ class LLVM(auto.pkg.Package):
 def _pkgs():
     # lowrisc llvm
     name = "llvm"
-    prefix = path(DIR.toolchain_debug, "lowrisc-llvm")
-    build_dir = path(DIR.build, "lowrisc-llvm/debug")
+    prefix = DIR.toolchain_debug
+    build_dir = path(DIR.build, "llvm")
 
     gnu_toolchain_prefix = auto.gnu_toolchain.GNU_TOOLCHAIN_PREFIX
 
@@ -58,7 +58,7 @@ def _pkgs():
     makefile = "build.ninja"
     out = "bin/clang"
     toolchain = "bin/clang"
-    deps = ["riscv-gnu-toolchain"]
+    deps = ["riscv-gnu-toolchain-newlib"]
 
     pkg = LLVM(name, prefix, build_dir,
             makefile=makefile,

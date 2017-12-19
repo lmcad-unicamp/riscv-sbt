@@ -1,10 +1,19 @@
-all: build
+all: src toolchain sbt
 
-copy_local:
-	cp -a ../make .
+src:
+	./get_srcs.sh
+src-clean:
+	rm -rf riscv-sbt
 
-build:
+toolchain:
+	docker build -t sbt-toolchain -f Dockerfile.toolchain .
+toolchain-save:
+	docker save sbt-toolchain | gzip -c > sbt-toolchain.tgz
+
+sbt:
 	docker build -t sbt .
+sbt-save:
+	docker save sbt | gzip -c > sbt.tgz
 
 run:
 	docker run -it --rm -h sbt sbt

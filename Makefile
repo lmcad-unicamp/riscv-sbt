@@ -4,9 +4,11 @@ endif
 
 BUILDPKG_PY := $(TOPDIR)/scripts/auto/build_pkg.py
 
-all: sbt spike qemu
+all: sbt riscv-gnu-toolchain-linux spike qemu
 
-riscv-gnu-toolchain:
+riscv-gnu-toolchain-newlib:
+	$(BUILDPKG_PY) $@ $(MAKE_OPTS)
+riscv-gnu-toolchain-linux:
 	$(BUILDPKG_PY) $@ $(MAKE_OPTS)
 
 llvm:
@@ -50,6 +52,9 @@ clean:
 
 lc:
 	cat $(TOPDIR)/sbt/*.h $(TOPDIR)/sbt/*.cpp $(TOPDIR)/sbt/*.s | wc -l
+
+almost-alltests:
+	cd $(TOPDIR)/test/sbt && ./genmake.py && make clean almost-alltests
 
 alltests:
 	cd $(TOPDIR)/test/sbt && ./genmake.py && make clean alltests
