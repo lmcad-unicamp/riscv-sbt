@@ -17,7 +17,6 @@ class GnuToolchain(auto.pkg.Package):
     def prepare(self):
         if not os.path.exists(self.build_dir):
             print("*** preparing {} ***".format(self.name))
-            shell("mkdir -p {}".format(path(DIR.build, "riscv-gnu-toolchain")))
             shell("cp -a {}/riscv-gnu-toolchain {}"
                 .format(DIR.submodules, self.build_dir))
 
@@ -61,7 +60,7 @@ def _pkgs():
        "--enable-multilib"
     )
 
-    toolchain = path(prefix, "bin/riscv64-unknown-linux-gnu-gcc")
+    toolchain = "bin/riscv64-unknown-linux-gnu-gcc"
 
     pkg2 = GnuToolchain(name, prefix, build_dir,
             configure=configure,

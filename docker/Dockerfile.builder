@@ -43,39 +43,14 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 
-### copy srcs ###
-
-COPY riscv-sbt /riscv-sbt/
-RUN false
-
-### build srcs ###
+### set env ###
 
 ENV TOPDIR=/riscv-sbt
+VOLUME $TOPDIR
 WORKDIR $TOPDIR
+
 ENV PYTHONPATH=$TOPDIR/scripts
 ENV PYTHONUNBUFFERED=1
-
-# build riscv-gnu-toolchain - newlib version
-RUN make riscv-gnu-toolchain \
-    && rm -rf build
-# build riscv-gnu-toolchain - linux version
-RUN make riscv-gnu-toolchain-linux \
-    && rm -rf build
-
 ENV PATH=$TOPDIR/toolchain/release/opt/riscv/bin:$PATH
 
-# build llvm/clang
-RUN make MAKE_OPTS=-j4 lowrisc-llvm-debug \
-    && rm -rf build
-
-# build fesvr & spike
-RUN make riscv-isa-sim \
-    && rm -rf build
-
-# build pk
-RUN make riscv-pk-32 \
-    && rm -rf build
-
-# build qemu
-RUN make qemu-user \
-    && rm -rf build
+ENTRYPOINT ["make"]

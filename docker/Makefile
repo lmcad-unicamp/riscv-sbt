@@ -5,10 +5,12 @@ src:
 src-clean:
 	rm -rf riscv-sbt
 
+builder:
+	docker build -t sbt-builder -f Dockerfile.builder .
+
+BUILDER := docker run -it -v $(PWD)/riscv-sbt:/riscv-sbt sbt-builder
 toolchain:
-	docker build -t sbt-toolchain -f Dockerfile.toolchain .
-toolchain-save:
-	docker save sbt-toolchain | gzip -c > sbt-toolchain.tgz
+	$(BUILDER) riscv-gnu-toolchain-newlib
 
 sbt:
 	docker build -t sbt .
