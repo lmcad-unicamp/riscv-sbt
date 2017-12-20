@@ -84,7 +84,7 @@ target_compile_options (x86-counters PRIVATE --32)
 
 # SBT
 
-set (CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/llvm/lib")
+set (CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 include_directories (${SBT_INCLUDE_DIRS})
 link_directories (${SBT_LINK_DIRS})
 add_executable (riscv-sbt
