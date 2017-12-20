@@ -40,8 +40,7 @@ elf: {dstdir}/elf
 x86-syscall-test: {dstdir}/x86-syscall-test
 
 {dstdir}/x86-syscall-test: {srcdir}/x86-syscall-test.s
-	{build} --arch x86 --srcdir {srcdir} --dstdir {dstdir} \
-		x86-syscall-test.s -o x86-syscall-test
+	{build} --arch x86 --srcdir {srcdir} --dstdir {dstdir} x86-syscall-test.s -o x86-syscall-test
 
 .PHONY: x86-syscall-test-run
 x86-syscall-test-run:
@@ -278,7 +277,7 @@ clean: rv32tests-clean
 almost-alltests: basic-test tests-run utests-run mmm rv32tests-run
 
 .PHONY: alltests
-alltests: setmsr almost-alltests system-test 
+alltests: setmsr almost-alltests system-test
 """.format(**fmtdata)
 
 
