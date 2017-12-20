@@ -65,7 +65,7 @@ def _pkgs():
         "--enable-32bit")
 
     class RISCVPK(Package):
-        def prepare(self):
+        def _prepare(self):
             stamp = path(self.build_dir, ".patched")
             if not os.path.exists(stamp):
                 with cd(srcdir):

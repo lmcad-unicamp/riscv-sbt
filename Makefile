@@ -42,7 +42,10 @@ patch-llvm:
 ### docker image
 
 docker-img:
-	$(MAKE) -C docker
+	cd docker && \
+		./build.py --get-srcs && \
+		./build.py --build all
+
 
 ###
 

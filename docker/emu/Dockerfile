@@ -1,11 +1,11 @@
-FROM sbt-emu
+FROM sbt-riscv-gnu-toolchain
 
-# llvm/clang reqs
+# qemu reqs
 RUN apt-get update \
     && apt-get install -y \
-    cmake \
-    g++-multilib \
-    ninja-build \
+    python \
+    pkg-config \
+    libglib2.0-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY src /riscv-sbt/submodules/
@@ -16,7 +16,10 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/riscv-sbt/scripts
 ENV PATH=$TOPDIR/toolchain/release/opt/riscv/bin:$PATH
 
-RUN make llvm \
+RUN make spike \
+    && rm -rf build
+
+RUN make qemu \
     && rm -rf build
 
 CMD ["/bin/bash"]

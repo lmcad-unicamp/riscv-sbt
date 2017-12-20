@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from auto.config import *
-from auto.utils import cat, cd, path, shell
+from auto.utils import cat, cd, mkdir_if_needed, path, shell
 
 import os
 
@@ -36,6 +36,7 @@ class Package:
 
 
     def do_deps(self):
+        """ build dependencies """
         if self.deps:
             for dep in self.deps:
                 for pkg in Package.pkgs:
@@ -46,20 +47,21 @@ class Package:
                     raise Exception("Dependency not found: " + dep)
 
 
-    def prepare(self):
+    def _prepare(self):
         pass
 
 
-    def configure(self):
-        # TODO check that self.deps exist
+    def prepare(self):
+        """ pre-build steps """
+        self._prepare()
 
+
+    def configure(self):
+        """ configure build """
         if not self._configure:
             raise Exception("configure not set!")
 
         self.prepare()
-
-        if not os.path.exists(self.build_dir):
-            shell("mkdir -p " + self.build_dir)
 
         if not os.path.exists(path(self.build_dir, self.makefile)):
             with cd(self.build_dir):
@@ -80,6 +82,7 @@ class Package:
 
 
     def build(self):
+        """ build, if build_out does not exist """
         if not os.path.exists(path(self.build_dir, self.build_out)):
             self.configure()
             print("*** building {} ***".format(self.name))
@@ -91,23 +94,32 @@ class Package:
 
 
     def install(self):
+        """ install, if toolchain does not exist """
         if not os.path.exists(path(self.prefix, self.toolchain)):
-            self.build()
-
             print("*** installing {} ***".format(self.name))
             self._install()
             self.postinstall()
 
 
-    def postinstall(self):
+    def _postinstall(self):
         pass
 
 
-    def build_and_install(self):
-        if not os.path.exists(DIR.build):
-            shell("mkdir " + DIR.build)
+    def postinstall(self):
+        self._postinstall()
 
-        self.do_deps()
+
+    def _build_and_install(self):
+        mkdir_if_needed(self.build_dir)
         self.build()
         self.install()
+
+
+    def build_and_install(self):
+        """ build and install, if toolchain does not exist """
+        mkdir_if_needed(DIR.build)
+
+        if not os.path.exists(path(self.prefix, self.toolchain)):
+            self.do_deps()
+            self._build_and_install()
 

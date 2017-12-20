@@ -22,7 +22,7 @@ def _pkgs():
     )
 
     class QEMU(Package):
-        def prepare(self):
+        def _prepare(self):
             link = path(DIR.submodules, "riscv-qemu")
             if not os.path.exists(link):
                 shell("ln -sf {}/riscv-gnu-toolchain/riscv-qemu {}"

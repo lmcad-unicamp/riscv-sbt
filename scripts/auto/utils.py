@@ -76,3 +76,8 @@ def xarch_brk(xarch):
     farch = xarch[0 : dash]
     narch = xarch[dash + 1 :]
     return farch, narch
+
+
+def mkdir_if_needed(dir):
+    if not os.path.exists(dir):
+        shell("mkdir -p " + dir)

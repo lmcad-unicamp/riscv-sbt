@@ -14,22 +14,18 @@ class GnuToolchain(auto.pkg.Package):
         self.build_target = target
 
 
-    def prepare(self):
+    def _prepare(self):
         if not os.path.exists(self.build_dir):
             print("*** preparing {} ***".format(self.name))
             shell("cp -a {}/riscv-gnu-toolchain {}"
                 .format(DIR.submodules, self.build_dir))
 
 
-    def build_and_install(self):
-        if not os.path.exists(DIR.build):
-            shell("mkdir " + DIR.build)
+    def _build_and_install(self):
+        self.configure()
 
-        if not os.path.exists(path(self.prefix, self.toolchain)):
-            self.configure()
-
-            print("*** building and installing " + self.name + " ***")
-            self._make(self.build_target)
+        print("*** building and installing " + self.name + " ***")
+        self._make(self.build_target)
 
 
 def _pkgs():

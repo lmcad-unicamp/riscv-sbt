@@ -27,6 +27,7 @@ COPY src /riscv-sbt/submodules/riscv-gnu-toolchain/
 WORKDIR /riscv-sbt
 
 ENV TOPDIR=/riscv-sbt
+ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/riscv-sbt/scripts
 
 RUN make riscv-gnu-toolchain-newlib \

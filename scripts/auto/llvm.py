@@ -7,7 +7,7 @@ import os
 
 
 class LLVM(auto.pkg.Package):
-    def prepare(self):
+    def _prepare(self):
         link = path(DIR.submodules, "llvm/tools/clang")
         if not os.path.exists(link):
             shell("ln -sf {}/clang {}".format(DIR.submodules, link))
@@ -21,7 +21,7 @@ class LLVM(auto.pkg.Package):
         shell("cmake --build {} --target install".format(self.build_dir))
 
 
-    def postinstall(self):
+    def _postinstall(self):
         srcdir = path(self.build_dir, "lib/Target/RISCV")
         dstdir = path(self.prefix, "include/llvm/Target/RISCV")
 
