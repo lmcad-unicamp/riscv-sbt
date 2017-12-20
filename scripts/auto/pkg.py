@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from auto.config import *
 from auto.utils import cat, cd, path, shell
 
 import os
@@ -103,6 +104,9 @@ class Package:
 
 
     def build_and_install(self):
+        if not os.path.exists(DIR.build):
+            shell("mkdir " + DIR.build)
+
         self.do_deps()
         self.build()
         self.install()

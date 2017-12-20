@@ -6,7 +6,14 @@ import argparse
 import re
 import os
 
-TOPDIR = os.environ["TOPDIR"]
+TOPDIR          = os.environ["TOPDIR"]
+DOCKER_DIR      = path(TOPDIR, "docker")
+OUTPUT_DIR      = path(DOCKER_DIR, "output")
+
+SRC_DIR         = path(OUTPUT_DIR, "src")
+BUILD_DIR       = path(OUTPUT_DIR, "build")
+TOOLCHAIN_DIR   = path(OUTPUT_DIR, "toolchain")
+
 
 class Commit:
     def __init__(self, module, commit):
@@ -31,7 +38,9 @@ class Commits:
 
         # add sbt
         commits.append(Commit("sbt",
-            shell("git rev-parse HEAD", save_out=True).strip()))
+            shell("cd {} && git rev-parse HEAD", save_out=True)
+                .format(TOPDIR)
+                .strip()))
         return commits
 
 
@@ -75,6 +84,8 @@ def get_srcs():
     commits.load()
 
     srcs = [
+        Source("riscv-sbt",
+            "https://github.com/OpenISA/riscv-sbt.git"),
         Source("riscv-gnu-toolchain",
             "https://github.com/riscv/riscv-gnu-toolchain",
             "--recursive"),
@@ -102,16 +113,14 @@ def get_srcs():
     for src in srcs:
         src.commit = commits[src.name]
 
-    # get riscv-sbt first
-    if not os.path.exists(path(TOPDIR, "docker/riscv-sbt")):
-        with cd(path(TOPDIR, "docker")):
-            shell("git clone https://github.com/OpenISA/riscv-sbt.git")
-            shell("rmdir submodules/*")
-            with cd("riscv-sbt"):
-                shell("git checkout " + commits["sbt"])
+    def mkdir_if_needed(dir):
+        if not os.path.exists(dir):
+            shell("mkdir -p " + dir)
+
+    mkdir_if_needed(SRC_DIR)
 
     # get all sources
-    with cd(path(TOPDIR, "docker/riscv-sbt/submodules")):
+    with cd(SRC_DIR):
         for src in srcs:
             src.get()
 

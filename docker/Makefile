@@ -1,16 +1,45 @@
-all: src toolchain sbt
+all: srcs-get sbt-builder
 
-src:
-	./get_srcs.sh
-src-clean:
-	rm -rf riscv-sbt
+SRCDIR := $(TOPDIR)/docker/output/src
 
-builder:
-	docker build -t sbt-builder -f Dockerfile.builder .
+riscv-sbt/src: $(SRCDIR)/riscv-sbt
+	rm -rf $@
+	cp -a $< $@
+
+.PHONY: riscv-sbt
+riscv-sbt: riscv-sbt/src
+	docker build -t sbt-$@ $@
+
+riscv-gnu-toolchain/src: $(SRCDIR)/riscv-gnu-toolchain
+	rm -rf $@
+	cp -a $< $@
+
+.PHONY: riscv-gnu-toolchain
+riscv-gnu-toolchain: riscv-gnu-toolchain/src
+	docker build -t sbt-$@ $@
+
+srcs-get:
+	./get_srcs.py
+srcs-clean:
+	rm -rf $(SRCDIR)
+
+sbt-builder:
+	docker build -t sbt-builder builder
+
+sbt-data:
+	docker create -v --name sbt-data
 
 BUILDER := docker run -it -v $(PWD)/riscv-sbt:/riscv-sbt sbt-builder
 toolchain:
-	$(BUILDER) riscv-gnu-toolchain-newlib
+	$(BUILDER) llvm
+	$(BUILDER) riscv-gnu-toolchain-linux
+	$(BUILDER) spike
+	$(BUILDER) qemu
+	cp -a riscv-sbt/toolchain .
+
+sbt-toolchain:
+	docker build -t sbt-toolchain -f Dockerfile.toolchain .
+	rm -rf toolchain
 
 sbt:
 	docker build -t sbt .

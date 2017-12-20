@@ -2,6 +2,7 @@ FROM sbt-toolchain
 
 ENV TOPDIR=/riscv-sbt
 WORKDIR $TOPDIR
+
 ENV PYTHONPATH=$TOPDIR/scripts
 ENV PYTHONUNBUFFERED=1
 ENV PATH=$TOPDIR/toolchain/release/opt/riscv/bin:$PATH

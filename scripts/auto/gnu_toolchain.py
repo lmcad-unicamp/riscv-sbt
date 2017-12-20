@@ -22,6 +22,9 @@ class GnuToolchain(auto.pkg.Package):
 
 
     def build_and_install(self):
+        if not os.path.exists(DIR.build):
+            shell("mkdir " + DIR.build)
+
         if not os.path.exists(path(self.prefix, self.toolchain)):
             self.configure()
 
