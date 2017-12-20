@@ -12,7 +12,8 @@ ENV PATH=$TOPDIR/toolchain/debug/bin:$PATH
 ### SBT ###
 
 # XXX
-RUN git pull
+RUN git pull \
+    && git checkout e75b017ec7b563ac2c0f4bcf584d6f2b07138472
 
 # build sbt
 RUN make sbt \
