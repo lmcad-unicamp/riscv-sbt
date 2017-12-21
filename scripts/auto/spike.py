@@ -70,7 +70,7 @@ def _pkgs():
             if not os.path.exists(stamp):
                 with cd(srcdir):
                     shell("patch < " + path(DIR.patches, "riscv-pk-32-bit-build-fix.patch"))
-                    shell("mkdir " + self.build_dir)
+                    shell("mkdir -p " + self.build_dir)
                     shell("touch " + stamp)
 
 

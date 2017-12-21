@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from auto.utils import cd, mkdir_if_needed, mpath, path, shell
+from auto.utils import cat, cd, mkdir_if_needed, mpath, path, shell
 
 import argparse
 import re
@@ -33,6 +33,7 @@ class Image:
 
         if len(self.srcs) == 1:
             if not os.path.exists(dstdir):
+                # NOTE use -rL if you get issues on Windows
                 shell("cp -a {} {}".format(
                     path(SRC_DIR, self.srcs[0]),
                     dstdir))
@@ -132,7 +133,7 @@ def get_srcs():
 
             if not os.path.exists(dir):
                 with cd(self.srcdir):
-                    cmd = "git clone {} {}".format(self.clone_flags, self.url)
+                    cmd = cat("git clone", self.clone_flags, self.url)
                     shell(cmd)
                     with cd(self.name):
                         shell("git checkout " + self.commit)
