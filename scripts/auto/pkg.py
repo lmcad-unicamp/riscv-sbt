@@ -22,10 +22,13 @@ class Package:
         self.toolchain = toolchain
         self.deps = deps
         self.build_target = None
+        self.force = False
 
 
     def _clean(self):
         shell("rm -rf " + self.build_dir)
+        if self.toolchain:
+            shell("rm -f " + path(self.prefix, self.toolchain))
 
 
     def clean(self):
@@ -83,7 +86,8 @@ class Package:
 
     def build(self):
         """ build, if build_out does not exist """
-        if not os.path.exists(path(self.build_dir, self.build_out)):
+        if (not os.path.exists(path(self.build_dir, self.build_out))
+                or self.force):
             self.configure()
             print("*** building {} ***".format(self.name))
             self._build()
@@ -95,7 +99,8 @@ class Package:
 
     def install(self):
         """ install, if toolchain does not exist """
-        if not os.path.exists(path(self.prefix, self.toolchain)):
+        if (not os.path.exists(path(self.prefix, self.toolchain))
+                or self.force):
             print("*** installing {} ***".format(self.name))
             self._install()
             self.postinstall()
@@ -119,7 +124,8 @@ class Package:
         """ build and install, if toolchain does not exist """
         mkdir_if_needed(DIR.build)
 
-        if not os.path.exists(path(self.prefix, self.toolchain)):
+        if (not os.path.exists(path(self.prefix, self.toolchain))
+                or self.force):
             self.do_deps()
             self._build_and_install()
 

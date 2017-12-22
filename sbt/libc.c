@@ -1,6 +1,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define F(x) \
   void* rv32_##x = x;
@@ -26,6 +27,7 @@ F(perror)
 F(printf)
 F(putchar)
 F(puts)
+F(rand)
 
 F(_IO_getc)
 F(__ctype_toupper_loc)

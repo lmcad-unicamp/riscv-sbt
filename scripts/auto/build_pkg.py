@@ -17,6 +17,7 @@ if __name__ == "__main__":
     parser.add_argument("pkg")
     parser.add_argument("--clean", action="store_true")
     parser.add_argument("-j", type=int, default=9)
+    parser.add_argument("-f", action="store_true", help="force")
     args = parser.parse_args()
 
     auto.pkg.Package.make_opts = "-j" + str(args.j)
@@ -39,4 +40,5 @@ if __name__ == "__main__":
         pkg.clean()
     else:
         print("building", pkg.name)
+        pkg.force = args.f
         pkg.build_and_install()
