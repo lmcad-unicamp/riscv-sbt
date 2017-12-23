@@ -1039,9 +1039,11 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
     llvm::Value* ext;
     BasicBlock* bbSaveRegs;
     BasicBlock* bbICall;
+
+
+    // XXX FIXME for debugging only - uncomment this later
+    //ext = _bld->call(llie, target);
     if (!alwaysSync) {
-        // XXX FIXME for debugging only - uncomment this later
-        //ext = _bld->call(llie, target);
         ext = _c->i32(0);
         ext = _bld->eq(ext, _c->i32(1));
         bbSaveRegs = f->newUBB(_addr, "save_regs");
@@ -1083,7 +1085,9 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
     llvm::Value* v = _bld->call(llic, args);
 
     // restore regs
-    if (!alwaysSync) {
+    if (alwaysSync)
+        f->loadRegisters();
+    else if (!alwaysSync) {
         BasicBlock *bbRestoreRegs = f->newUBB(_addr, "restore_regs");
         BasicBlock *bbICallEnd = f->newUBB(_addr, "icall_end");
         _bld->condBr(ext, bbICallEnd, bbRestoreRegs);
@@ -1103,18 +1107,6 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
 llvm::Error Instruction::handleCallExt(llvm::Value* target, unsigned linkReg)
 {
     xunreachable("handleCallExt() should not be needed");
-    /*
-    DBGF("linkReg={1}", linkReg);
-
-    link(linkReg);
-
-    // at this point, 'target' will be the address of our external
-    // call handler, set by Relocator previously
-    llvm::FunctionType* ft = _t->voidFunc;
-    llvm::Value* v = _bld->intToPtr(target, ft->getPointerTo());
-    v = _bld->call(v);
-    return llvm::Error::success();
-    */
 }
 
 

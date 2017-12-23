@@ -223,6 +223,8 @@ if __name__ == "__main__":
         with cd(DOCKER_DIR):
             shell("rm -rf {}".format(
                 " ".join([name + "/src" for name in names])))
+            shell("rm -f {}".format(
+                " ".join([name + "/done" for name in names])))
     # --save-current-commits
     elif args.save_current_commits:
         commits = Commits(TOPDIR, DOCKER_DIR)

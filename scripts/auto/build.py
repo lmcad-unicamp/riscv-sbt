@@ -27,7 +27,7 @@ def _c2bc(arch, srcdir, dstdir, _in, out, opts):
         arch.clang_flags,
         (arch.sysroot_flag if opts.setsysroot else ""),
         opts.cflags,
-        EMITLLVM)
+        emit_llvm(opts))
 
     ipath = path(srcdir, _in)
     opath = path(dstdir, out)
@@ -96,24 +96,29 @@ def bc2s(arch, dir, _in, out, opts):
 
 def _c2s(arch, srcdir, dstdir, ins, out, opts):
     """ *.c -> .s """
-    _c2lbc(arch, srcdir, dstdir, ins, out, opts)
+    bc = chsuf(out, ".bc")
+    _c2lbc(arch, srcdir, dstdir, ins, bc, opts)
 
-    opt1 = chsuf(out, ".opt.bc")
-    opt2 = chsuf(out, ".opt2.bc")
+    if opts.dbg:
+        bc2s(arch, dstdir, bc, out, opts)
+    else:
+        opt1 = chsuf(bc, ".opt.bc")
+        opt2 = chsuf(bc, ".opt2.bc")
 
-    # opt; dis; opt; dis; .bc -> .s
-    opt(arch, dstdir, out, opt1)
-    dis(arch, dstdir, opt1)
-    opt(arch, dstdir, opt1, opt2)
-    dis(arch, dstdir, opt2)
-    bc2s(arch, dstdir, opt2, out, opts)
+        # opt; dis; opt; dis; .bc -> .s
+        opt(arch, dstdir, bc, opt1)
+        dis(arch, dstdir, opt1)
+        opt(arch, dstdir, opt1, opt2)
+        dis(arch, dstdir, opt2)
+        bc2s(arch, dstdir, opt2, out, opts)
 
 
 def _s2o(arch, srcdir, dstdir, _in, out, opts):
     """ .s -> .o """
     ipath = path(srcdir, _in)
     opath = path(dstdir, out)
-    flags = cat(arch.as_flags, opts.sflags)
+    flags = cat(arch.as_flags, opts.sflags,
+        "-g" if opts.dbg else '')
 
     cmd = cat(arch._as, flags, "-c", ipath, "-o", opath)
     shell(cmd)

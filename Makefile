@@ -25,6 +25,9 @@ qemu:
 sbt:
 	@$(BUILDPKG_PY) $(MAKE_OPTS) sbt
 
+sbt-force:
+	@$(BUILDPKG_PY) $(MAKE_OPTS) -f sbt
+
 ### patch llvm (lowrisc) ###
 
 patch-llvm:

@@ -28,8 +28,8 @@ flags = [
 '-Wall',
 '-Werror',
 '-std=c++11',
-'-I', TOPDIR + '/toolchain/debug/lowrisc-llvm/include',
-'-I', TOPDIR + '/build/lowrisc-llvm/debug',
+'-I', TOPDIR + '/toolchain/debug/include',
+'-I', TOPDIR + '/build/llvm/debug',
 ]
 
 

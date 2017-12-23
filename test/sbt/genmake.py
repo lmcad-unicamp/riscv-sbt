@@ -55,8 +55,9 @@ x86-syscall-test-run:
 
 
     def gen_basic(self):
-        # tests
+        dbg = True
 
+        # tests
         rflags = "-o {}.out --tee"
         mods = [
             Module("hello", "{}-hello.s", xflags="-C", bflags="-C", rflags=rflags),
@@ -67,8 +68,8 @@ x86-syscall-test-run:
         for mod in mods:
             name = mod.name
             src = mod.src
-            xflags = mod.xflags
-            bflags = mod.bflags
+            xflags = cat(mod.xflags, "--dbg" if dbg else '')
+            bflags = cat(mod.bflags, "--dbg" if dbg else '')
             rflags = mod.rflags
             self.txt = self.txt + do_mod(
                 self.narchs, self.xarchs,
@@ -89,6 +90,12 @@ tests: x86-syscall-test {names}
 tests-run: tests x86-syscall-test-run {tests}
 
 """.format(**{"names": " ".join(names), "tests": " ".join(tests)})
+
+        # rv32-test
+        mod = Module("test", "rv32-test.s", rflags=rflags)
+        self.txt = self.txt + do_mod([RV32], [(RV32, X86)],
+            mod.name, mod.src, self.srcdir, self.dstdir,
+            mod.xflags, mod.bflags, mod.rflags)
 
 
     def gen_utests(self):
