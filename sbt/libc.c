@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <unistd.h>
 
 // function
 
@@ -32,6 +32,8 @@ F(printf)
 F(putchar)
 F(puts)
 F(rand)
+F(read)
+F(write)
 
 F(_IO_getc)
 F(__ctype_toupper_loc)

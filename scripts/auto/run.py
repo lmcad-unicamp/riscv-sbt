@@ -7,7 +7,7 @@ import argparse
 import shlex
 
 # run
-def run(arch, dir, prog, args, out, tee):
+def run(arch, dir, prog, args, out, tee, bin):
     ppath = path(dir, prog)
     opath = path(dir, out)
     save_out = len(out) > 0
@@ -18,10 +18,15 @@ def run(arch, dir, prog, args, out, tee):
               "; exit ${PIPESTATUS[0]}")
         shell(cmd)
     else:
-        sout = shell(cmd, save_out)
-        if save_out:
-            with open(opath, "w") as f:
+        if save_out and bin:
+            sout = shell(cmd, save_out, bin)
+            with open(opath, "wb") as f:
                 f.write(sout)
+        else:
+            sout = shell(cmd, save_out)
+            if save_out:
+                with open(opath, "w") as f:
+                    f.write(sout)
 
 
 if __name__ == "__main__":
@@ -33,7 +38,10 @@ if __name__ == "__main__":
     parser.add_argument("-o", help="save output to file", metavar="file",
             default="")
     parser.add_argument("--tee", action="store_true")
+    parser.add_argument("--bin", action="store_true",
+        help="use this flag if the output is a binary file")
 
     args = parser.parse_args()
 
-    run(ARCH[args.arch], args.dir, args.prog, args.args, args.o, args.tee)
+    run(ARCH[args.arch], args.dir, args.prog, args.args, args.o, args.tee,
+            args.bin)

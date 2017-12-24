@@ -15,14 +15,19 @@ class cd:
         os.chdir(self.prev_dir)
 
 
-def shell(cmd, save_out=False):
+def shell(cmd, save_out=False, bin=False):
     """ run shell command """
     print(cmd)
     if save_out:
-        cp = subprocess.run(cmd, shell=True, check=True,
-            universal_newlines=True,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        return cp.stdout
+        if bin:
+            cp = subprocess.run(cmd, shell=True, check=True,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            return cp.stdout
+        else:
+            cp = subprocess.run(cmd, shell=True, check=True,
+                universal_newlines=True,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            return cp.stdout
     else:
         subprocess.run(cmd, shell=True, check=True)
 

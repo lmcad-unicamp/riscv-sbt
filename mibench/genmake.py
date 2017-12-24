@@ -29,19 +29,26 @@ clean:
 
 """.format(dstdir)
 
-    def __init__(self, name, dir, ins, args=None, dbg=False, sbtflags=[]):
+    def __init__(self, name, dir, ins, args=None, dbg=False,
+            stdin=None, sbtflags=[], rflags=None):
         self.name = name
         self.dir = dir
         self.ins = ins
-        self.args = args
         self.srcdir = path(srcdir, dir)
         self.dstdir = path(dstdir, dir)
-        self.rflags = cat(args, Bench.rflags)
+        self.args = args
+        self.stdin = stdin
+
+        if stdin:
+            self.rflags = cat(args, "<", stdin, Bench.rflags)
+        else:
+            self.rflags = cat(args, Bench.rflags)
 
         if dbg:
             self.xflags = cat(Bench.xflags, "--dbg")
             self.bflags = cat(Bench.bflags, "--dbg")
         self.sbtflags = sbtflags
+        self.rflags = cat(self.rflags, rflags)
 
 
     def _measure(self):
@@ -50,12 +57,13 @@ clean:
             "dstdir":   self.dstdir,
             "name":     self.name,
             "args":     " " + self.args if self.args else "",
+            "stdin":    " --stdin=" + self.stdin if self.stdin else "",
         }
 
         return """\
 .PHONY: {name}-measure
 {name}-measure: {name}
-\t{measure} {dstdir} {name}{args}
+\t{measure} {dstdir} {name}{args}{stdin}
 
 """.format(**fmtdata)
 
@@ -290,6 +298,14 @@ if __name__ == "__main__":
             ["sha_driver.c", "sha.c"],
             path(srcdir, "security/sha/input_large.asc"),
             sbtflags=["-stack-size=16384"]),
+        Bench("rawcaudio", "telecomm/adpcm/src",
+            ["rawcaudio.c", "adpcm.c"],
+            stdin=path(srcdir, "telecomm/adpcm/data/large.pcm"),
+            rflags="--bin"),
+        Bench("rawdaudio", "telecomm/adpcm/src",
+            ["rawdaudio.c", "adpcm.c"],
+            stdin=path(srcdir, "telecomm/adpcm/data/large.adpcm"),
+            rflags="--bin"),
     ]
 
     txt = Bench.PROLOGUE
@@ -357,36 +373,6 @@ BLOWFISH_NAME   := blowfish
 BLOWFISH_DIR    := security/blowfish
 BLOWFISH_MODS   := bf bf_skey bf_ecb bf_enc bf_cbc bf_cfb64 bf_ofb64
 BLOWFISH_ARGS   := notests
-
-## 08- SHA
-# rv32: OK
-
-SHA_NAME        := sha
-SHA_DIR         := security/sha
-SHA_MODS        := sha_driver sha
-SHA_ARGS        := $(MIBENCH)/$(SHA_DIR)/input_large.asc
-
-## 09- RAWCAUDIO
-# rv32: OK
-
-RAWCAUDIO_NAME  := rawcaudio
-RAWCAUDIO_DIR   := telecomm/adpcm
-RAWCAUDIO_MODS  := rawcaudio adpcm
-RAWCAUDIO_ARGS  := < $(MIBENCH)/$(RAWCAUDIO_DIR)/data/large.pcm
-RAWCAUDIO_SRC_DIR_SUFFIX := /src
-RAWCAUDIO_OUT_DIR_SUFFIX := /rawcaudio
-RAWCAUDIO_NO_TEE := 1
-
-## 10- RAWDAUDIO
-# rv32: OK
-
-RAWDAUDIO_NAME  := rawdaudio
-RAWDAUDIO_DIR   := telecomm/adpcm
-RAWDAUDIO_MODS  := rawdaudio adpcm
-RAWDAUDIO_ARGS  := < $(MIBENCH)/$(RAWDAUDIO_DIR)/data/large.adpcm
-RAWDAUDIO_SRC_DIR_SUFFIX := /src
-RAWDAUDIO_OUT_DIR_SUFFIX := /rawdaudio
-RAWDAUDIO_NO_TEE := 1
 
 ## 12- FFT
 # rv32: OK (soft-float)

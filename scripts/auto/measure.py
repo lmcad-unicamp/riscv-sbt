@@ -10,6 +10,11 @@ import time
 
 TARGETS = [ 'x86' ]
 
+class Options:
+    def __init__(self, stdin):
+        self.stdin = stdin
+
+
 class TestData:
     def __init__(self, bin):
         self.bin = bin
@@ -19,22 +24,30 @@ class TestData:
 
 
 class Test:
-    def __init__(self, target, dir, test, args):
+    def __init__(self, target, dir, test, args, opts):
         self.target = target
         self.dir = dir
         self.test = test
         self.args = args
+        self.opts = opts
 
         bin = target + '-' + test
         self.native = TestData(bin)
         self.rv32 = TestData("rv32-" + bin)
 
     def run1(self, args, td, i):
-        with open(td.out(i), 'w') as f:
-            t0 = time.time()
-            subprocess.check_call(args, stdout=f)
-            t1 = time.time()
-            t = t1 - t0
+        with open(td.out(i), 'wb') as fout:
+            stdin = self.opts.stdin
+            if stdin:
+                with open(stdin, 'rb') as fin:
+                    t0 = time.time()
+                    subprocess.check_call(args, stdin=fin, stdout=fout)
+                    t1 = time.time()
+            else:
+                t0 = time.time()
+                subprocess.check_call(args, stdout=fout)
+                t1 = time.time()
+        t = t1 - t0
         print("run #" + str(i) + ": time taken:", t)
         sys.stdout.flush()
         return t
@@ -99,8 +112,8 @@ class Test:
             print("overhead        =", oh)
 
 
-def measure(target, dir, test_name, args):
-    test = Test(target, dir, test_name, args)
+def measure(target, dir, test_name, args, opts):
+    test = Test(target, dir, test_name, args, opts)
     test.run()
 
 
@@ -110,12 +123,14 @@ def main(args):
     parser.add_argument('dir', type=str)
     parser.add_argument('test', type=str)
     parser.add_argument('args', metavar='arg', type=str, nargs='*')
+    parser.add_argument("--stdin", help="stdin redirection")
 
     args = parser.parse_args()
+    opts = Options(args.stdin)
 
     print("measuring", args.test)
 
     for target in TARGETS:
-        measure(target, args.dir, args.test, args.args)
+        measure(target, args.dir, args.test, args.args, opts)
 
 main(sys.argv)
