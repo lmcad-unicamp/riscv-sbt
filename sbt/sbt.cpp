@@ -181,6 +181,11 @@ int main(int argc, char* argv[])
         "dont-use-libc",
         cl::desc("Disallow the SBT to use libC for extended features"));
 
+    cl::opt<std::string> stackSizeOpt(
+        "stack-size",
+        cl::desc("Stack size"),
+        cl::init("4096"));
+
     cl::opt<bool> testOpt("test");
 
     // enable debug code
@@ -230,7 +235,7 @@ int main(int argc, char* argv[])
     sbt::SBTFinish fini;
 
     // create SBT
-    sbt::Options opts(regs, !dontUseLibCOpt);
+    sbt::Options opts(regs, !dontUseLibCOpt, std::atol(stackSizeOpt.c_str()));
     auto exp = sbt::create<sbt::SBT>(inputFiles, outputFile, opts);
     if (!exp)
         sbt::handleError(exp.takeError());

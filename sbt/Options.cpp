@@ -24,6 +24,7 @@ void Options::dump() const
     DBGS << "Options:\n";
     DBGS << "regs=" << regs2str(regs()) << nl;
     DBGS << "useLibC=" << useLibC() << nl;
+    DBGS << "stackSize=" << stackSize() << nl;
 }
 
 }

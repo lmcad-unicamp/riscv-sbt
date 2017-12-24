@@ -1,6 +1,8 @@
 #ifndef SBT_OPTIONS_H
 #define SBT_OPTIONS_H
 
+#include <cstdint>
+
 namespace sbt {
 
 class Options
@@ -13,9 +15,11 @@ public:
 
     Options(
         Regs regs = Regs::GLOBALS,
-        bool useLibC = true)
+        bool useLibC = true,
+        std::size_t stackSize = 0)
         : _regs(regs),
-          _useLibC(useLibC)
+          _useLibC(useLibC),
+          _stackSize(stackSize)
     {
     }
 
@@ -29,11 +33,17 @@ public:
         return _useLibC;
     }
 
+    std::size_t stackSize() const
+    {
+        return _stackSize;
+    }
+
     void dump() const;
 
 private:
     Regs _regs;
     bool _useLibC;
+    std::size_t _stackSize;
 };
 
 }

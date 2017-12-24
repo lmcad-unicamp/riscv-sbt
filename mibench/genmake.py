@@ -29,7 +29,7 @@ clean:
 
 """.format(dstdir)
 
-    def __init__(self, name, dir, ins, args=None):
+    def __init__(self, name, dir, ins, args=None, dbg=False, sbtflags=[]):
         self.name = name
         self.dir = dir
         self.ins = ins
@@ -37,6 +37,11 @@ clean:
         self.srcdir = path(srcdir, dir)
         self.dstdir = path(dstdir, dir)
         self.rflags = cat(args, Bench.rflags)
+
+        if dbg:
+            self.xflags = cat(Bench.xflags, "--dbg")
+            self.bflags = cat(Bench.bflags, "--dbg")
+        self.sbtflags = sbtflags
 
 
     def _measure(self):
@@ -78,7 +83,8 @@ clean:
                 txt = txt + \
                     xlatenrun(narch, self.srcdir, self.dstdir,
                         fmod, nmod, mode,
-                        self.xflags, self.rflags.format(nmod + "-" + mode))
+                        self.xflags, self.rflags.format(nmod + "-" + mode),
+                        sbtflags=self.sbtflags)
 
         # tests
         txt = txt + test(self.xarchs, self.dstdir, self.name, ntest=True)
@@ -280,9 +286,11 @@ if __name__ == "__main__":
             path(srcdir, "telecomm/adpcm/data/large.pcm")),
         Rijndael("rijndael", "security/rijndael",
             ["aes.c", "aesxam.c"]),
-        #Bench("sha", "security/sha",
-        #    ["sha_driver.c", "sha.c"],
-        #    path(srcdir, "security/sha/input_large.asc")),
+        Bench("sha", "security/sha",
+            ["sha_driver.c", "sha.c"],
+            path(srcdir, "security/sha/input_large.asc"),
+            sbtflags=["-stack-size=16384"],
+            dbg=True),
     ]
 
     txt = Bench.PROLOGUE

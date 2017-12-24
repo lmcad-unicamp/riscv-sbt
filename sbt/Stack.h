@@ -15,9 +15,7 @@ class Context;
 class Stack
 {
 public:
-  static const std::size_t SIZE = 4096;
-
-  Stack(Context* ctx, std::size_t sz = SIZE);
+  Stack(Context* ctx, std::size_t sz);
 
   llvm::GlobalVariable* var() const
   {
@@ -27,6 +25,11 @@ public:
   llvm::Value* end() const
   {
     return _end;
+  }
+
+  std::size_t size() const
+  {
+      return _size;
   }
 
 private:

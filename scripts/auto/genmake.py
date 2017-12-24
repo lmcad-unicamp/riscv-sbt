@@ -62,8 +62,10 @@ def bldnrun(arch, srcdir, dstdir, ins, out, bflags=None, rflags=None):
     return txt
 
 
-def xlate(arch, srcdir, dstdir, _in, out, mode, xflags=None):
+def xlate(arch, srcdir, dstdir, _in, out, mode, xflags=None, sbtflags=[]):
     flags = '--flags " -regs={}"'.format(mode)
+    for flag in sbtflags:
+        flags = flags + ' " {}"'.format(flag)
 
     fmtdata = {
         "arch":     arch.name,
@@ -86,8 +88,9 @@ def xlate(arch, srcdir, dstdir, _in, out, mode, xflags=None):
 """.format(**fmtdata)
 
 
-def xlatenrun(arch, srcdir, dstdir, _in, out, mode, xflags=None, rflags=None):
-    txt = xlate(arch, srcdir, dstdir, _in, out, mode, xflags)
+def xlatenrun(arch, srcdir, dstdir, _in, out, mode, xflags=None, rflags=None,
+        sbtflags=[]):
+    txt = xlate(arch, srcdir, dstdir, _in, out, mode, xflags, sbtflags)
     txt = txt + run(arch, dstdir, out + "-" + mode, rflags)
     return txt
 

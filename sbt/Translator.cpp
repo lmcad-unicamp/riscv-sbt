@@ -67,7 +67,7 @@ llvm::Error Translator::start()
     // global register file
     _ctx->x = new XRegisters(_ctx, XRegisters::NONE);
     // stack
-    _ctx->stack = new Stack(_ctx);
+    _ctx->stack = new Stack(_ctx, _opts.stackSize());
     // disassembler
     _ctx->disasm = new Disassembler(&*_disAsm, &*_instPrinter, &*_sti);
     // function lookup
