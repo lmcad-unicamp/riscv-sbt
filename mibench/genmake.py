@@ -289,8 +289,7 @@ if __name__ == "__main__":
         Bench("sha", "security/sha",
             ["sha_driver.c", "sha.c"],
             path(srcdir, "security/sha/input_large.asc"),
-            sbtflags=["-stack-size=16384"],
-            dbg=True),
+            sbtflags=["-stack-size=16384"]),
     ]
 
     txt = Bench.PROLOGUE
