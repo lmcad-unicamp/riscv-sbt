@@ -280,6 +280,9 @@ if __name__ == "__main__":
             path(srcdir, "telecomm/adpcm/data/large.pcm")),
         Rijndael("rijndael", "security/rijndael",
             ["aes.c", "aesxam.c"]),
+        #Bench("sha", "security/sha",
+        #    ["sha_driver.c", "sha.c"],
+        #    path(srcdir, "security/sha/input_large.asc")),
     ]
 
     txt = Bench.PROLOGUE

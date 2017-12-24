@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+
+// function
+
 #define F(x) \
   void* rv32_##x = x;
 
@@ -22,6 +25,7 @@ F(fseek)
 F(fwrite)
 F(getc)
 F(malloc)
+F(memcpy)
 F(memset)
 F(perror)
 F(printf)
@@ -32,6 +36,23 @@ F(rand)
 F(_IO_getc)
 F(__ctype_toupper_loc)
 
-// x86 libc stuff
-//int __isoc99_fscanf(FILE *__restrict, const char *__restrict, ...);
-//F(__isoc99_fscanf)
+
+// data
+
+#define D(x) \
+  void* rv32_##x = NULL;
+
+#define DI(x) \
+  rv32_##x = x;
+
+D(stdin)
+D(stderr)
+D(stdout)
+
+// dummy function to be able to reference non compile time stuff
+void set_non_const()
+{
+    DI(stdin)
+    DI(stderr)
+    DI(stdout)
+}

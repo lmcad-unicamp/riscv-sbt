@@ -188,17 +188,12 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     // external symbol case: handle data or function
     if (ssym.isExternal()) {
         auto expAddr =_ctx->translator->import(ssym.name);
+        if (!expAddr)
+            return expAddr.takeError();
+        uint64_t saddr = expAddr.get();
 
-        // function not found: assume it is data
-        if (!expAddr) {
-            llvm::Error err = llvm::handleErrors(expAddr.takeError(),
-            [](const FunctionNotFound& serr) {
-                serr.log(DBGS);
-            });
-
-            if (err)
-                return std::move(err);
-
+        // data
+        if (saddr == SYM_TYPE_DATA) {
             const Types& t = _ctx->t;
             llvm::Constant* c = _ctx->module->getOrInsertGlobal(ssym.name, t.i32);
             v = llvm::ConstantExpr::getPointerCast(c, t.i32);
@@ -208,11 +203,10 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
 
         // handle external function
         } else {
-            uint64_t addr = expAddr.get();
-            DBGF("external function: addr={0:X+8}, mask={1:X+8}", addr, mask);
+            DBGF("external function: addr={0:X+8}, mask={1:X+8}", saddr, mask);
 
-            addr &= mask;
-            v = _ctx->c.i32(addr);
+            saddr &= mask;
+            v = _ctx->c.i32(saddr);
         }
 
     // internal function case

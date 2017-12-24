@@ -26,6 +26,7 @@ C SIGNED = true;
 C VAR_ARG = true;
 C VOLATILE = true;
 static const char nl = '\n';
+static const uint64_t SYM_TYPE_DATA = ~0ULL;
 #undef C
 
 

@@ -234,9 +234,13 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
 
     // lookup function
     llvm::Function* lf = _lcModule->getFunction(func);
-    if (!lf)
+    if (!lf) {
+        // check if its data
+        if (_lcModule->getNamedGlobal(func))
+            return SYM_TYPE_DATA;
         return ERROR2(FunctionNotFound,
             llvm::formatv("function not found: {0}", func));
+    }
     llvm::FunctionType* ft = lf->getFunctionType();
 
     xassert(ft->getNumParams() < 9 &&
