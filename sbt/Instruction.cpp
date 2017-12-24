@@ -840,8 +840,10 @@ llvm::Error Instruction::translateBranch(BranchType bt)
     {
         if (_ctx->inMain)
             v = _bld->ret(_bld->load(XRegister::A0));
-        else
+        else {
+            _ctx->f->storeRegisters();
             v = _bld->retVoid();
+        }
         return llvm::Error::success();
     }
 
@@ -999,6 +1001,8 @@ void Instruction::link(unsigned linkReg)
 
 llvm::Error Instruction::handleCall(uint64_t target, unsigned linkReg)
 {
+    xunreachable("Unexpected call");
+    /*
     DBGF("target={0:X+8}, linkReg={1}", target, linkReg);
 
     // find function
@@ -1011,6 +1015,7 @@ llvm::Error Instruction::handleCall(uint64_t target, unsigned linkReg)
     _bld->call(f->func());
     _ctx->f->loadRegisters();
     return llvm::Error::success();
+    */
 }
 
 

@@ -141,8 +141,10 @@ llvm::Error Function::finish()
         // In this case, the next instruction will be unreachable.
         if (_ctx->inMain)
             bld->unreachable();
-        else
+        else {
+            storeRegisters();
             bld->retVoid();
+        }
     }
     _ctx->inMain = false;
     cleanRegs();
