@@ -30,12 +30,16 @@ clean:
 """.format(dstdir)
 
     def __init__(self, name, dir, ins, args=None, dbg=False,
-            stdin=None, sbtflags=[], rflags=None):
+            stdin=None, sbtflags=[], rflags=None,
+            dstdir=None):
         self.name = name
         self.dir = dir
         self.ins = ins
         self.srcdir = path(srcdir, dir)
-        self.dstdir = path(dstdir, dir)
+        if dstdir == None:
+            self.dstdir = path(Bench.dstdir, dir)
+        else:
+            self.dstdir = dstdir
         self.args = args
         self.stdin = stdin
 
@@ -300,10 +304,12 @@ if __name__ == "__main__":
             sbtflags=["-stack-size=16384"]),
         Bench("rawcaudio", "telecomm/adpcm/src",
             ["rawcaudio.c", "adpcm.c"],
+            dstdir=path(Bench.dstdir, "telecomm/adpcm/rawcaudio"),
             stdin=path(srcdir, "telecomm/adpcm/data/large.pcm"),
             rflags="--bin"),
         Bench("rawdaudio", "telecomm/adpcm/src",
             ["rawdaudio.c", "adpcm.c"],
+            dstdir=path(Bench.dstdir, "telecomm/adpcm/rawdaudio"),
             stdin=path(srcdir, "telecomm/adpcm/data/large.adpcm"),
             rflags="--bin"),
     ]
