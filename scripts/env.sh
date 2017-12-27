@@ -48,7 +48,7 @@ BUILD_DIR=$TOPDIR/build
 PK32=$TCR/riscv32-unknown-elf/bin/pk
 PK64=$TCR/riscv64-unknown-elf/bin/pk
 
-alias elf="$BUILD_DIR/sbt/$BUILD_TYPE_DIR/test/elf"
+alias elf="$BUILD_DIR/test/sbt/elf"
 alias spike32="spike $PK32"
 alias spike64="spike --isa=RV64IMAFDC $PK64"
 alias qemu32=qemu-riscv32

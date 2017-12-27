@@ -107,6 +107,16 @@ clean:
         # measure
         txt = txt + self._measure()
 
+        # clean
+        txt = txt + """\
+.phony: {name}-clean
+{name}-clean:
+\trm -rf {dstdir}
+
+""".format(**{
+        "name":     name,
+        "dstdir":   self.dstdir})
+
         return txt
 
 
@@ -281,6 +291,16 @@ class Rijndael(Bench):
         "measures": " ".join([name + suffix + "-measure" for suffix in suffixes])
     })
 
+        # clean
+        txt = txt + """\
+.phony: {name}-clean
+{name}-clean:
+\trm -rf {dstdir}
+
+""".format(**{
+        "name":     name,
+        "dstdir":   dstdir})
+
         return txt
 
 
@@ -312,6 +332,10 @@ if __name__ == "__main__":
             dstdir=path(Bench.dstdir, "telecomm/adpcm/rawdaudio"),
             stdin=path(srcdir, "telecomm/adpcm/data/large.adpcm"),
             rflags="--bin"),
+        Bench("stringsearch", "office/stringsearch",
+            ["bmhasrch.c", "bmhisrch.c", "bmhsrch.c", "pbmsrch_large.c"],
+            sbtflags=["-stack-size=131072"],
+            dbg=True),
     ]
 
     txt = Bench.PROLOGUE
@@ -387,15 +411,6 @@ FFT_NAME        := fft
 FFT_DIR         := telecomm/FFT
 FFT_MODS        := main fftmisc fourierf
 FFT_ARGS        := notests
-
-## 13- STRINGSEARCH
-# rv32: OK
-
-STRINGSEARCH_NAME := stringsearch
-STRINGSEARCH_BIN  := search_large
-STRINGSEARCH_DIR  := office/stringsearch
-STRINGSEARCH_MODS := bmhasrch bmhisrch bmhsrch pbmsrch_large
-STRINGSEARCH_ARGS :=
 
 ## 14- LAME
 # rv32: OK (soft-float)

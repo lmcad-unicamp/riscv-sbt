@@ -10,6 +10,7 @@
   void* rv32_##x = x;
 
 F(abort)
+F(atexit)
 F(exit)
 F(fclose)
 F(feof)
@@ -33,9 +34,15 @@ F(putchar)
 F(puts)
 F(rand)
 F(read)
+F(realloc)
+F(strlen)
+F(strncmp)
+F(tolower)
+F(toupper)
 F(write)
 
 F(_IO_getc)
+F(__ctype_tolower_loc)
 F(__ctype_toupper_loc)
 
 

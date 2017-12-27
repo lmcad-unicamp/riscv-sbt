@@ -11,6 +11,7 @@ CFLAGS          = "-fno-rtti -fno-exceptions"
 _O              = "-O3"
 
 emit_llvm       = lambda opts: \
+    "-fstack-protector " + \
     "-emit-llvm -c -O0 -g -mllvm -disable-llvm-optzns" if opts.dbg \
     else "-emit-llvm -c {} -mllvm -disable-llvm-optzns".format(_O)
 RV32_TRIPLE     = "riscv32-unknown-elf"
