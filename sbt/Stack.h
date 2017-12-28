@@ -15,28 +15,28 @@ class Context;
 class Stack
 {
 public:
-  Stack(Context* ctx, std::size_t sz);
+    Stack(Context* ctx, std::size_t sz);
 
-  llvm::GlobalVariable* var() const
-  {
-    return _stack;
-  }
+    llvm::GlobalVariable* var() const
+    {
+        return _stack;
+    }
 
-  llvm::Value* end() const
-  {
-    return _end;
-  }
+    llvm::Value* end() const
+    {
+        return _end;
+    }
 
-  std::size_t size() const
-  {
-      return _size;
-  }
+    std::size_t size() const
+    {
+            return _size;
+    }
 
 private:
-  std::size_t _size;
+    std::size_t _size;
 
-  llvm::GlobalVariable* _stack;
-  llvm::Value* _end;
+    llvm::GlobalVariable* _stack;
+    llvm::Value* _end;
 };
 
 }

@@ -100,6 +100,7 @@ add_executable (riscv-sbt
     Relocation.cpp
     SBTError.cpp
     Section.cpp
+    ShadowImage.cpp
     Stack.cpp
     Syscall.cpp
     Translator.cpp

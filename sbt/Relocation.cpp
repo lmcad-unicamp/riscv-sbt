@@ -5,6 +5,7 @@
 #include "Object.h"
 #include "SBTError.h"
 #include "Section.h"
+#include "ShadowImage.h"
 #include "Translator.h"
 
 #include <llvm/IR/Module.h>
@@ -22,13 +23,15 @@ static SBTSymbol g_invalidSymbol(0, 0, "", nullptr, 0);
 SBTRelocation::SBTRelocation(
     Context* ctx,
     ConstRelocIter ri,
-    ConstRelocIter re)
+    ConstRelocIter re,
+    ConstSectionPtr section)
     :
     _ctx(ctx),
     _ri(ri),
     _re(re),
     _rlast(ri),
-    _last(g_invalidSymbol)
+    _last(g_invalidSymbol),
+    _section(section)
 {
 }
 
@@ -162,7 +165,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             ssym.val += reloc->addend();
     } else if (ssym.sec) {
         xassert(ssym.addr < ssym.sec->size() && "out of bounds relocation");
-        ssym.val += ssym.sec->shadowOffs() + reloc->addend();
+        ssym.val += reloc->addend();
     }
 
     if (isNextToo)
@@ -224,7 +227,8 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
         // get char* to memory
         DBGF("reloc={0:X+8}", ssym.val);
         std::vector<llvm::Value*> idx = { _ctx->c.ZERO, _ctx->c.i32(ssym.val) };
-        v = bld->gep(_ctx->shadowImage, idx);
+        // TODO speed up section lookup for relocations
+        v = bld->gep(_ctx->shadowImage->getSection(ssym.sec->name()), idx);
 
         v = bld->i8PtrToI32(v);
 
@@ -260,6 +264,67 @@ void SBTRelocation::skipRelocation(uint64_t addr)
     do {
         ++_ri;
     } while (_ri != _re && (**_ri).offset() == addr);
+}
+
+
+llvm::GlobalVariable* SBTRelocation::relocateSection(
+    const std::vector<uint8_t>& bytes,
+    const ShadowImage* shadowImage)
+{
+    xassert(_section);
+    DBGF("relocating section {0}", _section->name());
+    std::vector<llvm::Constant*> cvec;
+
+    size_t n = bytes.size();
+    ConstRelocIter rit = _ri;
+
+    for (size_t addr = 0; addr < n; addr+=4) {
+        // reloc
+        if (rit != _re && addr == (*rit)->offset()) {
+            ConstRelocationPtr reloc = *rit;
+            switch (reloc->type()) {
+                case llvm::ELF::R_RISCV_32: {
+                    ConstSymbolPtr sym = reloc->symbol();
+                    xassert(sym);
+                    ConstSectionPtr symSec = reloc->section();
+                    xassert(symSec);
+                    DBGF(
+                        "relocating {0:X-8}: "
+                        "symbol: name={1}, section={2}, offs={3:X-8}",
+                        reloc->offset(),
+                        sym->name(), symSec->name(), sym->address());
+
+                    llvm::Constant* c1 = llvm::ConstantExpr::getPointerCast(
+                        shadowImage->getSection(symSec->name()), _ctx->t.i32);
+                    llvm::Constant* cexpr =
+                        llvm::ConstantExpr::getAdd(c1,
+                            _ctx->c.u32(sym->address()));
+                    cvec.push_back(cexpr);
+                    break;
+                }
+
+                default:
+                    DBGF("unknown relocation type: {0}", reloc->type());
+                    xunreachable("Unsupported relocation type");
+            }
+            ++rit;
+        // or just copy the raw bytes
+        } else {
+            uint32_t val = 0;
+            for (int i = 3; i >= 0; i--) {
+                val |= bytes[addr + i];
+                val <<= 8;
+            }
+            DBGF("copying raw bytes @{0:X-8}: {1:X-8}", addr, val);
+            cvec.push_back(_ctx->c.u32(val));
+        }
+    }
+
+    llvm::ArrayType* aty = llvm::ArrayType::get(_ctx->t.i32, cvec.size());
+    llvm::Constant* ca = llvm::ConstantArray::get(aty, cvec);
+    return new llvm::GlobalVariable(*_ctx->module, ca->getType(),
+        !CONSTANT, llvm::GlobalValue::ExternalLinkage,
+        ca, "ShadowMemory" + _section->name());
 }
 
 }

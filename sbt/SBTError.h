@@ -177,6 +177,19 @@ static inline llvm::Error verror(const std::string& meth, const std::string& msg
 #define ERROR2F(E, msg, ...) ERROR2(E, llvm::formatv(msg, __VA_ARGS__))
 #define ERRORF(msg, ...) ERROR2F(SBTError, msg, __VA_ARGS__)
 
+
+// xabort
+
+[[noreturn]] static inline void xabort(
+    const std::string& meth, const std::string& msg)
+{
+    llvm::errs() << meth + "(): " + msg << nl;
+    std::exit(1);
+}
+
+#define XABORT(msg) xabort(__METHOD_NAME__, msg)
+#define XABORTF(msg, ...) XABORT(llvm::formatv(msg, __VA_ARGS__))
+
 } // sbt
 
 #endif

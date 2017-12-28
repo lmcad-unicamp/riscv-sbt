@@ -3,6 +3,7 @@
 #include "SBTError.h"
 
 #include <llvm/Object/ELFObjectFile.h>
+#include <llvm/Support/FormatVariadic.h>
 
 #include <algorithm>
 
@@ -87,6 +88,9 @@ std::string Section::str() const
     // dump symbols
     for (ConstSymbolPtr sym : symbols())
         ss << "\n        " << sym->str();
+    // dump relocations
+    for (ConstRelocationPtr rel : relocs())
+        ss << rel->str() << "\n";
     ss << " }";
     return s;
 }
@@ -208,15 +212,13 @@ std::string Symbol::str() const
 Relocation::Relocation(
     ConstObjectPtr obj,
     llvm::object::RelocationRef reloc,
+    ConstSymbolPtr sym,
     llvm::Error& err)
     :
     _obj(obj),
-    _reloc(reloc)
+    _reloc(reloc),
+    _sym(sym)
 {
-    // symbol
-    llvm::object::symbol_iterator it = _reloc.getSymbol();
-    if (it != _obj->symbolEnd())
-        _sym = _obj->lookupSymbol(*it);
 }
 
 
@@ -224,14 +226,12 @@ std::string Relocation::str() const
 {
     std::string s;
     llvm::raw_string_ostream ss(s);
-    ss    << "reloc{"
-            << " offs=[" << offset()
-            << "], type=[" << typeName();
+    ss  << llvm::formatv("reloc: offset=[{0:X-8}]", offset());
+    ss  << ", type=[" << typeName() << "]";
     if (section())
-        ss << "], section=[" << section()->name();
+        ss << llvm::formatv(", section=[{0}]", section()->name());
     if (symbol())
-        ss    << "], symbol=[" << symbol()->name();
-    ss << "] }";
+        ss << llvm::formatv(", symbol=[{0}]", symbol()->name());
     return s;
 }
 
@@ -375,20 +375,57 @@ llvm::Error Object::readSymbols()
         }
     }
 
+    // build section by name map
+    std::map<std::string, SectionPtr> sectionByName;
+    for (SectionPtr s : sections)
+        sectionByName[s->name()] = s;
+
     // relocs
+    const std::string rela = ".rela";
     for (const llvm::object::SectionRef& s : _obj->sections()) {
+        // get section name
+        llvm::StringRef sref;
+        auto ec = s.getName(sref);
+        if (ec)
+            continue;
+        // strip ".rela"
+        std::string name = sref.str();
+        if (name.find(rela) != 0)
+            continue;
+        name = name.substr(rela.size());
+        // skip debug sections
+        if (name.find(".debug") != std::string::npos)
+            continue;
+
+        // get target section
+        auto it = sectionByName.find(name);
+        xassert(it != sectionByName.end());
+        SectionPtr targetSection = it->second;
+
+        ConstRelocationPtrVec relocs;
+
         for (auto rb = s.relocations().begin(),
                  re = s.relocations().end();
                  rb != re; ++rb)
         {
             const llvm::object::RelocationRef& r = *rb;
-            auto expRel = create<Relocation*>(this, r);
+
+            // get symbol
+            llvm::object::symbol_iterator symit = r.getSymbol();
+            ConstSymbolPtr sym = lookupSymbol(*symit);
+            // skip debug symbols
+            if (sym && sym->type() == llvm::object::SymbolRef::ST_Debug)
+                continue;
+
+            // add relocation
+            auto expRel = create<Relocation*>(this, r, sym);
             if (!expRel)
                 return expRel.takeError();
             Relocation* rel = expRel.get();
             ConstRelocationPtr ptr(rel);
-            _relocs.push_back(ptr);
+            relocs.push_back(ptr);
         }
+        targetSection->setRelocs(std::move(relocs));
     }
 
     return llvm::Error::success();
@@ -407,11 +444,6 @@ void Object::dump() const
     os << "sections:\n";
     for (ConstSectionPtr sec : sections())
         os << sec->str() << "\n";
-
-    // relocations
-    os << "relocations:\n";
-    for (ConstRelocationPtr rel : _relocs)
-        os << rel->str() << "\n";
 }
 
 } // sbt

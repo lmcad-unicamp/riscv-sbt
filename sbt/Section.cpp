@@ -36,8 +36,7 @@ llvm::Error SBTSection::translate()
     DBGF("{0}", _section->str());
 
     // get relocations
-    ConstObjectPtr obj = _section->object();
-    const ConstRelocationPtrVec& relocs = obj->relocs();
+    const ConstRelocationPtrVec& relocs = _section->relocs();
     SBTRelocation reloc(_ctx, relocs.cbegin(), relocs.cend());
     _ctx->reloc = &reloc;
 

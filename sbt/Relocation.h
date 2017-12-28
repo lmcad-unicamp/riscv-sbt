@@ -9,6 +9,11 @@
 #include <llvm/Support/Error.h>
 #include <llvm/Support/raw_ostream.h>
 
+namespace llvm {
+class GlobalVariable;
+}
+
+
 namespace sbt {
 
 // relocator
@@ -21,11 +26,13 @@ public:
      * @param ctx
      * @param ri relocation begin (iterator)
      * @param re relocation end
+     * @param section
      */
     SBTRelocation(
         Context* ctx,
         ConstRelocIter ri,
-        ConstRelocIter re);
+        ConstRelocIter re,
+        ConstSectionPtr section = nullptr);
 
     /**
      * Handle relocation, by checking if there is a relocation for the
@@ -68,6 +75,10 @@ public:
         return _hasSymbol && _last.instrAddr == addr;
     }
 
+    llvm::GlobalVariable* relocateSection(
+        const std::vector<uint8_t>& bytes,
+        const ShadowImage* shadowImage);
+
 private:
     Context* _ctx;
     ConstRelocIter _ri;
@@ -76,6 +87,7 @@ private:
     SBTSymbol _last;
     bool _hasSymbol = false;
     uint64_t _next = Constants::INVALID_ADDR;
+    ConstSectionPtr _section;
 };
 
 }

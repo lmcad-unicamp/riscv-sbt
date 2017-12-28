@@ -17,6 +17,7 @@ class Disassembler;
 class Function;
 class SBTRelocation;
 class SBTSection;
+class ShadowImage;
 class Stack;
 class Translator;
 class XRegister;
@@ -117,7 +118,7 @@ public:
   // object
   // ConstObjectPtr obj = nullptr;
   // shadow image
-  llvm::GlobalVariable* shadowImage = nullptr;
+  ShadowImage* shadowImage = nullptr;
 
   // section scope
   // (e.g.: .text)

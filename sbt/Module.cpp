@@ -4,6 +4,7 @@
 #include "Function.h"
 #include "SBTError.h"
 #include "Section.h"
+#include "ShadowImage.h"
 
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
@@ -24,18 +25,15 @@ Module::Module(Context* ctx)
 {}
 
 
-llvm::Error Module::start()
+Module::~Module()
 {
-    if (auto err = buildShadowImage())
-        return err;
-
-    return llvm::Error::success();
 }
 
 
-llvm::Error Module::finish()
+void Module::start()
 {
-    return llvm::Error::success();
+    _shadowImage.reset(new ShadowImage(_ctx, _obj));
+    _ctx->shadowImage = _shadowImage.get();
 }
 
 
@@ -49,8 +47,7 @@ llvm::Error Module::translate(const std::string& file)
         return err;
     _obj = &expObj.get();
 
-    if (auto err = start())
-        return err;
+    start();
 
     // translate each section
     for (ConstSectionPtr sec : _obj->sections()) {
@@ -60,55 +57,7 @@ llvm::Error Module::translate(const std::string& file)
     }
 
     // finish module
-    if (auto err = finish())
-        return err;
-
-    return llvm::Error::success();
-}
-
-
-llvm::Error Module::buildShadowImage()
-{
-    std::vector<uint8_t> vec;
-    for (ConstSectionPtr sec : _obj->sections()) {
-        // skip non text/data sections
-        if (!sec->isText() && !sec->isData() && !sec->isBSS() && !sec->isCommon())
-            continue;
-
-        llvm::StringRef bytes;
-        std::string z;
-        // .bss/.common
-        if (sec->isBSS() || sec->isCommon()) {
-            z = std::string(sec->size(), 0);
-            bytes = z;
-        // others
-        } else {
-            // read contents
-            if (sec->contents(bytes))
-                return ERRORF(
-                    "failed to get section [{0}] contents", sec->name());
-        }
-
-        // align
-        while (vec.size() % 4 != 0)
-            vec.push_back(0);
-        size_t addr = vec.size();
-        DBGF("{0}@{1:X+8}-{2:X+8}", sec->name(), addr, addr + bytes.size());
-
-        // set shadow offset of section
-        sec->shadowOffs(addr);
-
-        // append to vector
-        vec.resize(addr + bytes.size());
-        std::copy(bytes.begin(), bytes.end(), vec.begin() + addr);
-    }
-
-    // create the ShadowImage
-    llvm::Constant* cda = llvm::ConstantDataArray::get(*_ctx->ctx, vec);
-    _shadowImage =
-        new llvm::GlobalVariable(*_ctx->module, cda->getType(), !CONSTANT,
-            llvm::GlobalValue::ExternalLinkage, cda, "ShadowMemory");
-    _ctx->shadowImage = _shadowImage;
+    finish();
 
     return llvm::Error::success();
 }

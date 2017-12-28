@@ -7,9 +7,8 @@
 
 #include <llvm/Support/Error.h>
 
-namespace llvm {
-class GlobalVariable;
-}
+#include <memory>
+
 
 namespace sbt {
 
@@ -19,6 +18,7 @@ class Module
 {
 public:
   Module(Context* ctx);
+  ~Module();
 
   // translate object file
   llvm::Error translate(const std::string& file);
@@ -26,13 +26,12 @@ public:
 private:
   Context* _ctx;
   ConstObjectPtr _obj = nullptr;
-  llvm::GlobalVariable* _shadowImage = nullptr;
+  std::unique_ptr<ShadowImage> _shadowImage;
 
   // methods
 
-  llvm::Error start();
-  llvm::Error finish();
-  llvm::Error buildShadowImage();
+  void start();
+  void finish() {}
 };
 
 }
