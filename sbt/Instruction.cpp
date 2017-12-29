@@ -1084,7 +1084,7 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
     //    arg->dump();
 
     // call
-    llvm::Value* v = _bld->call(llic, args);
+    _bld->call(llic, args);
 
     // restore regs
     if (alwaysSync)
@@ -1100,7 +1100,6 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
 
         _bld->setInsertBlock(bbICallEnd);
     }
-    _bld->store(v, XRegister::A0);
 
     return llvm::Error::success();
 }

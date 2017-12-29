@@ -11,8 +11,9 @@ import time
 TARGETS = [ 'x86' ]
 
 class Options:
-    def __init__(self, stdin):
+    def __init__(self, stdin, verbose):
         self.stdin = stdin
+        self.verbose = verbose
 
 
 class TestData:
@@ -48,21 +49,24 @@ class Test:
                 subprocess.check_call(args, stdout=fout)
                 t1 = time.time()
         t = t1 - t0
-        print("run #" + str(i) + ": time taken:", t)
+        if self.opts.verbose:
+            print("run #" + str(i) + ": time taken:", t)
         sys.stdout.flush()
         return t
 
 
     def run(self):
         def prep(td, mode=None):
-            print("measuring", td.bin, "mode:", mode)
+            if self.opts.verbose or mode:
+                print("measuring ", td.bin, ": mode=", mode, sep='')
 
             path = self.dir + '/' + td.bin
             if mode:
                 path = path + '-' + mode
             args = [path]
             args.extend(self.args)
-            print(" ".join(args))
+            if self.opts.verbose:
+                print(" ".join(args))
             sys.stdout.flush()
             return args
 
@@ -124,11 +128,12 @@ def main(args):
     parser.add_argument('test', type=str)
     parser.add_argument('args', metavar='arg', type=str, nargs='*')
     parser.add_argument("--stdin", help="stdin redirection")
+    parser.add_argument("-v", action="store_true", help="verbose")
 
     args = parser.parse_args()
-    opts = Options(args.stdin)
+    opts = Options(args.stdin, args.v)
 
-    print("measuring", args.test)
+    # print("measuring", args.test)
 
     for target in TARGETS:
         measure(target, args.dir, args.test, args.args, opts)

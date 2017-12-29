@@ -81,7 +81,7 @@ llvm::Error Translator::start()
     args.reserve(n);
     for (size_t i = 0; i < n; i++)
         args.push_back(t.i32);
-    _iCaller.create(llvm::FunctionType::get(t.i32, args, !VAR_ARG));
+    _iCaller.create(llvm::FunctionType::get(t.voidT, args, !VAR_ARG));
 
     _isExternal.create(llvm::FunctionType::get(t.i32, { t.i32 }, !VAR_ARG));
 
@@ -322,13 +322,14 @@ void Translator::genICaller()
 
     // abort
     bld->call(_sbtabort->func());
-    bld->ret(c.ZERO);
+    bld->retVoid();
 
     // cases
     // case fun: arg = realFunAddress;
     for (const auto& p : _funcByAddr) {
         Function* f = p.val;
         uint64_t addr = f->addr();
+        bool isExternal = addr >= FIRST_EXT_FUNC_ADDR;
         DBGF("function={0}, addr={1:X+8}", f->name(), addr);
         xassert(addr != Constants::INVALID_ADDR);
 
@@ -388,16 +389,18 @@ void Translator::genICaller()
         // call
         llvm::PointerType* ty = llft->getPointerTo();
         llvm::Value* fptr = bld->bitOrPointerCast(sym, ty);
-        llvm::Value* ret;
         if (llft->getReturnType()->isVoidTy()) {
             bld->call(fptr, args);
-            ret = _ctx->c.ZERO;
+        // write return value into x10 for libc functions
         } else {
-            ret = bld->call(fptr, args);
+            xassert(isExternal);
+            llvm::Value* ret = bld->call(fptr, args);
             if (ret->getType() != t.i32)
                 ret = bld->bitOrPointerCast(ret, t.i32);
+            auto& reg = _ctx->x->getReg(XRegister::A0);
+            bld->store(ret, reg.getForWrite());
         }
-        bld->ret(ret);
+        bld->retVoid();
 
         bld->setInsertBlock(&bbBeg);
         sw->addCase(c.i32(addr), dest.bb());

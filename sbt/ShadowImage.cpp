@@ -4,6 +4,7 @@
 #include "Relocation.h"
 #include "SBTError.h"
 
+#include <algorithm>
 #include <vector>
 
 namespace sbt {
@@ -33,6 +34,16 @@ void ShadowImage::build()
 
     std::vector<Work> workVec;
     size_t addr = 0;
+
+    auto gvname = [](const std::string& s) {
+        auto s2 = s;
+        std::replace(s2.begin(), s2.end(), '.', '_');
+        return "ShadowMemory" + s2;
+    };
+
+    auto toI32 = [this](llvm::GlobalVariable* gv) {
+        return llvm::ConstantExpr::getPointerCast(gv, _ctx->t.i32);
+    };
 
     for (ConstSectionPtr sec : _obj->sections()) {
         // skip non text/data sections
@@ -75,16 +86,19 @@ void ShadowImage::build()
         gv = new llvm::GlobalVariable(
             *_ctx->module, cda->getType(), !CONSTANT,
             llvm::GlobalValue::ExternalLinkage, cda,
-            "ShadowMemory" + sec->name());
-        _sections[sec->name()] = gv;
+            gvname(sec->name()));
+        _sections[sec->name()] = toI32(gv);
     }
 
     // now process sections that need relocation,
     // because they may point to other ones
     for (auto work : workVec) {
+        // relocate
         SBTRelocation reloc(_ctx,
             work.relocs.begin(), work.relocs.end(), work.sec);
-        _sections[work.sec->name()] = reloc.relocateSection(work.vec, this);
+        auto* gv = reloc.relocateSection(work.vec, this);
+        gv->setName(gvname(work.sec->name()));
+        _sections[work.sec->name()] = toI32(gv);
     }
 }
 

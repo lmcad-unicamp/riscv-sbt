@@ -334,8 +334,7 @@ if __name__ == "__main__":
             rflags="--bin"),
         Bench("stringsearch", "office/stringsearch",
             ["bmhasrch.c", "bmhisrch.c", "bmhsrch.c", "pbmsrch_large.c"],
-            sbtflags=["-stack-size=131072"],
-            dbg=True),
+            sbtflags=["-stack-size=131072"]),
     ]
 
     txt = Bench.PROLOGUE

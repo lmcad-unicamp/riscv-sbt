@@ -6,7 +6,7 @@
 #include <map>
 
 namespace llvm {
-class GlobalVariable;
+class Constant;
 }
 
 namespace sbt {
@@ -18,7 +18,7 @@ class ShadowImage
 public:
     ShadowImage(Context* ctx, const Object* obj);
 
-    llvm::GlobalVariable* getSection(const std::string& name) const
+    llvm::Constant* getSection(const std::string& name) const
     {
         auto it = _sections.find(name);
         xassert(it != _sections.end() && "Section not found in ShadowImage!");
@@ -30,7 +30,7 @@ private:
 
     Context* _ctx;
     const Object* _obj;
-    std::map<std::string, llvm::GlobalVariable*> _sections;
+    std::map<std::string, llvm::Constant*> _sections;
 };
 
 }

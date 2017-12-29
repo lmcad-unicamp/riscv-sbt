@@ -222,18 +222,14 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     // other relocation types:
     // add the relocation offset to ShadowImage to get the final address
     } else if (ssym.sec) {
-        Builder* bld = _ctx->bld;
-
         // get char* to memory
         DBGF("reloc={0:X+8}", ssym.val);
-        std::vector<llvm::Value*> idx = { _ctx->c.ZERO, _ctx->c.i32(ssym.val) };
         // TODO speed up section lookup for relocations
-        v = bld->gep(_ctx->shadowImage->getSection(ssym.sec->name()), idx);
-
-        v = bld->i8PtrToI32(v);
-
+        llvm::Constant* cv = llvm::ConstantExpr::getAdd(
+            _ctx->shadowImage->getSection(ssym.sec->name()),
+            _ctx->c.i32(ssym.val));
         // get only the upper or lower part of the result
-        v = bld->_and(v, _ctx->c.i32(mask));
+        v = llvm::ConstantExpr::getAnd(cv, _ctx->c.i32(mask));
 
     } else
         xassert(false && "failed to resolve relocation");
@@ -294,10 +290,9 @@ llvm::GlobalVariable* SBTRelocation::relocateSection(
                         reloc->offset(),
                         sym->name(), symSec->name(), sym->address());
 
-                    llvm::Constant* c1 = llvm::ConstantExpr::getPointerCast(
-                        shadowImage->getSection(symSec->name()), _ctx->t.i32);
                     llvm::Constant* cexpr =
-                        llvm::ConstantExpr::getAdd(c1,
+                        llvm::ConstantExpr::getAdd(
+                            shadowImage->getSection(symSec->name()),
                             _ctx->c.u32(sym->address()));
                     cvec.push_back(cexpr);
                     break;
@@ -323,8 +318,7 @@ llvm::GlobalVariable* SBTRelocation::relocateSection(
     llvm::ArrayType* aty = llvm::ArrayType::get(_ctx->t.i32, cvec.size());
     llvm::Constant* ca = llvm::ConstantArray::get(aty, cvec);
     return new llvm::GlobalVariable(*_ctx->module, ca->getType(),
-        !CONSTANT, llvm::GlobalValue::ExternalLinkage,
-        ca, "ShadowMemory" + _section->name());
+        !CONSTANT, llvm::GlobalValue::ExternalLinkage, ca);
 }
 
 }
