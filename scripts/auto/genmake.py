@@ -142,25 +142,60 @@ def test(xarchs, dir, name, ntest=False):
     return txt
 
 
-def aliases(narchs, xarchs, mod):
+def alias(name, aliasees):
+    fmtdata = {
+        "name":     name,
+        "aliasees": " ".join(aliasees),
+    }
+
+    return """\
+.PHONY: {name}
+{name}: {aliasees}
+
+""".format(**fmtdata)
+
+
+def alias_build_all(narchs, xarchs, mod):
     nmods = [arch.add_prefix(mod) for arch in narchs]
     xmods = [farch.add_prefix(narch.add_prefix(mod)) + "-" + mode
             for (farch, narch) in xarchs
             for mode in SBT.modes]
 
-    runs = [m + "-run" for m in nmods + xmods]
-
     fmtdata = {
         "mod":      mod,
         "nmods":    " ".join(nmods),
-        "xmods":    " ".join(xmods),
-        "runs":     " ".join(runs),
+        "xmods":    " ".join(xmods)
     }
 
     return """\
 .PHONY: {mod}
 {mod}: {nmods} {xmods}
 
+""".format(**fmtdata)
+
+
+def alias_run_all(narchs, xarchs, mod, suffixes):
+    nmods = [arch.add_prefix(mod) for arch in narchs]
+    xmods = [farch.add_prefix(narch.add_prefix(mod)) + "-" + mode
+            for (farch, narch) in xarchs
+            for mode in SBT.modes]
+
+    runs = []
+    for m in nmods:
+        for suffix in suffixes:
+            suffix = "-" + suffix if suffix else ""
+            runs.append(m + suffix + "-run")
+    for m in xmods:
+        for suffix in suffixes:
+            suffix = "-" + suffix if suffix else ""
+            runs.append(m + suffix + "-run")
+
+    fmtdata = {
+        "mod":      mod,
+        "runs":     " ".join(runs),
+    }
+
+    return """\
 .PHONY: {mod}-run
 {mod}-run: {runs}
 

@@ -10,6 +10,42 @@ from auto.genmake import *
 # http://vhosts.eecs.umich.edu/mibench//office.tar.gz
 # http://vhosts.eecs.umich.edu/mibench//consumer.tar.gz
 
+# arguments for a given run
+class Args:
+    def __init__(self, args, id=None):
+        self.id = id
+        self._args = args
+
+
+    # add prefix and mode to arguments, if needed
+    def args(self, prefix, mode):
+        fmtdata = {
+            "prefix":   prefix + "-" if prefix else '',
+            "mode":     "-" + mode if mode else ''
+        }
+
+        return [arg.format(**fmtdata) for arg in self._args]
+
+
+class ArchAndMode:
+    def __init__(self, farch, narch, mode=None):
+        self.farch = farch
+        self.narch = narch
+        self.mode = mode
+
+    # get arch prefix string
+    def prefix(self):
+        if not self.farch:
+            return self.narch.prefix
+        else:
+            return self.farch.add_prefix(self.narch.prefix)
+
+    # get output file name for this ArchAndMode
+    def out(self, name):
+        return (self.prefix() + "-" + name +
+            ("-" + self.mode if self.mode else ""));
+
+
 class Bench:
     narchs = [RV32_LINUX, X86]
     xarchs = [(RV32_LINUX, X86)]
@@ -17,7 +53,7 @@ class Bench:
     dstdir = path(DIR.build, "mibench")
     xflags = None
     bflags = None
-    rflags = "-o {}.out"
+    rflags_var = "-o {}.out"
 
     PROLOGUE = """\
 ### MIBENCH ###
@@ -29,6 +65,7 @@ clean:
 
 """.format(dstdir)
 
+    # args: list of Args
     def __init__(self, name, dir, ins, args=None, dbg=False,
             stdin=None, sbtflags=[], rflags=None,
             dstdir=None):
@@ -40,147 +77,33 @@ clean:
             self.dstdir = path(Bench.dstdir, dir)
         else:
             self.dstdir = dstdir
-        self.args = args
+        self.args = args if args else [Args([])]
         self.stdin = stdin
-
-        if stdin:
-            self.rflags = cat(args, "<", stdin, Bench.rflags)
-        else:
-            self.rflags = cat(args, Bench.rflags)
+        self.sbtflags = sbtflags
+        self.dbg = dbg
+        self.rflags_suffix = rflags
 
         if dbg:
-            self.xflags = cat(Bench.xflags, "--dbg")
             self.bflags = cat(Bench.bflags, "--dbg")
-        self.sbtflags = sbtflags
-        self.rflags = cat(self.rflags, rflags)
+            self.xflags = cat(Bench.xflags, "--dbg")
 
 
-    def _measure(self):
-        fmtdata = {
-            "measure":  TOOLS.measure,
-            "dstdir":   self.dstdir,
-            "name":     self.name,
-            "args":     " " + self.args if self.args else "",
-            "stdin":    " --stdin=" + self.stdin if self.stdin else "",
-        }
+    def rflags(self, args_obj, prefix, mode):
+        if args_obj:
+            args_str = " ".join(args_obj.args(prefix, mode))
+        else:
+            args_str = ''
 
-        return """\
-.PHONY: {name}-measure
-{name}-measure: {name}
-\t{measure} {dstdir} {name}{args}{stdin}
-
-""".format(**fmtdata)
+        if self.stdin:
+            ret = cat(args_str, "<", self.stdin, Bench.rflags_var)
+        else:
+            ret = cat(args_str, Bench.rflags_var)
+        ret = cat(ret, self.rflags_suffix).format(
+                prefix + "-" + self.name + ("-" + mode if mode else ""))
+        return ret
 
 
-    def gen(self):
-        name = self.name
-
-        # module comment
-        txt = "### {} ###\n\n".format(name)
-
-        # native builds
-        for arch in self.narchs:
-            out = arch.add_prefix(name)
-            txt = txt + \
-                bldnrun(arch, self.srcdir, self.dstdir, self.ins, out,
-                    self.bflags, self.rflags.format(out))
-
-        # translations
-        for xarch in self.xarchs:
-            (farch, narch) = xarch
-            fmod  = farch.out2objname(name)
-            nmod  = farch.add_prefix(narch.add_prefix(name))
-
-            for mode in SBT.modes:
-                txt = txt + \
-                    xlatenrun(narch, self.srcdir, self.dstdir,
-                        fmod, nmod, mode,
-                        self.xflags, self.rflags.format(nmod + "-" + mode),
-                        sbtflags=self.sbtflags)
-
-        # tests
-        txt = txt + test(self.xarchs, self.dstdir, self.name, ntest=True)
-
-        # aliases
-        txt = txt + aliases(self.narchs, self.xarchs, self.name)
-
-        # measure
-        txt = txt + self._measure()
-
-        # clean
-        txt = txt + """\
-.phony: {name}-clean
-{name}-clean:
-\trm -rf {dstdir}
-
-""".format(**{
-        "name":     name,
-        "dstdir":   self.dstdir})
-
-        return txt
-
-
-class Rijndael(Bench):
-    class Args:
-        def __init__(self, suffix, args):
-            self.suffix = suffix
-            self._args = args
-
-        def args(self, prefix, mode):
-            fmtdata = {
-                "prefix":   prefix + "-" if prefix else '',
-                "mode":     "-" + mode if mode else ''
-            }
-
-            args = list(self._args)
-            args[0] = args[0].format(**fmtdata)
-            args[1] = args[1].format(**fmtdata)
-            return args
-
-
-    class X:
-        """ this class just holds some related data together """
-
-        def __init__(self, farch, narch, mode=None):
-            self.farch = farch
-            self.narch = narch
-            self.mode = mode
-
-        def prefix(self):
-            if not self.farch:
-                return self.narch.prefix
-            else:
-                return self.farch.add_prefix(self.narch.prefix)
-
-        def out(self, name):
-            if not self.farch:
-                return self.prefix() + "-" + name
-            else:
-                return self.prefix() + "-" + name + "-" + self.mode
-
-
-    def __init__(self, name, dir, ins, args=None):
-        super(Rijndael, self).__init__(name, dir, ins, args)
-
-
-    def _measure(self, suffix, args):
-        fmtdata = {
-            "measure":  TOOLS.measure,
-            "dstdir":   self.dstdir,
-            "name":     self.name,
-            "suffix":   suffix,
-            "args":     " ".join(args),
-        }
-
-        return """\
-.PHONY: {name}{suffix}-measure
-{name}{suffix}-measure: {name}
-\t{measure} {dstdir} {name} {args}
-
-""".format(**fmtdata)
-
-
-    def gen(self):
+    def gen_build(self):
         name = self.name
         srcdir = self.srcdir
         dstdir = self.dstdir
@@ -203,124 +126,210 @@ class Rijndael(Bench):
             for mode in SBT.modes:
                 txt = txt + \
                     xlate(narch, srcdir, dstdir,
-                        fmod, nmod, mode, self.xflags)
+                        fmod, nmod, mode, self.xflags,
+                        sbtflags=self.sbtflags)
+        return txt
+
+
+    def gen_run(self):
+        txt = ''
 
         # prepare archs and modes
-        xs = [self.X(None, arch) for arch in self.narchs]
-        xs.extend(
-            [self.X(farch, narch, mode)
+        ams = [ArchAndMode(None, arch) for arch in self.narchs]
+        ams.extend(
+            [ArchAndMode(farch, narch, mode)
             for (farch, narch) in self.xarchs
             for mode in SBT.modes])
 
-        # prepare args
-        asc = path(srcdir, "input_large.asc")
-        enc = path(dstdir, "{prefix}output_large{mode}.enc")
-        dec = path(dstdir, "{prefix}output_large{mode}.dec")
-        args = [
-            self.Args("-encode", [
-                asc,
-                enc,
-                "e",
-                "1234567890abcdeffedcba09876543211234567890abcdeffedcba0987654321"
-            ]),
-            self.Args("-decode", [
-                enc,
-                dec,
-                "d",
-                "1234567890abcdeffedcba09876543211234567890abcdeffedcba0987654321"
-            ])
-        ]
-        suffixes = [a.suffix for a in args]
+        # runs
+        for am in ams:
+            arch = am.narch
+            prefix = am.prefix()
+            mode = am.mode
+            out = am.out(self.name)
 
-        # runs and tests
-        for x in xs:
-            arch = x.narch
-            prefix = x.prefix()
-            mode = x.mode
-            out = x.out(name)
-            fdec = dec.format(**{
-                "prefix":   prefix + "-",
-                "mode":     "-" + mode if mode else ''
-            })
-
-            for a in args:
-                aargs = a.args(prefix, mode)
-                suffix = a.suffix
-
-                rflags = cat(" ".join(aargs), self.rflags.format(out + suffix))
-                txt = txt + run(arch, dstdir, out, rflags, suffix)
-
-            # runs + test
-            runs = [out + suffix + "-run" for suffix in suffixes]
-            txt = txt + """\
-.PHONY: {out}-run
-{out}-run: {runs}
-
-.PHONY: {out}-test
-{out}-test: {runs}
-\tdiff {dec} {asc}
-
-""".format(**{
-        "out":  out,
-        "runs": " ".join(runs),
-        "dec":  fdec,
-        "asc":  asc,
-    })
+            # runs
+            for args_obj in self.args:
+                suffix = "-" + args_obj.id if args_obj.id else ""
+                # run
+                txt = txt + run(arch, self.dstdir, out,
+                        self.rflags(args_obj, prefix, mode), suffix)
+        return txt
 
 
-        # aliases
-        txt = txt + aliases(self.narchs, self.xarchs, self.name)
+    def gen_test(self):
+        return test(self.xarchs, self.dstdir, self.name, ntest=True)
+
+
+    def measure(self, args_obj=None):
+        suffix = None
+        if args_obj:
+            args = " " + " ".join(args_obj.args(prefix='', mode=''))
+            suffix = args_obj.id
+        else:
+            args = ""
+
+        fmtdata = {
+            "measure":  TOOLS.measure,
+            "dstdir":   self.dstdir,
+            "name":     self.name,
+            "suffix":   "-" + suffix if suffix else "",
+            "args":     args,
+            "stdin":    " --stdin=" + self.stdin if self.stdin else "",
+        }
+
+        return """\
+.PHONY: {name}{suffix}-measure
+{name}{suffix}-measure: {name}
+\t{measure} {dstdir} {name}{args}{stdin}
+
+""".format(**fmtdata)
+
+
+    def gen_measure(self):
+        txt = ""
 
         # measures
-        for a in args:
-            aargs = a.args('', '')
-            suffix = a.suffix
-            txt = txt + self._measure(suffix, aargs)
+        measures = []
+        for args_obj in self.args:
+            txt = txt + self.measure(args_obj)
+            m = self.name
+            if args_obj.id:
+                m = m + "-" + args_obj.id
+            m = m + "-measure"
+            measures.append(m)
 
-        # all tests & measures targets
-        txt = txt + """\
-.PHONY: {name}-test
-{name}-test: {tests}
+        if len(measures) > 1:
+            txt = txt + alias(self.name + "-measure", measures)
 
-.PHONY: {name}-measure
-{name}-measure: {measures}
+        return txt
 
-""".format(**{
-        "name":     name,
-        "tests":    " ".join([x.out(name) + "-test" for x in xs]),
-        "measures": " ".join([name + suffix + "-measure" for suffix in suffixes])
-    })
 
+    def gen_clean(self):
         # clean
-        txt = txt + """\
+        return """\
 .phony: {name}-clean
 {name}-clean:
 \trm -rf {dstdir}
 
 """.format(**{
-        "name":     name,
-        "dstdir":   dstdir})
+        "name":     self.name,
+        "dstdir":   self.dstdir})
 
+
+    def gen_alias(self):
+        # aliases
+        txt = alias_build_all(self.narchs, self.xarchs, self.name)
+        suffixes = [o.id if o.id else '' for o in self.args]
+        txt = txt + alias_run_all(self.narchs, self.xarchs, self.name,
+                suffixes)
         return txt
 
+
+    def gen(self):
+        txt = self.gen_build()
+        txt = txt + self.gen_run()
+        txt = txt + self.gen_test()
+        txt = txt + self.gen_measure()
+        txt = txt + self.gen_clean()
+        txt = txt + self.gen_alias()
+        return txt
+
+
+class EncDecBench(Bench):
+    def set_asc_index(self, index):
+        self.asc_index = index
+        return self
+
+    def set_dec_index(self, index):
+        self.dec_index = index
+        return self
+
+    def test1(self, prefix, mode, suffixes, asc, dec):
+        out = prefix + "-" + self.name + ("-" + mode if mode else '')
+        runs = [out + "-" + suf + "-run" for suf in suffixes]
+
+        return (
+            ".PHONY: {out}-test\n" +
+            "{out}-test: {runs}\n" +
+            "\tdiff {dec} {asc}\n\n").format(
+            **{
+                "out":  out,
+                "runs": " ".join(runs),
+                "asc":  asc,
+                "dec":  dec,
+            })
+
+
+    def gen_test(self):
+        txt = ''
+        asc_i = self.asc_index[0]
+        asc_j = self.asc_index[1]
+        dec_i = self.dec_index[0]
+        dec_j = self.dec_index[1]
+
+        suffixes = [o.id for o in self.args]
+        tests = []
+        for arch in self.narchs + self.xarchs:
+            is_xarch = isinstance(arch, tuple)
+            if is_xarch:
+                (farch, narch) = arch
+                prefix = farch.prefix + "-" + narch.prefix
+                modes = SBT.modes
+            else:
+                prefix = arch.prefix
+                modes = ['']
+
+            for mode in modes:
+                asc = self.args[asc_i].args(prefix, mode)[asc_j]
+                dec = self.args[dec_i].args(prefix, mode)[dec_j]
+                txt = txt + self.test1(prefix, mode, suffixes, asc, dec)
+                tests.append(prefix + "-" + self.name +
+                    ("-" + mode if mode else "") + "-test")
+
+        txt = txt + alias(self.name + "-test", tests)
+        return txt
 
 
 if __name__ == "__main__":
     srcdir = Bench.srcdir
     dstdir = Bench.dstdir
 
+    # rijndael args
+    rijndael_dir = "security/rijndael"
+    rijndael_asc = mpath(srcdir, rijndael_dir, "input_large.asc")
+    rijndael_enc = mpath(dstdir, rijndael_dir, "{prefix}output_large{mode}.enc")
+    rijndael_dec = mpath(dstdir, rijndael_dir, "{prefix}output_large{mode}.dec")
+    rijndael_key = "1234567890abcdeffedcba09876543211234567890abcdeffedcba0987654321"
+    rijndael_args = [
+        Args([rijndael_asc, rijndael_enc, "e", rijndael_key], "encode"),
+        Args([rijndael_enc, rijndael_dec, "d", rijndael_key], "decode")]
+
+    # blowfish args
+    bf_dir = "security/blowfish"
+    bf_asc = mpath(srcdir, bf_dir, "input_large.asc")
+    bf_enc = mpath(dstdir, bf_dir, "{prefix}output_large{mode}.enc")
+    bf_dec = mpath(dstdir, bf_dir, "{prefix}output_large{mode}.asc")
+    bf_key = "1234567890abcdeffedcba0987654321"
+    bf_args = [
+        Args(["e", bf_asc, bf_enc, bf_key], "encode"),
+        Args(["d", bf_enc, bf_dec, bf_key], "decode")]
+
     benchs = [
         Bench("dijkstra", "network/dijkstra",
             ["dijkstra_large.c"],
-            path(srcdir, "network/dijkstra/input.dat")),
+            [Args([path(srcdir, "network/dijkstra/input.dat")])]),
         Bench("crc32", "telecomm/CRC32",
             ["crc_32.c"],
-            path(srcdir, "telecomm/adpcm/data/large.pcm")),
-        Rijndael("rijndael", "security/rijndael",
-            ["aes.c", "aesxam.c"]),
+            [Args([path(srcdir, "telecomm/adpcm/data/large.pcm")])]),
+        EncDecBench("rijndael", rijndael_dir,
+            ["aes.c", "aesxam.c"],
+            rijndael_args).
+            set_asc_index([0, 0]).
+            set_dec_index([1, 1]),
         Bench("sha", "security/sha",
             ["sha_driver.c", "sha.c"],
-            path(srcdir, "security/sha/input_large.asc"),
+            [Args([path(srcdir, "security/sha/input_large.asc")])],
             sbtflags=["-stack-size=16384"]),
         Bench("rawcaudio", "telecomm/adpcm/src",
             ["rawcaudio.c", "adpcm.c"],
@@ -335,6 +344,20 @@ if __name__ == "__main__":
         Bench("stringsearch", "office/stringsearch",
             ["bmhasrch.c", "bmhisrch.c", "bmhsrch.c", "pbmsrch_large.c"],
             sbtflags=["-stack-size=131072"]),
+        EncDecBench("blowfish", bf_dir,
+            ["bf.c",
+            "bf_skey.c",
+            "bf_ecb.c",
+            "bf_enc.c",
+            "bf_cbc.c",
+            "bf_cfb64.c",
+            "bf_ofb64.c"],
+            bf_args,
+            sbtflags=["-stack-size=131072"],
+            rflags="--exp-rc=1",
+            dbg=True).
+            set_asc_index([0, 1]).
+            set_dec_index([1, 2]),
     ]
 
     txt = Bench.PROLOGUE
@@ -394,14 +417,6 @@ PATRICIA_NAME   := patricia
 PATRICIA_DIR    := network/patricia
 PATRICIA_MODS   := patricia patricia_test
 PATRICIA_ARGS   := $(MIBENCH)/$(PATRICIA_DIR)/large.udp
-
-## 07- BLOWFISH
-# rv32: wrong results
-
-BLOWFISH_NAME   := blowfish
-BLOWFISH_DIR    := security/blowfish
-BLOWFISH_MODS   := bf bf_skey bf_ecb bf_enc bf_cbc bf_cfb64 bf_ofb64
-BLOWFISH_ARGS   := notests
 
 ## 12- FFT
 # rv32: OK (soft-float)

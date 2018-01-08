@@ -15,21 +15,32 @@ class cd:
         os.chdir(self.prev_dir)
 
 
-def shell(cmd, save_out=False, bin=False):
+def shell(cmd, save_out=False, bin=False, exp_rc=0):
     """ run shell command """
     print(cmd)
+
+    check = exp_rc == 0
+    def check_rc(cp):
+        if exp_rc != 0:
+            if cp.returncode != exp_rc:
+                raise Exception("shell(" + cmd + ") failed! rc=" +
+                        str(cp.returncode))
+
     if save_out:
         if bin:
-            cp = subprocess.run(cmd, shell=True, check=True,
+            cp = subprocess.run(cmd, shell=True, check=check,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            check_rc(cp)
             return cp.stdout
         else:
-            cp = subprocess.run(cmd, shell=True, check=True,
+            cp = subprocess.run(cmd, shell=True, check=check,
                 universal_newlines=True,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            check_rc(cp)
             return cp.stdout
     else:
-        subprocess.run(cmd, shell=True, check=True)
+        cp = subprocess.run(cmd, shell=True, check=check)
+        check_rc(cp)
 
 
 def cat(*args):
