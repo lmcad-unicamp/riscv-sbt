@@ -174,7 +174,7 @@ def alias_build_all(narchs, xarchs, mod):
 """.format(**fmtdata)
 
 
-def alias_run_all(narchs, xarchs, mod, suffixes):
+def alias_run_all(narchs, xarchs, mod, suffixes=['']):
     nmods = [arch.add_prefix(mod) for arch in narchs]
     xmods = [farch.add_prefix(narch.add_prefix(mod)) + "-" + mode
             for (farch, narch) in xarchs
@@ -239,7 +239,8 @@ def do_mod(narchs, xarchs, name, src, srcdir, dstdir, xflags, bflags, rflags):
     txt = txt + test(xarchs, dstdir, name, ntest=len(narchs) > 1)
 
     # aliases
-    txt = txt + aliases(narchs, xarchs, name)
+    txt = txt + alias_build_all(narchs, xarchs, name)
+    txt = txt + alias_run_all(narchs, xarchs, name)
 
     return txt
 

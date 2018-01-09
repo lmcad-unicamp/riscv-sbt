@@ -36,18 +36,25 @@ class Test:
         self.native = TestData(bin)
         self.rv32 = TestData("rv32-" + bin)
 
+    def check_rc(self, rc):
+        exp_rc = self.opts.exp_rc
+        if rc != exp_rc:
+            raise Exception("Failure! rc=" + str(rc) + " exp_rc=" + str(exp_rc))
+
     def run1(self, args, td, i):
         with open(td.out(i), 'wb') as fout:
             stdin = self.opts.stdin
             if stdin:
                 with open(stdin, 'rb') as fin:
                     t0 = time.time()
-                    subprocess.check_call(args, stdin=fin, stdout=fout)
+                    cp = subprocess.call(args, stdin=fin, stdout=fout)
                     t1 = time.time()
+                    self.check_rc(cp)
             else:
                 t0 = time.time()
-                subprocess.check_call(args, stdout=fout)
+                cp = subprocess.call(args, stdout=fout)
                 t1 = time.time()
+                self.check_rc(cp)
         t = t1 - t0
         if self.opts.verbose:
             print("run #" + str(i) + ": time taken:", t)
@@ -129,9 +136,12 @@ def main(args):
     parser.add_argument('args', metavar='arg', type=str, nargs='*')
     parser.add_argument("--stdin", help="stdin redirection")
     parser.add_argument("-v", action="store_true", help="verbose")
+    parser.add_argument("--exp-rc", type=int, default=0,
+        help="expected return code")
 
     args = parser.parse_args()
     opts = Options(args.stdin, args.v)
+    opts.exp_rc = args.exp_rc
 
     # print("measuring", args.test)
 

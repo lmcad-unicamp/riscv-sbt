@@ -76,8 +76,14 @@ i=0;
 while(!feof(fp))
 {
 	int j;
-	while(!feof(fp) && i<40)
-		indata[i++]=getc(fp);
+	int c;
+
+	while (i<40) {
+		c=getc(fp);
+		if (c == EOF)
+			break;
+		indata[i++]=c;
+	}
 
 	BF_cfb64_encrypt(indata,outdata,i,&key,ivec,&num,encordec);
 

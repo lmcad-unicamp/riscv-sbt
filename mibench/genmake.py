@@ -67,7 +67,7 @@ clean:
 
     # args: list of Args
     def __init__(self, name, dir, ins, args=None, dbg=False,
-            stdin=None, sbtflags=[], rflags=None,
+            stdin=None, sbtflags=[], rflags=None, mflags=None,
             dstdir=None):
         self.name = name
         self.dir = dir
@@ -82,6 +82,7 @@ clean:
         self.sbtflags = sbtflags
         self.dbg = dbg
         self.rflags_suffix = rflags
+        self.mflags = mflags
 
         if dbg:
             self.bflags = cat(Bench.bflags, "--dbg")
@@ -176,12 +177,13 @@ clean:
             "suffix":   "-" + suffix if suffix else "",
             "args":     args,
             "stdin":    " --stdin=" + self.stdin if self.stdin else "",
+            "mflags":   " " + " ".join(self.mflags) if self.mflags else "",
         }
 
         return """\
 .PHONY: {name}{suffix}-measure
 {name}{suffix}-measure: {name}
-\t{measure} {dstdir} {name}{args}{stdin}
+\t{measure} {dstdir} {name}{args}{stdin}{mflags}
 
 """.format(**fmtdata)
 
@@ -324,9 +326,9 @@ if __name__ == "__main__":
             [Args([path(srcdir, "telecomm/adpcm/data/large.pcm")])]),
         EncDecBench("rijndael", rijndael_dir,
             ["aes.c", "aesxam.c"],
-            rijndael_args).
-            set_asc_index([0, 0]).
-            set_dec_index([1, 1]),
+            rijndael_args)
+            .set_asc_index([0, 0])
+            .set_dec_index([1, 1]),
         Bench("sha", "security/sha",
             ["sha_driver.c", "sha.c"],
             [Args([path(srcdir, "security/sha/input_large.asc")])],
@@ -355,9 +357,9 @@ if __name__ == "__main__":
             bf_args,
             sbtflags=["-stack-size=131072"],
             rflags="--exp-rc=1",
-            dbg=True).
-            set_asc_index([0, 1]).
-            set_dec_index([1, 2]),
+            mflags=["--exp-rc=1"])
+            .set_asc_index([0, 1])
+            .set_dec_index([1, 2]),
     ]
 
     txt = Bench.PROLOGUE
