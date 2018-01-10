@@ -33,7 +33,7 @@ ENV PYTHONPATH=/riscv-sbt/scripts
 RUN make riscv-gnu-toolchain-newlib \
     && rm -rf build
 
-RUN make riscv-gnu-toolchain-linux \
+RUN make MAKE_OPTS=-j4 riscv-gnu-toolchain-linux \
     && rm -rf build
 
 CMD ["/bin/bash"]

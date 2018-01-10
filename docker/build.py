@@ -80,7 +80,7 @@ class Commits:
             # get submodules
             out = shell("git submodule", save_out=True)
             lines = out.split("\n")
-            patt = re.compile(" *([^ ]+) +submodules/([^ ]+) *")
+            patt = re.compile("[ -]*([^ ]+) +submodules/([^ ]+) *")
             for l in lines:
                 r = re.match(patt, l)
                 if r:
