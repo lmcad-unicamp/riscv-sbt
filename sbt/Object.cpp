@@ -61,9 +61,8 @@ static Flags* g_flags;
 static std::string getTypeStr(Symbol::Type type)
 {
     using SR = llvm::object::SymbolRef;
-    std::string typeStr;
+    std::string typeStr = "???";
     switch (type) {
-        default:
         case SR::ST_Unknown:    typeStr = "unk";    break;
         case SR::ST_Data:       typeStr = "data";   break;
         case SR::ST_Debug:      typeStr = "dbg";    break;

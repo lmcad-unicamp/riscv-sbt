@@ -1,9 +1,11 @@
 FROM sbt-emu
 
 # llvm/clang reqs
+# clang-3.9: to build LLVM (gcc could be used instead)
 RUN apt-get update \
     && apt-get install -y \
     cmake \
+    clang-3.9 \
     g++-multilib \
     ninja-build \
     && rm -rf /var/lib/apt/lists/*

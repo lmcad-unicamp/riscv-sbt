@@ -14,7 +14,8 @@ if __name__ == "__main__":
     pkgs = auto.pkg.Package.pkgs
 
     parser = argparse.ArgumentParser(description="build packages")
-    parser.add_argument("pkg")
+    parser.add_argument("pkg",
+        help="package name or 'list' to list all packages")
     parser.add_argument("--clean", action="store_true")
     parser.add_argument("-j", type=int, default=9)
     parser.add_argument("-f", action="store_true", help="force")

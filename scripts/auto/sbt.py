@@ -18,6 +18,8 @@ def _pkgs():
     configure = cat(
         "cmake",
         "-DCMAKE_BUILD_TYPE=Debug",
+        "-DCMAKE_C_COMPILER=/usr/bin/clang-3.9",
+        "-DCMAKE_CXX_COMPILER=/usr/bin/clang++-3.9",
         "-DCMAKE_INSTALL_PREFIX=" + prefix,
         path(DIR.top, "sbt")
     )
