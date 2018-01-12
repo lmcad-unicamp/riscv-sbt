@@ -19,6 +19,8 @@ class Opts:
         self.sflags = None
         self.ldflags = None
         self.sbtflags = None
+        #
+        self._as = None
 
 
 def _c2bc(arch, srcdir, dstdir, _in, out, opts):
@@ -89,9 +91,10 @@ def bc2s(arch, dir, _in, out, opts):
     cmd = cat(arch.llc, flags, ipath, "-o", opath)
     shell(cmd)
     # workaround for align issue with as
-    if arch == RV32 or arch == RV32_LINUX:
-        cmd = 'sed -i "1i.option norelax" ' + opath
-        shell(cmd)
+    if opts._as == "as":
+        if arch == RV32 or arch == RV32_LINUX:
+            cmd = 'sed -i "1i.option norelax" ' + opath
+            shell(cmd)
 
 
 def _c2s(arch, srcdir, dstdir, ins, out, opts):
@@ -117,11 +120,26 @@ def _s2o(arch, srcdir, dstdir, _in, out, opts):
     """ .s -> .o """
     ipath = path(srcdir, _in)
     opath = path(dstdir, out)
-    flags = cat(arch.as_flags, opts.sflags,
-        "-g" if opts.dbg else '')
 
-    cmd = cat(arch._as, flags, "-c", ipath, "-o", opath)
-    shell(cmd)
+    if opts._as == "as":
+        flags = cat(arch.as_flags, opts.sflags,
+            "-g" if opts.dbg else '')
+        cmd = cat(arch._as, flags, "-c", ipath, "-o", opath)
+        shell(cmd)
+
+    # llvm-mc
+    # Unlike GNU as for RISC-V, llvm-mc don't screw up with alignment in the
+    # generated object file, that would otherwise be fixed only later,
+    # at link stage, after it's done with relaxing.
+    else:
+        cmd = cat(TOOLS.mc, "-arch=" + arch.march,
+            "-mattr=" + arch.mattr, "-target-abi=ilp32d",
+            "-assemble", "-filetype=obj", ipath, "-o", opath)
+        shell(cmd)
+        # temporary workaround: set double-float ABI flag in ELF object file
+        shell(R"printf '\x04\x00\x00\x00' | " +
+            "dd of=" + opath + " bs=1 seek=$((0x24)) count=4 conv=notrunc")
+
 
 
 def _link(arch, srcdir, dstdir, ins, out, opts):
@@ -191,6 +209,8 @@ if __name__ == "__main__":
     parser.add_argument("--dbg", action='store_true', help="build for debug")
     parser.add_argument("--sbtobjs", nargs="+", default=["syscall"],
         help="optional SBT native objs to link with")
+    parser.add_argument("--as", dest="_as", help="assembler to use: as || mc",
+        default="mc")
 
     args = parser.parse_args()
 
@@ -212,6 +232,7 @@ if __name__ == "__main__":
     opts.cflags = args.cflags
     opts.sflags = args.sflags
     opts.ldflags = cat(*[SBT.nat_obj(arch, o) for o in args.sbtobjs])
+    opts._as = args._as
 
     # build
     build(arch, srcdir, dstdir, ins, out, opts)

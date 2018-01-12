@@ -10,13 +10,14 @@ SYS_EXIT = 93
 .global _start
 _start:
     # print
-    li a0,1
-    la a1,msg
-    li a2,msg_len
-    li a7,SYS_WRITE
+    addi a0, zero, 1
+    lui a1, %hi(msg)
+    addi a1, a1, %lo(msg)
+    addi a2, zero, %lo(msg_len)
+    addi a7, zero, %lo(SYS_WRITE)
     ecall
 
     # exit
-    li a0,0
-    li a7,SYS_EXIT
+    addi a0, zero, 0
+    addi a7, zero, %lo(SYS_EXIT)
     ecall

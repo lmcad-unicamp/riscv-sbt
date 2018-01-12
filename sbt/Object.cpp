@@ -82,15 +82,14 @@ std::string Section::str() const
 {
     std::string s;
     llvm::raw_string_ostream ss(s);
-    ss    << "section{"
-            << " name=[" << name() << "]";
+    ss  << "section:"
+        << " name=\"" << name() << "\"\n";
     // dump symbols
     for (ConstSymbolPtr sym : symbols())
-        ss << "\n        " << sym->str();
+        ss << sym->str();
     // dump relocations
     for (ConstRelocationPtr rel : relocs())
-        ss << rel->str() << "\n";
-    ss << " }";
+        ss << rel->str();
     return s;
 }
 
@@ -195,12 +194,12 @@ std::string Symbol::str() const
 {
     std::string s;
     llvm::raw_string_ostream ss(s);
-    ss    << "symbol{"
-            << " addr=[" << _address
-            << "], type=[" << getTypeStr(type())
-            << "], name=[" << name()
-            << "], flags=[" << g_flags->str(flags())
-            << "] }";
+    ss  << "symbol:"
+        << " addr=" << _address
+        << ", type=" << getTypeStr(type())
+        << ", name=\"" << name()
+        << "\", flags=[" << g_flags->str(flags())
+        << "]\n";
     return s;
 }
 
@@ -225,12 +224,13 @@ std::string Relocation::str() const
 {
     std::string s;
     llvm::raw_string_ostream ss(s);
-    ss  << llvm::formatv("reloc: offset=[{0:X-8}]", offset());
-    ss  << ", type=[" << typeName() << "]";
+    ss  << llvm::formatv("reloc: offset={0:X-8}", offset());
+    ss  << ", type=" << typeName();
     if (section())
-        ss << llvm::formatv(", section=[{0}]", section()->name());
+        ss << llvm::formatv(", section=\"{0}\"", section()->name());
     if (symbol())
-        ss << llvm::formatv(", symbol=[{0}]", symbol()->name());
+        ss << llvm::formatv(", symbol=\"{0}\"", symbol()->name());
+    ss  << nl;
     return s;
 }
 

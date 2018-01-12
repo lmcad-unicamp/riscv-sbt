@@ -33,7 +33,7 @@ llvm::Error SBTSection::translate()
         "size={3:X+8}",
         _section->name(), addr, elfOffset, size);
 
-    DBGF("{0}", _section->str());
+    DBGS << _section->str() << nl;
 
     // get relocations
     const ConstRelocationPtrVec& relocs = _section->relocs();
