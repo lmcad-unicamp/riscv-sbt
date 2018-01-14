@@ -209,14 +209,50 @@ std::string Symbol::str() const
 
 Relocation::Relocation(
     ConstObjectPtr obj,
-    llvm::object::RelocationRef reloc,
-    ConstSymbolPtr sym,
-    llvm::Error& err)
+    llvm::object::RelocationRef reloc)
     :
     _obj(obj),
-    _reloc(reloc),
-    _sym(sym)
+    _reloc(reloc)
 {
+}
+
+
+ConstSymbolPtr Relocation::symbol() const
+{
+    llvm::object::symbol_iterator symit = _reloc.getSymbol();
+    xassert(symit != _obj->symbolEnd());
+    return _obj->lookupSymbol(*symit);
+}
+
+
+ConstSectionPtr Relocation::section() const
+{
+    // DBGF("{0:X+8}", offset());
+    ConstSectionPtr sec;
+
+    // get symbol iter
+    llvm::object::symbol_iterator symit = _reloc.getSymbol();
+    xassert(symit != _obj->symbolEnd());
+
+    // get section iter
+    auto expSecIt = symit->getSection();
+    xassert(expSecIt);
+    auto& it = expSecIt.get();
+
+    // section in relocation: look it up
+    if (it != _obj->sectionEnd()) {
+        sec = _obj->lookupSection(*it);
+        // we must find the section it in this case
+        xassert(sec && "relocation section not found");
+    // no section in relocation: get from symbol
+    } else {
+        ConstSymbolPtr sym = _obj->lookupSymbol(*symit);
+        // we must find the symbol in this case
+        xassert(sym && "no symbol neither section found for relocation!");
+        sec = sym->section();
+    }
+
+    return sec;
 }
 
 
@@ -398,30 +434,17 @@ llvm::Error Object::readSymbols()
 
         // get target section
         auto it = sectionByName.find(name);
-        xassert(it != sectionByName.end());
+        xassert(it != sectionByName.end() &&
+            "relocation section not found");
         SectionPtr targetSection = it->second;
 
+        // add each relocation
         ConstRelocationPtrVec relocs;
-
         for (auto rb = s.relocations().begin(),
                  re = s.relocations().end();
                  rb != re; ++rb)
         {
-            const llvm::object::RelocationRef& r = *rb;
-
-            // get symbol
-            llvm::object::symbol_iterator symit = r.getSymbol();
-            ConstSymbolPtr sym = lookupSymbol(*symit);
-            // skip debug symbols
-            if (sym && sym->type() == llvm::object::SymbolRef::ST_Debug)
-                continue;
-
-            // add relocation
-            auto expRel = create<Relocation*>(this, r, sym);
-            if (!expRel)
-                return expRel.takeError();
-            Relocation* rel = expRel.get();
-            ConstRelocationPtr ptr(rel);
+            ConstRelocationPtr ptr(new Relocation(this, *rb));
             relocs.push_back(ptr);
         }
         targetSection->setRelocs(std::move(relocs));

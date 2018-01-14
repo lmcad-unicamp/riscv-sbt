@@ -327,22 +327,22 @@ llvm::Expected<llvm::Value*> Instruction::getRegOrImm(int op)
 }
 
 
-llvm::Expected<llvm::Value*> Instruction::getImm(int op)
+llvm::Expected<llvm::Constant*> Instruction::getImm(int op)
 {
-    auto expV = _ctx->reloc->handleRelocation(_addr, _os);
-    if (!expV)
-        return expV.takeError();
+    auto expC = _ctx->reloc->handleRelocation(_addr, _os);
+    if (!expC)
+        return expC.takeError();
 
     // case 1: symbol
-    llvm::Value* v = expV.get();
-    if (v)
-        return v;
+    llvm::Constant* c = expC.get();
+    if (c)
+        return c;
 
     // case 2: absolute immediate value
     int64_t imm = _inst.getOperand(op).getImm();
-    v = _c->i32(imm);
+    c = _c->i32(imm);
     *_os << llvm::formatv("0x{0:X-8}", uint32_t(imm));
-    return v;
+    return c;
 }
 
 
@@ -496,7 +496,7 @@ llvm::Error Instruction::translateUI(UIOp op)
 {
     switch (op) {
         case AUIPC: *_os << "auipc";    break;
-        case LUI:     *_os << "lui";        break;
+        case LUI:   *_os << "lui";      break;
     }
     *_os << '\t';
 
@@ -504,9 +504,10 @@ llvm::Error Instruction::translateUI(UIOp op)
     auto expImm = getImm(1);
     if (!expImm)
         return expImm.takeError();
-    llvm::Value* imm = expImm.get();
-    llvm::Value* v;
+    llvm::Constant* imm = expImm.get();
 
+    // XXX review this
+    /*
     if (_ctx->reloc->isSymbol(_addr))
         v = imm;
     else {
@@ -517,8 +518,9 @@ llvm::Error Instruction::translateUI(UIOp op)
         if (op == AUIPC)
             v = _bld->add(v, _c->i32(_addr));
     }
+    */
 
-    _bld->store(v, o);
+    _bld->store(imm, o);
 
     return llvm::Error::success();
 }
@@ -747,96 +749,88 @@ llvm::Error Instruction::translateBranch(BranchType bt)
     // inst print
     switch (bt) {
         case JAL:     *_os << "jal";    break;
-        case JALR:    *_os << "jalr"; break;
+        case JALR:    *_os << "jalr";   break;
         case BEQ:     *_os << "beq";    break;
         case BNE:     *_os << "bne";    break;
         case BGE:     *_os << "bge";    break;
-        case BGEU:    *_os << "bgeu"; break;
+        case BGEU:    *_os << "bgeu";   break;
         case BLT:     *_os << "blt";    break;
-        case BLTU:    *_os << "bltu"; break;
+        case BLTU:    *_os << "bltu";   break;
     }
     *_os << '\t';
 
     llvm::Error err = noError();
 
+    auto getRegNoLog = [this](int op) {
+        // save os
+        auto sos = _os;
+        // set _os to nulls(), just to avoid producing incorrect debug output
+        _os = &llvm::nulls();
+        // get reg
+        llvm::Value* v = getReg(op);
+        // restore os
+        _os = sos;
+        return v;
+    };
+
+    auto getRegNumNoLog = [this](unsigned op) {
+        // save os
+        auto sos = _os;
+        // set _os to nulls(), just to avoid producing incorrect debug output
+        _os = &llvm::nulls();
+        // get reg num
+        unsigned n = getRegNum(op);
+        // restore os
+        _os = sos;
+        return n;
+    };
+
     // get operands
-    unsigned o0n = getRegNum(0);
+    unsigned linkReg;
     llvm::Value* o0 = nullptr;
-    unsigned o1n = 0;
     llvm::Value* o1 = nullptr;
-    llvm::Value* o2 = nullptr;
     // jump register
     llvm::Value* jreg = nullptr;
+    unsigned jregn = 0;
     // jump immediate
-    llvm::Value* jimm = nullptr;
-    unsigned linkReg = 0;
+    llvm::Constant* jimm = nullptr;
     switch (bt) {
         case JAL:
-            linkReg = o0n;
-            if (!exp(getImm(1), o1, err))
+            linkReg = getRegNum(0);
+            if (!exp(getImm(1), jimm, err))
                 return err;
-            jimm = o1;
             break;
 
-        case JALR: {
-            linkReg = o0n;
-            // save os
-            auto sos = _os;
-            // set _os to nulls(), just to avoid producing incorrect debug output
-            _os = &llvm::nulls();
-            // get reg num
-            o1n = getRegNum(1);
-            // restore os
-            _os = sos;
-            // then get register value (this will produce correct debug output)
-            o1 = getReg(1);
-            if (!exp(getImm(2), o2, err))
+        case JALR:
+            linkReg = getRegNum(0);
+            jregn = getRegNumNoLog(1);
+            jreg = getReg(1);
+            if (!exp(getImm(2), jimm, err))
                 return err;
-            jreg = o1;
-            jimm = o2;
             break;
-        }
 
         case BEQ:
         case BNE:
         case BGE:
         case BGEU:
         case BLT:
-        case BLTU: {
-            // save os
-            auto sos = _os;
-            // set _os to nulls(), just to avoid producing incorrect debug output
-            _os = &llvm::nulls();
-            // get reg
-            o0 = getReg(0);
-            // restore os
-            _os = sos;
-
+        case BLTU:
+            linkReg = XRegister::ZERO;
+            o0 = getRegNoLog(0);
             o1 = getReg(1);
-            if (!exp(getImm(2), o2, err))
+            if (!exp(getImm(2), jimm, err))
                 return err;
-            jimm = o2;
             break;
-        }
     }
 
-    // jump immediate integer value
-    int64_t jimmi = 0;
-    // is jimm an immediate equal to zero?
-    bool jimmIsZeroImm = false;
-    bool isSymbol = _ctx->reloc->isSymbol(_addr);
-    if (!isSymbol) {
-        jimmi = llvm::cast<llvm::ConstantInt>(jimm)->getValue().getSExtValue();
-        jimmIsZeroImm = jimmi == 0 && !isSymbol;
-    }
     llvm::Value* v = nullptr;
 
     // return?
     // XXX using ABI info
     if (bt == JALR &&
-            o0n == XRegister::ZERO &&
-            o1n == XRegister::RA &&
-            jimmIsZeroImm)
+            linkReg == XRegister::ZERO &&
+            jregn == XRegister::RA &&
+            jimm->isZeroValue())
     {
         if (_ctx->inMain)
             v = _bld->ret(_bld->load(XRegister::A0));
@@ -848,33 +842,27 @@ llvm::Error Instruction::translateBranch(BranchType bt)
     }
 
     // get target
-    uint64_t target = 0;
+    llvm::Constant* target = nullptr;
 
     enum Action {
-        JUMP_TO_SYMBOL,
-        JUMP_TO_OFFS,
+        JUMP,
         IJUMP,
-        CALL_SYMBOL,
-        CALL_OFFS,
-        CALL_EXT,
+        CALL,
         ICALL
     };
     Action act;
 
     bool isCall = (bt == JAL || bt == JALR) &&
         linkReg != XRegister::ZERO;
-    const SBTSymbol& sym = _ctx->reloc->last();
 
     // JALR
-    //
-    // TODO set target LSB to zero
     if (bt == JALR) {
         // no base reg
-        if (o1n == XRegister::ZERO) {
-            xassert(false && "unexpected JALR with base register equal to zero!");
+        if (jregn == XRegister::ZERO) {
+            xunreachable("unexpected JALR with base register equal to zero!");
 
         // no immediate
-        } else if (jimmIsZeroImm) {
+        } else if (jimm->isZeroValue()) {
             v = jreg;
             if (isCall)
                 act = ICALL;
@@ -890,38 +878,15 @@ llvm::Error Instruction::translateBranch(BranchType bt)
                 act = IJUMP;
         }
 
-    // JAL to symbol
-    } else if (bt == JAL && isSymbol) {
-        if (isCall)
-            act = CALL_SYMBOL;
-        else
-            act = JUMP_TO_SYMBOL;
-
     // JAL/branches to PC offsets
     //
     // add PC
     } else {
-        target = jimmi + _addr;
+        target = llvm::ConstantExpr::getAdd(jimm, _ctx->c.i32(_addr));
         if (isCall)
-            act = CALL_OFFS;
+            act = CALL;
         else
-            act = JUMP_TO_OFFS;
-    }
-
-    // process symbols
-    if (act == CALL_SYMBOL || act == JUMP_TO_SYMBOL) {
-        if (sym.isExternal()) {
-            v = jimm;
-            xassert(isCall && "jump to external module!");
-            act = CALL_EXT;
-        } else {
-            xassert(sym.sec && sym.sec->isText() && "jump to non-text section!");
-            target = sym.addr;
-            if (isCall)
-                act = CALL_OFFS;
-            else
-                act = JUMP_TO_OFFS;
-        }
+            act = JUMP;
     }
 
     // evaluate condition
@@ -956,27 +921,25 @@ llvm::Error Instruction::translateBranch(BranchType bt)
             break;
     }
 
+    // target to integer
+    auto targetInt = [target] {
+        xassert(target);
+        llvm::ConstantInt* ci = llvm::cast<llvm::ConstantInt>(target);
+        return ci->getValue().getZExtValue();
+    };
+
     // dispatch to appropriated handler
     switch (act) {
-        case JUMP_TO_SYMBOL:
-            xassert(false && "JUMP_TO_SYMBOL should become JUMP_TO_OFFS");
-        case CALL_SYMBOL:
-            xassert(false && "CALL_SYMBOL should become CALL_OFFS");
-
-        case CALL_OFFS:
-            err = handleCall(target, linkReg);
+        case CALL:
+            err = handleCall(targetInt(), linkReg);
             break;
 
-        case JUMP_TO_OFFS:
-            err = handleJumpToOffs(target, cond, linkReg);
+        case JUMP:
+            err = handleJump(targetInt(), cond, linkReg);
             break;
 
         case ICALL:
             err = handleICall(v, linkReg);
-            break;
-
-        case CALL_EXT:
-            err = handleCallExt(v, linkReg);
             break;
 
         case IJUMP:
@@ -1105,12 +1068,6 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
 }
 
 
-llvm::Error Instruction::handleCallExt(llvm::Value* target, unsigned linkReg)
-{
-    xunreachable("handleCallExt() should not be needed");
-}
-
-
 static bool inBounds(
     uint64_t val,
     uint64_t begin,
@@ -1120,7 +1077,7 @@ static bool inBounds(
 }
 
 
-llvm::Error Instruction::handleJumpToOffs(
+llvm::Error Instruction::handleJump(
     uint64_t target,
     llvm::Value* cond,
     unsigned linkReg)

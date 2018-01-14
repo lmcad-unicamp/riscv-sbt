@@ -137,10 +137,8 @@ private:
     llvm::Error handleCall(uint64_t target, unsigned linkReg);
     // indirect call
     llvm::Error handleICall(llvm::Value* target, unsigned linkReg);
-    // call to "external" function (for now, to libc functions)
-    llvm::Error handleCallExt(llvm::Value* target, unsigned linkReg);
     // jump to offset
-    llvm::Error handleJumpToOffs(uint64_t target,
+    llvm::Error handleJump(uint64_t target,
         llvm::Value* cond, unsigned linkReg);
     // indirect jump
     llvm::Error handleIJump(llvm::Value* target, unsigned linkReg);
@@ -166,7 +164,7 @@ private:
     // get register value (input is operand index)
     llvm::Value* getReg(int op);
     // get immediate value
-    llvm::Expected<llvm::Value*> getImm(int op);
+    llvm::Expected<llvm::Constant*> getImm(int op);
     // get register or immediate
     llvm::Expected<llvm::Value*> getRegOrImm(int op);
 

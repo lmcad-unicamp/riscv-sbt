@@ -341,44 +341,31 @@ class Relocation
 public:
     Relocation(
         ConstObjectPtr obj,
-        llvm::object::RelocationRef reloc,
-        ConstSymbolPtr sym,
-        llvm::Error& err);
+        llvm::object::RelocationRef reloc);
 
-    // symbol
-    ConstSymbolPtr symbol() const
-    {
-        return _sym;
-    }
+    ConstSymbolPtr symbol() const;
+    ConstSectionPtr section() const;
 
-    // section
-    ConstSectionPtr section() const
-    {
-        if (!symbol())
-            return nullptr;
-        return _sym->section();
-    }
-
-    // offset
     uint64_t offset() const
     {
         return _reloc.getOffset();
     }
+
+    uint64_t addend() const;
 
     uint64_t type() const
     {
         return _reloc.getType();
     }
 
-    uint64_t addend() const;
-
-    // type name
-    using TypeVec = llvm::SmallVector<char, 128>;
-    TypeVec typeName() const
+    std::string typeName() const
     {
-        TypeVec vec;
+        llvm::SmallVector<char, 128> vec;
         _reloc.getTypeName(vec);
-        return vec;
+        std::string s;
+        llvm::raw_string_ostream ss(s);
+        ss << vec;
+        return s;
     }
 
     // get string representation
@@ -387,7 +374,6 @@ public:
 private:
     ConstObjectPtr _obj;
     llvm::object::RelocationRef _reloc;
-    ConstSymbolPtr _sym;
 };
 
 

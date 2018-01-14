@@ -52,13 +52,15 @@ alltests:
 
 ### dbg ###
 
+BIN := argv
+
 test-prep:
-	$(MAKE) -C mibench stringsearch-clean stringsearch
+	$(MAKE) -C $(TOPDIR)/test/sbt $(BIN)
 
 .PHONY: test
 test: sbt-force
-	riscv-sbt -x -regs=globals  -stack-size=131072 /mnt/ssd/riscv-sbt/build/mibench/office/stringsearch/rv32-stringsearch.o -o /mnt/ssd/riscv-sbt/build/mibench/office/stringsearch/rv32-x86-stringsearch-globals.bc >/mnt/ssd/riscv-sbt/junk/rv32-x86-stringsearch-globals.log 2>&1
+	riscv-sbt -x -regs=globals /mnt/ssd/riscv-sbt/build/test/sbt/rv32-$(BIN).o -o /mnt/ssd/riscv-sbt/build/test/sbt/rv32-x86-$(BIN)-globals.bc >/mnt/ssd/riscv-sbt/junk/rv32-x86-$(BIN)-globals.log 2>&1
 
 .PHONY: dbg
 dbg:
-	gdb --args riscv-sbt -x -regs=globals  -stack-size=131072 /mnt/ssd/riscv-sbt/build/mibench/office/stringsearch/rv32-stringsearch.o -o /mnt/ssd/riscv-sbt/build/mibench/office/stringsearch/rv32-x86-stringsearch-globals.bc
+	gdb --args riscv-sbt -x ...

@@ -23,6 +23,8 @@ public:
     using ConstRelocIter = ConstRelocationPtrVec::const_iterator;
 
     /**
+     * ctor
+     *
      * @param ctx
      * @param ri relocation begin (iterator)
      * @param re relocation end
@@ -36,45 +38,40 @@ public:
 
     /**
      * Handle relocation, by checking if there is a relocation for the
-     * given address, and if so returning an llvm::Value corresponding to
+     * given address, and if so returning an llvm::Constant corresponding to
      * the "relocated" value.
      *
      * @param addr address
      * @param os output stream to print debug info
      *
      * @return "relocated" value if there was a relocation to 'addr',
-     *                 or null otherwise.
+     *         or null otherwise.
      */
-    llvm::Expected<llvm::Value*>
+    llvm::Expected<llvm::Constant*>
     handleRelocation(uint64_t addr, llvm::raw_ostream* os);
 
+    /**
+     * Skip any relocations for the given address.
+     *
+     * It may happen, for instance, because of ALIGN relocations
+     * that may map to invalid instruction encoding bytes and we
+     * just want to ignore these.
+     */
     void skipRelocation(uint64_t addr);
 
     /**
-     * Move to next relocation.
+     * Relocate the whole section at once.
+     * This is used for data sections that need relocation.
      *
-     * @param addr current address
-     * @param hadNext was there a previous relocation
-     *        before the current one?
+     * @param bytes raw section bytes
+     * @param shadowImage pointer to ShadowImage
+     *        (note that we can't get it from _ctx because it
+     *         may not be available there yet, because this
+     *         method is called when ShadowImage is being
+     *         built)
+     *
+     * @return global variable whose content is the relocated section.
      */
-    void next(uint64_t addr, bool hadNext);
-
-    /**
-     * Get last "relocated" symbol.
-     */
-    const SBTSymbol& last() const
-    {
-        return _last;
-    }
-
-    /**
-     * Check if is there a symbol at 'addr'.
-     */
-    bool isSymbol(uint64_t addr) const
-    {
-        return _hasSymbol && _last.instrAddr == addr;
-    }
-
     llvm::GlobalVariable* relocateSection(
         const std::vector<uint8_t>& bytes,
         const ShadowImage* shadowImage);
@@ -84,10 +81,17 @@ private:
     ConstRelocIter _ri;
     ConstRelocIter _re;
     ConstRelocIter _rlast;
-    SBTSymbol _last;
-    bool _hasSymbol = false;
-    uint64_t _next = Constants::INVALID_ADDR;
+    // uint64_t _next = Constants::INVALID_ADDR;
     ConstSectionPtr _section;
+
+    /**
+     * Move to next relocation.
+     *
+     * @param addr current address
+     * @param hadNext was there a previous relocation
+     *        before the current one?
+     */
+    void next(uint64_t addr, bool hadNext);
 };
 
 }
