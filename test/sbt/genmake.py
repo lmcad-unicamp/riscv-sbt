@@ -99,6 +99,8 @@ tests-run: tests x86-syscall-test-run {tests}
 
 
     def gen_utests(self):
+        dbg = True
+
         # utests
         self.txt = self.txt + "### RV32 Translator unit tests ###\n\n"
 
@@ -115,6 +117,11 @@ tests-run: tests x86-syscall-test-run {tests}
         xflags = "--sbtobjs syscall counters"
         bflags = None
         rflags = "-o {}.out --tee"
+
+        if dbg:
+            bflags = cat(bflags, "--dbg")
+            xflags = cat(bflags, "--dbg")
+
         for mod in mods:
             name = mod
             src = "rv32-" + name + ".s"

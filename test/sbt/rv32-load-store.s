@@ -7,6 +7,11 @@
 # 07 sh
 # 08 sw
 
+.macro call func
+    lui  ra, %hi(\func)
+    jalr ra, ra, %lo(\func)
+.endm
+
 .text
 .global main
 main:
@@ -25,7 +30,8 @@ main:
     ### load ###
 
     # lb
-    la a0, lb_str
+    lui a0, %hi(lb_str)
+    addi a0, a0, %lo(lb_str)
     jalr ra, s2, 0
     # b0
     lui a0, %hi(b0_fmt)
@@ -63,7 +69,8 @@ main:
     jalr ra, s2, 0
 
     # lh
-    la a0, lh_str
+    lui a0, %hi(lh_str)
+    addi a0, a0, %lo(lh_str)
     jalr ra, s2, 0
     # h0
     lui a0, %hi(h0_fmt)
@@ -101,7 +108,8 @@ main:
     jalr ra, s2, 0
 
     # lw
-    la a0, lw_str
+    lui a0, %hi(lw_str)
+    addi a0, a0, %lo(lw_str)
     jalr ra, s2, 0
     # signed
     lui a0, %hi(w0_fmt)
@@ -129,7 +137,8 @@ main:
     addi s4, s4, %lo(s_fmt)
 
     # sb
-    la a0, sb_str
+    lui a0, %hi(sb_str)
+    addi a0, a0, %lo(sb_str)
     call printf
     # signed
     addi t0, zero, -128
@@ -145,7 +154,8 @@ main:
     call printf
 
     # sh
-    la a0, sh_str
+    lui a0, %hi(sh_str)
+    addi a0, a0, %lo(sh_str)
     jalr ra, s2, 0
     # signed
     lui t0, 0x10
@@ -163,7 +173,8 @@ main:
     jalr ra, s2, 0
 
     # sw
-    la a0, sw_str
+    lui a0, %hi(sw_str)
+    addi a0, a0, %lo(sw_str)
     jalr ra, s2, 0
     # signed
     lui t0, 0x80012
@@ -188,7 +199,8 @@ main:
     lui s4, %hi(a_fmt)
     addi s4, s4, %lo(a_fmt)
 
-    la a0, a_str
+    lui a0, %hi(a_str)
+    addi a0, a0, %lo(a_str)
     jalr ra, s2, 0
 
     # 0
@@ -246,26 +258,26 @@ bu0_fmt: .asciz "bu0=%hhu 0x%08X\n"
 bu1: .byte 255
 bu1_fmt: .asciz "bu1=%hhu 0x%08X\n"
 
-h0: .hword 32767
+h0: .short 32767
 h0_fmt: .asciz "h0=%hi 0x%08X\n"
-h1: .hword -32768
+h1: .short -32768
 h1_fmt: .asciz "h1=%hi 0x%08X\n"
 hu0_fmt: .asciz "hu0=%hu 0x%08X\n"
-hu1: .hword 65535
+hu1: .short 65535
 hu1_fmt: .asciz "hu1=%hu 0x%08X\n"
 
-w: .word 0x89ABCDEF
+w: .int 0x89ABCDEF
 w0_fmt: .asciz "w0=%i 0x%08X\n"
 w1_fmt: .asciz "w1=%u 0x%08X\n"
 
-s: .word 0
+s: .int 0
 s_fmt: .asciz "s=0x%08X\n"
 
 a:
-.word 0x01234567
-.word 0x456789AB
-.word 0x89ABCDEF
-.word 0xCDEF0123
+.int 0x01234567
+.int 0x456789AB
+.int 0x89ABCDEF
+.int 0xCDEF0123
 a_fmt: .asciz "a=0x%08X\n"
 
 lb_str: .asciz "lb\n"

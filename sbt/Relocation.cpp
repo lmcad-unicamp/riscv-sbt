@@ -169,16 +169,18 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
         */
 
         case llvm::ELF::R_RISCV_HI20:
+            // addr >>= 12
             relfn = [this](llvm::Constant* addr) {
                 llvm::Constant* c =
-                    llvm::ConstantExpr::getAnd(
+                    llvm::ConstantExpr::getLShr(
                         addr,
-                        _ctx->c.i32(0xFFFFF000));
+                        _ctx->c.i32(12));
                 return c;
             };
             break;
 
         case llvm::ELF::R_RISCV_LO12_I:
+            // addr &= 0xFFF
             relfn = [this](llvm::Constant* addr) {
                 llvm::Constant* c =
                     llvm::ConstantExpr::getAnd(

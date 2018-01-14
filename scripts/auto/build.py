@@ -132,13 +132,22 @@ def _s2o(arch, srcdir, dstdir, _in, out, opts):
     # generated object file, that would otherwise be fixed only later,
     # at link stage, after it's done with relaxing.
     else:
-        cmd = cat(TOOLS.mc, "-arch=" + arch.march,
-            "-mattr=" + arch.mattr, "-target-abi=ilp32d",
-            "-assemble", "-filetype=obj", ipath, "-o", opath)
+        flags = cat(
+            "-g" if opts.dbg else "",
+            "-arch=" + arch.march,
+            "-mattr=" + arch.mattr,
+            "-target-abi=ilp32d")
+        cmd = cat(
+            TOOLS.mc,
+            flags,
+            "-assemble",
+            "-filetype=obj",
+            ipath, "-o", opath)
         shell(cmd)
         # temporary workaround: set double-float ABI flag in ELF object file
         shell(R"printf '\x04\x00\x00\x00' | " +
-            "dd of=" + opath + " bs=1 seek=$((0x24)) count=4 conv=notrunc")
+            "dd of=" + opath + " bs=1 seek=$((0x24)) count=4 conv=notrunc" +
+            " >/dev/null 2>&1")
 
 
 
