@@ -120,7 +120,7 @@ tests-run: tests x86-syscall-test-run {tests}
 
         if dbg:
             bflags = cat(bflags, "--dbg")
-            xflags = cat(bflags, "--dbg")
+            xflags = cat(xflags, "--dbg")
 
         for mod in mods:
             name = mod

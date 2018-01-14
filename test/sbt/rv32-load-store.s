@@ -7,10 +7,7 @@
 # 07 sh
 # 08 sw
 
-.macro call func
-    lui  ra, %hi(\func)
-    jalr ra, ra, %lo(\func)
-.endm
+.include "macro.s"
 
 .text
 .global main

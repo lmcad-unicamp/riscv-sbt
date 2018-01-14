@@ -494,7 +494,6 @@ llvm::Error Instruction::translateM(MOp op)
 
 llvm::Error Instruction::translateUI(UIOp op)
 {
-    xassert(op != AUIPC);
     switch (op) {
         case AUIPC: *_os << "auipc";    break;
         case LUI:   *_os << "lui";      break;
@@ -506,15 +505,14 @@ llvm::Error Instruction::translateUI(UIOp op)
     if (!expImm)
         return expImm.takeError();
     llvm::Constant* imm = expImm.get();
-    llvm::Constant* c = nullptr;
+    llvm::Constant* c;
 
     // get upper immediate: imm << 12
     c = llvm::ConstantExpr::getShl(imm, _c->i32(12));
+    // AUIPC: add PC
+    if (op == AUIPC)
+        c = llvm::ConstantExpr::getAdd(c, _ctx->c.i32(_addr));
     _bld->store(c, o);
-
-    // add PC (current address)
-    //if (op == AUIPC)
-    //    v = _bld->add(v, _c->i32(_addr));
 
     return llvm::Error::success();
 }
