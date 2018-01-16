@@ -59,20 +59,14 @@ SBTRelocation::SBTRelocation(
     _ctx(ctx),
     _ri(ri),
     _re(re),
-    _rlast(ri),
     _section(section)
 {
 }
 
 
-void SBTRelocation::next(uint64_t addr, bool hadNext)
+void SBTRelocation::next(uint64_t addr)
 {
-    // increment relocation iterator until it reaches a different address
-    _rlast = _ri;
-    // uint64_t reladdr = hadNext? addr - Constants::INSTRUCTION_SIZE : addr;
-    //do {
-        ++_ri;
-    //} while (_ri != _re && (**_ri).offset() == reladdr);
+    ++_ri;
     xassert(_ri == _re || (**_ri).offset() != addr);
 }
 
@@ -80,39 +74,24 @@ void SBTRelocation::next(uint64_t addr, bool hadNext)
 llvm::Expected<llvm::Constant*>
 SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
 {
-    // note: some relocations are used by two consecutive instructions
-    /*
-    bool hadNext = _next != Constants::INVALID_ADDR;
-    xassert(!hadNext);
-    */
-    bool hadNext = false;
-
     ConstRelocationPtr reloc = nullptr;
 
-    /*
-    if (hadNext) {
-        xassert(addr == _next && "unexpected relocation!");
-        _next = Constants::INVALID_ADDR;
-        reloc = *_ri;
-    } else {
-    */
-        // no more relocations exist
-        if (_ri == _re)
-            return nullptr;
+    // no more relocations exist
+    if (_ri == _re)
+        return nullptr;
 
-        reloc = *_ri;
+    reloc = *_ri;
 
-        // check if we skipped some addresses and now need to
-        // advance the iterator
-        if (addr > reloc->offset())
-            next(addr, hadNext);
+    // check if we skipped some addresses and now need to
+    // advance the iterator
+    if (addr > reloc->offset())
+        next(addr);
 
-        // check if there is a relocation for current address
-        if (reloc->offset() != addr)
-            return nullptr;
+    // check if there is a relocation for current address
+    if (reloc->offset() != addr)
+        return nullptr;
 
-        next(addr, hadNext);
-    //}
+    next(addr);
 
     DBGS << __METHOD_NAME__ << llvm::formatv("({0:X+8})\n", addr);
 
@@ -129,45 +108,9 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
         sec? sec->name() : "<null>",
         reloc->addend());
 
-    /*
-    ConstSymbolPtr realSym = sym;
-    bool isLO = false;
-    uint64_t mask;
-    bool useVal = false;
-    uint64_t val;
-    // note: some relocations are used by two consecutive instructions
-    bool isNextToo = false;
-    */
-
     std::function<llvm::Constant*(llvm::Constant* addr)> relfn;
 
     switch (reloc->type()) {
-        /*
-        case llvm::ELF::R_RISCV_CALL:
-            if (hadNext) {
-                DBGF("CALL(LO)");
-                isLO = true;
-            } else {
-                DBGF("CALL(HI)");
-                isNextToo = true;
-            }
-            break;
-
-        case llvm::ELF::R_RISCV_PCREL_HI20:
-            DBGF("PCREL_HI20");
-            break;
-
-        // this rellocation has PC info only
-        // symbol info is present on the PCREL_HI20 reloc
-        case llvm::ELF::R_RISCV_PCREL_LO12_I:
-            DBGF("PCREL_LO12_I");
-            isLO = true;
-            realSym = (**_rlast).symbol();
-            val = _last.val;
-            useVal = true;
-            break;
-        */
-
         case llvm::ELF::R_RISCV_HI20:
             // addr >>= 12
             relfn = [this](llvm::Constant* addr) {
@@ -190,58 +133,9 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             };
             break;
 
-        /*
-        case llvm::ELF::R_RISCV_LO12_S:
-            DBGF("LO12");
-            isLO = true;
-            break;
-
-        case llvm::ELF::R_RISCV_JAL:
-            DBGF("JAL");
-            isLO = true;
-            break;
-
-        // ignored
-        case llvm::ELF::R_RISCV_ALIGN:
-            DBGF("ALIGN: ignored: type={0}", type);
-            next(addr, hadNext);
-            _hasSymbol = false;
-            return nullptr;
-
-        case llvm::ELF::R_RISCV_BRANCH:
-            DBGF("BRANCH");
-            next(addr, hadNext);
-            _hasSymbol = false;
-            return nullptr;
-        */
-
         default:
             xassert(false && "unknown relocation");
     }
-
-    /*
-    // set symbol relocation info
-    uint64_t realSymAddr = 0;
-    uint64_t realSymVal = 0;
-    std::string realSymName = "noname";
-    ConstSectionPtr realSymSec = nullptr;
-
-    if (realSym) {
-        realSymAddr = realSym->address();
-        realSymVal = realSymAddr;
-        realSymName = realSym->name();
-        realSymSec = realSym->section();
-    }
-
-    SBTSymbol ssym(realSymAddr, realSymVal, realSymName,
-        realSymSec, addr);
-    DBGF("addr={0:X+8}, val={1:X+8}, name={2}, section={3}, addend={4:X+8}",
-        ssym.addr, ssym.val, ssym.name,
-        ssym.sec? ssym.sec->name() : "null",
-        reloc->addend());
-
-    xassert((ssym.sec || !ssym.addr) && "no section found for relocation");
-    */
 
     bool isLocalFunc = isLocalFunction(sym, sec);
     bool isExt = isExternal(sym, sec);
@@ -254,14 +148,6 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     xassert(!(sym && !isExt) ||
             sym->address() < sec->size() &&
             "out of bounds symbol relocation");
-
-
-    /*
-    if (isNextToo)
-        _next = addr + Constants::INSTRUCTION_SIZE;
-    else
-        next(addr, hadNext);
-    */
 
     llvm::Constant* c = nullptr;
 
@@ -289,31 +175,65 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
         if (os)
             *os << sym->name();
 
-    // internal function case
+    // internal function or label case
+    // FIXME this part is still a best effort to try to find out if
+    // the relocation refers to a function or a label
     } else if (isLocalFunc) {
         xassert(sec);
 
         uint64_t saddr;
+        bool isFunc;
 
         // get address
-        if (sym)
+        if (sym) {
             saddr = sym->address();
-        else
+            // if there is a symbol, this is most likely a function
+            isFunc = true;
+        } else {
             saddr = reloc->addend();
+            isFunc = false;
+        }
 
-        // get function
-        Function* f = Function::getByAddr(_ctx, saddr);
+        // check for existing functions
+        Function* f = _ctx->funcByAddr(saddr, !ASSERT_NOT_NULL);
+        if (f)
+            isFunc = true;
 
-        DBGF("internal function: name=\"{0}\", saddr={1:X+8}",
-            f->name(), saddr);
+        // no relocation symbol found: try to find a section symbol
+        if (!isFunc)
+            isFunc = !!_ctx->sec->section()->lookup(addr);
+
+        if (isFunc && !f) {
+            // function not found: create one only if it's ahead of
+            // current translation address
+            if (saddr > _ctx->addr)
+                f = Function::getByAddr(_ctx, saddr);
+            // Otherwise, currently the SBT does not create a new function for
+            // an already translated code, so the best we can do for now is to
+            // just return the address of where the function would be located.
+            // If the function is never called, there will be no problem.
+            // Otherwise, either the SBT will abort when trying to call a
+            // non-existing function or a new function with an unique name
+            // will be declared but never defined, resulting in a link error
+            // later.
+        }
+
+        if (f) {
+            DBGF("internal function: name=\"{0}\", saddr={1:X+8}",
+                f->name(), saddr);
+            if (os)
+                *os << f->name();
+        } else {
+            DBGF("internal label: saddr={0:X+8}", saddr);
+            if (os)
+                *os << llvm::formatv("{0:X+8}", saddr);
+        }
 
         // XXX for now, internal functions are always called
         //     indirectly, via icaller, so return just their
         //     original guest address
         c = _ctx->c.i32(saddr);
 
-        if (os)
-            *os << f->name();
 
     // other relocations
     // add the relocation offset to ShadowImage to get the final address
@@ -350,16 +270,12 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     }
 
     c = relfn(c);
-    c->dump();
     return c;
 }
 
 
 void SBTRelocation::skipRelocation(uint64_t addr)
 {
-    // this can't be the second part of a valid relocation
-    // xassert(_next == Constants::INVALID_ADDR);
-
     // no more relocations exist
     if (_ri == _re)
         return;
@@ -369,11 +285,7 @@ void SBTRelocation::skipRelocation(uint64_t addr)
     if (reloc->offset() != addr)
         return;
 
-    // increment relocation iterator until it reaches a different address
-    _rlast = _ri;
-    do {
-        ++_ri;
-    } while (_ri != _re && (**_ri).offset() == addr);
+    next(addr);
 }
 
 

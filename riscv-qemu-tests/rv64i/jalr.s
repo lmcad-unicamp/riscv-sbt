@@ -29,15 +29,14 @@ target_2:
 
   # Test delay slot instructions not executed nor bypassed
 
-  .option push
-  .option norvc
     li  t0, 1
     la  t1, 1f
 
     # FIXME indirect jump not yet implemented in SBT!
     # jr  t1, -4
     # remove begin
-    j 1f -4
+    L1 = 1f - 4
+    j L1
     # remove end
 
     addi t0, t0, 1
@@ -47,6 +46,5 @@ target_2:
 1:  addi t0, t0, 1
     addi t0, t0, 1
   TEST_CASE 7, t0, 4
-  .option pop
 
 EXIT

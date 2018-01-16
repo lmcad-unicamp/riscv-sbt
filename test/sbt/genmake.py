@@ -99,7 +99,7 @@ tests-run: tests x86-syscall-test-run {tests}
 
 
     def gen_utests(self):
-        dbg = True
+        dbg = False
 
         # utests
         self.txt = self.txt + "### RV32 Translator unit tests ###\n\n"

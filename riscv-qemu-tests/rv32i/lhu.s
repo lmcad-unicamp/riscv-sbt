@@ -58,7 +58,7 @@ EXIT
 .data
 
 tdat:
-tdat1:  .half 0x00ff
-tdat2:  .half 0xff00
-tdat3:  .half 0x0ff0
-tdat4:  .half 0xf00f
+tdat1:  .short 0x00ff
+tdat2:  .short 0xff00
+tdat3:  .short 0x0ff0
+tdat4:  .short 0xf00f

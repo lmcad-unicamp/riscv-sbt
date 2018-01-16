@@ -1,11 +1,11 @@
 .include "test.s"
 
 .macro TEST_LUI T res num shift
-	lui	s0, \num
-	sra	s0, s0, \shift
-	li	s1, \res
-	li	gp, \T
-	FAILIF bne	s0, s1
+    lui  s0, \num
+    srai s0, s0, \shift
+    li   s1, \res
+    li   gp, \T
+FAILIF bne s0, s1
 .endm
 
 START

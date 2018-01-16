@@ -134,6 +134,7 @@ def _s2o(arch, srcdir, dstdir, _in, out, opts):
     else:
         flags = cat(
             "-g" if opts.dbg else "",
+            opts.sflags,
             "-arch=" + arch.march,
             "-mattr=" + arch.mattr,
             "-target-abi=ilp32d")

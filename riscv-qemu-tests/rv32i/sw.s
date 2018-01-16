@@ -56,13 +56,13 @@ EXIT
 .data
 
 tdat:
-tdat1:  .word 0xdeadbeef
-tdat2:  .word 0xdeadbeef
-tdat3:  .word 0xdeadbeef
-tdat4:  .word 0xdeadbeef
-tdat5:  .word 0xdeadbeef
-tdat6:  .word 0xdeadbeef
-tdat7:  .word 0xdeadbeef
-tdat8:  .word 0xdeadbeef
-tdat9:  .word 0xdeadbeef
-tdat10: .word 0xdeadbeef
+tdat1:  .int 0xdeadbeef
+tdat2:  .int 0xdeadbeef
+tdat3:  .int 0xdeadbeef
+tdat4:  .int 0xdeadbeef
+tdat5:  .int 0xdeadbeef
+tdat6:  .int 0xdeadbeef
+tdat7:  .int 0xdeadbeef
+tdat8:  .int 0xdeadbeef
+tdat9:  .int 0xdeadbeef
+tdat10: .int 0xdeadbeef

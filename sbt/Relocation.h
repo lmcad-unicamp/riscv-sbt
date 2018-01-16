@@ -80,18 +80,14 @@ private:
     Context* _ctx;
     ConstRelocIter _ri;
     ConstRelocIter _re;
-    ConstRelocIter _rlast;
-    // uint64_t _next = Constants::INVALID_ADDR;
     ConstSectionPtr _section;
 
     /**
      * Move to next relocation.
      *
      * @param addr current address
-     * @param hadNext was there a previous relocation
-     *        before the current one?
      */
-    void next(uint64_t addr, bool hadNext);
+    void next(uint64_t addr);
 };
 
 }

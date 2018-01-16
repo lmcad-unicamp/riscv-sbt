@@ -58,7 +58,7 @@ EXIT
 .data
 
 tdat:
-tdat1:  .word 0x00ff00ff
-tdat2:  .word 0xff00ff00
-tdat3:  .word 0x0ff00ff0
-tdat4:  .word 0xf00ff00f
+tdat1:  .int 0x00ff00ff
+tdat2:  .int 0xff00ff00
+tdat3:  .int 0x0ff00ff0
+tdat4:  .int 0xf00ff00f

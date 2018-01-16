@@ -137,6 +137,7 @@ llvm::Error SBTSection::translate(Function* func)
 
 void SBTSection::updateNextFuncAddr(uint64_t next)
 {
+    // get function closest to next
     auto fmap = _ctx->_funcByAddr;
     auto nf = fmap->lower_bound(next);
 
@@ -144,7 +145,22 @@ void SBTSection::updateNextFuncAddr(uint64_t next)
     if (nf == fmap->end())
         return;
 
-    _nextFuncAddr = nf->val->addr();
+    // next function address
+    uint64_t nfa = nf->val->addr();
+    uint64_t addr = _ctx->addr;
+
+    // nfa must not be less than current address
+    if (nfa < addr)
+        return;
+    // if _nextFuncAddr is still valid (> addr)
+    // and is smaller than nfa
+    // then keep it
+    if (_nextFuncAddr > addr && _nextFuncAddr < nfa)
+        return;
+
+    // else update it
+    _nextFuncAddr = nfa;
+    DBGF("_nextFuncAddr={0:X+8}", _nextFuncAddr);
 }
 
 }
