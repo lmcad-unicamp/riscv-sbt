@@ -123,6 +123,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             break;
 
         case llvm::ELF::R_RISCV_LO12_I:
+        case llvm::ELF::R_RISCV_LO12_S:
             // addr &= 0xFFF
             relfn = [this](llvm::Constant* addr) {
                 llvm::Constant* c =
@@ -307,19 +308,32 @@ llvm::GlobalVariable* SBTRelocation::relocateSection(
             switch (reloc->type()) {
                 case llvm::ELF::R_RISCV_32: {
                     ConstSymbolPtr sym = reloc->symbol();
-                    xassert(sym);
-                    ConstSectionPtr symSec = reloc->section();
-                    xassert(symSec);
-                    DBGF(
-                        "relocating {0:X-8}: "
-                        "symbol: name={1}, section={2}, offs={3:X-8}",
-                        reloc->offset(),
-                        sym->name(), symSec->name(), sym->address());
+                    uint64_t addr = reloc->addend();
+                    ConstSectionPtr sec = reloc->section();
+                    xassert(sec);
+                    if (sym) {
+                        addr += sym->address();
+                        DBGF(
+                            "relocating {0:X-8}: "
+                            "symbol=\"{1}\", symaddr={2:X+8}, "
+                            "section=\"{3}\", addend={4:X+8}, "
+                            "addr={5:X-8}",
+                            reloc->offset(),
+                            sym->name(), sym->address(),
+                            sec->name(), reloc->addend(),
+                            addr);
+                    } else {
+                        DBGF(
+                            "relocating {0:X-8}: "
+                            "section=\"{1}\", addend={2:X+8}",
+                            reloc->offset(),
+                            sec->name(), reloc->addend());
+                    }
 
                     llvm::Constant* cexpr =
                         llvm::ConstantExpr::getAdd(
-                            shadowImage->getSection(symSec->name()),
-                            _ctx->c.u32(sym->address()));
+                            shadowImage->getSection(sec->name()),
+                            _ctx->c.u32(addr));
                     cvec.push_back(cexpr);
                     break;
                 }
