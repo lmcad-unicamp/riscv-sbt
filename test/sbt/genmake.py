@@ -63,6 +63,7 @@ x86-syscall-test-run:
             Module("hello", "{}-hello.s", xflags="-C", bflags="-C", rflags=rflags),
             Module("argv", "argv.c", rflags="one two three " + rflags),
             Module("mm", "mm.c", bflags='--cflags="-DROWS=4"', rflags=rflags),
+            Module("fp", "fp.c", rflags=rflags),
         ]
 
         for mod in mods:
@@ -99,7 +100,7 @@ tests-run: tests x86-syscall-test-run {tests}
 
 
     def gen_utests(self):
-        dbg = False
+        dbg = True
 
         # utests
         self.txt = self.txt + "### RV32 Translator unit tests ###\n\n"
@@ -110,7 +111,8 @@ tests-run: tests x86-syscall-test-run {tests}
             "branch",
             "fence",
             "system",
-            "m"
+            "m",
+            "f"
         ]
 
         narchs = [RV32]

@@ -169,7 +169,7 @@ void Function::cleanRegs()
         return;
 
     for (size_t i = 1; i < XRegisters::NUM; i++) {
-        XRegister& x = _regs->getReg(i);
+        Register& x = _regs->getReg(i);
         if (!x.hasAccess()) {
             llvm::Value* v = x.get();
             llvm::Instruction* inst = llvm::dyn_cast<llvm::Instruction>(v);
@@ -382,8 +382,8 @@ void Function::loadRegisters()
     xassert(bld);
 
     for (size_t i = 1; i < XRegisters::NUM; i++) {
-        XRegister& local = getReg(i);
-        XRegister& global = _ctx->x->getReg(i);
+        Register& local = getReg(i);
+        Register& global = _ctx->x->getReg(i);
         // NOTE don't count this write
         llvm::Value* v = bld->load(global.getForRead());
         bld->store(v, local.get());
@@ -400,11 +400,11 @@ void Function::storeRegisters()
     xassert(bld);
 
     for (size_t i = 1; i < XRegisters::NUM; i++) {
-        XRegister& local = getReg(i);
+        Register& local = getReg(i);
         if (!local.hasWrite())
             continue;
 
-        XRegister& global = _ctx->x->getReg(i);
+        Register& global = _ctx->x->getReg(i);
         // NOTE don't count this read
         llvm::Value* v = bld->load(local.get());
         bld->store(v, global.getForWrite());

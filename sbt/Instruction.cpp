@@ -273,7 +273,7 @@ llvm::Error Instruction::translate()
 
         // unknown
         default:
-            return ERRORF("unknown instruction opcode: {0}", _inst.getOpcode());
+            err = translateF();
     }
 
     if (err)
@@ -1026,7 +1026,7 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
     size_t i = 1;
     unsigned reg = XRegister::A0;
     for (; i < n; i++, reg++) {
-        XRegister& x = f->getReg(reg);
+        Register& x = f->getReg(reg);
         if (!x.touched())
             break;
         args.push_back(_bld->load(reg));
@@ -1166,6 +1166,157 @@ llvm::Error Instruction::handleJump(
 llvm::Error Instruction::handleIJump(llvm::Value* target, unsigned linkReg)
 {
     xassert(false && "indirect jump translation not implemented!");
+}
+
+
+llvm::Error Instruction::translateF()
+{
+    namespace RISCV = llvm::RISCV;
+
+    llvm::Error err = noError();
+    switch (_inst.getOpcode()) {
+        // load
+        case RISCV::FLW:
+            err = translateFLoad(F_SINGLE);
+            break;
+        case RISCV::FLD:
+            err = translateFLoad(F_DOUBLE);
+            break;
+
+        // store
+        case RISCV::FSW:
+            err = translateFStore(F_SINGLE);
+            break;
+        case RISCV::FSD:
+            err = translateFStore(F_DOUBLE);
+            break;
+
+        default:
+            return ERRORF("unknown instruction opcode: {0}", _inst.getOpcode());
+    }
+
+    return err;
+}
+
+// F helpers
+
+unsigned Instruction::getFRD()
+{
+    return getFRegNum(0);
+}
+
+
+unsigned Instruction::getFRegNum(unsigned op)
+{
+    /*
+    const llvm::MCOperand& r = _inst.getOperand(op);
+    unsigned nr = FRegister::num(r.getReg());
+    *_os << _ctx->x->getReg(nr).name() << ", ";
+    return nr;
+    */
+    return 0;
+}
+
+
+llvm::Value* Instruction::getFReg(int op)
+{
+    /*
+    const llvm::MCOperand& mcop = _inst.getOperand(op);
+    unsigned nr = XRegister::num(mcop.getReg());
+    llvm::Value* v;
+    if (nr == 0)
+        v = _ctx->c.ZERO;
+    else
+        v = _bld->load(nr);
+
+    *_os << _ctx->x->getReg(nr).name();
+    if (op < 2)
+         *_os << ", ";
+    return v;
+    */
+    return nullptr;
+}
+
+//
+
+llvm::Error Instruction::translateFLoad(FType ft)
+{
+    switch (ft) {
+        case F_SINGLE:
+            *_os << "flw";
+            break;
+
+        case F_DOUBLE:
+            *_os << "fld";
+    }
+    *_os << '\t';
+
+    /*
+    unsigned o = getRD();
+    llvm::Value* rs1 = getReg(1);
+    auto expImm = getImm(2);
+    if (!expImm)
+        return expImm.takeError();
+    llvm::Value* imm = expImm.get();
+
+    llvm::Value* v = _bld->add(rs1, imm);
+
+    llvm::Value* ptr;
+    switch (it) {
+        case S8:
+        case U8:
+            ptr = _bld->i32ToI8Ptr(v);
+            break;
+
+        case S16:
+        case U16:
+            ptr = _bld->i32ToI16Ptr(v);
+            break;
+
+        case U32:
+            ptr = _bld->i32ToI32Ptr(v);
+            break;
+    }
+
+    v = _bld->load(ptr);
+
+    // to int32
+    switch (it) {
+        case S8:
+        case S16:
+            v = _bld->sext(v);
+            break;
+
+        case U8:
+        case U16:
+            v = _bld->zext(v);
+            break;
+
+        case U32:
+            break;
+    }
+    _bld->store(v, o);
+    */
+
+    return ERROR("TODO: translateFLoad");
+    // return llvm::Error::success();
+}
+
+
+llvm::Error Instruction::translateFStore(FType ft)
+{
+    switch (ft) {
+        case F_SINGLE:
+            *_os << "fsw";
+            break;
+
+        case F_DOUBLE:
+            *_os << "fsd";
+    }
+    *_os << '\t';
+
+    return ERROR("TODO: translateFStore");
+    // return llvm::Error::success();
 }
 
 

@@ -1,20 +1,12 @@
 #ifndef SBT_XREGISTERS_H
 #define SBT_XREGISTERS_H
 
-#include "Context.h"
+#include "Register.h"
 
-#include <llvm/Support/raw_ostream.h>
-
-#include <string>
-#include <vector>
-
-namespace llvm {
-class GlobalVariable;
-}
 
 namespace sbt {
 
-class XRegister
+class XRegister : public Register
 {
 public:
     // RISC-V ABI
@@ -54,86 +46,20 @@ public:
         T6      = 31
     };
 
-    enum Flags : uint32_t {
-        NONE  = 0,
-        DECL  = 1,
-        LOCAL = 2
-    };
 
     /**
      * ctor.
+     *
      * @param ctx
      * @param num register number
      * @param flags
      */
     XRegister(Context* ctx, unsigned num, uint32_t flags);
 
-    // reg name
-    const std::string& name() const
-    {
-        return _name;
-    }
-
     // get RISC-V register number from llvm MCInst reg number
     static unsigned num(unsigned reg);
 
-    llvm::Value* get()
-    {
-        _touched = true;
-        return _x;
-    }
-
-    llvm::Value* getForRead()
-    {
-        _read = true;
-        return _x;
-    }
-
-    bool hasRead() const
-    {
-        return _read;
-    }
-
-    llvm::Value* getForWrite()
-    {
-        _write = true;
-        return _x;
-    }
-
-    bool hasWrite() const
-    {
-        return _write;
-    }
-
-    bool hasAccess() const
-    {
-        return _read || _write;
-    }
-
-    bool touched() const
-    {
-        return _touched || hasAccess();
-    }
-
 private:
-    unsigned _num;
-    std::string _name = getName(_num);
-    llvm::Value* _x;
-    bool _local;
-    bool _read = false;
-    bool _write = false;
-
-    // this flag may remain false only while in main(),
-    // because we don't load from global registers when
-    // we enter it
-    bool _touched = false;
-
-
-    // register name on generated llvm IR
-    static std::string getIRName()
-    {
-        return "rv_x";
-    }
 
     /**
      * Get register name.
@@ -145,46 +71,12 @@ private:
 };
 
 
-/**
- * Register file.
- */
-class XRegisters
+class XRegisters : public Registers
 {
 public:
     static const size_t NUM = 32;
 
-    enum Flags : uint32_t {
-        NONE  = 0,
-        DECL  = 1,
-        LOCAL = 2
-    };
-
     XRegisters(Context* ctx, uint32_t flags);
-
-    // get register by its number
-
-    XRegister& getReg(size_t p)
-    {
-        xassert(p < NUM && "register index is out of bounds");
-        return _regs[p];
-    }
-
-private:
-    std::vector<XRegister> _regs;
-};
-
-
-class CSR
-{
-public:
-    enum Num : unsigned {
-        RDCYCLE     = 0xC00,
-        RDTIME      = 0xC01,
-        RDINSTRET   = 0xC02,
-        RDCYCLEH    = 0xC80,
-        RDTIMEH     = 0xC81,
-        RDINSTRETH  = 0xC82
-    };
 };
 
 }

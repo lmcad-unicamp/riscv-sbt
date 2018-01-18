@@ -116,6 +116,12 @@ private:
         REMU
     };
 
+    // floating point enums
+
+    enum FType {
+        F_SINGLE,
+        F_DOUBLE
+    };
 
     // methods
 
@@ -171,6 +177,22 @@ private:
     // add RV instr metadata and print it in debug mode
     // (no-op in release mode)
     void dbgprint();
+
+
+    // float
+
+    // handle F/D extension
+    llvm::Error translateF();
+
+    // FP load/store
+    llvm::Error translateFLoad(FType ft);
+    llvm::Error translateFStore(FType ft);
+
+    // float helpers
+
+    unsigned getFRD();
+    unsigned getFRegNum(unsigned op);
+    llvm::Value* getFReg(int op);
 };
 
 }

@@ -117,7 +117,7 @@ llvm::Error Translator::startTarget()
     if (!_asmInfo)
         return ERROR(llvm::formatv("no assembly info for target {0}", tripleName));
 
-    llvm::SubtargetFeatures features("+m");
+    llvm::SubtargetFeatures features("-a,-c,+m,+f,+d");
     _sti.reset(
         _target->createMCSubtargetInfo(tripleName, "", features.getString()));
     if (!_sti)

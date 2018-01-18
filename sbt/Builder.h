@@ -68,7 +68,7 @@ public:
     llvm::LoadInst* load(unsigned reg)
     {
         xassert(_ctx->f);
-        XRegister& x = _ctx->f->getReg(reg);
+        Register& x = _ctx->f->getReg(reg);
         DBGF("reg={0}", x.name());
         llvm::LoadInst* i = _builder->CreateLoad(
                 x.getForRead(), x.name() + "_");
@@ -92,7 +92,7 @@ public:
 
         xassert(_ctx->f);
 
-        XRegister& x = _ctx->f->getReg(reg);
+        Register& x = _ctx->f->getReg(reg);
         llvm::StoreInst* i = _builder->CreateStore(v,
                 x.getForWrite(), !VOLATILE);
         updateFirst(i);

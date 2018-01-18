@@ -5,6 +5,8 @@
 #define GET_REGINFO_ENUM
 #include <llvm/Target/RISCV/RISCVGenRegisterInfo.inc>
 
+#include <llvm/Support/raw_ostream.h>
+
 namespace sbt {
 
 std::string XRegister::getName(unsigned reg, bool abi)
@@ -49,7 +51,8 @@ std::string XRegister::getName(unsigned reg, bool abi)
         case T4:     return "t4";
         case T5:     return "t5";
         case T6:     return "t6";
-        default:     return "??";
+        default:
+            xunreachable("Invalid X register!");
     }
 }
 
@@ -91,53 +94,56 @@ unsigned XRegister::num(unsigned reg)
         case RISCV::X29: return 29;
         case RISCV::X30: return 30;
         case RISCV::X31: return 31;
-        default: return 0x1000;
+        default:
+            xunreachable("Invalid X register!");
     }
+}
+
+
+static const std::string XIRName = "rv_x";
+
+static std::string getXRegName(unsigned num, bool local)
+{
+    // get reg name
+    std::string s;
+    llvm::raw_string_ostream ss(s);
+
+    if (local)
+        ss << "l" << XIRName << num;
+    else
+        ss << XIRName << num;
+
+    ss.flush();
+    return s;
 }
 
 
 XRegister::XRegister(Context* ctx, unsigned num, uint32_t flags)
-    :
-    _num(num),
-    _local(flags & LOCAL)
+    : Register(ctx, num,
+            getXRegName(num, flags & LOCAL),
+            Register::T_INT, flags)
 {
-    if (_num == 0) {
-        _x = nullptr;
-        return;
-    }
-
-    const bool decl = flags & DECL;
-
-    // get reg name and linkage type
-    std::string s;
-    llvm::raw_string_ostream ss(s);
-    if (_local) {
-        ss << "l" << getIRName() << _num;
-        const std::string& name = ss.str();
-        Builder* bld = ctx->bld;
-        xassert(bld);
-        _x = bld->_alloca(ctx->t.i32, nullptr, name);
-
-    // global
-    } else {
-        ss << getIRName() << _num;
-        llvm::GlobalVariable::LinkageTypes linkt =
-            llvm::GlobalVariable::ExternalLinkage;
-        const std::string& name = ss.str();
-        _x = new llvm::GlobalVariable(*ctx->module, ctx->t.i32, !CONSTANT,
-            linkt, decl? nullptr : ctx->c.ZERO, name);
-    }
 }
 
 
-XRegisters::XRegisters(Context* ctx, uint32_t flags)
+static std::vector<Register> createXRegisters(
+    Context* ctx, uint32_t flags)
 {
     // FIXME
     xassert(!(flags & DECL));
 
-    _regs.reserve(NUM);
-    for (size_t i = 0; i < NUM; i++)
-        _regs.emplace_back(XRegister(ctx, i, flags));
+    std::vector<Register> regs;
+    regs.reserve(XRegisters::NUM);
+
+    for (size_t i = 0; i < XRegisters::NUM; i++)
+        regs.emplace_back(XRegister(ctx, i, flags));
+
+    return regs;
+}
+
+XRegisters::XRegisters(Context* ctx, uint32_t flags)
+    : Registers(createXRegisters(ctx, flags))
+{
 }
 
 }

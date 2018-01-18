@@ -230,7 +230,7 @@ public:
     /**
      * Get local register.
      */
-    XRegister& getReg(size_t i)
+    Register& getReg(size_t i)
     {
         if (_localRegs) {
             xassert(_regs);
