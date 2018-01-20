@@ -88,8 +88,10 @@ llvm::Error Function::startMain()
     bld->setInsertBlock(newBB(_addr));
 
     // create local register file
-    if (_localRegs)
+    if (_localRegs) {
         _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
+        _fregs.reset(new FRegisters(_ctx, FRegisters::LOCAL));
+    }
 
     copyArgv();
 
@@ -113,8 +115,10 @@ llvm::Error Function::start()
     _ctx->bld->setInsertBlock(ptr);
 
     // create local register file
-    if (_localRegs)
+    if (_localRegs) {
         _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
+        _fregs.reset(new FRegisters(_ctx, FRegisters::LOCAL));
+    }
     loadRegisters();
 
     return llvm::Error::success();
@@ -168,10 +172,9 @@ void Function::cleanRegs()
     if (!_localRegs)
         return;
 
-    for (size_t i = 1; i < XRegisters::NUM; i++) {
-        Register& x = _regs->getReg(i);
-        if (!x.hasAccess()) {
-            llvm::Value* v = x.get();
+    auto cleanReg = [](Register& r) {
+        if (!r.hasAccess()) {
+            llvm::Value* v = r.get();
             llvm::Instruction* inst = llvm::dyn_cast<llvm::Instruction>(v);
             xassert(inst);
 
@@ -199,7 +202,12 @@ void Function::cleanRegs()
             }
             inst->eraseFromParent();
         }
-    }
+    };
+
+    for (size_t i = 1; i < XRegisters::NUM; i++)
+        cleanReg(_regs->getReg(i));
+    for (size_t i = 0; i < FRegisters::NUM; i++)
+        cleanReg(_fregs->getReg(i));
 }
 
 
@@ -321,7 +329,7 @@ Function* Function::getByAddr(Context* ctx, uint64_t addr)
 
     ctx->sec->updateNextFuncAddr(addr);
 
-    return ctx->func(name);
+    return ctx->funcByName(name);
 }
 
 
@@ -388,6 +396,17 @@ void Function::loadRegisters()
         llvm::Value* v = bld->load(global.getForRead());
         bld->store(v, local.get());
     }
+
+    if (!_ctx->opts->syncFRegs())
+        return;
+
+    for (size_t i = 0; i < FRegisters::NUM; i++) {
+        Register& local = getFReg(i);
+        Register& global = _ctx->f->getReg(i);
+        // NOTE don't count this write
+        llvm::Value* v = bld->load(global.getForRead());
+        bld->store(v, local.get());
+    }
 }
 
 
@@ -405,6 +424,20 @@ void Function::storeRegisters()
             continue;
 
         Register& global = _ctx->x->getReg(i);
+        // NOTE don't count this read
+        llvm::Value* v = bld->load(local.get());
+        bld->store(v, global.getForWrite());
+    }
+
+    if (!_ctx->opts->syncFRegs())
+        return;
+
+    for (size_t i = 0; i < FRegisters::NUM; i++) {
+        Register& local = getFReg(i);
+        if (!local.hasWrite())
+            continue;
+
+        Register& global = _ctx->f->getReg(i);
         // NOTE don't count this read
         llvm::Value* v = bld->load(local.get());
         bld->store(v, global.getForWrite());

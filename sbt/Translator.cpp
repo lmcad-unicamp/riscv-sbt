@@ -2,13 +2,14 @@
 
 #include "Builder.h"
 #include "Disassembler.h"
+#include "FRegister.h"
 #include "Instruction.h"
 #include "Module.h"
-#include "XRegister.h"
 #include "SBTError.h"
 #include "Stack.h"
 #include "Syscall.h"
 #include "Utils.h"
+#include "XRegister.h"
 
 #include <llvm/Bitcode/BitcodeReader.h>
 #include <llvm/IR/Constants.h>
@@ -66,6 +67,7 @@ llvm::Error Translator::start()
 
     // global register file
     _ctx->x = new XRegisters(_ctx, XRegisters::NONE);
+    _ctx->f = new FRegisters(_ctx, FRegisters::NONE);
     // stack
     _ctx->stack = new Stack(_ctx, _opts.stackSize());
     // disassembler

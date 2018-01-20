@@ -181,6 +181,11 @@ int main(int argc, char* argv[])
         "dont-use-libc",
         cl::desc("Disallow the SBT to use libC for extended features"));
 
+    cl::opt<bool> dontSyncFRegsOpt(
+        "dont-sync-fregs",
+        cl::desc("Disable F registers synchronization "
+            "(useful to analyze integer only programs)"));
+
     cl::opt<std::string> stackSizeOpt(
         "stack-size",
         cl::desc("Stack size"),
@@ -236,6 +241,7 @@ int main(int argc, char* argv[])
 
     // create SBT
     sbt::Options opts(regs, !dontUseLibCOpt, std::atol(stackSizeOpt.c_str()));
+    opts.setSyncFRegs(!dontSyncFRegsOpt);
     auto exp = sbt::create<sbt::SBT>(inputFiles, outputFile, opts);
     if (!exp)
         sbt::handleError(exp.takeError());

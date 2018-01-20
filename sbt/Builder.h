@@ -67,11 +67,23 @@ public:
     // load register
     llvm::LoadInst* load(unsigned reg)
     {
-        xassert(_ctx->f);
-        Register& x = _ctx->f->getReg(reg);
+        xassert(_ctx->func);
+        Register& x = _ctx->func->getReg(reg);
         DBGF("reg={0}", x.name());
         llvm::LoadInst* i = _builder->CreateLoad(
                 x.getForRead(), x.name() + "_");
+        updateFirst(i);
+        return i;
+    }
+
+    // load f register
+    llvm::LoadInst* fload(unsigned reg)
+    {
+        xassert(_ctx->func);
+        Register& f = _ctx->func->getFReg(reg);
+        DBGF("reg={0}", f.name());
+        llvm::LoadInst* i = _builder->CreateLoad(
+                f.getForRead(), f.name() + "_");
         updateFirst(i);
         return i;
     }
@@ -90,11 +102,23 @@ public:
         if (reg == XRegister::ZERO)
             return nullptr;
 
-        xassert(_ctx->f);
+        xassert(_ctx->func);
 
-        Register& x = _ctx->f->getReg(reg);
+        Register& x = _ctx->func->getReg(reg);
         llvm::StoreInst* i = _builder->CreateStore(v,
                 x.getForWrite(), !VOLATILE);
+        updateFirst(i);
+        return i;
+    }
+
+    // store value in f register
+    llvm::StoreInst* fstore(llvm::Value* v, unsigned reg)
+    {
+        xassert(_ctx->func);
+
+        Register& f = _ctx->func->getFReg(reg);
+        llvm::StoreInst* i = _builder->CreateStore(v,
+                f.getForWrite(), !VOLATILE);
         updateFirst(i);
         return i;
     }

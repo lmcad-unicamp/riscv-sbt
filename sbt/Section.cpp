@@ -125,11 +125,11 @@ llvm::Error SBTSection::translate(const Func& func)
 
 llvm::Error SBTSection::translate(Function* func)
 {
-    _ctx->f = func;
+    _ctx->func = func;
     updateNextFuncAddr(func->addr() + Constants::INSTRUCTION_SIZE);
     if (auto err = func->translate())
         return err;
-    _ctx->f = nullptr;
+    _ctx->func = nullptr;
 
     return llvm::Error::success();
 }

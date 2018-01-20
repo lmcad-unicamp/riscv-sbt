@@ -14,6 +14,8 @@ namespace sbt {
 
 class Builder;
 class Disassembler;
+class FRegister;
+class FRegisters;
 class Function;
 class SBTRelocation;
 class SBTSection;
@@ -76,8 +78,9 @@ public:
   Constants c;
   // types
   Types t;
-  // x registers
+  // registers
   XRegisters* x = nullptr;
+  FRegisters* f = nullptr;
   // stack
   Stack* stack = nullptr;
   // flags
@@ -88,7 +91,7 @@ public:
   Map<uint64_t, Function*>* _funcByAddr = nullptr;
 
   // get function by name
-  Function* func(const std::string& name, bool assertNotNull = true) const
+  Function* funcByName(const std::string& name, bool assertNotNull = true) const
   {
     FunctionPtr* f = (*_func)[name];
     if (assertNotNull)
@@ -130,7 +133,7 @@ public:
   // builder
   Builder* bld = nullptr;
   // function
-  Function* f = nullptr;
+  Function* func = nullptr;
 
   // function scope
 

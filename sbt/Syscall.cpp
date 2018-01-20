@@ -139,7 +139,7 @@ void Syscall::genHandler()
 void Syscall::call()
 {
     Builder* bld = _ctx->bld;
-    Function* f = _ctx->f;
+    Function* f = _ctx->func;
     xassert(f);
 
     DBGF("call");

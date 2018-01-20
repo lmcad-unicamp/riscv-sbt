@@ -827,7 +827,7 @@ llvm::Error Instruction::translateBranch(BranchType bt)
         if (_ctx->inMain)
             v = _bld->ret(_bld->load(XRegister::A0));
         else {
-            _ctx->f->storeRegisters();
+            _ctx->func->storeRegisters();
             v = _bld->retVoid();
         }
         return llvm::Error::success();
@@ -964,9 +964,9 @@ llvm::Error Instruction::handleCall(uint64_t target, unsigned linkReg)
     link(linkReg);
 
     // call
-    _ctx->f->storeRegisters();
+    _ctx->func->storeRegisters();
     _bld->call(f->func());
-    _ctx->f->loadRegisters();
+    _ctx->func->loadRegisters();
     return llvm::Error::success();
 }
 
@@ -978,7 +978,7 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
 
     // prepare
     Translator* translator = _ctx->translator;
-    Function* f = _ctx->f;
+    Function* f = _ctx->func;
     xassert(f);
     llvm::Function* llf = f->func();
     xassert(llf);
@@ -1085,7 +1085,7 @@ llvm::Error Instruction::handleJump(
     BasicBlock* targetBB;
 
     // init vars
-    func = _ctx->f;
+    func = _ctx->func;
 
     // jump forward
     if (target > _addr) {

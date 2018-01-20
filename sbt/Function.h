@@ -3,6 +3,7 @@
 
 #include "BasicBlock.h"
 #include "Context.h"
+#include "FRegister.h"
 #include "Map.h"
 #include "Object.h"
 #include "Pointer.h"
@@ -240,6 +241,18 @@ public:
     }
 
     /**
+     * Get local float register.
+     */
+    Register& getFReg(size_t i)
+    {
+        if (_localRegs) {
+            xassert(_fregs);
+            return _fregs->getReg(i);
+        } else
+            return _ctx->f->getReg(i);
+    }
+
+    /**
      * Erase unused local registers.
      */
     void cleanRegs();
@@ -274,6 +287,7 @@ private:
     Function* _nextf = nullptr;
 
     std::unique_ptr<XRegisters> _regs;
+    std::unique_ptr<FRegisters> _fregs;
 
     // methods
 

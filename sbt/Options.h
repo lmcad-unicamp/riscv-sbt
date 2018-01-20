@@ -38,12 +38,24 @@ public:
         return _stackSize;
     }
 
+    bool syncFRegs() const
+    {
+        return _syncFRegs;
+    }
+
+    Options& setSyncFRegs(bool b)
+    {
+        _syncFRegs = b;
+        return *this;
+    }
+
     void dump() const;
 
 private:
     Regs _regs;
     bool _useLibC;
     std::size_t _stackSize;
+    bool _syncFRegs = true;
 };
 
 }
