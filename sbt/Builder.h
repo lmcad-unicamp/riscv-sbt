@@ -76,18 +76,6 @@ public:
         return i;
     }
 
-    // load f register
-    llvm::LoadInst* fload(unsigned reg)
-    {
-        xassert(_ctx->func);
-        Register& f = _ctx->func->getFReg(reg);
-        DBGF("reg={0}", f.name());
-        llvm::LoadInst* i = _builder->CreateLoad(
-                f.getForRead(), f.name() + "_");
-        updateFirst(i);
-        return i;
-    }
-
     // store
     llvm::StoreInst* store(llvm::Value* v, llvm::Value* ptr)
     {
@@ -107,18 +95,6 @@ public:
         Register& x = _ctx->func->getReg(reg);
         llvm::StoreInst* i = _builder->CreateStore(v,
                 x.getForWrite(), !VOLATILE);
-        updateFirst(i);
-        return i;
-    }
-
-    // store value in f register
-    llvm::StoreInst* fstore(llvm::Value* v, unsigned reg)
-    {
-        xassert(_ctx->func);
-
-        Register& f = _ctx->func->getFReg(reg);
-        llvm::StoreInst* i = _builder->CreateStore(v,
-                f.getForWrite(), !VOLATILE);
         updateFirst(i);
         return i;
     }
@@ -543,6 +519,75 @@ public:
         if (!_first)
             nop();
         return _first;
+    }
+
+    // floating point ops
+
+    // i32 to fp32*
+    llvm::Value* i32ToFP32Ptr(llvm::Value* i32)
+    {
+        llvm::Value* v = _builder->CreateCast(
+            llvm::Instruction::CastOps::IntToPtr, i32, _t->fp32ptr);
+        updateFirst(v);
+        return v;
+    }
+
+    // i32 to fp64*
+    llvm::Value* i32ToFP64Ptr(llvm::Value* i32)
+    {
+        llvm::Value* v = _builder->CreateCast(
+            llvm::Instruction::CastOps::IntToPtr, i32, _t->fp64ptr);
+        updateFirst(v);
+        return v;
+    }
+
+    // fp32 to fp64
+    llvm::Value* fp32ToFP64(llvm::Value* fp32)
+    {
+        llvm::Value* v = _builder->CreateFPCast(fp32, _t->fp64);
+        updateFirst(v);
+        return v;
+    }
+
+    // fp64 to fp32
+    llvm::Value* fp64ToFP32(llvm::Value* fp64)
+    {
+        llvm::Value* v = _builder->CreateFPCast(fp64, _t->fp32);
+        updateFirst(v);
+        return v;
+    }
+
+    // load f register
+    llvm::LoadInst* fload(unsigned reg)
+    {
+        xassert(_ctx->func);
+        Register& f = _ctx->func->getFReg(reg);
+        DBGF("reg={0}", f.name());
+        llvm::LoadInst* i = _builder->CreateLoad(
+                f.getForRead(), f.name() + "_");
+        updateFirst(i);
+        return i;
+    }
+
+    // store value in f register
+    llvm::StoreInst* fstore(llvm::Value* v, unsigned reg)
+    {
+        xassert(_ctx->func);
+
+        Register& f = _ctx->func->getFReg(reg);
+        llvm::StoreInst* i = _builder->CreateStore(v,
+                f.getForWrite(), !VOLATILE);
+        updateFirst(i);
+        return i;
+    }
+
+    // FPU ops
+
+    llvm::Value* fadd(llvm::Value* a, llvm::Value* b)
+    {
+        llvm::Value* v = _builder->CreateFAdd(a, b);
+        updateFirst(v);
+        return v;
     }
 
 private:

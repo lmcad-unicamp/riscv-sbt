@@ -548,7 +548,7 @@ llvm::Error Instruction::translateLoad(IntType it)
     auto expImm = getImm(2);
     if (!expImm)
         return expImm.takeError();
-    llvm::Value* imm = expImm.get();
+    llvm::Constant* imm = expImm.get();
 
     llvm::Value* v = _bld->add(rs1, imm);
 
@@ -618,7 +618,7 @@ llvm::Error Instruction::translateStore(IntType it)
     auto expImm = getImm(2);
     if (!expImm)
         return expImm.takeError();
-    llvm::Value* imm = expImm.get();
+    llvm::Constant* imm = expImm.get();
 
     llvm::Value* v = _bld->add(rs1, imm);
 
@@ -1177,18 +1177,26 @@ llvm::Error Instruction::translateF()
     switch (_inst.getOpcode()) {
         // load
         case RISCV::FLW:
-            err = translateFLoad(F_SINGLE);
+            err = translateFPLoad(F_SINGLE);
             break;
         case RISCV::FLD:
-            err = translateFLoad(F_DOUBLE);
+            err = translateFPLoad(F_DOUBLE);
             break;
 
         // store
         case RISCV::FSW:
-            err = translateFStore(F_SINGLE);
+            err = translateFPStore(F_SINGLE);
             break;
         case RISCV::FSD:
-            err = translateFStore(F_DOUBLE);
+            err = translateFPStore(F_DOUBLE);
+            break;
+
+        // FPU op
+        case RISCV::FADD_S:
+            err = translateFPUOp(F_ADD, F_SINGLE);
+            break;
+        case RISCV::FADD_D:
+            err = translateFPUOp(F_ADD, F_DOUBLE);
             break;
 
         default:
@@ -1208,38 +1216,29 @@ unsigned Instruction::getFRD()
 
 unsigned Instruction::getFRegNum(unsigned op)
 {
-    /*
     const llvm::MCOperand& r = _inst.getOperand(op);
     unsigned nr = FRegister::num(r.getReg());
-    *_os << _ctx->x->getReg(nr).name() << ", ";
+    *_os << _ctx->f->getReg(nr).name() << ", ";
     return nr;
-    */
-    return 0;
 }
 
 
 llvm::Value* Instruction::getFReg(int op)
 {
-    /*
     const llvm::MCOperand& mcop = _inst.getOperand(op);
-    unsigned nr = XRegister::num(mcop.getReg());
+    unsigned nr = FRegister::num(mcop.getReg());
     llvm::Value* v;
-    if (nr == 0)
-        v = _ctx->c.ZERO;
-    else
-        v = _bld->load(nr);
+    v = _bld->fload(nr);
 
-    *_os << _ctx->x->getReg(nr).name();
+    *_os << _ctx->f->getReg(nr).name();
     if (op < 2)
-         *_os << ", ";
+        *_os << ", ";
     return v;
-    */
-    return nullptr;
 }
 
 //
 
-llvm::Error Instruction::translateFLoad(FType ft)
+llvm::Error Instruction::translateFPLoad(FType ft)
 {
     switch (ft) {
         case F_SINGLE:
@@ -1251,59 +1250,37 @@ llvm::Error Instruction::translateFLoad(FType ft)
     }
     *_os << '\t';
 
-    /*
-    unsigned o = getRD();
+    unsigned fr = getFRD();
     llvm::Value* rs1 = getReg(1);
     auto expImm = getImm(2);
     if (!expImm)
         return expImm.takeError();
-    llvm::Value* imm = expImm.get();
+    llvm::Constant* imm = expImm.get();
 
-    llvm::Value* v = _bld->add(rs1, imm);
+    llvm::Value* addr = _bld->add(rs1, imm);
+    llvm::Value* ptr = nullptr;
+    llvm::Value* v = nullptr;
 
-    llvm::Value* ptr;
-    switch (it) {
-        case S8:
-        case U8:
-            ptr = _bld->i32ToI8Ptr(v);
+    switch (ft) {
+        case F_SINGLE:
+            ptr = _bld->i32ToFP32Ptr(addr);
+            v = _bld->load(ptr);
+            // cast to double
+            v = _bld->fp32ToFP64(v);
             break;
 
-        case S16:
-        case U16:
-            ptr = _bld->i32ToI16Ptr(v);
-            break;
-
-        case U32:
-            ptr = _bld->i32ToI32Ptr(v);
-            break;
-    }
-
-    v = _bld->load(ptr);
-
-    // to int32
-    switch (it) {
-        case S8:
-        case S16:
-            v = _bld->sext(v);
-            break;
-
-        case U8:
-        case U16:
-            v = _bld->zext(v);
-            break;
-
-        case U32:
+        case F_DOUBLE:
+            ptr = _bld->i32ToFP64Ptr(addr);
+            v = _bld->load(ptr);
             break;
     }
-    _bld->store(v, o);
-    */
 
-    return ERROR("TODO: translateFLoad");
-    // return llvm::Error::success();
+    _bld->fstore(v, fr);
+    return llvm::Error::success();
 }
 
 
-llvm::Error Instruction::translateFStore(FType ft)
+llvm::Error Instruction::translateFPStore(FType ft)
 {
     switch (ft) {
         case F_SINGLE:
@@ -1315,8 +1292,59 @@ llvm::Error Instruction::translateFStore(FType ft)
     }
     *_os << '\t';
 
-    return ERROR("TODO: translateFStore");
-    // return llvm::Error::success();
+    llvm::Value* fr = getFReg(0);
+    llvm::Value* rs1 = getReg(1);
+    auto expImm = getImm(2);
+    if (!expImm)
+        return expImm.takeError();
+    llvm::Constant* imm = expImm.get();
+
+    llvm::Value* addr = _bld->add(rs1, imm);
+    llvm::Value* v = nullptr;
+    llvm::Value* ptr = nullptr;
+
+    switch (ft) {
+        case F_SINGLE:
+            ptr = _bld->i32ToFP32Ptr(addr);
+            v = _bld->fp64ToFP32(fr);
+            break;
+
+        case F_DOUBLE:
+            ptr = _bld->i32ToFP64Ptr(addr);
+            v = fr;
+            break;
+    }
+
+    _bld->store(v, ptr);
+    return llvm::Error::success();
+}
+
+
+llvm::Error Instruction::translateFPUOp(FPUOp op, FType ft)
+{
+    switch (op) {
+        case F_ADD: *_os << "fadd"; break;
+    }
+    switch (ft) {
+        case F_SINGLE:  *_os << ".s";   break;
+        case F_DOUBLE:  *_os << ".d";   break;
+    }
+    *_os << '\t';
+
+    unsigned o = getFRD();
+    llvm::Value* o1 = getFReg(1);
+    llvm::Value* o2 = getFReg(2);
+
+    llvm::Value* v;
+
+    switch (op) {
+        case F_ADD:
+            v = _bld->fadd(o1, o2);
+            break;
+    }
+
+    _bld->fstore(v, o);
+    return llvm::Error::success();
 }
 
 

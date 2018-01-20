@@ -8,6 +8,7 @@ Register::Register(
     Context* ctx,
     unsigned num,
     const std::string& name,
+    const std::string& irName,
     Type type,
     uint32_t flags)
     :
@@ -35,14 +36,14 @@ Register::Register(
     if (_local) {
         Builder* bld = ctx->bld;
         xassert(bld);
-        _r = bld->_alloca(lltype, nullptr, _name);
+        _r = bld->_alloca(lltype, nullptr, irName);
 
     // global
     } else {
         llvm::GlobalVariable::LinkageTypes linkt =
             llvm::GlobalVariable::ExternalLinkage;
         _r = new llvm::GlobalVariable(*ctx->module, lltype, !CONSTANT,
-            linkt, decl? nullptr : zero, name);
+            linkt, decl? nullptr : zero, irName);
     }
 }
 

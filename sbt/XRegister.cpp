@@ -102,7 +102,7 @@ unsigned XRegister::num(unsigned reg)
 
 static const std::string XIRName = "rv_x";
 
-static std::string getXRegName(unsigned num, bool local)
+static std::string getXRegIRName(unsigned num, bool local)
 {
     // get reg name
     std::string s;
@@ -120,7 +120,8 @@ static std::string getXRegName(unsigned num, bool local)
 
 XRegister::XRegister(Context* ctx, unsigned num, uint32_t flags)
     : Register(ctx, num,
-            getXRegName(num, flags & LOCAL),
+            XRegister::getName(num),
+            getXRegIRName(num, flags & LOCAL),
             Register::T_INT, flags)
 {
 }

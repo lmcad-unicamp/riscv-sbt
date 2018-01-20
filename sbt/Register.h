@@ -32,7 +32,8 @@ public:
      *
      * @param ctx
      * @param num register number
-     * @param name register name
+     * @param name register name (for printing purposes)
+     * @param irName register name (for IR generation)
      * @param type register type
      * @param flags
      */
@@ -40,6 +41,7 @@ public:
         Context* ctx,
         unsigned num,
         const std::string& name,
+        const std::string& irName,
         Type type,
         uint32_t flags);
 

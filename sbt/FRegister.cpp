@@ -63,7 +63,7 @@ unsigned FRegister::num(unsigned reg)
 
 static const std::string FIRName = "rv_f";
 
-static std::string getFRegName(unsigned num, bool local)
+static std::string getFRegIRName(unsigned num, bool local)
 {
     // get reg name
     std::string s;
@@ -81,7 +81,8 @@ static std::string getFRegName(unsigned num, bool local)
 
 FRegister::FRegister(Context* ctx, unsigned num, uint32_t flags)
     : Register(ctx, num,
-            getFRegName(num, flags & LOCAL),
+            FRegister::getName(num),
+            getFRegIRName(num, flags & LOCAL),
             Register::T_FLOAT, flags)
 {
 }

@@ -29,6 +29,10 @@ public:
 
   llvm::FunctionType* voidFunc;
 
+  llvm::Type* fp32;
+  llvm::Type* fp64;
+  llvm::Type* fp32ptr;
+  llvm::Type* fp64ptr;
 
   Types(llvm::LLVMContext& ctx);
 };

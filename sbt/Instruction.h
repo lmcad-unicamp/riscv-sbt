@@ -123,6 +123,10 @@ private:
         F_DOUBLE
     };
 
+    enum FPUOp {
+        F_ADD
+    };
+
     // methods
 
     // ALU op
@@ -185,8 +189,11 @@ private:
     llvm::Error translateF();
 
     // FP load/store
-    llvm::Error translateFLoad(FType ft);
-    llvm::Error translateFStore(FType ft);
+    llvm::Error translateFPLoad(FType ft);
+    llvm::Error translateFPStore(FType ft);
+
+    // FPU op
+    llvm::Error translateFPUOp(FPUOp op, FType ft);
 
     // float helpers
 
