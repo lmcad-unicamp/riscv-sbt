@@ -317,6 +317,7 @@ if __name__ == "__main__":
         Args(["e", bf_asc, bf_enc, bf_key], "encode"),
         Args(["d", bf_enc, bf_dec, bf_key], "decode")]
 
+    stack_large = ["-stack-size=131072"];
     benchs = [
         Bench("dijkstra", "network/dijkstra",
             ["dijkstra_large.c"],
@@ -345,7 +346,7 @@ if __name__ == "__main__":
             rflags="--bin"),
         Bench("stringsearch", "office/stringsearch",
             ["bmhasrch.c", "bmhisrch.c", "bmhsrch.c", "pbmsrch_large.c"],
-            sbtflags=["-stack-size=131072"]),
+            sbtflags=stack_large),
         EncDecBench("blowfish", bf_dir,
             ["bf.c",
             "bf_skey.c",
@@ -355,11 +356,15 @@ if __name__ == "__main__":
             "bf_cfb64.c",
             "bf_ofb64.c"],
             bf_args,
-            sbtflags=["-stack-size=131072"],
+            sbtflags=stack_large,
             rflags="--exp-rc=1",
             mflags=["--exp-rc=1"])
             .set_asc_index([0, 1])
             .set_dec_index([1, 2]),
+        Bench("basicmath", "automotive/basicmath",
+            ["basicmath_large.c", "rad2deg.c", "cubic.c", "isqrt.c"],
+            sbtflags=stack_large,
+            dbg=True),
     ]
 
     txt = Bench.PROLOGUE
@@ -387,14 +392,6 @@ benchs-measure: benchs {}
 
 
 """
-## 01- BASICMATH
-# rv32: OK (soft-float)
-
-BASICMATH_NAME  := basicmath
-BASICMATH_DIR   := automotive/basicmath
-BASICMATH_MODS  := basicmath_large rad2deg cubic isqrt
-BASICMATH_ARGS  :=
-
 ## 02- BITCOUNT
 # rv32: OK (soft-float)
 
