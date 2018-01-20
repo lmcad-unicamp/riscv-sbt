@@ -5,7 +5,7 @@
 #include "Context.h"
 #include "Function.h"
 #include "Types.h"
-#include "XRegisters.h"
+#include "XRegister.h"
 
 #undef ENABLE_DBGS
 #define ENABLE_DBGS 1

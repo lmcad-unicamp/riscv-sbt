@@ -6,7 +6,7 @@
 #include "Map.h"
 #include "Object.h"
 #include "Pointer.h"
-#include "XRegisters.h"
+#include "XRegister.h"
 
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/Error.h>

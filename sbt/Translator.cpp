@@ -4,7 +4,7 @@
 #include "Disassembler.h"
 #include "Instruction.h"
 #include "Module.h"
-#include "XRegisters.h"
+#include "XRegister.h"
 #include "SBTError.h"
 #include "Stack.h"
 #include "Syscall.h"

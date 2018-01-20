@@ -3,7 +3,7 @@
 #include "Disassembler.h"
 #include "Function.h"
 #include "Stack.h"
-#include "XRegisters.h"
+#include "XRegister.h"
 
 namespace sbt {
 

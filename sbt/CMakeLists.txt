@@ -107,7 +107,7 @@ add_executable (riscv-sbt
     Translator.cpp
     Types.cpp
     Utils.cpp
-    XRegisters.cpp
+    XRegister.cpp
     sbt.cpp
     )
 target_compile_options (riscv-sbt PRIVATE ${SBT_COMPILE_OPTIONS})
