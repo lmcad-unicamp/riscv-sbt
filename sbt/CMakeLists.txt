@@ -92,6 +92,7 @@ add_executable (riscv-sbt
     Constants.cpp
     Context.cpp
     Disassembler.cpp
+    FRegister.cpp
     Function.cpp
     Instruction.cpp
     Module.cpp

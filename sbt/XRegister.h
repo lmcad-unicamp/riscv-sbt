@@ -1,5 +1,5 @@
-#ifndef SBT_XREGISTERS_H
-#define SBT_XREGISTERS_H
+#ifndef SBT_XREGISTER_H
+#define SBT_XREGISTER_H
 
 #include "Register.h"
 
