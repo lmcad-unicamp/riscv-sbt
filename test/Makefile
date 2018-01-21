@@ -7,7 +7,7 @@ RUN_PY   := $(TOPDIR)/scripts/auto/run.py
 SRCDIR   := $(shell pwd)
 DSTDIR   := $(TOPDIR)/build/test
 
-BINS   := rv32-hello-asm rv32-hello x86-hello rv32-linux-hello
+BINS   := rv32-hello-asm rv32-linux-hello x86-hello
 
 all:  $(BINS)
 run:  $(addsuffix -run,$(BINS))
@@ -47,4 +47,4 @@ $(A_BIN)-run:
 
 endef
 
-$(eval $(foreach ARCH,rv32 x86 rv32-linux,$(call BLDNRUN,$(ARCH),hello)))
+$(eval $(foreach ARCH,rv32-linux x86,$(call BLDNRUN,$(ARCH),hello)))

@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -46,6 +47,10 @@ F(_IO_getc)
 F(__ctype_tolower_loc)
 F(__ctype_toupper_loc)
 
+
+// math
+
+F(sqrt)
 
 // data
 

@@ -5,8 +5,8 @@ from auto.genmake import *
 
 class Tests():
     def __init__(self):
-        self.narchs = [RV32, X86]
-        self.xarchs = [(RV32, X86)]
+        self.narchs = [RV32_LINUX, X86]
+        self.xarchs = [(RV32_LINUX, X86)]
         self.srcdir = path(DIR.top, "test/sbt")
         self.dstdir = path(DIR.build, "test/sbt")
         self.txt = None
@@ -72,6 +72,7 @@ x86-syscall-test-run:
             xflags = cat(mod.xflags, "--dbg" if dbg else '')
             bflags = cat(mod.bflags, "--dbg" if dbg else '')
             rflags = mod.rflags
+            # do_mod
             self.txt = self.txt + do_mod(
                 self.narchs, self.xarchs,
                 name, src,
@@ -94,7 +95,7 @@ tests-run: tests x86-syscall-test-run {tests}
 
         # rv32-test
         mod = Module("test", "rv32-test.s", rflags=rflags)
-        self.txt = self.txt + do_mod([RV32], [(RV32, X86)],
+        self.txt = self.txt + do_mod(self.narchs, self.xarchs,
             mod.name, mod.src, self.srcdir, self.dstdir,
             mod.xflags, mod.bflags, mod.rflags)
 

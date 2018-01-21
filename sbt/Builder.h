@@ -557,6 +557,24 @@ public:
         return v;
     }
 
+    // unsigned integer to FP
+    llvm::Value* uiToFP(llvm::Value* ui, llvm::Type* ty)
+    {
+        llvm::Value* v =
+            _builder->CreateCast(llvm::Instruction::CastOps::UIToFP, ui, ty);
+        updateFirst(v);
+        return v;
+    }
+
+    // FP to unsigned integer
+    llvm::Value* fpToUI(llvm::Value* fp, llvm::Type* ty)
+    {
+        llvm::Value* v =
+            _builder->CreateCast(llvm::Instruction::CastOps::FPToUI, fp, ty);
+        updateFirst(v);
+        return v;
+    }
+
     // load f register
     llvm::LoadInst* fload(unsigned reg)
     {

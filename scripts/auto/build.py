@@ -136,8 +136,7 @@ def _s2o(arch, srcdir, dstdir, _in, out, opts):
             "-g" if opts.dbg else "",
             opts.sflags,
             "-arch=" + arch.march,
-            "-mattr=" + arch.mattr,
-            "-target-abi=ilp32d")
+            "-mattr=" + arch.mattr)
         cmd = cat(
             TOOLS.mc,
             flags,
@@ -146,9 +145,9 @@ def _s2o(arch, srcdir, dstdir, _in, out, opts):
             ipath, "-o", opath)
         shell(cmd)
         # temporary workaround: set double-float ABI flag in ELF object file
-        shell(R"printf '\x04\x00\x00\x00' | " +
-            "dd of=" + opath + " bs=1 seek=$((0x24)) count=4 conv=notrunc" +
-            " >/dev/null 2>&1")
+        #shell(R"printf '\x04\x00\x00\x00' | " +
+        #    "dd of=" + opath + " bs=1 seek=$((0x24)) count=4 conv=notrunc" +
+        #    " >/dev/null 2>&1")
 
 
 

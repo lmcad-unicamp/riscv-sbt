@@ -154,7 +154,7 @@ RV32 = Arch(
 
 
 RV32_LINUX_SYSROOT  = DIR.toolchain_release + "/opt/riscv/sysroot"
-RV32_LINUX_ABI      = "ilp32d"
+RV32_LINUX_ABI      = "ilp32"
 
 RV32_LINUX = Arch(
         "rv32-linux", "rv32",

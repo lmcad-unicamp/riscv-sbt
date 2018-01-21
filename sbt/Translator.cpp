@@ -382,7 +382,23 @@ void Translator::genICaller()
                 DBG(ty->dump());
                 DBGS.flush();
 
-                v = bld->bitOrPointerCast(v, ty);
+                // handle cast to double
+                if (ty->isDoubleTy()) {
+                    // v = low word
+                    v = bld->zext64(v);
+                    ++argit;
+                    // hi = uint64(high word) << 32
+                    llvm::Value *hi = &*argit;
+                    hi = bld->zext64(hi);
+                    hi = bld->sll(hi, c.i64(32));
+                    // merge hi and low
+                    v = bld->_or(hi, v);
+                    // then finally cast to double
+                    v = bld->bitOrPointerCast(v, ty);
+                // all other type casts
+                } else {
+                    v = bld->bitOrPointerCast(v, ty);
+                }
             }
 
             args.push_back(v);
@@ -393,14 +409,34 @@ void Translator::genICaller()
         llvm::Value* fptr = bld->bitOrPointerCast(sym, ty);
         if (llft->getReturnType()->isVoidTy()) {
             bld->call(fptr, args);
-        // write return value into x10 for libc functions
+        // write return value into x10/x11 for libc functions
         } else {
             xassert(isExternal);
             llvm::Value* ret = bld->call(fptr, args);
-            if (ret->getType() != t.i32)
-                ret = bld->bitOrPointerCast(ret, t.i32);
-            auto& reg = _ctx->x->getReg(XRegister::A0);
-            bld->store(ret, reg.getForWrite());
+            llvm::Type* retty = ret->getType();
+            bool retIs64b = false;
+            if (retty != t.i32) {
+                if (retty->isDoubleTy()) {
+                    retIs64b = true;
+                    ret = bld->bitOrPointerCast(ret, t.i64);
+                } else {
+                    ret = bld->bitOrPointerCast(ret, t.i32);
+                }
+            }
+
+            if (retIs64b) {
+                llvm::Value* vlo = bld->truncOrBitCastI32(ret);
+                llvm::Value* vhi = bld->srl(ret, c.i64(32));
+                vhi = bld->truncOrBitCastI32(vhi);
+
+                auto& reglo = _ctx->x->getReg(XRegister::A0);
+                auto& reghi = _ctx->x->getReg(XRegister::A1);
+                bld->store(vlo, reglo.getForWrite());
+                bld->store(vhi, reghi.getForWrite());
+            } else {
+                auto& reg = _ctx->x->getReg(XRegister::A0);
+                bld->store(ret, reg.getForWrite());
+            }
         }
         bld->retVoid();
 

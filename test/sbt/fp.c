@@ -1,10 +1,10 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include <math.h>
 
 int main()
 {
-    double f = 2.5;
-    f = f * 2;
+    double f = 9.99;
+    f = sqrt(f);
 
     printf("%c%f\n", ' ', f);
     return 0;
