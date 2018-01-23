@@ -29,11 +29,14 @@ WORKDIR /riscv-sbt
 ENV TOPDIR=/riscv-sbt
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/riscv-sbt/scripts
+ENV MAKE_OPTS=-j2
 
 RUN make riscv-gnu-toolchain-newlib \
     && rm -rf build
 
-RUN make MAKE_OPTS=-j4 riscv-gnu-toolchain-linux \
+RUN make riscv-gnu-toolchain-linux \
     && rm -rf build
+
+RUN rm -rf /riscv-sbt/submodules/riscv-gnu-toolchain
 
 CMD ["/bin/bash"]

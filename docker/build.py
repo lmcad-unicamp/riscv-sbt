@@ -43,6 +43,10 @@ class Image:
             for src in self.srcs:
                 dir = path(dstdir, src)
                 if not os.path.exists(dir):
+                    # create parent dir, if needed
+                    if not os.path.exists(os.path.dirname(dir)):
+                        shell("mkdir " + os.path.dirname(dir))
+                    # copy
                     shell("cp -a {} {}".format(
                         path(SRC_DIR, src),
                         dir))
@@ -191,8 +195,11 @@ if __name__ == "__main__":
         Image("riscv-sbt"),
         Image("riscv-gnu-toolchain"),
         Image("emu",
-            srcs=["riscv-fesvr", "riscv-isa-sim",
-                "riscv-pk", "riscv-qemu-tests"]),
+            srcs=["riscv-fesvr",
+                "riscv-isa-sim",
+                "riscv-pk",
+                "riscv-gnu-toolchain/riscv-qemu",
+                "riscv-qemu-tests"]),
         Image("llvm", srcs=["llvm", "clang"]),
         Image("sbt", srcs=[], img="sbt")
     ]

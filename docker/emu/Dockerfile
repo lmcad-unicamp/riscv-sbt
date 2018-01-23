@@ -22,4 +22,6 @@ RUN make spike \
 RUN make qemu \
     && rm -rf build
 
+RUN rm -rf /riscv-sbt/submodules/*
+
 CMD ["/bin/bash"]

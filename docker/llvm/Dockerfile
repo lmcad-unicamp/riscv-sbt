@@ -17,8 +17,11 @@ ENV TOPDIR=/riscv-sbt
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/riscv-sbt/scripts
 ENV PATH=$TOPDIR/toolchain/release/opt/riscv/bin:$PATH
+ENV MAKE_OPTS=-j2
 
-RUN make MAKE_OPTS=-j4 llvm \
+RUN make llvm \
     && rm -rf build
+
+RUN rm -rf /riscv-sbt/submodules/*
 
 CMD ["/bin/bash"]
