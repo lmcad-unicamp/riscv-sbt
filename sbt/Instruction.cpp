@@ -1198,6 +1198,60 @@ llvm::Error Instruction::translateF()
         case RISCV::FADD_D:
             err = translateFPUOp(F_ADD, F_DOUBLE);
             break;
+        case RISCV::FDIV_S:
+            err = translateFPUOp(F_DIV, F_SINGLE);
+            break;
+        case RISCV::FDIV_D:
+            err = translateFPUOp(F_DIV, F_DOUBLE);
+            break;
+        case RISCV::FSGNJ_S:
+            err = translateFPUOp(F_SGNJ, F_SINGLE);
+            break;
+        case RISCV::FSGNJ_D:
+            err = translateFPUOp(F_SGNJ, F_DOUBLE);
+            break;
+        case RISCV::FSGNJN_S:
+            err = translateFPUOp(F_SGNJN, F_SINGLE);
+            break;
+        case RISCV::FSGNJN_D:
+            err = translateFPUOp(F_SGNJN, F_DOUBLE);
+            break;
+        case RISCV::FSGNJX_S:
+            err = translateFPUOp(F_SGNJX, F_SINGLE);
+            break;
+        case RISCV::FSGNJX_D:
+            err = translateFPUOp(F_SGNJX, F_DOUBLE);
+            break;
+        case RISCV::FEQ_S:
+            err = translateFPUOp(F_EQ, F_SINGLE);
+            break;
+        case RISCV::FEQ_D:
+            err = translateFPUOp(F_EQ, F_DOUBLE);
+            break;
+        case RISCV::FLE_S:
+            err = translateFPUOp(F_LE, F_SINGLE);
+            break;
+        case RISCV::FLE_D:
+            err = translateFPUOp(F_LE, F_DOUBLE);
+            break;
+        case RISCV::FLT_S:
+            err = translateFPUOp(F_LT, F_SINGLE);
+            break;
+        case RISCV::FLT_D:
+            err = translateFPUOp(F_LT, F_DOUBLE);
+            break;
+        case RISCV::FMUL_S:
+            err = translateFPUOp(F_MUL, F_SINGLE);
+            break;
+        case RISCV::FMUL_D:
+            err = translateFPUOp(F_MUL, F_DOUBLE);
+            break;
+        case RISCV::FSUB_S:
+            err = translateFPUOp(F_SUB, F_SINGLE);
+            break;
+        case RISCV::FSUB_D:
+            err = translateFPUOp(F_SUB, F_DOUBLE);
+            break;
 
         default:
             return ERRORF("unknown instruction opcode: {0}", _inst.getOpcode());
@@ -1323,7 +1377,16 @@ llvm::Error Instruction::translateFPStore(FType ft)
 llvm::Error Instruction::translateFPUOp(FPUOp op, FType ft)
 {
     switch (op) {
-        case F_ADD: *_os << "fadd"; break;
+        case F_ADD:     *_os << "fadd";     break;
+        case F_SUB:     *_os << "fsub";     break;
+        case F_MUL:     *_os << "fmul";     break;
+        case F_DIV:     *_os << "fdiv";     break;
+        case F_SGNJ:    *_os << "fsgnj";    break;
+        case F_SGNJN:   *_os << "fsgnjn";   break;
+        case F_SGNJX:   *_os << "fsgnjx";   break;
+        case F_EQ:      *_os << "feq";      break;
+        case F_LE:      *_os << "fle";      break;
+        case F_LT:      *_os << "flt";      break;
     }
     switch (ft) {
         case F_SINGLE:  *_os << ".s";   break;
@@ -1331,7 +1394,28 @@ llvm::Error Instruction::translateFPUOp(FPUOp op, FType ft)
     }
     *_os << '\t';
 
-    unsigned o = getFRD();
+    unsigned o;
+    bool oIsInt;
+    switch (op) {
+        case F_ADD:
+        case F_SUB:
+        case F_MUL:
+        case F_DIV:
+        case F_SGNJ:
+        case F_SGNJN:
+        case F_SGNJX:
+            o = getFRD();
+            oIsInt = false;
+            break;
+
+        case F_EQ:
+        case F_LE:
+        case F_LT:
+            o = getRD();
+            oIsInt = true;
+            break;
+    }
+
     llvm::Value* o1 = getFReg(1);
     llvm::Value* o2 = getFReg(2);
 
@@ -1341,9 +1425,51 @@ llvm::Error Instruction::translateFPUOp(FPUOp op, FType ft)
         case F_ADD:
             v = _bld->fadd(o1, o2);
             break;
+
+        case F_SUB:
+            v = _bld->fsub(o1, o2);
+            break;
+
+        case F_MUL:
+            v = _bld->fmul(o1, o2);
+            break;
+
+        case F_DIV:
+            v = _bld->fdiv(o1, o2);
+            break;
+
+        case F_SGNJ:
+            v = _bld->fsgnj(o1, o2);
+            break;
+
+        case F_SGNJN:
+            v = _bld->fsgnjn(o1, o2);
+            break;
+
+        case F_SGNJX:
+            v = _bld->fsgnjx(o1, o2);
+            break;
+
+        case F_EQ:
+            v = _bld->feq(o1, o2);
+            v = _bld->zext(v);
+            break;
+
+        case F_LE:
+            v = _bld->fle(o1, o2);
+            v = _bld->zext(v);
+            break;
+
+        case F_LT:
+            v = _bld->flt(o1, o2);
+            v = _bld->zext(v);
+            break;
     }
 
-    _bld->fstore(v, o);
+    if (oIsInt)
+        _bld->store(v, o);
+    else
+        _bld->fstore(v, o);
     return llvm::Error::success();
 }
 

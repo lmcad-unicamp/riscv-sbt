@@ -51,6 +51,10 @@ F(__ctype_toupper_loc)
 
 // math
 
+F(acos)
+F(atan)
+F(cos)
+F(pow)
 F(sqrt)
 
 // data

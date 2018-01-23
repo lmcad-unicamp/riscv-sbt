@@ -124,7 +124,16 @@ private:
     };
 
     enum FPUOp {
-        F_ADD
+        F_ADD,
+        F_DIV,
+        F_EQ,
+        F_LE,
+        F_LT,
+        F_MUL,
+        F_SGNJ,
+        F_SGNJN,
+        F_SGNJX,
+        F_SUB
     };
 
     // methods

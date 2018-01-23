@@ -608,6 +608,100 @@ public:
         return v;
     }
 
+    llvm::Value* fsub(llvm::Value* a, llvm::Value* b)
+    {
+        llvm::Value* v = _builder->CreateFSub(a, b);
+        updateFirst(v);
+        return v;
+    }
+
+    llvm::Value* fmul(llvm::Value* a, llvm::Value* b)
+    {
+        llvm::Value* v = _builder->CreateFMul(a, b);
+        updateFirst(v);
+        return v;
+    }
+
+    llvm::Value* fdiv(llvm::Value* a, llvm::Value* b)
+    {
+        llvm::Value* v = _builder->CreateFDiv(a, b);
+        updateFirst(v);
+        return v;
+    }
+
+    llvm::Value* fsgnj(llvm::Value* a, llvm::Value* b)
+    {
+        // to int64
+        a = bitOrPointerCast(a, _t->i64);
+        b = bitOrPointerCast(b, _t->i64);
+        // mask a's signal bit
+        a = _and(a, _c->i64((1ULL<<63) -1));
+        // mask all but b's signal bit
+        b = _and(b, _c->i64(1ULL<<63));
+        // or a and b
+        llvm::Value* v = _or(a, b);
+        // cast back to double
+        v = bitOrPointerCast(v, _t->fp64);
+        return v;
+    }
+
+    llvm::Value* fsgnjn(llvm::Value* a, llvm::Value* b)
+    {
+        // to int64
+        a = bitOrPointerCast(a, _t->i64);
+        b = bitOrPointerCast(b, _t->i64);
+        // mask a's signal bit
+        a = _and(a, _c->i64((1ULL<<63) -1));
+        // negate b's signal bit
+        b = _xor(b, b);
+        // mask all but b's signal bit
+        b = _and(b, _c->i64(1ULL<<63));
+        // or a and b
+        llvm::Value* v = _or(a, b);
+        // cast back to double
+        v = bitOrPointerCast(v, _t->fp64);
+        return v;
+    }
+
+    llvm::Value* fsgnjx(llvm::Value* a, llvm::Value* b)
+    {
+        // to int64
+        a = bitOrPointerCast(a, _t->i64);
+        b = bitOrPointerCast(b, _t->i64);
+        // xor a and b (to get the correct value of the result signal bit)
+        b = _xor(a, b);
+        // mask the other bits
+        b = _and(b, _c->i64(1ULL<<63));
+        // mask a's signal bit
+        a = _and(a, _c->i64((1ULL<<63) -1));
+        // or a and b
+        llvm::Value* v = _or(a, b);
+        // cast back to double
+        v = bitOrPointerCast(v, _t->fp64);
+        return v;
+    }
+
+    llvm::Value* feq(llvm::Value* a, llvm::Value* b)
+    {
+        llvm::Value* v = _builder->CreateFCmpOEQ(a, b);
+        updateFirst(v);
+        return v;
+    }
+
+    llvm::Value* fle(llvm::Value* a, llvm::Value* b)
+    {
+        llvm::Value* v = _builder->CreateFCmpOLE(a, b);
+        updateFirst(v);
+        return v;
+    }
+
+    llvm::Value* flt(llvm::Value* a, llvm::Value* b)
+    {
+        llvm::Value* v = _builder->CreateFCmpOLT(a, b);
+        updateFirst(v);
+        return v;
+    }
+
 private:
 
     // update first instruction pointer
