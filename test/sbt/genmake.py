@@ -116,7 +116,7 @@ tests-run: tests x86-syscall-test-run {tests}
             "f"
         ]
 
-        narchs = [RV32]
+        narchs = [RV32_LINUX]
         xflags = "--sbtobjs syscall counters"
         bflags = None
         rflags = "-o {}.out --tee"
@@ -229,7 +229,7 @@ rv32tests_status:
         srcdir = path(qtests, "rv32i")
         dstdir = path(DIR.build, "riscv-qemu-tests/rv32i")
 
-        narchs = [RV32]
+        narchs = [RV32_LINUX]
         xflags = "-C"
         bflags = '-C --sflags="-I {}"'.format(incdir)
         rflags = "-o {}.out"

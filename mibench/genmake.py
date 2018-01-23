@@ -361,10 +361,10 @@ if __name__ == "__main__":
             mflags=["--exp-rc=1"])
             .set_asc_index([0, 1])
             .set_dec_index([1, 2]),
-        Bench("basicmath", "automotive/basicmath",
-            ["basicmath_large.c", "rad2deg.c", "cubic.c", "isqrt.c"],
-            sbtflags=stack_large,
-            dbg=True),
+        #Bench("basicmath", "automotive/basicmath",
+        #    ["basicmath_large.c", "rad2deg.c", "cubic.c", "isqrt.c"],
+        #    sbtflags=stack_large,
+        #    dbg=True),
     ]
 
     txt = Bench.PROLOGUE

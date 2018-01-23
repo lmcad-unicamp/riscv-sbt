@@ -44,6 +44,7 @@ F(toupper)
 F(write)
 
 F(_IO_getc)
+F(_IO_putc)
 F(__ctype_tolower_loc)
 F(__ctype_toupper_loc)
 
