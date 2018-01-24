@@ -136,6 +136,11 @@ private:
         F_SUB
     };
 
+    enum IType {
+        F_W,
+        F_WU
+    };
+
     // methods
 
     // ALU op
@@ -203,6 +208,12 @@ private:
 
     // FPU op
     llvm::Error translateFPUOp(FPUOp op, FType ft);
+
+    // CVT
+    // fp to int
+    llvm::Error translateCVT(IType it, FType ft);
+    // int to fp
+    llvm::Error translateCVT(FType ft, IType it);
 
     // float helpers
 

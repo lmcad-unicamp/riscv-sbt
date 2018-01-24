@@ -557,6 +557,24 @@ public:
         return v;
     }
 
+    // integer to FP
+    llvm::Value* siToFP(llvm::Value* i, llvm::Type* ty)
+    {
+        llvm::Value* v =
+            _builder->CreateCast(llvm::Instruction::CastOps::SIToFP, i, ty);
+        updateFirst(v);
+        return v;
+    }
+
+    // FP to integer
+    llvm::Value* fpToSI(llvm::Value* fp, llvm::Type* ty)
+    {
+        llvm::Value* v =
+            _builder->CreateCast(llvm::Instruction::CastOps::FPToSI, fp, ty);
+        updateFirst(v);
+        return v;
+    }
+
     // unsigned integer to FP
     llvm::Value* uiToFP(llvm::Value* ui, llvm::Type* ty)
     {

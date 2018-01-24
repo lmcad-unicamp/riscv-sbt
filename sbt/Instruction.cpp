@@ -1191,12 +1191,24 @@ llvm::Error Instruction::translateF()
             err = translateFPStore(F_DOUBLE);
             break;
 
-        // FPU op
+        // FPU ops
         case RISCV::FADD_S:
             err = translateFPUOp(F_ADD, F_SINGLE);
             break;
         case RISCV::FADD_D:
             err = translateFPUOp(F_ADD, F_DOUBLE);
+            break;
+        case RISCV::FSUB_S:
+            err = translateFPUOp(F_SUB, F_SINGLE);
+            break;
+        case RISCV::FSUB_D:
+            err = translateFPUOp(F_SUB, F_DOUBLE);
+            break;
+        case RISCV::FMUL_S:
+            err = translateFPUOp(F_MUL, F_SINGLE);
+            break;
+        case RISCV::FMUL_D:
+            err = translateFPUOp(F_MUL, F_DOUBLE);
             break;
         case RISCV::FDIV_S:
             err = translateFPUOp(F_DIV, F_SINGLE);
@@ -1204,6 +1216,8 @@ llvm::Error Instruction::translateF()
         case RISCV::FDIV_D:
             err = translateFPUOp(F_DIV, F_DOUBLE);
             break;
+
+        // sign injection
         case RISCV::FSGNJ_S:
             err = translateFPUOp(F_SGNJ, F_SINGLE);
             break;
@@ -1222,6 +1236,8 @@ llvm::Error Instruction::translateF()
         case RISCV::FSGNJX_D:
             err = translateFPUOp(F_SGNJX, F_DOUBLE);
             break;
+
+        // comparisons
         case RISCV::FEQ_S:
             err = translateFPUOp(F_EQ, F_SINGLE);
             break;
@@ -1240,17 +1256,31 @@ llvm::Error Instruction::translateF()
         case RISCV::FLT_D:
             err = translateFPUOp(F_LT, F_DOUBLE);
             break;
-        case RISCV::FMUL_S:
-            err = translateFPUOp(F_MUL, F_SINGLE);
+
+        // FP/int conversions
+        case RISCV::FCVT_W_S:
+            err = translateCVT(F_W, F_SINGLE);
             break;
-        case RISCV::FMUL_D:
-            err = translateFPUOp(F_MUL, F_DOUBLE);
+        case RISCV::FCVT_W_D:
+            err = translateCVT(F_W, F_DOUBLE);
             break;
-        case RISCV::FSUB_S:
-            err = translateFPUOp(F_SUB, F_SINGLE);
+        case RISCV::FCVT_WU_S:
+            err = translateCVT(F_WU, F_SINGLE);
             break;
-        case RISCV::FSUB_D:
-            err = translateFPUOp(F_SUB, F_DOUBLE);
+        case RISCV::FCVT_WU_D:
+            err = translateCVT(F_WU, F_DOUBLE);
+            break;
+        case RISCV::FCVT_S_W:
+            err = translateCVT(F_SINGLE, F_W);
+            break;
+        case RISCV::FCVT_D_W:
+            err = translateCVT(F_DOUBLE, F_W);
+            break;
+        case RISCV::FCVT_S_WU:
+            err = translateCVT(F_SINGLE, F_WU);
+            break;
+        case RISCV::FCVT_D_WU:
+            err = translateCVT(F_DOUBLE, F_WU);
             break;
 
         default:
@@ -1470,6 +1500,76 @@ llvm::Error Instruction::translateFPUOp(FPUOp op, FType ft)
         _bld->store(v, o);
     else
         _bld->fstore(v, o);
+    return llvm::Error::success();
+}
+
+
+llvm::Error Instruction::translateCVT(IType it, FType ft)
+{
+    *_os << "fcvt";
+    switch (it) {
+        case F_W:   *_os << ".w";   break;
+        case F_WU:  *_os << ".wu";  break;
+    }
+    switch (ft) {
+        case F_SINGLE: *_os << ".s"; break;
+        case F_DOUBLE: *_os << ".d"; break;
+    }
+    *_os << '\t';
+
+    // TODO handle overflows
+
+    llvm::Type* ty =_t->i32;
+    unsigned rd = getRD();
+    llvm::Value* fr = getFReg(1);
+    llvm::Value* v;
+
+    switch (it) {
+        case F_W:
+            v = _bld->fpToSI(fr, ty);
+            break;
+
+        case F_WU:
+            v = _bld->fpToUI(fr, ty);
+            break;
+    }
+
+    _bld->store(v, rd);
+    return llvm::Error::success();
+}
+
+
+llvm::Error Instruction::translateCVT(FType ft, IType it)
+{
+    *_os << "fcvt";
+    switch (ft) {
+        case F_SINGLE: *_os << ".s"; break;
+        case F_DOUBLE: *_os << ".d"; break;
+    }
+    switch (it) {
+        case F_W:   *_os << ".w";   break;
+        case F_WU:  *_os << ".wu";  break;
+    }
+    *_os << '\t';
+
+    // TODO handle overflows
+
+    llvm::Type* ty = _t->fp64;
+    unsigned rd = getFRD();
+    llvm::Value* ir = getReg(1);
+    llvm::Value* v;
+
+    switch (it) {
+        case F_W:
+            v = _bld->siToFP(ir, ty);
+            break;
+
+        case F_WU:
+            v = _bld->uiToFP(ir, ty);
+            break;
+    }
+
+    _bld->fstore(v, rd);
     return llvm::Error::success();
 }
 
