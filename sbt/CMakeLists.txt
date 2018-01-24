@@ -87,6 +87,14 @@ target_compile_options (x86-counters PRIVATE --32)
 set (CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 include_directories (${SBT_INCLUDE_DIRS})
 link_directories (${SBT_LINK_DIRS})
+
+# PrintfBreak
+add_library (PrintfBreak SHARED PrintfBreak.cpp)
+target_compile_options (PrintfBreak PRIVATE ${SBT_COMPILE_OPTIONS})
+target_compile_definitions(PrintfBreak PRIVATE ${SBT_COMPILE_DEFINITIONS})
+target_link_libraries (PrintfBreak ${SBT_LIBS} ${SBT_SYS_LIBS})
+
+# SBT
 add_executable (riscv-sbt
     BasicBlock.cpp
     Constants.cpp

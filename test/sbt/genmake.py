@@ -64,6 +64,7 @@ x86-syscall-test-run:
             Module("argv", "argv.c", rflags="one two three " + rflags),
             Module("mm", "mm.c", bflags='--cflags="-DROWS=4"', rflags=rflags),
             Module("fp", "fp.c", rflags=rflags),
+            Module("printf", "printf.c", rflags=rflags),
         ]
 
         for mod in mods:
