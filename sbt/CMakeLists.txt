@@ -83,8 +83,8 @@ add_library (x86-counters OBJECT x86-counters.s)
 target_compile_options (x86-counters PRIVATE --32)
 
 # runtime
-add_library (runtime OBJECT Runtime.c)
-target_compile_options (runtime PRIVATE -m32)
+add_library (x86-runtime OBJECT Runtime.c)
+target_compile_options (x86-runtime PRIVATE -m32)
 
 # SBT
 
@@ -151,5 +151,5 @@ install (FILES ${CMAKE_BINARY_DIR}/CMakeFiles/x86-syscall.dir/x86-syscall.s.o
     RENAME x86-syscall.o DESTINATION share/riscv-sbt)
 install (FILES ${CMAKE_BINARY_DIR}/CMakeFiles/x86-counters.dir/x86-counters.s.o
     RENAME x86-counters.o DESTINATION share/riscv-sbt)
-install (FILES ${CMAKE_BINARY_DIR}/CMakeFiles/runtime.dir/Runtime.c.o
-    RENAME runtime.o DESTINATION share/riscv-sbt)
+install (FILES ${CMAKE_BINARY_DIR}/CMakeFiles/x86-runtime.dir/Runtime.c.o
+    RENAME x86-runtime.o DESTINATION share/riscv-sbt)
