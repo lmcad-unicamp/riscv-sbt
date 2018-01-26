@@ -52,14 +52,14 @@ alltests:
 
 ### dbg ###
 
-BIN := argv
+BIN := printf
 
 test-prep:
 	$(MAKE) -C $(TOPDIR)/test/sbt $(BIN)
 
 .PHONY: test
 test: sbt-force
-	riscv-sbt -x -regs=globals /mnt/ssd/riscv-sbt/build/test/sbt/rv32-$(BIN).o -o /mnt/ssd/riscv-sbt/build/test/sbt/rv32-x86-$(BIN)-globals.bc >/mnt/ssd/riscv-sbt/junk/rv32-x86-$(BIN)-globals.log 2>&1
+	opt -load $(TOPDIR)/build/sbt/libPrintfBreak.so -printf-break < $(TOPDIR)/build/test/sbt/rv32-printf.bc >/dev/null
 
 .PHONY: dbg
 dbg:
