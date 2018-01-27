@@ -30,19 +30,20 @@ def checkout(mod, commit):
 def patch_llvm():
     with cd(path(DIR.submodules, "llvm")):
         # patch llvm
-        ents = os.listdir("../lowrisc-llvm")
+        dir = "../lowrisc-llvm"
+        ents = os.listdir(dir)
         ents.sort()
         patches = [p for p in ents if p.endswith(".patch")]
         for p in patches:
-            shell('echo "patch -p1 < ' + p + '"')
+            shell("patch -p1 < " + dir + "/" + p)
 
         # patch clang
-        ents = os.listdir("../lowrisc-llvm/clang")
+        dir = "../lowrisc-llvm/clang"
+        ents = os.listdir(dir)
         ents.sort()
         patches = [p for p in ents if p.endswith(".patch")]
         for p in patches:
-            shell('echo "patch -d tools/clang -p1 < ' + p + '"')
-
+            shell("patch -d tools/clang -p1 < " + dir + "/" + p)
 
 
 def commit(mod, sha):
@@ -88,6 +89,9 @@ if __name__ == "__main__":
     # - Use git log and look for git-svn-id and find the commit that corresponds to
     #   REV, or the closest one not greater than REV
     # - pass the SHA values to this script (--llvm-commit, --clang-commit)
+    #
+    # last LLVM commit: 68ee79b605bbef2de2e9addb9443a99a433a14dd
+    # last clang commit: e0f57df6fa23b61ac3e065244cf190e870e9d158
 
     if args.checkout:
         if not args.llvm_commit:
