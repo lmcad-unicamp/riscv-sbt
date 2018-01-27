@@ -80,8 +80,7 @@ public:
     bool runOnFunction(Function& f) override
     {
         _toRemove.clear();
-        errs() << PREFIX << "scanning function "
-               << f.getName() << '\n';
+        // errs() << PREFIX << "scanning function " << f.getName() << '\n';
 
         // for each basic block
         for (auto& bb : f) {
@@ -92,7 +91,8 @@ public:
                 if (!call)
                     continue;
                 Function* callee = call->getCalledFunction();
-                if (callee->getName() != "printf")
+                // NOTE callee will be null for indirect function invocation
+                if (!callee || callee->getName() != "printf")
                     continue;
 
                 // break it, if needed
@@ -144,11 +144,29 @@ private:
         _i = 1;
         _n = args - 1;
         _pcalls.clear();
-        if (args == 1) {
-            LOG << "1 arg only, no need to break call\n";
-            return false;
+
+        // check if this call needs to be broken:
+        // - do not break if:
+        //   - call has less than 4 var_args
+        //   AND
+        //   - call has no var_arg with 2x the length of a word (32-bit)
+        if (_n < 5) {
+            bool has2xLenArg = false;
+
+            for (unsigned i = 1; i < args; i++) {
+                Value* arg = call->getArgOperand(i);
+                assert(arg);
+                Type* ty = arg->getType();
+                if (ty->isDoubleTy() ||
+                        (ty->isIntegerTy() && ty->getIntegerBitWidth() > 32)) {
+                    has2xLenArg = true;
+                    break;
+                }
+            }
+
+            if (!has2xLenArg)
+                return false;
         }
-        LOG << "args=" << _n << nl;
 
         // get format string
         GlobalVariable* gv;
@@ -167,9 +185,11 @@ private:
 
         // log original format string
         StringRef fmt = gvini->getAsCString();
-        LOG << "fmt=\"";
+        LOG << "breaking printf in function [";
+        errs().write_escaped(call->getParent()->getParent()->getName());
+        errs() << "]: fmt=\"";
         errs().write_escaped(fmt);
-        errs() << "\"" << nl;
+        errs() << "\", var_args=" << _n << nl;
 
         // init _pcalls with the whole format string
         PCall pcall = { fmt.str(), args, false };
