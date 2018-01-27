@@ -13,9 +13,9 @@ main:
     # print f
     la a0, f_fmt
     la t0, f
-    lw a2, 0(t0)
-    lw a3, 4(t0)
-    call printf
+    lw a1, 0(t0)
+    lw a2, 4(t0)
+    call sbt_printf_d
 
     # restore ra
     mv ra, s1

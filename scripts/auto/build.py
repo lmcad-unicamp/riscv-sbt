@@ -56,12 +56,19 @@ def dis(arch, dir, mod):
     shell(cmd)
 
 
-def opt(arch, dir, _in, out):
+def opt(arch, dir, _in, out, opts, printf_break):
     """ opt """
     ipath = path(dir, _in)
     opath = path(dir, out)
 
-    cmd = cat(TOOLS.opt, TOOLS.opt_flags, ipath, "-o", opath)
+    flags = TOOLS.opt_flags(opts)
+    if printf_break:
+        flags = cat(flags,
+            "-load",
+            path(DIR.build, "sbt/libPrintfBreak.so"),
+            "-printf-break")
+
+    cmd = cat(TOOLS.opt, flags, ipath, "-o", opath)
     shell(cmd)
 
 
@@ -103,15 +110,17 @@ def _c2s(arch, srcdir, dstdir, ins, out, opts):
     _c2lbc(arch, srcdir, dstdir, ins, bc, opts)
 
     if opts.dbg:
+        opt(arch, dstdir, bc, bc, opts, printf_break=True)
+        dis(arch, dstdir, bc)
         bc2s(arch, dstdir, bc, out, opts)
     else:
         opt1 = chsuf(bc, ".opt.bc")
         opt2 = chsuf(bc, ".opt2.bc")
 
         # opt; dis; opt; dis; .bc -> .s
-        opt(arch, dstdir, bc, opt1)
+        opt(arch, dstdir, bc, opt1, opts, printf_break=True)
         dis(arch, dstdir, opt1)
-        opt(arch, dstdir, opt1, opt2)
+        opt(arch, dstdir, opt1, opt2, opts, printf_break=False)
         dis(arch, dstdir, opt2)
         bc2s(arch, dstdir, opt2, out, opts)
 
@@ -216,7 +225,7 @@ if __name__ == "__main__":
     parser.add_argument("--ldflags", help="linker flags")
     parser.add_argument("-C", action='store_false', help="don't link with C libs")
     parser.add_argument("--dbg", action='store_true', help="build for debug")
-    parser.add_argument("--sbtobjs", nargs="+", default=["syscall"],
+    parser.add_argument("--sbtobjs", nargs="+", default=["syscall", "runtime"],
         help="optional SBT native objs to link with")
     parser.add_argument("--as", dest="_as", help="assembler to use: as || mc",
         default="mc")
@@ -240,7 +249,7 @@ if __name__ == "__main__":
     opts.dbg = args.dbg
     opts.cflags = args.cflags
     opts.sflags = args.sflags
-    opts.ldflags = cat(*[SBT.nat_obj(arch, o) for o in args.sbtobjs])
+    opts.ldflags = cat(*[SBT.nat_obj(arch, o, opts) for o in args.sbtobjs])
     opts._as = args._as
 
     # build

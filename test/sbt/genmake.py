@@ -118,7 +118,7 @@ tests-run: tests x86-syscall-test-run {tests}
         ]
 
         narchs = [RV32_LINUX]
-        xflags = "--sbtobjs syscall counters"
+        xflags = "--sbtobjs syscall runtime counters"
         bflags = None
         rflags = "-o {}.out --tee"
 

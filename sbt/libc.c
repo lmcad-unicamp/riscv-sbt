@@ -57,6 +57,11 @@ F(cos)
 F(pow)
 F(sqrt)
 
+// runtime
+
+int sbt_printf_d(const char*, double);
+F(sbt_printf_d)
+
 // data
 
 #define D(x) \

@@ -43,10 +43,15 @@ class Sbt:
     def __init__(self):
         self.flags = "-x"
         self.share_dir = DIR.toolchain + "/share/riscv-sbt"
-        self.nat_obj  = lambda arch, name: \
-            "{}/{}-{}.o".format(self.share_dir, arch.prefix, name) \
-            if arch != RV32 and arch != RV32_LINUX else ""
         self.modes = ["globals", "locals"]
+
+    def nat_obj(self, arch, name, opts):
+        if arch == RV32 or arch == RV32_LINUX and name != "runtime":
+            return ""
+        if name == "runtime" and not opts.clink:
+            return ""
+        return "{}/{}-{}.o".format(self.share_dir, arch.prefix, name)
+
 
 SBT = Sbt()
 
@@ -55,7 +60,7 @@ class Tools:
     def __init__(self):
         self.cmake      = "cmake"
         self.opt        = "opt"
-        self.opt_flags  = _O #-stats
+        self.opt_flags  = lambda opts: "-O0" if opts.dbg else _O
         self.dis        = "llvm-dis"
         self.link       = "llvm-link"
         self.mc         = "llvm-mc"

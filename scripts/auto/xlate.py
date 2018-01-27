@@ -31,7 +31,7 @@ def translate(arch, srcdir, dstdir, _in, out, opts):
         bc2s(arch, dstdir, bc, s, opts)
     else:
         opt1 = out + ".opt.bc"
-        opt(arch, dstdir, bc, opt1)
+        opt(arch, dstdir, bc, opt1, opts, printf_break=False)
         dis(arch, dstdir, opt1)
         bc2s(arch, dstdir, opt1, s, opts)
 
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     parser.add_argument("--flags", nargs="+", metavar="flag")
     parser.add_argument("-C", action='store_false', help="don't link with C libs")
     parser.add_argument("--dbg", action='store_true', help="build for debug")
-    parser.add_argument("--sbtobjs", nargs="+", default=["syscall"],
+    parser.add_argument("--sbtobjs", nargs="+", default=["syscall", "runtime"],
         help="optional SBT native objs to link with")
 
     args = parser.parse_args()
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     opts.dbg = args.dbg
     opts.cflags = ""
     opts.sflags = ""
-    opts.ldflags = cat(*[SBT.nat_obj(arch, o) for o in args.sbtobjs])
+    opts.ldflags = cat(*[SBT.nat_obj(arch, o, opts) for o in args.sbtobjs])
     opts.sbtflags = cat(" ".join(args.flags).strip(),
             "-dont-use-libc" if not opts.clink else "")
 
