@@ -159,3 +159,8 @@ install(FILES ${CMAKE_BINARY_DIR}/CMakeFiles/x86-counters.dir/x86-counters.s.o
 # runtime
 install(FILES ${CMAKE_BINARY_DIR}/rv32-runtime.o DESTINATION share/riscv-sbt)
 install(FILES ${CMAKE_BINARY_DIR}/x86-runtime.o  DESTINATION share/riscv-sbt)
+# PrintfBreak
+install(TARGETS PrintfBreak DESTINATION lib
+    PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+        GROUP_READ GROUP_EXECUTE
+        WORLD_READ WORLD_EXECUTE)

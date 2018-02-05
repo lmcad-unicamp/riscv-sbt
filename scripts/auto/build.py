@@ -64,9 +64,7 @@ def opt(arch, dir, _in, out, opts, printf_break):
     flags = TOOLS.opt_flags(opts)
     if printf_break:
         flags = cat(flags,
-            "-load",
-            path(DIR.build, "sbt/libPrintfBreak.so"),
-            "-printf-break")
+            "-load", "libPrintfBreak.so", "-printf-break")
 
     cmd = cat(TOOLS.opt, flags, ipath, "-o", opath)
     shell(cmd)

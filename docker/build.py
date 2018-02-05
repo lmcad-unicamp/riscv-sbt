@@ -234,6 +234,7 @@ if __name__ == "__main__":
         help="clone and checkout all needed sources")
     parser.add_argument("--build", metavar="img",
         help="build img. If img='all', build everything")
+    parser.add_argument("--dev", action="store_true")
     args = parser.parse_args()
 
     imgs = [
@@ -246,7 +247,8 @@ if __name__ == "__main__":
                 "riscv-gnu-toolchain/riscv-qemu",
                 "riscv-qemu-tests"]),
         Image("llvm", srcs=["llvm", "clang"]),
-        Image("sbt", srcs=[], img="sbt")
+        Image("sbt", srcs=[], img="sbt"),
+        Image("dev", srcs=[], img="dev")
     ]
 
     names = [img.name for img in imgs]
@@ -254,6 +256,31 @@ if __name__ == "__main__":
     # --run
     if args.run:
         shell("docker run -it --rm -h sbt sbt")
+    # --dev
+    elif args.dev:
+        is_cygwin = True
+        try:
+            shell("uname | grep -i cygwin")
+        except:
+            is_cygwin = False
+        if is_cygwin:
+            prefix = "winpty "
+            top = shell("cygpath -m " + TOPDIR, save_out=True).strip()
+            src = shell("cygpath -m " + SRC_DIR, save_out=True).strip()
+        else:
+            prefix = ''
+            top = TOPDIR
+            src = SRC_DIR
+        top = top + os.sep
+
+        vols = (
+            "-v {0}Makefile:/riscv-sbt/Makefile " +
+            "-v {0}build:/riscv-sbt/build " +
+            "-v {0}sbt:/riscv-sbt/sbt " +
+            "-v {0}scripts:/riscv-sbt/scripts " +
+            "-v {1}:/riscv-sbt/submodules").format(
+                top, src)
+        shell(prefix + "docker run -it --rm -h dev " + vols + " dev")
     # --clean-srcs
     elif args.clean_srcs:
         shell("rm -rf " + SRC_DIR)
