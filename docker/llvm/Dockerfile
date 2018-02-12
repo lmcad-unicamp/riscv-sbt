@@ -1,17 +1,23 @@
-FROM sbt-emu
+FROM sbt-emu as emu
+
+FROM debian:stretch
+WORKDIR /riscv-sbt
+COPY --from=emu /riscv-sbt .
 
 # llvm/clang reqs
 # clang-3.9: to build LLVM (gcc could be used instead)
 RUN apt-get update \
     && apt-get install -y \
+    build-essential \
     cmake \
     clang-3.9 \
     g++-multilib \
     ninja-build \
+    python \
+    python3 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY src /riscv-sbt/submodules/
-WORKDIR /riscv-sbt
 
 ENV TOPDIR=/riscv-sbt
 ENV PYTHONUNBUFFERED=1

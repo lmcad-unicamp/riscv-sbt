@@ -36,7 +36,7 @@ ENV MAKE_OPTS=-j2
 # So, it's better to reset it to its original state first.
 RUN git reset --hard
 
-# fast update
+# XXX fast update
 RUN git checkout unstable && git pull
 
 ### SBT ###
