@@ -647,6 +647,15 @@ public:
         return v;
     }
 
+    llvm::Value* fsqrt(llvm::Value* a)
+    {
+        llvm::Function* f = llvm::Intrinsic::
+            getDeclaration(_ctx->module, llvm::Intrinsic::sqrt, {_t->fp64});
+        llvm::Value* v = call(f, {a});
+        xassert(_first);
+        return v;
+    }
+
     llvm::Value* fsgnj(llvm::Value* a, llvm::Value* b)
     {
         // to int64

@@ -133,6 +133,7 @@ private:
         F_SGNJ,
         F_SGNJN,
         F_SGNJX,
+        F_SQRT,
         F_SUB
     };
 

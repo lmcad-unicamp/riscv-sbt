@@ -1216,6 +1216,12 @@ llvm::Error Instruction::translateF()
         case RISCV::FDIV_D:
             err = translateFPUOp(F_DIV, F_DOUBLE);
             break;
+        case RISCV::FSQRT_S:
+            err = translateFPUOp(F_SQRT, F_SINGLE);
+            break;
+        case RISCV::FSQRT_D:
+            err = translateFPUOp(F_SQRT, F_DOUBLE);
+            break;
 
         // sign injection
         case RISCV::FSGNJ_S:
@@ -1411,6 +1417,7 @@ llvm::Error Instruction::translateFPUOp(FPUOp op, FType ft)
         case F_SUB:     *_os << "fsub";     break;
         case F_MUL:     *_os << "fmul";     break;
         case F_DIV:     *_os << "fdiv";     break;
+        case F_SQRT:    *_os << "fsqrt";    break;
         case F_SGNJ:    *_os << "fsgnj";    break;
         case F_SGNJN:   *_os << "fsgnjn";   break;
         case F_SGNJX:   *_os << "fsgnjx";   break;
@@ -1431,6 +1438,7 @@ llvm::Error Instruction::translateFPUOp(FPUOp op, FType ft)
         case F_SUB:
         case F_MUL:
         case F_DIV:
+        case F_SQRT:
         case F_SGNJ:
         case F_SGNJN:
         case F_SGNJX:
@@ -1447,7 +1455,15 @@ llvm::Error Instruction::translateFPUOp(FPUOp op, FType ft)
     }
 
     llvm::Value* o1 = getFReg(1);
-    llvm::Value* o2 = getFReg(2);
+    llvm::Value* o2;
+
+    switch (op) {
+        case F_SQRT:
+            break;
+
+        default:
+            o2 = getFReg(2);
+    }
 
     llvm::Value* v;
 
@@ -1466,6 +1482,10 @@ llvm::Error Instruction::translateFPUOp(FPUOp op, FType ft)
 
         case F_DIV:
             v = _bld->fdiv(o1, o2);
+            break;
+
+        case F_SQRT:
+            v = _bld->fsqrt(o1);
             break;
 
         case F_SGNJ:
