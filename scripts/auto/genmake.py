@@ -95,10 +95,17 @@ def xlatenrun(arch, srcdir, dstdir, _in, out, mode, xflags=None, rflags=None,
     return txt
 
 
-def test(xarchs, dir, name, ntest=False):
+def test(xarchs, dir, name, ntest=False, out_filter=None):
     diffs = []
     def diff(bin1, bin2):
-        diff = "\tdiff {0}/{1}.out {0}/{2}.out".format(dir, bin1, bin2)
+        if out_filter:
+            diff = (
+                "\tcat {0}/{1}.out | {3} >{0}/{1}.filt.out\n" +
+                "\tcat {0}/{2}.out | {3} >{0}/{2}.filt.out\n" +
+                "\tdiff {0}/{1}.filt.out {0}/{2}.filt.out").format(
+                    dir, bin1, bin2, out_filter)
+        else:
+            diff = "\tdiff {0}/{1}.out {0}/{2}.out".format(dir, bin1, bin2)
         diffs.append(diff)
 
     farchs = []

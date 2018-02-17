@@ -647,6 +647,24 @@ public:
         return v;
     }
 
+    llvm::Value* fmin(llvm::Value* a, llvm::Value* b)
+    {
+        llvm::Function* f = llvm::Intrinsic::
+            getDeclaration(_ctx->module, llvm::Intrinsic::minnum, {_t->fp64});
+        llvm::Value* v = call(f, {a, b});
+        xassert(_first);
+        return v;
+    }
+
+    llvm::Value* fmax(llvm::Value* a, llvm::Value* b)
+    {
+        llvm::Function* f = llvm::Intrinsic::
+            getDeclaration(_ctx->module, llvm::Intrinsic::maxnum, {_t->fp64});
+        llvm::Value* v = call(f, {a, b});
+        xassert(_first);
+        return v;
+    }
+
     llvm::Value* fsqrt(llvm::Value* a)
     {
         llvm::Function* f = llvm::Intrinsic::

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 // function
@@ -12,11 +13,13 @@
 
 F(abort)
 F(atexit)
+F(clock)
 F(exit)
 F(fclose)
 F(feof)
 F(ferror)
 F(fflush)
+F(fgetc)
 F(fgetpos)
 F(fopen)
 F(free)
@@ -28,6 +31,7 @@ F(fseek)
 F(fwrite)
 F(getc)
 F(malloc)
+F(memchr)
 F(memcpy)
 F(memset)
 F(perror)
@@ -39,6 +43,7 @@ F(read)
 F(realloc)
 F(strlen)
 F(strncmp)
+F(strtol)
 F(tolower)
 F(toupper)
 F(write)

@@ -99,11 +99,14 @@ class Test:
                 ttimes.append(t)
 
             # compare outputs
-            for i in range(n):
-                rc = subprocess.call(["diff", self.native.out(i), self.rv32.out(i)])
-                if rc:
-                    sys.exit("ERROR: translated output differs from native (run #"
-                             + str(i) + ")")
+            if not self.opts.no_diff:
+                for i in range(n):
+                    rc = subprocess.call(
+                        ["diff", self.native.out(i), self.rv32.out(i)])
+                    if rc:
+                        sys.exit("ERROR: "
+                            "translated output differs from native (run #"
+                                 + str(i) + ")")
 
             def median(vals):
                 vals.sort()
@@ -138,10 +141,12 @@ def main(args):
     parser.add_argument("-v", action="store_true", help="verbose")
     parser.add_argument("--exp-rc", type=int, default=0,
         help="expected return code")
+    parser.add_argument("--no-diff", action="store_true")
 
     args = parser.parse_args()
     opts = Options(args.stdin, args.v)
     opts.exp_rc = args.exp_rc
+    opts.no_diff = args.no_diff
 
     # print("measuring", args.test)
 

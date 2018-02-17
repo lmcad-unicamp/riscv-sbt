@@ -345,11 +345,7 @@ llvm::GlobalVariable* SBTRelocation::relocateSection(
             ++rit;
         // or just copy the raw bytes
         } else {
-            uint32_t val = 0;
-            for (int i = 3; i >= 0; i--) {
-                val |= bytes[addr + i];
-                val <<= 8;
-            }
+            uint32_t val = *(uint32_t*)&bytes[addr];
             DBGF("copying raw bytes @{0:X-8}: {1:X-8}", addr, val);
             cvec.push_back(_ctx->c.u32(val));
         }

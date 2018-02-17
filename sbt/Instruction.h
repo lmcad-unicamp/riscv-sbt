@@ -129,6 +129,8 @@ private:
         F_EQ,
         F_LE,
         F_LT,
+        F_MIN,
+        F_MAX,
         F_MUL,
         F_SGNJ,
         F_SGNJN,

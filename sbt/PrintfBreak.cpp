@@ -305,9 +305,10 @@ private:
         // Otherwise, our algorithm is broken!
         assert(count == n + 1 || count == n && pos == s.size());
 
+        // LOG << "count=" << count << ", n=" << n << ", isDouble=" << isDouble << nl;
         if (count != n) {
             _pcalls.back() = {s.substr(0, pos), n, isDouble};
-            _pcalls.emplace_back(s.substr(pos), _n - n, false);
+            _pcalls.emplace_back(s.substr(pos), _n - (_i - 1) - n, false);
         } else if (isDouble) {
             auto& pcall = _pcalls[pi];
             pcall.isDouble = isDouble;

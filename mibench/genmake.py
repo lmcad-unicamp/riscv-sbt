@@ -293,6 +293,16 @@ class EncDecBench(Bench):
         return txt
 
 
+class CustomTestBench(Bench):
+    def out_filter(self, of):
+        self.out_filter = of
+        return self
+
+    def gen_test(self):
+        return test(self.xarchs, self.dstdir, self.name, ntest=True,
+                out_filter=self.out_filter)
+
+
 if __name__ == "__main__":
     srcdir = Bench.srcdir
     dstdir = Bench.dstdir
@@ -363,6 +373,13 @@ if __name__ == "__main__":
             .set_dec_index([1, 2]),
         Bench("basicmath", "automotive/basicmath",
             ["basicmath_large.c", "rad2deg.c", "cubic.c", "isqrt.c"]),
+        CustomTestBench("bitcount", "automotive/bitcount",
+            ["bitcnt_1.c", "bitcnt_2.c", "bitcnt_3.c", "bitcnt_4.c",
+                "bitcnts.c", "bitfiles.c", "bitstrng.c", "bstr_i.c"],
+            [Args(["1125000"])],
+            sbtflags=["-stack-size=131072"],
+            mflags=["--no-diff"])
+            .out_filter("sed 's/Time:[^;]*; //;/^Best/d;/^Worst/d'"),
     ]
 
     txt = Bench.PROLOGUE
@@ -390,15 +407,6 @@ benchs-measure: benchs {}
 
 
 """
-## 02- BITCOUNT
-# rv32: OK (soft-float)
-
-BITCOUNT_NAME   := bitcount
-BITCOUNT_DIR    := automotive/bitcount
-BITCOUNT_MODS   := bitcnt_1 bitcnt_2 bitcnt_3 bitcnt_4 \
-                   bitcnts bitfiles bitstrng bstr_i
-BITCOUNT_ARGS   := 1125000 | sed 's/Time:[^;]*; //;/^Best/d;/^Worst/d'
-
 ## 03- SUSAN
 # rv32: OK (soft-float)
 
