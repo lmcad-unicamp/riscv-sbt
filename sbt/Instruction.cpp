@@ -1301,6 +1301,14 @@ llvm::Error Instruction::translateF()
             err = translateCVT(F_DOUBLE, F_WU);
             break;
 
+        // FP/FP conversions
+        case RISCV::FCVT_S_D:
+            err = translateCVT(F_SINGLE, F_DOUBLE);
+            break;
+        case RISCV::FCVT_D_S:
+            err = translateCVT(F_DOUBLE, F_SINGLE);
+            break;
+
         default:
             return ERRORF("unknown instruction opcode: {0}", _inst.getOpcode());
     }
@@ -1614,6 +1622,28 @@ llvm::Error Instruction::translateCVT(FType ft, IType it)
     }
 
     _bld->fstore(v, rd);
+    return llvm::Error::success();
+}
+
+
+llvm::Error Instruction::translateCVT(FType ft1, FType ft2)
+{
+    *_os << "fcvt";
+    switch (ft1) {
+        case F_SINGLE: *_os << ".s"; break;
+        case F_DOUBLE: *_os << ".d"; break;
+    }
+    switch (ft2) {
+        case F_SINGLE: *_os << ".s"; break;
+        case F_DOUBLE: *_os << ".d"; break;
+    }
+    *_os << '\t';
+
+    // NOTE just copy the src register
+    unsigned rd = getFRD();
+    llvm::Value* r = getFReg(1);
+    _bld->fstore(r, rd);
+
     return llvm::Error::success();
 }
 

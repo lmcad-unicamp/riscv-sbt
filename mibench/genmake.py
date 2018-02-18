@@ -380,6 +380,10 @@ if __name__ == "__main__":
             sbtflags=["-stack-size=131072"],
             mflags=["--no-diff"])
             .out_filter("sed 's/Time:[^;]*; //;/^Best/d;/^Worst/d'"),
+        Bench("fft", "telecomm/FFT",
+            ["main.c", "fftmisc.c", "fourierf.c"],
+            [Args(["8", "32768"])],
+            sbtflags=stack_large),
     ]
 
     txt = Bench.PROLOGUE
@@ -422,14 +426,6 @@ PATRICIA_NAME   := patricia
 PATRICIA_DIR    := network/patricia
 PATRICIA_MODS   := patricia patricia_test
 PATRICIA_ARGS   := $(MIBENCH)/$(PATRICIA_DIR)/large.udp
-
-## 12- FFT
-# rv32: OK (soft-float)
-
-FFT_NAME        := fft
-FFT_DIR         := telecomm/FFT
-FFT_MODS        := main fftmisc fourierf
-FFT_ARGS        := notests
 
 ## 14- LAME
 # rv32: OK (soft-float)

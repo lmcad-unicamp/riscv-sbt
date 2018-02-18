@@ -12,8 +12,11 @@
   void* rv32_##x = x;
 
 F(abort)
+F(acos)
+F(atan)
 F(atexit)
 F(clock)
+F(cos)
 F(exit)
 F(fclose)
 F(feof)
@@ -35,12 +38,16 @@ F(memchr)
 F(memcpy)
 F(memset)
 F(perror)
+F(pow)
 F(printf)
 F(putchar)
 F(puts)
 F(rand)
 F(read)
 F(realloc)
+F(sin)
+F(sqrt)
+F(srand)
 F(strlen)
 F(strncmp)
 F(strtol)
@@ -53,14 +60,6 @@ F(_IO_putc)
 F(__ctype_tolower_loc)
 F(__ctype_toupper_loc)
 
-
-// math
-
-F(acos)
-F(atan)
-F(cos)
-F(pow)
-F(sqrt)
 
 // runtime
 

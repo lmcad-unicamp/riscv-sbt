@@ -217,6 +217,8 @@ private:
     llvm::Error translateCVT(IType it, FType ft);
     // int to fp
     llvm::Error translateCVT(FType ft, IType it);
+    // fp to fp
+    llvm::Error translateCVT(FType ft, FType it);
 
     // float helpers
 

@@ -23,6 +23,41 @@ unsigned FRegister::num(unsigned reg)
     namespace RISCV = llvm::RISCV;
 
     switch (reg) {
+        // single
+        case RISCV::F0_32:  return 0;
+        case RISCV::F1_32:  return 1;
+        case RISCV::F2_32:  return 2;
+        case RISCV::F3_32:  return 3;
+        case RISCV::F4_32:  return 4;
+        case RISCV::F5_32:  return 5;
+        case RISCV::F6_32:  return 6;
+        case RISCV::F7_32:  return 7;
+        case RISCV::F8_32:  return 8;
+        case RISCV::F9_32:  return 9;
+        case RISCV::F10_32: return 10;
+        case RISCV::F11_32: return 11;
+        case RISCV::F12_32: return 12;
+        case RISCV::F13_32: return 13;
+        case RISCV::F14_32: return 14;
+        case RISCV::F15_32: return 15;
+        case RISCV::F16_32: return 16;
+        case RISCV::F17_32: return 17;
+        case RISCV::F18_32: return 18;
+        case RISCV::F19_32: return 19;
+        case RISCV::F20_32: return 20;
+        case RISCV::F21_32: return 21;
+        case RISCV::F22_32: return 22;
+        case RISCV::F23_32: return 23;
+        case RISCV::F24_32: return 24;
+        case RISCV::F25_32: return 25;
+        case RISCV::F26_32: return 26;
+        case RISCV::F27_32: return 27;
+        case RISCV::F28_32: return 28;
+        case RISCV::F29_32: return 29;
+        case RISCV::F30_32: return 30;
+        case RISCV::F31_32: return 31;
+
+        // double
         case RISCV::F0_64:  return 0;
         case RISCV::F1_64:  return 1;
         case RISCV::F2_64:  return 2;
@@ -55,6 +90,7 @@ unsigned FRegister::num(unsigned reg)
         case RISCV::F29_64: return 29;
         case RISCV::F30_64: return 30;
         case RISCV::F31_64: return 31;
+
         default:
             xunreachable("Invalid F register!");
     }
