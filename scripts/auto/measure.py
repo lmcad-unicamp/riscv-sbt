@@ -136,7 +136,7 @@ def main(args):
     parser = argparse.ArgumentParser(description='Measure translation overhead')
     parser.add_argument('dir', type=str)
     parser.add_argument('test', type=str)
-    parser.add_argument('args', metavar='arg', type=str, nargs='*')
+    parser.add_argument("--args", nargs="*", metavar="arg", default=[])
     parser.add_argument("--stdin", help="stdin redirection")
     parser.add_argument("-v", action="store_true", help="verbose")
     parser.add_argument("--exp-rc", type=int, default=0,
@@ -147,10 +147,11 @@ def main(args):
     opts = Options(args.stdin, args.v)
     opts.exp_rc = args.exp_rc
     opts.no_diff = args.no_diff
+    sargs = [arg.strip() for arg in args.args]
 
     # print("measuring", args.test)
 
     for target in TARGETS:
-        measure(target, args.dir, args.test, args.args, opts)
+        measure(target, args.dir, args.test, sargs, opts)
 
 main(sys.argv)

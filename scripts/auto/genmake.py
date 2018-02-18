@@ -39,6 +39,8 @@ def bld(arch, srcdir, dstdir, ins, out, bflags=None):
 
 
 def run(arch, dir, out, rflags=None, suffix=""):
+    if rflags and len(suffix) > 0:
+        rflags = rflags.replace(".out", suffix + ".out")
     fmtdata = {
         "arch":     arch.name,
         "dir":      dir,
@@ -95,7 +97,7 @@ def xlatenrun(arch, srcdir, dstdir, _in, out, mode, xflags=None, rflags=None,
     return txt
 
 
-def test(xarchs, dir, name, ntest=False, out_filter=None):
+def test(xarchs, dir, name, ntest=False, out_filter=None, id=None):
     diffs = []
     def diff(bin1, bin2):
         if out_filter:
@@ -108,6 +110,15 @@ def test(xarchs, dir, name, ntest=False, out_filter=None):
             diff = "\tdiff {0}/{1}.out {0}/{2}.out".format(dir, bin1, bin2)
         diffs.append(diff)
 
+    if id:
+        fname = name + '-' + id
+        nname = name + '-' + id
+        xname = lambda mode: name + '-' + mode + '-' + id
+    else:
+        fname = name
+        nname = name
+        xname = lambda mode: name + '-' + mode
+
     farchs = []
     narchs = []
     for xarch in xarchs:
@@ -115,26 +126,26 @@ def test(xarchs, dir, name, ntest=False, out_filter=None):
         farchs.append(farch)
         narchs.append(narch)
 
-        fbin = farch.add_prefix(name)
+        fbin = farch.add_prefix(fname)
 
         for mode in SBT.modes:
-            xbin = farch.add_prefix(narch.add_prefix(name + "-" + mode))
+            xbin = farch.add_prefix(narch.add_prefix(xname(mode)))
             diff(fbin, xbin)
             if ntest:
-                nbin = narch.add_prefix(name)
+                nbin = narch.add_prefix(nname)
                 diff(nbin, xbin)
 
-    runs = [arch.add_prefix(name + "-run")
+    runs = [arch.add_prefix(fname + "-run")
             for arch in farchs + (narchs if ntest else [])]
 
     runs.extend(
         [farch.add_prefix(
-            narch.add_prefix(name + "-" + mode + "-run"))
+            narch.add_prefix(xname(mode) + "-run"))
             for (farch, narch) in xarchs
             for mode in SBT.modes])
 
     fmtdata = {
-        "name":     name,
+        "name":     fname,
         "runs":     " ".join(runs),
         "diffs":    "\n".join(diffs)
     }

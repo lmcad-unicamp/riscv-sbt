@@ -1318,6 +1318,22 @@ llvm::Error Instruction::translateF()
 
 // F helpers
 
+llvm::LoadInst* Instruction::fload(unsigned reg, FType ty)
+{
+    if (ty == F_SINGLE)
+        return _bld->fload32(reg);
+    else
+        return _bld->fload64(reg);
+}
+
+llvm::StoreInst* Instruction::fstore(llvm::Value* v, unsigned reg, FType ty)
+{
+    if (ty == F_SINGLE)
+        return _bld->fstore32(v, reg);
+    else
+        return _bld->fstore64(v, reg);
+}
+
 unsigned Instruction::getFRD()
 {
     return getFRegNum(0);
@@ -1333,12 +1349,11 @@ unsigned Instruction::getFRegNum(unsigned op)
 }
 
 
-llvm::Value* Instruction::getFReg(int op)
+llvm::Value* Instruction::getFReg(int op, FType ty)
 {
     const llvm::MCOperand& mcop = _inst.getOperand(op);
     unsigned nr = FRegister::num(mcop.getReg());
-    llvm::Value* v;
-    v = _bld->fload(nr);
+    llvm::Value* v = fload(nr, ty);
 
     *_os << _ctx->f->getReg(nr).name();
     if (op < 2)
@@ -1375,8 +1390,6 @@ llvm::Error Instruction::translateFPLoad(FType ft)
         case F_SINGLE:
             ptr = _bld->i32ToFP32Ptr(addr);
             v = _bld->load(ptr);
-            // cast to double
-            v = _bld->fp32ToFP64(v);
             break;
 
         case F_DOUBLE:
@@ -1385,7 +1398,7 @@ llvm::Error Instruction::translateFPLoad(FType ft)
             break;
     }
 
-    _bld->fstore(v, fr);
+    fstore(v, fr, ft);
     return llvm::Error::success();
 }
 
@@ -1402,7 +1415,7 @@ llvm::Error Instruction::translateFPStore(FType ft)
     }
     *_os << '\t';
 
-    llvm::Value* fr = getFReg(0);
+    llvm::Value* fr = getFReg(0, ft);
     llvm::Value* rs1 = getReg(1);
     auto expImm = getImm(2);
     if (!expImm)
@@ -1410,22 +1423,19 @@ llvm::Error Instruction::translateFPStore(FType ft)
     llvm::Constant* imm = expImm.get();
 
     llvm::Value* addr = _bld->add(rs1, imm);
-    llvm::Value* v = nullptr;
     llvm::Value* ptr = nullptr;
 
     switch (ft) {
         case F_SINGLE:
             ptr = _bld->i32ToFP32Ptr(addr);
-            v = _bld->fp64ToFP32(fr);
             break;
 
         case F_DOUBLE:
             ptr = _bld->i32ToFP64Ptr(addr);
-            v = fr;
             break;
     }
 
-    _bld->store(v, ptr);
+    _bld->store(fr, ptr);
     return llvm::Error::success();
 }
 
@@ -1478,7 +1488,7 @@ llvm::Error Instruction::translateFPUOp(FPUOp op, FType ft)
             break;
     }
 
-    llvm::Value* o1 = getFReg(1);
+    llvm::Value* o1 = getFReg(1, ft);
     llvm::Value* o2;
 
     switch (op) {
@@ -1486,7 +1496,7 @@ llvm::Error Instruction::translateFPUOp(FPUOp op, FType ft)
             break;
 
         default:
-            o2 = getFReg(2);
+            o2 = getFReg(2, ft);
     }
 
     llvm::Value* v;
@@ -1551,7 +1561,7 @@ llvm::Error Instruction::translateFPUOp(FPUOp op, FType ft)
     if (oIsInt)
         _bld->store(v, o);
     else
-        _bld->fstore(v, o);
+        fstore(v, o, ft);
     return llvm::Error::success();
 }
 
@@ -1573,7 +1583,7 @@ llvm::Error Instruction::translateCVT(IType it, FType ft)
 
     llvm::Type* ty =_t->i32;
     unsigned rd = getRD();
-    llvm::Value* fr = getFReg(1);
+    llvm::Value* fr = getFReg(1, ft);
     llvm::Value* v;
 
     switch (it) {
@@ -1606,7 +1616,7 @@ llvm::Error Instruction::translateCVT(FType ft, IType it)
 
     // TODO handle overflows
 
-    llvm::Type* ty = _t->fp64;
+    llvm::Type* ty = ft == F_SINGLE? _t->fp32 : _t->fp64;
     unsigned rd = getFRD();
     llvm::Value* ir = getReg(1);
     llvm::Value* v;
@@ -1621,7 +1631,7 @@ llvm::Error Instruction::translateCVT(FType ft, IType it)
             break;
     }
 
-    _bld->fstore(v, rd);
+    fstore(v, rd, ft);
     return llvm::Error::success();
 }
 
@@ -1639,10 +1649,15 @@ llvm::Error Instruction::translateCVT(FType ft1, FType ft2)
     }
     *_os << '\t';
 
-    // NOTE just copy the src register
+    xassert(ft1 != ft2);
+
     unsigned rd = getFRD();
-    llvm::Value* r = getFReg(1);
-    _bld->fstore(r, rd);
+    llvm::Value* v = getFReg(1, ft2);
+    if (ft2 == F_SINGLE)
+        v = _bld->fp32ToFP64(v);
+    else
+        v = _bld->fp64ToFP32(v);
+    fstore(v, rd, ft1);
 
     return llvm::Error::success();
 }

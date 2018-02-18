@@ -8,7 +8,9 @@
 #include <cstdint>
 
 namespace llvm {
+class LoadInst;
 class MCInst;
+class StoreInst;
 }
 
 namespace sbt {
@@ -222,9 +224,11 @@ private:
 
     // float helpers
 
+    llvm::LoadInst* fload(unsigned reg, FType ty);
+    llvm::StoreInst* fstore(llvm::Value* v, unsigned reg, FType ty);
     unsigned getFRD();
     unsigned getFRegNum(unsigned op);
-    llvm::Value* getFReg(int op);
+    llvm::Value* getFReg(int op, FType ty);
 };
 
 }

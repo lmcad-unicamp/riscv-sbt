@@ -32,7 +32,7 @@ def run(arch, dir, prog, args, out, tee, bin, exp_rc):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="run program")
     parser.add_argument("prog")
-    parser.add_argument("args", nargs="*", metavar="arg")
+    parser.add_argument("--args", nargs="*", metavar="arg", default=[])
     parser.add_argument("--arch", default="rv32")
     parser.add_argument("--dir", default=".")
     parser.add_argument("-o", help="save output to file", metavar="file",
@@ -45,5 +45,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    run(ARCH[args.arch], args.dir, args.prog, args.args, args.o, args.tee,
+    sargs = [arg.strip() for arg in args.args]
+    run(ARCH[args.arch], args.dir, args.prog, sargs, args.o, args.tee,
             args.bin, args.exp_rc)

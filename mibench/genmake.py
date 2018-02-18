@@ -89,18 +89,37 @@ clean:
             self.xflags = cat(Bench.xflags, "--dbg")
 
 
+    def _escape_args(self, args):
+        args2 = []
+        for arg in args:
+            if len(arg) > 0 and arg[0] == '-':
+                arg = '" {}"'.format(arg)
+            args2.append(arg)
+        return args2
+
+
+    def args_str(self, args):
+        if not args:
+            return ''
+
+        args2 = ["--args"]
+        args2.extend(self._escape_args(args))
+        return " ".join(args2)
+
+
     def rflags(self, args_obj, prefix, mode):
         if args_obj:
-            args_str = " ".join(args_obj.args(prefix, mode))
+            args = args_obj.args(prefix, mode)
+            args_str = self.args_str(args)
         else:
             args_str = ''
 
         if self.stdin:
-            ret = cat(args_str, "<", self.stdin, Bench.rflags_var)
-        else:
-            ret = cat(args_str, Bench.rflags_var)
-        ret = cat(ret, self.rflags_suffix).format(
-                prefix + "-" + self.name + ("-" + mode if mode else ""))
+            args_str = cat(args_str, "<", self.stdin)
+
+        ret = cat(Bench.rflags_var, self.rflags_suffix, args_str)
+        out = prefix + "-" + self.name + ("-" + mode if mode else "")
+        ret = ret.format(out)
         return ret
 
 
@@ -165,17 +184,18 @@ clean:
     def measure(self, args_obj=None):
         suffix = None
         if args_obj:
-            args = " " + " ".join(args_obj.args(prefix='', mode=''))
+            args = args_obj.args(prefix='', mode='')
+            args_str = self.args_str(args)
             suffix = args_obj.id
         else:
-            args = ""
+            args_str = ''
 
         fmtdata = {
             "measure":  TOOLS.measure,
             "dstdir":   self.dstdir,
             "name":     self.name,
             "suffix":   "-" + suffix if suffix else "",
-            "args":     args,
+            "args":     " " + args_str if args_str else "",
             "stdin":    " --stdin=" + self.stdin if self.stdin else "",
             "mflags":   " " + " ".join(self.mflags) if self.mflags else "",
         }
@@ -302,6 +322,18 @@ class CustomTestBench(Bench):
         return test(self.xarchs, self.dstdir, self.name, ntest=True,
                 out_filter=self.out_filter)
 
+class MultiTestBench(Bench):
+    def gen_test(self):
+        txt = ''
+        aliasees = []
+        for args_obj in self.args:
+            id = args_obj.id
+            txt = txt + test(self.xarchs, self.dstdir, self.name, ntest=True,
+                id=id)
+            aliasees.append(self.name + '-' + id + "-test")
+        txt = txt + alias(self.name + "-test", aliasees)
+        return txt
+
 
 if __name__ == "__main__":
     srcdir = Bench.srcdir
@@ -380,9 +412,9 @@ if __name__ == "__main__":
             sbtflags=["-stack-size=131072"],
             mflags=["--no-diff"])
             .out_filter("sed 's/Time:[^;]*; //;/^Best/d;/^Worst/d'"),
-        Bench("fft", "telecomm/FFT",
+        MultiTestBench("fft", "telecomm/FFT",
             ["main.c", "fftmisc.c", "fourierf.c"],
-            [Args(["8", "32768"])],
+            [Args(["8", "32768"], "std"), Args(["8", "32768", "-i"], "inv")],
             sbtflags=stack_large),
     ]
 
