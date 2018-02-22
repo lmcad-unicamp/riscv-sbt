@@ -222,6 +222,12 @@ private:
     // fp to fp
     llvm::Error translateCVT(FType ft, FType it);
 
+    // fmv
+    // fp to int
+    llvm::Error translateFMV(IType it, FType ft);
+    // int to fp
+    llvm::Error translateFMV(FType ft, IType it);
+
     // float helpers
 
     llvm::LoadInst* fload(unsigned reg, FType ty);

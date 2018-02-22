@@ -694,7 +694,8 @@ public:
     llvm::Value* fmin(llvm::Value* a, llvm::Value* b)
     {
         llvm::Function* f = llvm::Intrinsic::
-            getDeclaration(_ctx->module, llvm::Intrinsic::minnum, {_t->fp64});
+            getDeclaration(_ctx->module, llvm::Intrinsic::minnum,
+                {a->getType()});
         llvm::Value* v = call(f, {a, b});
         xassert(_first);
         return v;
@@ -703,7 +704,8 @@ public:
     llvm::Value* fmax(llvm::Value* a, llvm::Value* b)
     {
         llvm::Function* f = llvm::Intrinsic::
-            getDeclaration(_ctx->module, llvm::Intrinsic::maxnum, {_t->fp64});
+            getDeclaration(_ctx->module, llvm::Intrinsic::maxnum,
+                {a->getType()});
         llvm::Value* v = call(f, {a, b});
         xassert(_first);
         return v;
@@ -712,61 +714,96 @@ public:
     llvm::Value* fsqrt(llvm::Value* a)
     {
         llvm::Function* f = llvm::Intrinsic::
-            getDeclaration(_ctx->module, llvm::Intrinsic::sqrt, {_t->fp64});
+            getDeclaration(_ctx->module, llvm::Intrinsic::sqrt,
+                {a->getType()});
         llvm::Value* v = call(f, {a});
         xassert(_first);
         return v;
     }
 
+private:
+    void fsgnj_init(
+        llvm::Value* v,
+        llvm::Type*& fty,
+        llvm::Type*& ity,
+        llvm::Constant*& sgn,
+        llvm::Constant*& nsgn)
+    {
+        fty = v->getType();
+        xassert(fty == _t->fp32 || fty == _t->fp64);
+        ity = fty == _t->fp32? _t->i32 : _t->i64;
+
+        if (ity == _t->i32) {
+            sgn = _c->i32(1U<<31);
+            nsgn = _c->i32((1U<<31) -1);
+        } else {
+            sgn = _c->i64(1ULL<<63);
+            nsgn = _c->i64((1ULL<<63) -1);
+        }
+    }
+
+public:
     llvm::Value* fsgnj(llvm::Value* a, llvm::Value* b)
     {
-        // to int64
-        a = bitOrPointerCast(a, _t->i64);
-        b = bitOrPointerCast(b, _t->i64);
+        llvm::Type *fty, *ity;
+        llvm::Constant *sgn, *nsgn;
+        fsgnj_init(a, fty, ity, sgn, nsgn);
+
+        // to int
+        a = bitOrPointerCast(a, ity);
+        b = bitOrPointerCast(b, ity);
         // mask a's signal bit
-        a = _and(a, _c->i64((1ULL<<63) -1));
+        a = _and(a, sgn);
         // mask all but b's signal bit
-        b = _and(b, _c->i64(1ULL<<63));
+        b = _and(b, nsgn);
         // or a and b
         llvm::Value* v = _or(a, b);
-        // cast back to double
-        v = bitOrPointerCast(v, _t->fp64);
+        // cast back to fp
+        v = bitOrPointerCast(v, fty);
         return v;
     }
 
     llvm::Value* fsgnjn(llvm::Value* a, llvm::Value* b)
     {
-        // to int64
-        a = bitOrPointerCast(a, _t->i64);
-        b = bitOrPointerCast(b, _t->i64);
+        llvm::Type *fty, *ity;
+        llvm::Constant *sgn, *nsgn;
+        fsgnj_init(a, fty, ity, sgn, nsgn);
+
+        // to int
+        a = bitOrPointerCast(a, ity);
+        b = bitOrPointerCast(b, ity);
         // mask a's signal bit
-        a = _and(a, _c->i64((1ULL<<63) -1));
+        a = _and(a, sgn);
         // negate b's signal bit
         b = _xor(b, b);
         // mask all but b's signal bit
-        b = _and(b, _c->i64(1ULL<<63));
+        b = _and(b, nsgn);
         // or a and b
         llvm::Value* v = _or(a, b);
-        // cast back to double
-        v = bitOrPointerCast(v, _t->fp64);
+        // cast back to fp
+        v = bitOrPointerCast(v, fty);
         return v;
     }
 
     llvm::Value* fsgnjx(llvm::Value* a, llvm::Value* b)
     {
-        // to int64
-        a = bitOrPointerCast(a, _t->i64);
-        b = bitOrPointerCast(b, _t->i64);
+        llvm::Type *fty, *ity;
+        llvm::Constant *sgn, *nsgn;
+        fsgnj_init(a, fty, ity, sgn, nsgn);
+
+        // to int
+        a = bitOrPointerCast(a, ity);
+        b = bitOrPointerCast(b, ity);
         // xor a and b (to get the correct value of the result signal bit)
         b = _xor(a, b);
         // mask the other bits
-        b = _and(b, _c->i64(1ULL<<63));
+        b = _and(b, nsgn);
         // mask a's signal bit
-        a = _and(a, _c->i64((1ULL<<63) -1));
+        a = _and(a, sgn);
         // or a and b
         llvm::Value* v = _or(a, b);
-        // cast back to double
-        v = bitOrPointerCast(v, _t->fp64);
+        // cast back to fp
+        v = bitOrPointerCast(v, fty);
         return v;
     }
 

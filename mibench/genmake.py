@@ -359,6 +359,15 @@ if __name__ == "__main__":
         Args(["e", bf_asc, bf_enc, bf_key], "encode"),
         Args(["d", bf_enc, bf_dec, bf_key], "decode")]
 
+    # susan args
+    susan_dir = "automotive/susan"
+    susan_in  = mpath(srcdir, susan_dir, "input_large.pgm")
+    susan_out = mpath(dstdir, susan_dir, "output_large.")
+    susan_args = [
+        Args([susan_in, susan_out + "smoothing.pgm", "-s"], "smoothing"),
+        Args([susan_in, susan_out + "edges.pgm", "-e"], "edges"),
+        Args([susan_in, susan_out + "corners.pgm", "-c"], "corners")]
+
     stack_large = ["-stack-size=131072"];
     benchs = [
         Bench("dijkstra", "network/dijkstra",
@@ -421,6 +430,11 @@ if __name__ == "__main__":
             [Args([path(srcdir, "network/patricia/large.udp")])],
             rflags="--exp-rc=1",
             mflags=["--exp-rc=1"]),
+        MultiTestBench("susan", susan_dir,
+            ["susan.c"],
+            susan_args,
+            sbtflags=stack_large,
+            dbg=True),
     ]
 
     txt = Bench.PROLOGUE
@@ -448,14 +462,6 @@ benchs-measure: benchs {}
 
 
 """
-## 03- SUSAN
-# rv32: OK (soft-float)
-
-SUSAN_NAME      := susan
-SUSAN_DIR       := automotive/susan
-SUSAN_MODS      := susan
-SUSAN_ARGS      := notests
-
 ## 14- LAME
 # rv32: OK (soft-float)
 

@@ -1309,6 +1309,14 @@ llvm::Error Instruction::translateF()
             err = translateCVT(F_DOUBLE, F_SINGLE);
             break;
 
+        // FP/int move
+        case RISCV::FMV_W_X:    // FMV_S_X:
+            err = translateFMV(F_SINGLE, F_W);
+            break;
+        case RISCV::FMV_X_W:    // FMV_X_S:
+            err = translateFMV(F_W, F_SINGLE);
+            break;
+
         default:
             return ERRORF("unknown instruction opcode: {0}", _inst.getOpcode());
     }
@@ -1658,6 +1666,34 @@ llvm::Error Instruction::translateCVT(FType ft1, FType ft2)
     else
         v = _bld->fp64ToFP32(v);
     fstore(v, rd, ft1);
+
+    return llvm::Error::success();
+}
+
+
+llvm::Error Instruction::translateFMV(IType it, FType ft)
+{
+    xassert(it == F_W && ft == F_SINGLE);
+    *_os << "fmv.x.s\t";
+
+    unsigned rd = getRD();
+    llvm::Value* v = getFReg(1, ft);
+    v = _bld->bitOrPointerCast(v, _t->i32);
+    _bld->store(v, rd);
+
+    return llvm::Error::success();
+}
+
+
+llvm::Error Instruction::translateFMV(FType ft, IType it)
+{
+    xassert(it == F_W && ft == F_SINGLE);
+    *_os << "fmv.s.x\t";
+
+    unsigned rd = getFRD();
+    llvm::Value* v = getReg(1);
+    v = _bld->bitOrPointerCast(v, _t->fp32);
+    fstore(v, rd, ft);
 
     return llvm::Error::success();
 }
