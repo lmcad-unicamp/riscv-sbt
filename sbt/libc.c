@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -15,6 +16,7 @@ F(abort)
 F(acos)
 F(atan)
 F(atexit)
+F(bcopy)
 F(clock)
 F(cos)
 F(exit)
@@ -24,6 +26,7 @@ F(ferror)
 F(fflush)
 F(fgetc)
 F(fgetpos)
+F(fgets)
 F(fopen)
 F(free)
 F(fprintf)
@@ -48,6 +51,7 @@ F(realloc)
 F(sin)
 F(sqrt)
 F(srand)
+F(sscanf)
 F(strlen)
 F(strncmp)
 F(strtol)

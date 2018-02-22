@@ -416,6 +416,11 @@ if __name__ == "__main__":
             ["main.c", "fftmisc.c", "fourierf.c"],
             [Args(["8", "32768"], "std"), Args(["8", "32768", "-i"], "inv")],
             sbtflags=stack_large),
+        Bench("patricia", "network/patricia",
+            ["patricia.c", "patricia_test.c"],
+            [Args([path(srcdir, "network/patricia/large.udp")])],
+            rflags="--exp-rc=1",
+            mflags=["--exp-rc=1"]),
     ]
 
     txt = Bench.PROLOGUE
@@ -450,14 +455,6 @@ SUSAN_NAME      := susan
 SUSAN_DIR       := automotive/susan
 SUSAN_MODS      := susan
 SUSAN_ARGS      := notests
-
-## 04- PATRICIA
-# rv32: OK (soft float)
-
-PATRICIA_NAME   := patricia
-PATRICIA_DIR    := network/patricia
-PATRICIA_MODS   := patricia patricia_test
-PATRICIA_ARGS   := $(MIBENCH)/$(PATRICIA_DIR)/large.udp
 
 ## 14- LAME
 # rv32: OK (soft-float)
