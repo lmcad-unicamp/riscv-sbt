@@ -12,9 +12,10 @@ from auto.genmake import *
 
 # arguments for a given run
 class Args:
-    def __init__(self, args, id=None):
+    def __init__(self, args, id=None, outidx=None):
         self.id = id
         self._args = args
+        self.outidx = outidx
 
 
     # add prefix and mode to arguments, if needed
@@ -25,6 +26,9 @@ class Args:
         }
 
         return [arg.format(**fmtdata) for arg in self._args]
+
+    def raw_args(self):
+        return self._args
 
 
 class ArchAndMode:
@@ -328,8 +332,12 @@ class MultiTestBench(Bench):
         aliasees = []
         for args_obj in self.args:
             id = args_obj.id
+            if args_obj.outidx:
+                outname = args_obj.raw_args()[args_obj.outidx]
+            else:
+                outname = None
             txt = txt + test(self.xarchs, self.dstdir, self.name, ntest=True,
-                id=id)
+                id=id, outname=outname)
             aliasees.append(self.name + '-' + id + "-test")
         txt = txt + alias(self.name + "-test", aliasees)
         return txt
@@ -362,13 +370,14 @@ if __name__ == "__main__":
     # susan args
     susan_dir = "automotive/susan"
     susan_in  = mpath(srcdir, susan_dir, "input_large.pgm")
-    susan_out = mpath(dstdir, susan_dir, "output_large.")
+    susan_out = mpath(dstdir, susan_dir, "{prefix}output_large{mode}.")
     susan_args = [
-        Args([susan_in, susan_out + "smoothing.pgm", "-s"], "smoothing"),
-        Args([susan_in, susan_out + "edges.pgm", "-e"], "edges"),
-        Args([susan_in, susan_out + "corners.pgm", "-c"], "corners")]
+        Args([susan_in, susan_out + "smoothing.pgm", "-s"], "smoothing", 1),
+        Args([susan_in, susan_out + "edges.pgm", "-e"], "edges", 1),
+        Args([susan_in, susan_out + "corners.pgm", "-c"], "corners", 1)]
 
-    stack_large = ["-stack-size=131072"];
+    stack_large = ["-stack-size=131072"]    # 128K
+    stack_huge = ["-stack-size=1048576"]    # 1M
     benchs = [
         Bench("dijkstra", "network/dijkstra",
             ["dijkstra_large.c"],
@@ -433,8 +442,7 @@ if __name__ == "__main__":
         MultiTestBench("susan", susan_dir,
             ["susan.c"],
             susan_args,
-            sbtflags=stack_large,
-            dbg=True),
+            sbtflags=stack_huge),
     ]
 
     txt = Bench.PROLOGUE

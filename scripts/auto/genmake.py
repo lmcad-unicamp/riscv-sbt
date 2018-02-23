@@ -3,7 +3,6 @@
 from auto.config import *
 from auto.utils import *
 
-
 def bld(arch, srcdir, dstdir, ins, out, bflags=None):
     if len(ins) == 1:
         objs = [arch.out2objname(out)]
@@ -97,27 +96,54 @@ def xlatenrun(arch, srcdir, dstdir, _in, out, mode, xflags=None, rflags=None,
     return txt
 
 
-def test(xarchs, dir, name, ntest=False, out_filter=None, id=None):
+def test(xarchs, dir, name, ntest=False, out_filter=None, id=None,
+        outname=None):
+
+    def build_name(base, prefix, mode, id, suffix):
+        r = base
+        if prefix:
+            r = prefix + '-' + r
+        if mode:
+            r = r + '-' + mode
+        if id:
+            r = r + '-' + id
+        if suffix:
+            r = r + suffix
+        return r
+
+    def fmt_name(base, prefix, mode):
+        return base.format(**{
+            "prefix" : prefix + '-',
+            "mode"   : '-' + mode if mode else ''})
+
+    def xprefix(farch, narch):
+        return farch.prefix + '-' + narch.prefix
+
+    if outname:
+        fname = lambda prefix: fmt_name(outname, prefix, "")
+        nname = fname
+        xname = lambda prefix, mode: fmt_name(outname, prefix, mode)
+    else:
+        outname = name
+        suffix = ".out"
+        fname = lambda prefix: path(dir,
+                    build_name(outname, prefix, None, id, suffix))
+        nname = fname
+        xname = lambda prefix, mode: path(dir,
+                    build_name(outname, prefix, mode, id, suffix))
+
     diffs = []
-    def diff(bin1, bin2):
+    def diff(out1, out2):
         if out_filter:
             diff = (
-                "\tcat {0}/{1}.out | {3} >{0}/{1}.filt.out\n" +
-                "\tcat {0}/{2}.out | {3} >{0}/{2}.filt.out\n" +
-                "\tdiff {0}/{1}.filt.out {0}/{2}.filt.out").format(
-                    dir, bin1, bin2, out_filter)
+                "\tcat {0} | {2} >{0}.filt\n" +
+                "\tcat {1} | {2} >{1}.filt\n" +
+                "\tdiff {0}.filt {1}.filt").format(
+                    out1, out2, out_filter)
         else:
-            diff = "\tdiff {0}/{1}.out {0}/{2}.out".format(dir, bin1, bin2)
+            diff = "\tdiff {0} {1}".format(out1, out2)
         diffs.append(diff)
 
-    if id:
-        fname = name + '-' + id
-        nname = name + '-' + id
-        xname = lambda mode: name + '-' + mode + '-' + id
-    else:
-        fname = name
-        nname = name
-        xname = lambda mode: name + '-' + mode
 
     farchs = []
     narchs = []
@@ -126,26 +152,31 @@ def test(xarchs, dir, name, ntest=False, out_filter=None, id=None):
         farchs.append(farch)
         narchs.append(narch)
 
-        fbin = farch.add_prefix(fname)
+        fout = fname(farch.prefix)
 
         for mode in SBT.modes:
-            xbin = farch.add_prefix(narch.add_prefix(xname(mode)))
-            diff(fbin, xbin)
+            xout = xname(xprefix(farch, narch), mode)
+            diff(fout, xout)
             if ntest:
-                nbin = narch.add_prefix(nname)
-                diff(nbin, xbin)
+                nout = nname(narch.prefix)
+                diff(nout, xout)
 
-    runs = [arch.add_prefix(fname + "-run")
+    def run_name(prefix):
+        return build_name(name, prefix, None, id, "-run")
+
+    def xrun_name(prefix, mode):
+        return build_name(name, prefix, mode, id, "-run")
+
+    runs = [run_name(arch.prefix)
             for arch in farchs + (narchs if ntest else [])]
 
     runs.extend(
-        [farch.add_prefix(
-            narch.add_prefix(xname(mode) + "-run"))
+        [xrun_name(xprefix(farch, narch), mode)
             for (farch, narch) in xarchs
             for mode in SBT.modes])
 
     fmtdata = {
-        "name":     fname,
+        "name":     build_name(name, None, None, id, None),
         "runs":     " ".join(runs),
         "diffs":    "\n".join(diffs)
     }
