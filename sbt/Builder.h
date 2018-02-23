@@ -752,13 +752,10 @@ public:
         // to int
         a = bitOrPointerCast(a, ity);
         b = bitOrPointerCast(b, ity);
-        // mask a's signal bit
-        a = _and(a, sgn);
-        // mask all but b's signal bit
-        b = _and(b, nsgn);
-        // or a and b
+        a = _and(a, nsgn);
+        b = _and(b, sgn);
         llvm::Value* v = _or(a, b);
-        // cast back to fp
+        // to fp
         v = bitOrPointerCast(v, fty);
         return v;
     }
@@ -772,15 +769,12 @@ public:
         // to int
         a = bitOrPointerCast(a, ity);
         b = bitOrPointerCast(b, ity);
-        // mask a's signal bit
-        a = _and(a, sgn);
+        a = _and(a, nsgn);
         // negate b's signal bit
         b = _xor(b, b);
-        // mask all but b's signal bit
-        b = _and(b, nsgn);
-        // or a and b
+        b = _and(b, sgn);
         llvm::Value* v = _or(a, b);
-        // cast back to fp
+        // to fp
         v = bitOrPointerCast(v, fty);
         return v;
     }
@@ -796,13 +790,10 @@ public:
         b = bitOrPointerCast(b, ity);
         // xor a and b (to get the correct value of the result signal bit)
         b = _xor(a, b);
-        // mask the other bits
-        b = _and(b, nsgn);
-        // mask a's signal bit
-        a = _and(a, sgn);
-        // or a and b
+        b = _and(b, sgn);
+        a = _and(a, nsgn);
         llvm::Value* v = _or(a, b);
-        // cast back to fp
+        // to fp
         v = bitOrPointerCast(v, fty);
         return v;
     }
