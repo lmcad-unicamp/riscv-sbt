@@ -771,7 +771,7 @@ public:
         b = bitOrPointerCast(b, ity);
         a = _and(a, nsgn);
         // negate b's signal bit
-        b = _xor(b, b);
+        b = _xor(b, llvm::ConstantInt::get(ity, ~0ULL));
         b = _and(b, sgn);
         llvm::Value* v = _or(a, b);
         // to fp
