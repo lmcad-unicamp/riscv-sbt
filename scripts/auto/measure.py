@@ -3,6 +3,7 @@
 from auto.config import *
 
 import argparse
+import numpy as np
 import os
 import subprocess
 import sys
@@ -62,6 +63,24 @@ class Test:
         return t
 
 
+    @staticmethod
+    def median(vals):
+        vals.sort()
+        n = len(vals)
+        if n % 2 == 0:
+            v1 = vals[n//2 -1]
+            v2 = vals[n//2]
+            return (v1 + v2) / 2
+        else:
+            return vals[n//2 +1]
+
+
+    @staticmethod
+    def geomean(iterable):
+        a = np.array(iterable)
+        return a.prod()**(1.0/len(a))
+
+
     def run(self):
         def prep(td, mode=None):
             if self.opts.verbose or mode:
@@ -108,18 +127,8 @@ class Test:
                             "translated output differs from native (run #"
                                  + str(i) + ")")
 
-            def median(vals):
-                vals.sort()
-                n = len(vals)
-                if n % 2 == 0:
-                    v1 = vals[n//2 -1]
-                    v2 = vals[n//2]
-                    return (v1 + v2) / 2
-                else:
-                    return vals[n//2 +1]
-
-            nt = median(ntimes)
-            tt = median(ttimes)
+            nt = self.geomean(ntimes)
+            tt = self.geomean(ttimes)
             oh = (tt - nt) / nt
             print("native time     =", nt)
             print("translated time =", tt)

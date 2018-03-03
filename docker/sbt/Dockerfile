@@ -22,6 +22,7 @@ RUN apt-get update \
     git \
     libglib2.0-0 \
     python3 \
+    python3-numpy \
     && rm -rf /var/lib/apt/lists/*
 
 ENV TOPDIR=/riscv-sbt
