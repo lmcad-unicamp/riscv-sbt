@@ -1,6 +1,4 @@
-ifeq ($(TOPDIR),)
-$(error "TOPDIR not set. Please run '. scripts/env.sh' first.")
-endif
+TOPDIR ?= $(shell pwd)
 
 BUILDPKG_PY := $(TOPDIR)/scripts/auto/build_pkg.py
 
@@ -32,6 +30,7 @@ sbt-force:
 
 docker-img:
 	cd docker && \
+		export TOPDIR=$(TOPDIR) PYTHONPATH=$(TOPDIR)/scripts && \
 		./build.py --get-srcs && \
 		./build.py --build all
 
