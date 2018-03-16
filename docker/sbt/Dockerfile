@@ -1,17 +1,16 @@
-FROM sbt-llvm as toolchain
+FROM sbt-llvm as llvm
 
-FROM debian:stretch
+FROM sbt-riscv-sbt
 WORKDIR /riscv-sbt
-COPY --from=toolchain /riscv-sbt .
+COPY --from=llvm /riscv-sbt/toolchain /riscv-sbt/toolchain
 
 # build-essential: needed to build sbt
 # clang-3.9: needed to build sbt
 # cmake: needed to build sbt
 # device-tree-compiler: needed to run spike
 # g++-multilib: needed to link 32-bit x86 bins
-# git: needed to reset files and/or make quick revision updates
 # libglib2.0-0: needed by qemu
-# python3: needed by SBT build/test system
+# python3-numpy: needed by measure.py
 RUN apt-get update \
     && apt-get install -y \
     build-essential \
@@ -19,9 +18,7 @@ RUN apt-get update \
     cmake \
     device-tree-compiler \
     g++-multilib \
-    git \
     libglib2.0-0 \
-    python3 \
     python3-numpy \
     && rm -rf /var/lib/apt/lists/*
 
@@ -38,17 +35,14 @@ ENV MAKE_OPTS=-j2
 RUN git reset --hard
 
 # XXX fast update
-RUN git checkout unstable && git pull
+# RUN git checkout unstable && git pull
 
 ### SBT ###
 
 # build sbt
-RUN make sbt \
-    && rm -rf build
+RUN make sbt
 
 # run sbt tests (all but system)
-RUN mkdir -p junk \
-    && make almost-alltests \
-    && rm -rf build
+RUN mkdir -p junk && make almost-alltests
 
 CMD ["/bin/bash"]

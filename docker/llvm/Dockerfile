@@ -1,8 +1,8 @@
 FROM sbt-emu as emu
 
-FROM debian:stretch
+FROM sbt-riscv-sbt
 WORKDIR /riscv-sbt
-COPY --from=emu /riscv-sbt .
+COPY --from=emu /riscv-sbt/toolchain /riscv-sbt/toolchain
 
 # llvm/clang reqs
 # clang-3.9: to build LLVM (gcc could be used instead)
@@ -14,7 +14,6 @@ RUN apt-get update \
     g++-multilib \
     ninja-build \
     python \
-    python3 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY src /riscv-sbt/submodules/
@@ -25,9 +24,6 @@ ENV PYTHONPATH=/riscv-sbt/scripts
 ENV PATH=$TOPDIR/toolchain/release/opt/riscv/bin:$PATH
 ENV MAKE_OPTS=-j2
 
-RUN make llvm \
-    && rm -rf build
-
-RUN rm -rf /riscv-sbt/submodules/*
+RUN make llvm
 
 CMD ["/bin/bash"]

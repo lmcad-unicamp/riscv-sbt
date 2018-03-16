@@ -9,9 +9,11 @@ class cd:
 
     def __enter__(self):
         self.prev_dir = os.getcwd()
+        print("cd", self.dir)
         os.chdir(self.dir)
 
     def __exit__(self, etype, value, traceback):
+        print("cd", self.prev_dir)
         os.chdir(self.prev_dir)
 
 

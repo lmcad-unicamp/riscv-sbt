@@ -8,7 +8,7 @@ RUN apt-get update \
     python3 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY src /riscv-sbt/
+COPY src/riscv-sbt /riscv-sbt/
 
 WORKDIR /riscv-sbt
 CMD ["/bin/bash"]

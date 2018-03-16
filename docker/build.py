@@ -9,11 +9,9 @@ import sys
 
 TOPDIR          = os.environ["TOPDIR"]
 DOCKER_DIR      = path(TOPDIR, "docker")
-OUTPUT_DIR      = path(DOCKER_DIR, "output")
-SRC_DIR         = path(OUTPUT_DIR, "src")
 
 #
-# Sources
+# Commits
 #
 
 # module + commit_hash
@@ -39,6 +37,8 @@ class Commits:
             lines = out.split("\n")
             patt = re.compile("[ -]*([^ ]+) +submodules/([^ ]+) *")
             for l in lines:
+                if l.find("lowrisc-llvm") >= 0:
+                    continue
                 r = re.match(patt, l)
                 if r:
                     commit = r.group(1)
@@ -68,80 +68,80 @@ class Commits:
             for line in f:
                 r = re.match(patt, line)
                 self.commits[r.group(1)] = r.group(2)
+        return self
 
 
     def __getitem__(self, key):
         return self.commits[key]
 
-
-COMMITS = Commits(TOPDIR, DOCKER_DIR)
-
+#
+# Sources
+#
 
 # source package
 class Source:
-    srcdir = SRC_DIR
-
-    def __init__(self, name, url, clone_flags=None):
+    def __init__(self, name, dir, url, clone_flags=None):
         self.name = name
+        self.parent_dir = mpath(DOCKER_DIR, dir, "src")
+        self.dstdir = path(self.parent_dir, name)
         self.url = url
         self.clone_flags = clone_flags
+        self.update = True
 
 
     def get(self):
-        dir = path(self.srcdir, self.name)
-
-        if not os.path.exists(dir):
-            with cd(self.srcdir):
+        if not os.path.exists(self.dstdir):
+            mkdir_if_needed(self.parent_dir)
+            with cd(self.parent_dir):
                 cmd = cat("git clone", self.clone_flags, self.url)
                 shell(cmd)
-                with cd(self.name):
-                    shell("git checkout " + self.commit)
+        elif self.update:
+            with cd(self.dstdir):
+                shell("git fetch")
+
+        with cd(self.dstdir):
+            shell("git checkout " + self.commit)
 
 
-SRCS = [
-    Source("riscv-sbt",
-        "https://github.com/OpenISA/riscv-sbt.git"),
-    Source("riscv-gnu-toolchain",
-        "https://github.com/riscv/riscv-gnu-toolchain",
-        "--recursive"),
-    Source("llvm",
-        "https://github.com/OpenISA/llvm",
-        "--recursive -b lowrisc"),
-    Source("clang",
-        "https://github.com/OpenISA/clang",
-        "--recursive -b lowrisc"),
-    Source("riscv-fesvr",
-        "https://github.com/riscv/riscv-fesvr",
-        "--recursive"),
-    Source("riscv-pk",
-        "https://github.com/riscv/riscv-pk",
-        "--recursive"),
-    Source("riscv-isa-sim",
-        "https://github.com/riscv/riscv-isa-sim",
-        "--recursive"),
-    Source("riscv-qemu-tests",
-        "https://github.com/arsv/riscv-qemu-tests",
-        "--recursive")
-]
+class Sources:
+    def __init__(self):
+        self.srcs = [
+            Source("riscv-sbt", "riscv-sbt",
+                "https://github.com/OpenISA/riscv-sbt.git"),
+            Source("riscv-gnu-toolchain", "riscv-gnu-toolchain",
+                "https://github.com/riscv/riscv-gnu-toolchain",
+                "--recursive"),
+            Source("llvm", "llvm",
+                "https://github.com/OpenISA/llvm",
+                "--recursive -b lowrisc"),
+            Source("clang", "llvm",
+                "https://github.com/OpenISA/clang",
+                "--recursive -b lowrisc"),
+            Source("riscv-fesvr", "emu",
+                "https://github.com/riscv/riscv-fesvr",
+                "--recursive"),
+            Source("riscv-pk", "emu",
+                "https://github.com/riscv/riscv-pk",
+                "--recursive"),
+            Source("riscv-isa-sim", "emu",
+                "https://github.com/riscv/riscv-isa-sim",
+                "--recursive"),
+            Source("riscv-qemu-tests", "emu",
+                "https://github.com/arsv/riscv-qemu-tests",
+                "--recursive")
+        ]
 
-def init_srcs():
-    COMMITS.load()
+        commits = Commits(TOPDIR, DOCKER_DIR)
+        commits.load()
 
-    # set commits
-    for src in SRCS:
-        src.commit = COMMITS[src.name]
-
-
-
-# get all sources
-def get_srcs():
-    init_srcs()
-
-    mkdir_if_needed(SRC_DIR)
+        # set commits
+        for src in self.srcs:
+            src.commit = commits[src.name]
 
     # get all sources
-    for src in srcs:
-        src.get()
+    def get(self):
+        for src in self.srcs:
+            src.get()
 
 
 #
@@ -149,6 +149,8 @@ def get_srcs():
 #
 
 class Image:
+    commits = Commits(TOPDIR, DOCKER_DIR).load()
+
     def __init__(self, name, srcs=None, img=None):
         self.name = name
         if srcs == None:
@@ -161,43 +163,6 @@ class Image:
             self.img = img
 
 
-    # copy src to current dir
-    # (only copy srcs if they don't exist)
-    # (doesn't check if src is outdated)
-    def copy_src(self):
-        if len(self.srcs) == 0:
-            return
-
-        dstdir = mpath(DOCKER_DIR, self.name, "src")
-
-        if len(self.srcs) == 1:
-            if not os.path.exists(dstdir):
-                # NOTE use -rL if you get issues on Windows
-                shell("cp -a {} {}".format(
-                    path(SRC_DIR, self.srcs[0]),
-                    dstdir))
-        else:
-            mkdir_if_needed(dstdir)
-
-            for src in self.srcs:
-                dir = path(dstdir, src)
-                if not os.path.exists(dir):
-                    # create parent dir, if needed
-                    if not os.path.exists(os.path.dirname(dir)):
-                        shell("mkdir " + os.path.dirname(dir))
-                    # copy
-                    shell("cp -a {} {}".format(
-                        path(SRC_DIR, src),
-                        dir))
-
-
-    def checkout(self, dir):
-        for src in self.srcs:
-            commit = COMMITS[src]
-            with cd(dir):
-                shell("git checkout " + commit)
-
-
     # build if done file does not exist
     def build(self):
         # skip if done
@@ -206,11 +171,6 @@ class Image:
         if os.path.exists(done):
             return
 
-        # copy src
-        self.copy_src()
-        # checkout correct version
-        self.checkout(dir)
-
         # docker build
         with cd(DOCKER_DIR):
             shell("docker build -t {} {}".format(
@@ -218,72 +178,158 @@ class Image:
             shell("touch " + done)
 
 
+class Images:
+    build_vol = "sbt-vol-build"
+
+    def __init__(self):
+        self.imgs = [
+            Image("riscv-sbt"),
+            Image("riscv-gnu-toolchain"),
+            Image("emu",
+                srcs=["riscv-fesvr",
+                    "riscv-isa-sim",
+                    "riscv-pk",
+                    "riscv-gnu-toolchain/riscv-qemu",
+                    "riscv-qemu-tests"]),
+            Image("llvm", srcs=["llvm", "clang"]),
+            Image("sbt", srcs=[], img="sbt"),
+            Image("dev", srcs=[])
+        ]
+        self._iter = None
+
+
+    def build(self, name):
+        # build all?
+        if name == "all":
+            for img in self.imgs:
+                img.build()
+            return
+
+        # find and build img by name
+        for img in self.imgs:
+            if img.name == name:
+                img.build()
+                break
+        else:
+            sys.exit("ERROR: component not found: " + args.build)
+
+
+    def copy_build_objs(self):
+        shell("docker volume create " + self.build_vol)
+
+        for img in self.imgs:
+            if img.name in ["riscv-sbt", "dev"]:
+                continue
+
+            shell("docker run --rm --mount source=" + self.build_vol +
+                    ",destination=/build " + img.img +
+                    " cp -a build /")
+
+    def __iter__(self):
+        self._iter = iter(self.imgs)
+        return self._iter
+
+#
+# main
+#
+
+def is_cygwin():
+    try:
+        shell("uname | grep -i cygwin")
+        return True
+    except:
+        return False
+
+
+def run_dev():
+    workdir = mpath(DOCKER_DIR, "riscv-sbt", "src", "riscv-sbt")
+    emu = mpath(DOCKER_DIR, "emu", "src")
+    llvm = mpath(DOCKER_DIR, "llvm", "src")
+    vols = {
+        "/riscv-sbt/Makefile"   : path(workdir, "Makefile"),
+        "/riscv-sbt/sbt"        : path(workdir, "sbt"),
+        "/riscv-sbt/scripts"    : path(workdir, "scripts"),
+        "/riscv-sbt/build"      : Images.build_vol,
+        "/riscv-sbt/submodules/riscv-gnu-toolchain" :
+            mpath(DOCKER_DIR, "riscv-gnu-toolchain", "src",
+                    "riscv-gnu-toolchain"),
+        "/riscv-sbt/submodules/riscv-fesvr"     : path(emu, "riscv-fesvr"),
+        "/riscv-sbt/submodules/riscv-isa-sim"   : path(emu, "riscv-isa-sim"),
+        "/riscv-sbt/submodules/riscv-pk"        : path(emu, "riscv-pk"),
+        "/riscv-sbt/submodules/riscv-qemu-tests": path(emu, "riscv-qemu-tests"),
+        "/riscv-sbt/submodules/llvm"    : path(llvm, "llvm"),
+        "/riscv-sbt/submodules/clang"   : path(llvm, "clang"),
+    }
+
+    if is_cygwin():
+        prefix = "winpty "
+
+        def cygpath(path):
+            return shell("cygpath -m " + path, save_out=True).strip()
+
+        for k, v in vols.items():
+            if k.endswith("build"):
+                continue
+            vols[k] = cygpath(v)
+    else:
+        prefix = ''
+
+    vols_str = ''
+    for k, v in vols.items():
+        if k.endswith("build"):
+            t="volume"
+        else:
+            t="bind"
+        vols_str = cat(vols_str,
+                "--mount type={},source={},destination={}".format(t, v, k))
+
+    shell(prefix + "docker run -it --rm -h dev " + vols_str + " sbt-dev")
+
+
 if __name__ == "__main__":
+    imgs = Images()
+    names = [img.name for img in imgs]
+
     parser = argparse.ArgumentParser(description="docker build helper")
-    parser.add_argument("--run", action="store_true",
-        help="run the sbt container")
-    parser.add_argument("--clean-srcs", action="store_true",
-        help="remove downloaded sources dir")
-    parser.add_argument("--clean-imgs", action="store_true",
-        help="remove <none> and docker related images")
-    parser.add_argument("--clean", action="store_true",
-        help="remove src/ and done files from every docker build dir")
     parser.add_argument("--save-current-commits", action="store_true",
         help="save the current commit hash of each submodule in commits.txt")
     parser.add_argument("--get-srcs", action="store_true",
         help="clone and checkout all needed sources")
-    parser.add_argument("--build", metavar="img",
-        help="build img. If img='all', build everything")
+    parser.add_argument("--clean", action="store_true",
+        help="remove src/ and done files from every docker build dir")
+    parser.add_argument("--clean-srcs", action="store_true",
+        help="remove downloaded sources dir")
+    parser.add_argument("--clean-imgs", action="store_true",
+        help="remove <none> and docker related images")
+    parser.add_argument("--build", metavar="img", type=str,
+        choices=names + ["all"],
+        help="build img. imgs=[{}]".format(", ".join(names + ["all"])))
+    parser.add_argument("--run", action="store_true",
+        help="run the sbt container")
+    parser.add_argument("--copy-build-objs", action="store_true",
+        help="copy build objects from intermediate containers")
     parser.add_argument("--dev", action="store_true")
     args = parser.parse_args()
 
-    imgs = [
-        Image("riscv-sbt"),
-        Image("riscv-gnu-toolchain"),
-        Image("emu",
-            srcs=["riscv-fesvr",
-                "riscv-isa-sim",
-                "riscv-pk",
-                "riscv-gnu-toolchain/riscv-qemu",
-                "riscv-qemu-tests"]),
-        Image("llvm", srcs=["llvm", "clang"]),
-        Image("sbt", srcs=[], img="sbt"),
-        Image("dev", srcs=[], img="dev")
-    ]
 
-    names = [img.name for img in imgs]
-
-    # --run
-    if args.run:
-        shell("docker run -it --rm -h sbt sbt")
-    # --dev
-    elif args.dev:
-        is_cygwin = True
-        try:
-            shell("uname | grep -i cygwin")
-        except:
-            is_cygwin = False
-        if is_cygwin:
-            prefix = "winpty "
-            top = shell("cygpath -m " + TOPDIR, save_out=True).strip()
-            src = shell("cygpath -m " + SRC_DIR, save_out=True).strip()
-        else:
-            prefix = ''
-            top = TOPDIR
-            src = SRC_DIR
-        top = top + os.sep
-
-        vols = (
-            "-v {0}Makefile:/riscv-sbt/Makefile " +
-            "-v {0}build:/riscv-sbt/build " +
-            "-v {0}sbt:/riscv-sbt/sbt " +
-            "-v {0}scripts:/riscv-sbt/scripts " +
-            "-v {1}:/riscv-sbt/submodules").format(
-                top, src)
-        shell(prefix + "docker run -it --rm -h dev " + vols + " dev")
+    # --save-current-commits
+    if args.save_current_commits:
+        commits = Commits(TOPDIR, DOCKER_DIR)
+        commits.save(commits.get_current())
+    # --get-srcs
+    elif args.get_srcs:
+        srcs = Sources()
+        srcs.get()
+    # --clean
+    elif args.clean:
+        with cd(DOCKER_DIR):
+            shell("rm -f {}".format(
+                " ".join([name + "/done" for name in names])))
     # --clean-srcs
     elif args.clean_srcs:
-        shell("rm -rf " + SRC_DIR)
+        with cd(DOCKER_DIR):
+            shell("rm -rf {}".format(
+                " ".join([name + "/src" for name in names])))
     # --clean-imgs
     elif args.clean_imgs:
         # remove all container instances
@@ -297,34 +343,23 @@ if __name__ == "__main__":
             save_out=True).split()
         if len(images) > 0:
             shell("docker rmi " + " ".join(images))
-    # --clean
-    elif args.clean:
-        with cd(DOCKER_DIR):
-            shell("rm -rf {}".format(
-                " ".join([name + "/src" for name in names])))
-            shell("rm -f {}".format(
-                " ".join([name + "/done" for name in names])))
-    # --save-current-commits
-    elif args.save_current_commits:
-        commits = Commits(TOPDIR, DOCKER_DIR)
-        commits.save(commits.get_current())
-    # --get-srcs
-    elif args.get_srcs:
-        get_srcs()
     # --build
     elif args.build:
-        init_srcs()
-
-        # find img by name
-        for img in imgs:
-            if img.name == args.build or args.build == "all":
-                # build it
-                img.build()
-                if args.build != "all":
-                    break
+        imgs.build(args.build)
+    # --run
+    elif args.run:
+        if is_cygwin():
+            cmd = "winpty "
         else:
-            if args.build != "all":
-                sys.exit("ERROR: component not found: " + args.build)
+            cmd = ''
+        cmd = cmd + "docker run -it --rm -h sbt sbt"
+        shell(cmd)
+    # --copy-build-objs
+    elif args.copy_build_objs:
+        imgs.copy_build_objs()
+    # --dev
+    elif args.dev:
+        run_dev()
     # error
     else:
         sys.exit("ERROR: no command specified")
