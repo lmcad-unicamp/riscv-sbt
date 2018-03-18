@@ -1,66 +1,125 @@
 #!/usr/bin/python3
 
 from auto.config import *
+from auto.utils import path
 
 import argparse
+import math
 import numpy as np
 import os
 import subprocess
 import sys
 import time
 
-TARGETS = [ 'x86' ]
-
 class Options:
-    def __init__(self, stdin, verbose):
+    def __init__(self, stdin, verbose, exp_rc):
         self.stdin = stdin
         self.verbose = verbose
+        self.exp_rc = exp_rc
 
 
-class TestData:
-    def __init__(self, bin):
-        self.bin = bin
-
-    def out(self, i):
-        return "/tmp/" + self.bin + str(i) + ".out"
-
-
-class Test:
-    def __init__(self, target, dir, test, args, opts):
-        self.target = target
-        self.dir = dir
-        self.test = test
-        self.args = args
+class Program:
+    def __init__(self, dir, basename, arch, mode, args, opts):
+        self.name = arch + '-' + basename
+        if mode:
+            self.name = self.name + '-' + mode
+        else:
+            mode = 'native'
+        self.mode = mode
+        self.args = [path(dir, self.name)] + args
         self.opts = opts
+        self.times = []
 
-        bin = target + '-' + test
-        self.native = TestData(bin)
-        self.rv32 = TestData("rv32-" + bin)
+        if self.opts.verbose:
+            print(" ".join(self.args))
 
-    def check_rc(self, rc):
+
+    def _out(self, i):
+        return "/tmp/" + self.name + str(i) + ".out"
+
+
+    def _check_rc(self, rc):
         exp_rc = self.opts.exp_rc
         if rc != exp_rc:
             raise Exception("Failure! rc=" + str(rc) + " exp_rc=" + str(exp_rc))
 
-    def run1(self, args, td, i):
-        with open(td.out(i), 'wb') as fout:
+
+    def run(self, i):
+        with open(self._out(i), 'wb') as fout:
             stdin = self.opts.stdin
             if stdin:
                 with open(stdin, 'rb') as fin:
                     t0 = time.time()
-                    cp = subprocess.call(args, stdin=fin, stdout=fout)
+                    cp = subprocess.call(self.args, stdin=fin, stdout=fout)
                     t1 = time.time()
-                    self.check_rc(cp)
+                    self._check_rc(cp)
             else:
                 t0 = time.time()
-                cp = subprocess.call(args, stdout=fout)
+                cp = subprocess.call(self.args, stdout=fout)
                 t1 = time.time()
-                self.check_rc(cp)
+                self._check_rc(cp)
         t = t1 - t0
+        self.times.append(t)
         if self.opts.verbose:
             print("run #" + str(i) + ": time taken:", t)
         sys.stdout.flush()
-        return t
+
+
+class Measure:
+    def __init__(self, dir, prog, args, opts):
+        self.dir = dir
+        self.prog = prog
+        self.args = args
+        self.opts = opts
+
+
+    def measure(self):
+        for target in ['x86']:
+            self._measure_target(target)
+
+
+    def _measure_target(self, target):
+        # prepare programs
+        nprog = Program(self.dir, self.prog, target, None, self.args, self.opts)
+        xarch = 'rv32-' + target
+        xprogs = [
+            Program(self.dir, self.prog, xarch, mode, self.args, self.opts)
+                for mode in SBT.modes]
+
+        # run
+        N = 10
+        times = {}
+        for prog in [nprog] + xprogs:
+            if self.opts.verbose:
+                print("measuring", prog.name)
+            for i in range(N):
+                prog.run(i)
+            times[prog.mode] = prog.times
+
+        # get means
+        nat_m = None
+        nat_sd = None
+        for mode in ['native'] + SBT.modes:
+            m = self.mean(times[mode])
+            sd = self.sd(times[mode], m)
+            if mode == 'native':
+                nat_m = m
+                nat_sd = sd
+            slowdown = 1 + (m - nat_m) / nat_m
+            print("{0:<8}: {1:.5f} {2:.5f} {3:.2f}".
+                    format(mode, m, sd, slowdown))
+
+
+    @staticmethod
+    def mean(vals):
+        return sum(vals) / len(vals)
+
+
+    @staticmethod
+    def sd(vals, mean):
+        return math.sqrt(
+            sum([math.pow(val - mean, 2) for val in vals])
+            / (len(vals) - 1))
 
 
     @staticmethod
@@ -81,67 +140,9 @@ class Test:
         return a.prod()**(1.0/len(a))
 
 
-    def run(self):
-        def prep(td, mode=None):
-            if self.opts.verbose or mode:
-                print("measuring ", td.bin, ": mode=", mode, sep='')
-
-            path = self.dir + '/' + td.bin
-            if mode:
-                path = path + '-' + mode
-            args = [path]
-            args.extend(self.args)
-            if self.opts.verbose:
-                print(" ".join(args))
-            sys.stdout.flush()
-            return args
-
-        n = 10
-
-        # native
-        td = self.native
-        args = prep(td)
-
-        ntimes = []
-        for i in range(n):
-            t = self.run1(args, td, i)
-            ntimes.append(t)
-
-        # translated
-        for mode in SBT.modes:
-            td = self.rv32
-            args = prep(td, mode)
-
-            ttimes = []
-            for i in range(n):
-                t = self.run1(args, td, i)
-                ttimes.append(t)
-
-            # compare outputs
-            if not self.opts.no_diff:
-                for i in range(n):
-                    rc = subprocess.call(
-                        ["diff", self.native.out(i), self.rv32.out(i)])
-                    if rc:
-                        sys.exit("ERROR: "
-                            "translated output differs from native (run #"
-                                 + str(i) + ")")
-
-            nt = self.geomean(ntimes)
-            tt = self.geomean(ttimes)
-            oh = (tt - nt) / nt
-            print("native time     =", nt)
-            print("translated time =", tt)
-            print("overhead        =", oh)
-
-
-def measure(target, dir, test_name, args, opts):
-    test = Test(target, dir, test_name, args, opts)
-    test.run()
-
 
 # dir test arg
-def main(args):
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Measure translation overhead')
     parser.add_argument('dir', type=str)
     parser.add_argument('test', type=str)
@@ -150,17 +151,63 @@ def main(args):
     parser.add_argument("-v", action="store_true", help="verbose")
     parser.add_argument("--exp-rc", type=int, default=0,
         help="expected return code")
-    parser.add_argument("--no-diff", action="store_true")
 
     args = parser.parse_args()
-    opts = Options(args.stdin, args.v)
-    opts.exp_rc = args.exp_rc
-    opts.no_diff = args.no_diff
     sargs = [arg.strip() for arg in args.args]
 
-    # print("measuring", args.test)
+    # args.v = True
+    opts = Options(args.stdin, args.v, args.exp_rc)
+    measure = Measure(args.dir, args.test, sargs, opts)
+    measure.measure()
 
-    for target in TARGETS:
-        measure(target, args.dir, args.test, sargs, opts)
+"""
+    ### main_factor_libc_out ###
 
-main(sys.argv)
+    RUNSCENARIO="run_test_factor_libc_out"
+    CHECKOUTPUT=0
+    OUTSCENARIO="$REMOTEINSTALL/mibench_factor_libc_out.csv"
+    echo -ne "Index Program Native NStdDev Globals GStdDev Locals LStdDev Whole WStdDev Abi AStdDev\n" | tee $OUTSCENARIO
+    run_mibench
+
+    # run_family
+    #
+    # run_test_factor_libc_out:
+    # repeat 10:
+    #   perf record -q {bin}
+    #   perf report --sort=dso > perfreport.txt
+    #   extract_info ${progname} "perfreport.txt"
+    #   # RET=<percentage of time spent on the binary>
+    # calculate mean and stddev
+    # means[$progname]=$mean
+    # stddevs[$progname]=$sd
+    # echo -ne "$mean " | tee -a mibench_factor_libc_out.csv
+    # echo -ne "$sd" | tee -a mibench_factor_libc_out.csv
+
+    ### main_measure_runtime ###
+    RUNSCENARIO="run_test_measure_time"
+    CHECKOUTPUT=0
+    OUTSCENARIO="$REMOTEINSTALL/mibench_runtime.csv"
+    echo -ne "Index Program Globals GError Locals LError Whole WError Abi AError\n" | tee $OUTSCENARIO
+    run_mibench
+
+    # run_family
+    #
+    # run_test_measure_time
+    # repeat 10:
+    #   perf stat {bin}
+    #   extract_perf_time # get elapsed time
+    #
+    # time_mean
+    # time_sd
+    # factored_mean = ${means[$progname]}
+    # factored_sd = ${stddevs[$progname]}
+    #
+    # mean = time_mean * factored_mean
+    # sd = mean * sqrt((time_sd / time_mean)^2 + (factored_sd / factored_mean)^2)
+    # # sqrt(...) -> error propagation
+    #
+    # mean = mean / NATMEAN
+    # echo mean
+    # sd = mean * sqrt((sd / mean)^2 + (NATSD / NATMEAN)^2)
+    # echo sd
+"""

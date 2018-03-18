@@ -427,8 +427,7 @@ if __name__ == "__main__":
             ["bitcnt_1.c", "bitcnt_2.c", "bitcnt_3.c", "bitcnt_4.c",
                 "bitcnts.c", "bitfiles.c", "bitstrng.c", "bstr_i.c"],
             [Args(["1125000"])],
-            sbtflags=["-stack-size=131072"],
-            mflags=["--no-diff"])
+            sbtflags=["-stack-size=131072"])
             .out_filter("sed 's/Time:[^;]*; //;/^Best/d;/^Worst/d'"),
         MultiTestBench("fft", "telecomm/FFT",
             ["main.c", "fftmisc.c", "fourierf.c"],
