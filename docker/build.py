@@ -180,6 +180,7 @@ class Image:
 
 class Images:
     build_vol = "sbt-vol-build"
+    toolchain_vol = "sbt-vol-toolchain"
 
     def __init__(self):
         self.imgs = [
@@ -225,6 +226,14 @@ class Images:
                     ",destination=/build " + img.img +
                     " cp -a build /")
 
+
+    def copy_toolchain(self):
+        shell("docker volume create " + self.toolchain_vol)
+        shell("docker run --rm --mount source=" + self.toolchain_vol +
+                ",destination=/toolchain sbt" +
+                " cp -a toolchain /")
+
+
     def __iter__(self):
         self._iter = iter(self.imgs)
         return self._iter
@@ -246,10 +255,9 @@ def run_dev():
     emu = mpath(DOCKER_DIR, "emu", "src")
     llvm = mpath(DOCKER_DIR, "llvm", "src")
     vols = {
-        "/riscv-sbt/Makefile"   : path(workdir, "Makefile"),
-        "/riscv-sbt/sbt"        : path(workdir, "sbt"),
-        "/riscv-sbt/scripts"    : path(workdir, "scripts"),
+        "/riscv-sbt"            : workdir,
         "/riscv-sbt/build"      : Images.build_vol,
+        "/riscv-sbt/toolchain"  : Images.toolchain_vol,
         "/riscv-sbt/submodules/riscv-gnu-toolchain" :
             mpath(DOCKER_DIR, "riscv-gnu-toolchain", "src",
                     "riscv-gnu-toolchain"),
@@ -261,6 +269,9 @@ def run_dev():
         "/riscv-sbt/submodules/clang"   : path(llvm, "clang"),
     }
 
+    def is_vol(key):
+        return key in ["/riscv-sbt/build", "/riscv-sbt/toolchain"]
+
     if is_cygwin():
         prefix = "winpty "
 
@@ -268,7 +279,7 @@ def run_dev():
             return shell("cygpath -m " + path, save_out=True).strip()
 
         for k, v in vols.items():
-            if k.endswith("build"):
+            if is_vol(k):
                 continue
             vols[k] = cygpath(v)
     else:
@@ -276,7 +287,7 @@ def run_dev():
 
     vols_str = ''
     for k, v in vols.items():
-        if k.endswith("build"):
+        if is_vol(k):
             t="volume"
         else:
             t="bind"
@@ -308,6 +319,8 @@ if __name__ == "__main__":
         help="run the sbt container")
     parser.add_argument("--copy-build-objs", action="store_true",
         help="copy build objects from intermediate containers")
+    parser.add_argument("--copy-toolchain", action="store_true",
+        help="copy toolchain files to volume")
     parser.add_argument("--dev", action="store_true")
     args = parser.parse_args()
 
@@ -357,6 +370,9 @@ if __name__ == "__main__":
     # --copy-build-objs
     elif args.copy_build_objs:
         imgs.copy_build_objs()
+    # --copy-toolchain
+    elif args.copy_toolchain:
+        imgs.copy_toolchain()
     # --dev
     elif args.dev:
         run_dev()
