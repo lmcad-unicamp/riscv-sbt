@@ -86,7 +86,7 @@ class Arch:
         # gcc
         self.gcc = triple + "-gcc"
         self.gcc_flags = lambda opts: \
-            "-static {} {} {}".format(
+            "{} {} {}".format(
                 ("-O0 -g" if opts.dbg else _O),
                 CFLAGS,
                 gcc_flags)

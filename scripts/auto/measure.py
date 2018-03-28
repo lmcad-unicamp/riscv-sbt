@@ -7,6 +7,7 @@ import argparse
 import math
 import numpy as np
 import os
+import re
 import subprocess
 import sys
 import time
@@ -65,6 +66,41 @@ class Program:
         sys.stdout.flush()
 
 
+    def perf_libc(self):
+        args = ["perf", "record", "-q"] + self.args
+        print(" ".join(args))
+
+        stdin = self.opts.stdin
+        stdout = subprocess.DEVNULL
+        if stdin:
+            with open(stdin, 'rb') as fin:
+                cp = subprocess.call(args, stdin=fin, stdout=stdout)
+        else:
+            cp = subprocess.call(args, stdout=stdout)
+        self._check_rc(cp)
+
+        cp = subprocess.run(["perf", "report", "--sort=dso", "--stdio"],
+            stdout=subprocess.PIPE, universal_newlines=True)
+        cp.check_returncode()
+
+        patt = re.compile("([0-9]+\.[0-9]+)% +(.*)")
+        p = None
+        for l in cp.stdout.split('\n'):
+            l = l.strip()
+            if not l or l[0] == '#':
+                continue
+            print(l)
+            m = patt.match(l)
+            if m and m.group(2) == self.name:
+                p = float(m.group(1))
+                p = p / 100
+
+        if p:
+            print("{0}: {1:.3f}".format(self.name, p))
+
+        # TODO calculate mean and stddev
+
+
 class Measure:
     def __init__(self, dir, prog, args, opts):
         self.dir = dir
@@ -78,18 +114,27 @@ class Measure:
             self._measure_target(target)
 
 
-    def _measure_target(self, target):
-        # prepare programs
+    def perf(self):
+        for target in ['x86']:
+            self._perf_target(target)
+
+
+    def _build_programs(self, target):
         nprog = Program(self.dir, self.prog, target, None, self.args, self.opts)
         xarch = 'rv32-' + target
         xprogs = [
             Program(self.dir, self.prog, xarch, mode, self.args, self.opts)
                 for mode in SBT.modes]
+        return [nprog] + xprogs
+
+
+    def _measure_target(self, target):
+        progs = self._build_programs(target)
 
         # run
         N = 10
         times = {}
-        for prog in [nprog] + xprogs:
+        for prog in progs:
             if self.opts.verbose:
                 print("measuring", prog.name)
             for i in range(N):
@@ -108,6 +153,13 @@ class Measure:
             slowdown = 1 + (m - nat_m) / nat_m
             print("{0:<8}: {1:.5f} {2:.5f} {3:.2f}".
                     format(mode, m, sd, slowdown))
+
+
+    def _perf_target(self, target):
+        progs = self._build_programs(target)
+
+        for prog in progs:
+            prog.perf_libc()
 
 
     @staticmethod
@@ -151,6 +203,7 @@ if __name__ == "__main__":
     parser.add_argument("-v", action="store_true", help="verbose")
     parser.add_argument("--exp-rc", type=int, default=0,
         help="expected return code")
+    parser.add_argument("--perf", action="store_true")
 
     args = parser.parse_args()
     sargs = [arg.strip() for arg in args.args]
@@ -158,31 +211,13 @@ if __name__ == "__main__":
     # args.v = True
     opts = Options(args.stdin, args.v, args.exp_rc)
     measure = Measure(args.dir, args.test, sargs, opts)
-    measure.measure()
+
+    if args.perf:
+        measure.perf()
+    else:
+        measure.measure()
 
 """
-    ### main_factor_libc_out ###
-
-    RUNSCENARIO="run_test_factor_libc_out"
-    CHECKOUTPUT=0
-    OUTSCENARIO="$REMOTEINSTALL/mibench_factor_libc_out.csv"
-    echo -ne "Index Program Native NStdDev Globals GStdDev Locals LStdDev Whole WStdDev Abi AStdDev\n" | tee $OUTSCENARIO
-    run_mibench
-
-    # run_family
-    #
-    # run_test_factor_libc_out:
-    # repeat 10:
-    #   perf record -q {bin}
-    #   perf report --sort=dso > perfreport.txt
-    #   extract_info ${progname} "perfreport.txt"
-    #   # RET=<percentage of time spent on the binary>
-    # calculate mean and stddev
-    # means[$progname]=$mean
-    # stddevs[$progname]=$sd
-    # echo -ne "$mean " | tee -a mibench_factor_libc_out.csv
-    # echo -ne "$sd" | tee -a mibench_factor_libc_out.csv
-
     ### main_measure_runtime ###
     RUNSCENARIO="run_test_measure_time"
     CHECKOUTPUT=0

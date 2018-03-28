@@ -54,3 +54,4 @@ alias spike64="spike --isa=RV64IMAFDC $PK64"
 alias qemu32=qemu-riscv32
 alias qemu64=qemu-riscv64
 alias git_status_all="git status --ignore-submodules=none"
+alias perfperm="echo -1 | sudo tee /proc/sys/kernel/perf_event_paranoid"
