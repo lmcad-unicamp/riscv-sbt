@@ -30,6 +30,7 @@ class Program:
         self.args = [path(dir, self.name)] + args
         self.opts = opts
         self.times = []
+        self.lcperfs = []
 
         if self.opts.verbose:
             print(" ".join(self.args))
@@ -39,10 +40,72 @@ class Program:
         return "/tmp/" + self.name + str(i) + ".out"
 
 
+    def _perf_out(self, i):
+        return "/tmp/" + self.name + str(i) + ".perf.out"
+
+
     def _check_rc(self, rc):
         exp_rc = self.opts.exp_rc
         if rc != exp_rc:
             raise Exception("Failure! rc=" + str(rc) + " exp_rc=" + str(exp_rc))
+
+
+    def _extract_perf_time(self, out):
+        patt = re.compile(" *([^ ]+) seconds time elapsed")
+        with open(out, 'r') as f:
+            for l in f:
+                m = patt.match(l)
+                if m:
+                    return float(m.group(1))
+            else:
+                raise Exception("Failed to extract perf time!")
+
+
+    def perf_libc(self, verbose=False, freq=None):
+        args = ["perf", "record", "-q"]
+        if freq:
+            args.extend(["-F", str(freq)])
+        args.extend(self.args)
+        if verbose:
+            print(" ".join(args))
+
+        fin = None
+        try:
+            stdin = self.opts.stdin
+            if stdin:
+                fin = open(stdin, 'rb')
+            stdout = subprocess.DEVNULL
+
+            cp = subprocess.call(args, stdin=fin,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self._check_rc(cp)
+        finally:
+            if fin:
+                fin.close()
+
+        cp = subprocess.run(["perf", "report", "--sort=dso", "--stdio"],
+            stdout=subprocess.PIPE, universal_newlines=True)
+        cp.check_returncode()
+
+        patt = re.compile("([0-9]+\.[0-9]+)% +(.*)")
+        p = None
+        for l in cp.stdout.split('\n'):
+            l = l.strip()
+            if not l or l[0] == '#':
+                continue
+            if verbose:
+                print(l)
+            m = patt.match(l)
+            if m and m.group(2) == self.name:
+                p = float(m.group(1))
+                p = p / 100
+
+        if p:
+            if verbose:
+                print("{0}: {1:.3f}".format(self.name, p))
+            self.lcperfs.append(p)
+        else:
+            raise Exception("Failed to perf libc!")
 
 
     def run(self, i):
@@ -55,12 +118,16 @@ class Program:
                 fin = open(stdin, 'rb')
             fout = open(self._out(i), 'wb')
 
-            t0 = time.time()
-            cp = subprocess.call(self.args, stdin=fin, stdout=fout,
+            perf_out = self._perf_out(i)
+            args = ["perf", "stat", "-o", perf_out] + self.args
+
+            # t0 = time.time()
+            cp = subprocess.call(args, stdin=fin, stdout=fout,
                     stderr=subprocess.DEVNULL)
-            t1 = time.time()
+            # t1 = time.time()
             self._check_rc(cp)
-            t = t1 - t0
+            # t = t1 - t0
+            t = self._extract_perf_time(perf_out)
 
         finally:
             if fin:
@@ -72,41 +139,6 @@ class Program:
         if self.opts.verbose:
             print("run #" + str(i) + ": time taken:", t)
         sys.stdout.flush()
-
-
-    def perf_libc(self):
-        args = ["perf", "record", "-q"] + self.args
-        print(" ".join(args))
-
-        stdin = self.opts.stdin
-        stdout = subprocess.DEVNULL
-        if stdin:
-            with open(stdin, 'rb') as fin:
-                cp = subprocess.call(args, stdin=fin, stdout=stdout)
-        else:
-            cp = subprocess.call(args, stdout=stdout)
-        self._check_rc(cp)
-
-        cp = subprocess.run(["perf", "report", "--sort=dso", "--stdio"],
-            stdout=subprocess.PIPE, universal_newlines=True)
-        cp.check_returncode()
-
-        patt = re.compile("([0-9]+\.[0-9]+)% +(.*)")
-        p = None
-        for l in cp.stdout.split('\n'):
-            l = l.strip()
-            if not l or l[0] == '#':
-                continue
-            print(l)
-            m = patt.match(l)
-            if m and m.group(2) == self.name:
-                p = float(m.group(1))
-                p = p / 100
-
-        if p:
-            print("{0}: {1:.3f}".format(self.name, p))
-
-        # TODO calculate mean and stddev
 
 
 class Measure:
@@ -136,38 +168,127 @@ class Measure:
         return [nprog] + xprogs
 
 
+    class Result:
+        # m: mean
+        # sd: standard deviation
+        # t: time
+        # p: perf/percentage of total time spent on main bench code
+        # f: final
+
+        def __init__(self, times, lcperfs):
+            # functions' aliases
+            mean = Measure.mean
+            sd = Measure.sd
+            sqr = self.sqr
+            sqrt = math.sqrt
+
+            # time
+            tm = mean(times)
+            tsd = sd(times, tm)
+
+            # %
+            pm = mean(lcperfs)
+            psd = sd(lcperfs, pm)
+
+            # final
+            fm = tm * pm
+            # sqrt(...) -> error propagation
+            fsd = fm * sqrt(sqr(tsd/tm) + sqr(psd/pm))
+
+            # save results in self
+            self.tm = tm
+            self.tsd = tsd
+            self.pm = pm
+            self.psd = psd
+            self.fm = fm
+            self.fsd = fsd
+
+
+        @staticmethod
+        def sqr(x):
+            return x*x
+
+
+        @staticmethod
+        def slowdown(res, nat):
+            if res == nat:
+                return (1, 0)
+
+            # time based only
+            time_based_only = False
+            if time_based_only:
+                return (1 + (res.tm - nat.tm) / nat.tm, 0)
+
+            sqr = Measure.Result.sqr
+            sqrt = math.sqrt
+
+            m = res.fm / nat.fm
+            sd = m * sqrt(sqr(res.fsd/res.fm) + sqr(nat.fsd/nat.fm))
+            return (m, sd)
+
+
     def _measure_target(self, target):
         progs = self._build_programs(target)
 
         # run
         N = 10
         times = {}
+        lcperfs = {}
+        # stringsearch runs to fast, so we need to increase the
+        # sample frequency in its case
+        freq = 20000 if self.prog == "stringsearch" else None
         for prog in progs:
             if self.opts.verbose:
                 print("measuring", prog.name)
             for i in range(N):
+                prog.perf_libc(freq=freq)
+            for i in range(N):
                 prog.run(i)
             times[prog.mode] = prog.times
+            lcperfs[prog.mode] = prog.lcperfs
 
         # get means
-        nat_m = None
-        nat_sd = None
+        nat = None
+        Result = Measure.Result
+
+        # mode len
+        ml = 8
+        # precisions
+        p = [
+                # times
+                8, 5, 8, 5,
+                # %'s
+                5, 2, 5, 2,
+                # final times
+                8, 5, 8, 5,
+                # slowdown
+                5, 2, 5, 2]
+        # caption lengths
+        l = [p[i] for i in range(0, len(p), 2)]
+
+        # format strings
+        header = ("{{:<{}}} " + " {{:<{}}}"  * 8 + " ({{}})").format(ml, *l)
+        row =    ("{{:<{}}}:" + " {{: <{}.{}f}}" * 8).format(ml, *p)
+
+        print(header.format("mode",
+            "tmean", "tsd", "%mean", "%sd", "mean", "sd",
+            "x", "xsd", self.prog))
         for mode in ['native'] + SBT.modes:
-            m = self.mean(times[mode])
-            sd = self.sd(times[mode], m)
+            res = Result(times[mode], lcperfs[mode])
             if mode == 'native':
-                nat_m = m
-                nat_sd = sd
-            slowdown = 1 + (m - nat_m) / nat_m
-            print("{0:<8}: {1:.5f} {2:.5f} {3:.2f}".
-                    format(mode, m, sd, slowdown))
+                nat = res
+
+            (x, xsd) = Result.slowdown(res, nat)
+            print(row.format(mode,
+                res.tm, res.tsd, res.pm * 100, res.psd * 100, res.fm, res.fsd,
+                x, xsd))
 
 
     def _perf_target(self, target):
         progs = self._build_programs(target)
 
         for prog in progs:
-            prog.perf_libc()
+            prog.perf_libc(verbose=True)
 
 
     @staticmethod
@@ -225,32 +346,3 @@ if __name__ == "__main__":
     else:
         measure.measure()
 
-"""
-    ### main_measure_runtime ###
-    RUNSCENARIO="run_test_measure_time"
-    CHECKOUTPUT=0
-    OUTSCENARIO="$REMOTEINSTALL/mibench_runtime.csv"
-    echo -ne "Index Program Globals GError Locals LError Whole WError Abi AError\n" | tee $OUTSCENARIO
-    run_mibench
-
-    # run_family
-    #
-    # run_test_measure_time
-    # repeat 10:
-    #   perf stat {bin}
-    #   extract_perf_time # get elapsed time
-    #
-    # time_mean
-    # time_sd
-    # factored_mean = ${means[$progname]}
-    # factored_sd = ${stddevs[$progname]}
-    #
-    # mean = time_mean * factored_mean
-    # sd = mean * sqrt((time_sd / time_mean)^2 + (factored_sd / factored_mean)^2)
-    # # sqrt(...) -> error propagation
-    #
-    # mean = mean / NATMEAN
-    # echo mean
-    # sd = mean * sqrt((sd / mean)^2 + (NATSD / NATMEAN)^2)
-    # echo sd
-"""
