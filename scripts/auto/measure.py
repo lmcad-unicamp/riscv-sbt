@@ -46,20 +46,28 @@ class Program:
 
 
     def run(self, i):
-        with open(self._out(i), 'wb') as fout:
+        fin = None
+        fout = None
+
+        try:
             stdin = self.opts.stdin
             if stdin:
-                with open(stdin, 'rb') as fin:
-                    t0 = time.time()
-                    cp = subprocess.call(self.args, stdin=fin, stdout=fout)
-                    t1 = time.time()
-                    self._check_rc(cp)
-            else:
-                t0 = time.time()
-                cp = subprocess.call(self.args, stdout=fout)
-                t1 = time.time()
-                self._check_rc(cp)
-        t = t1 - t0
+                fin = open(stdin, 'rb')
+            fout = open(self._out(i), 'wb')
+
+            t0 = time.time()
+            cp = subprocess.call(self.args, stdin=fin, stdout=fout,
+                    stderr=subprocess.DEVNULL)
+            t1 = time.time()
+            self._check_rc(cp)
+            t = t1 - t0
+
+        finally:
+            if fin:
+                fin.close()
+            if fout:
+                fout.close()
+
         self.times.append(t)
         if self.opts.verbose:
             print("run #" + str(i) + ": time taken:", t)
