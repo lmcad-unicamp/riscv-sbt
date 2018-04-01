@@ -51,7 +51,7 @@ PK64=$TCR/riscv64-unknown-elf/bin/pk
 alias elf="$BUILD_DIR/test/sbt/elf"
 alias spike32="spike $PK32"
 alias spike64="spike --isa=RV64IMAFDC $PK64"
-alias qemu32=qemu-riscv32
+alias qemu32="qemu-riscv32 -L $TOPDIR/toolchain/release/opt/riscv/sysroot"
 alias qemu64=qemu-riscv64
 alias git_status_all="git status --ignore-submodules=none"
 alias perfperm="echo -1 | sudo tee /proc/sys/kernel/perf_event_paranoid"

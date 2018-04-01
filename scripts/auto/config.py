@@ -143,18 +143,19 @@ RV32_MATTR      = "-a,-c,+m,+f,+d"
 RV32_LLC_FLAGS  = cat("-march=" + RV32_MARCH, "-mattr=" + RV32_MATTR)
 
 RV32 = Arch(
-        "rv32", "rv32",
-        RV32_TRIPLE,
-        "LD_LIBRARY_PATH={}/lib spike {}".format(
+        name="rv32",
+        prefix="rv32",
+        triple=RV32_TRIPLE,
+        run="LD_LIBRARY_PATH={}/lib spike {}".format(
             DIR.toolchain_release, PK32),
-        RV32_MARCH,
-        "",
-        "--target=riscv32",
-        RV32_SYSROOT,
-        RV32_SYSROOT + "/include",
-        RV32_LLC_FLAGS,
-        "",
-        "",
+        march=RV32_MARCH,
+        gcc_flags="",
+        clang_flags="--target=riscv32",
+        sysroot=RV32_SYSROOT,
+        isysroot=RV32_SYSROOT + "/include",
+        llc_flags=RV32_LLC_FLAGS,
+        as_flags="",
+        ld_flags="",
         mattr=RV32_MATTR)
 
 
@@ -162,17 +163,18 @@ RV32_LINUX_SYSROOT  = DIR.toolchain_release + "/opt/riscv/sysroot"
 RV32_LINUX_ABI      = "ilp32"
 
 RV32_LINUX = Arch(
-        "rv32-linux", "rv32",
-        "riscv64-unknown-linux-gnu",
-        "qemu-riscv32",
-        RV32_MARCH,
-        "-march=rv32g -mabi=" + RV32_LINUX_ABI,
-        "--target=riscv32 -D__riscv_xlen=32",
-        RV32_LINUX_SYSROOT,
-        RV32_LINUX_SYSROOT + "/usr/include",
-        RV32_LLC_FLAGS,
-        "-march=rv32g -mabi=" + RV32_LINUX_ABI,
-        "-m elf32lriscv",
+        name="rv32-linux",
+        prefix="rv32",
+        triple="riscv64-unknown-linux-gnu",
+        run="qemu-riscv32 -L " + RV32_LINUX_SYSROOT,
+        march=RV32_MARCH,
+        gcc_flags="-march=rv32g -mabi=" + RV32_LINUX_ABI,
+        clang_flags="--target=riscv32 -D__riscv_xlen=32",
+        sysroot=RV32_LINUX_SYSROOT,
+        isysroot=RV32_LINUX_SYSROOT + "/usr/include",
+        llc_flags=RV32_LLC_FLAGS,
+        as_flags="-march=rv32g -mabi=" + RV32_LINUX_ABI,
+        ld_flags="-m elf32lriscv",
         mattr=RV32_MATTR)
 
 
@@ -180,17 +182,18 @@ X86_MARCH = "x86"
 X86_MATTR = "avx"
 
 X86 = Arch(
-        "x86", "x86",
-        "x86_64-linux-gnu",
-        "",
-        X86_MARCH,
-        "-m32",
-        "--target=x86_64-unknown-linux-gnu -m32",
-        "/",
-        "/usr/include",
-        cat("-march=" + X86_MARCH, "-mattr=" + X86_MATTR),
-        "--32",
-        "-m elf_i386",
+        name="x86",
+        prefix="x86",
+        triple="x86_64-linux-gnu",
+        run="",
+        march=X86_MARCH,
+        gcc_flags="-m32",
+        clang_flags="--target=x86_64-unknown-linux-gnu -m32",
+        sysroot="/",
+        isysroot="/usr/include",
+        llc_flags=cat("-march=" + X86_MARCH, "-mattr=" + X86_MATTR),
+        as_flags="--32",
+        ld_flags="-m elf_i386",
         mattr=X86_MATTR)
 
 
