@@ -55,3 +55,4 @@ alias qemu32="qemu-riscv32 -L $TOPDIR/toolchain/release/opt/riscv/sysroot"
 alias qemu64=qemu-riscv64
 alias git_status_all="git status --ignore-submodules=none"
 alias perfperm="echo -1 | sudo tee /proc/sys/kernel/perf_event_paranoid"
+alias perfmax="echo 500000 | sudo tee /proc/sys/kernel/perf_event_max_sample_rate"

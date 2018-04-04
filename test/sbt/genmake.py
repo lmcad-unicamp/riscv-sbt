@@ -283,7 +283,7 @@ setmsr:
 ### matrix multiply test
 
 mmm:
-	{measure} {dstdir} mm
+	{measure} --no-perf {dstdir} mm
 
 ### everything ###
 

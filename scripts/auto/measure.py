@@ -17,6 +17,9 @@ class Options:
         self.stdin = stdin
         self.verbose = verbose
         self.exp_rc = exp_rc
+        self.freq = None
+        self.perf_libc = True
+        self.perf = True
 
 
 class Program:
@@ -44,10 +47,11 @@ class Program:
         return "/tmp/" + self.name + str(i) + ".perf.out"
 
 
-    def _check_rc(self, rc):
+    def _check_rc(self, rc, args=None):
         exp_rc = self.opts.exp_rc
         if rc != exp_rc:
-            raise Exception("Failure! rc=" + str(rc) + " exp_rc=" + str(exp_rc))
+            raise Exception("Failure! rc=" + str(rc) + " exp_rc=" + str(exp_rc)
+                    + ("\nCommand: " + " ".join(args) if args else ""))
 
 
     def _extract_perf_time(self, out):
@@ -65,23 +69,28 @@ class Program:
         args = ["perf", "record", "-q"]
         if freq:
             args.extend(["-F", str(freq)])
+        elif self.opts.freq:
+            args.extend(["-F", str(self.opts.freq)])
         args.extend(self.args)
         if verbose:
             print(" ".join(args))
 
         fin = None
+        fout = None
         try:
             stdin = self.opts.stdin
             if stdin:
                 fin = open(stdin, 'rb')
-            stdout = subprocess.DEVNULL
+            fout = open(self._out(0), 'wb')
 
-            cp = subprocess.call(args, stdin=fin,
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            self._check_rc(cp)
+            cp = subprocess.call(args, stdin=fin, stdout=fout,
+                    stderr=subprocess.DEVNULL)
+            self._check_rc(cp, args)
         finally:
             if fin:
                 fin.close()
+            if fout:
+                fout.close()
 
         cp = subprocess.run(["perf", "report", "--sort=dso", "--stdio"],
             stdout=subprocess.PIPE, universal_newlines=True)
@@ -119,15 +128,23 @@ class Program:
             fout = open(self._out(i), 'wb')
 
             perf_out = self._perf_out(i)
-            args = ["perf", "stat", "-o", perf_out] + self.args
+            perf = self.opts.perf
+            if perf:
+                args = ["perf", "stat", "-o", perf_out]
+            else:
+                args = []
+            args.extend(self.args)
 
-            # t0 = time.time()
+            if not perf:
+                t0 = time.time()
             cp = subprocess.call(args, stdin=fin, stdout=fout,
                     stderr=subprocess.DEVNULL)
-            # t1 = time.time()
-            self._check_rc(cp)
-            # t = t1 - t0
-            t = self._extract_perf_time(perf_out)
+            if not perf:
+                t1 = time.time()
+                t = t1 - t0
+            self._check_rc(cp, args)
+            if perf:
+                t = self._extract_perf_time(perf_out)
 
         finally:
             if fin:
@@ -187,8 +204,12 @@ class Measure:
             tsd = sd(times, tm)
 
             # %
-            pm = mean(lcperfs)
-            psd = sd(lcperfs, pm)
+            if len(lcperfs):
+                pm = mean(lcperfs)
+                psd = sd(lcperfs, pm)
+            else:
+                pm = 1
+                psd = 0
 
             # final
             fm = tm * pm
@@ -234,14 +255,15 @@ class Measure:
         N = 10
         times = {}
         lcperfs = {}
-        # stringsearch runs to fast, so we need to increase the
-        # sample frequency in its case
-        freq = 20000 if self.prog == "stringsearch" else None
+        # some benchs runs too fast, so we need to increase the
+        # sample frequency in this case
+        freq = 200000 if self.prog == "susan-corners" else None
         for prog in progs:
             if self.opts.verbose:
                 print("measuring", prog.name)
-            for i in range(N):
-                prog.perf_libc(freq=freq)
+            if self.opts.perf_libc:
+                for i in range(N):
+                    prog.perf_libc(freq=freq)
             for i in range(N):
                 prog.run(i)
             times[prog.mode] = prog.times
@@ -333,12 +355,22 @@ if __name__ == "__main__":
     parser.add_argument("--exp-rc", type=int, default=0,
         help="expected return code")
     parser.add_argument("--perf", action="store_true")
+    parser.add_argument("--freq", type=int,
+        help="perf sample frequency")
+    parser.add_argument("--no-perf-libc", action="store_true")
+    parser.add_argument("--no-perf", action="store_true",
+        help="don't use perf")
 
     args = parser.parse_args()
     sargs = [arg.strip() for arg in args.args]
+    if args.no_perf:
+        args.no_perf_libc = True
 
     # args.v = True
     opts = Options(args.stdin, args.v, args.exp_rc)
+    opts.freq = args.freq
+    opts.perf_libc = not args.no_perf_libc
+    opts.perf = not args.no_perf
     measure = Measure(args.dir, args.test, sargs, opts)
 
     if args.perf:
