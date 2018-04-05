@@ -194,6 +194,11 @@ clean:
         else:
             args_str = ''
 
+        mflags = self.mflags
+        if suffix:
+            if not mflags:
+                mflags = []
+            mflags.extend(["--id", self.name + '-' + suffix])
         fmtdata = {
             "measure":  TOOLS.measure,
             "dstdir":   self.dstdir,
@@ -201,7 +206,7 @@ clean:
             "suffix":   "-" + suffix if suffix else "",
             "args":     " " + args_str if args_str else "",
             "stdin":    " --stdin=" + self.stdin if self.stdin else "",
-            "mflags":   " " + " ".join(self.mflags) if self.mflags else "",
+            "mflags":   " " + " ".join(mflags) if mflags else "",
         }
 
         return """\
@@ -444,6 +449,28 @@ if __name__ == "__main__":
             sbtflags=stack_huge),
     ]
 
+    header = []
+
+    ispace = ["", "", ""]
+    l = ["Mibench Benchmarks", ""]
+    l.extend(["Native x86"] + ispace)
+    l.extend(["Globals"] + ispace)
+    l.extend(["Locals"] + ispace)
+    header.append(l)
+
+    tm = "Time"
+    tsd = "Time SD"
+    x = "Slowdown"
+    xsd = "Slowdown SD"
+    item = [tm, tsd, x, xsd]
+
+    l = ["Name", "Set"]
+    l.extend(item * 3)
+    header.append(l)
+
+    # footer = ["Geometric Average:", ""]
+
+    names = [b.name for b in benchs]
     txt = Bench.PROLOGUE
     for bench in benchs:
         txt = txt + bench.gen()
@@ -455,12 +482,20 @@ benchs: {}
 .PHONY: benchs-test
 benchs-test: benchs {}
 
+.PHONY: csv-header
+csv-header:
+\techo {} > mibench.csv
+\techo {} >> mibench.csv
+
 .PHONY: benchs-measure
-benchs-measure: benchs {}
+benchs-measure: benchs csv-header {}
+
 """.format(
-        " ".join([b.name for b in benchs]),
-        " ".join([b.name + "-test" for b in benchs]),
-        " ".join([b.name + "-measure" for b in benchs]),
+        " ".join(names),
+        " ".join([name + "-test" for name in names]),
+        ",".join(header[0]),
+        ",".join(header[1]),
+        " ".join([name + "-measure" for name in names]),
     )
 
     # write txt to Makefile

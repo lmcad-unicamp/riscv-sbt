@@ -20,6 +20,8 @@ class Options:
         self.freq = None
         self.perf_libc = True
         self.perf = True
+        self.csv = True
+        self.id = None
 
 
 class Program:
@@ -164,6 +166,10 @@ class Measure:
         self.prog = prog
         self.args = args
         self.opts = opts
+        if opts.id:
+            self.id = opts.id
+        else:
+            self.id = prog
 
 
     def measure(self):
@@ -186,13 +192,34 @@ class Measure:
 
 
     class Result:
+        # mode len
+        ml = 8
+
         # m: mean
         # sd: standard deviation
         # t: time
         # p: perf/percentage of total time spent on main bench code
         # f: final
 
-        def __init__(self, times, lcperfs):
+        class Field:
+            def __init__(self, m, sd, p):
+                self.m = m
+                self.sd = sd
+                self.p = p
+
+
+            def _to_str(self, v, align):
+                fmt = ("{{: <{}.{}f}}").format(
+                        self.p[0] if align else self.p[1], self.p[1])
+                return fmt.format(v)
+
+
+            def to_str_list(self, align=True):
+                return [ self._to_str(self.m, align),
+                         self._to_str(self.sd, align) ]
+
+
+        def __init__(self, mode, times, lcperfs):
             # functions' aliases
             mean = Measure.mean
             sd = Measure.sd
@@ -217,12 +244,12 @@ class Measure:
             fsd = fm * sqrt(sqr(tsd/tm) + sqr(psd/pm))
 
             # save results in self
-            self.tm = tm
-            self.tsd = tsd
-            self.pm = pm
-            self.psd = psd
-            self.fm = fm
-            self.fsd = fsd
+            self.mode = mode
+            Field = self.Field
+            self.t = Field(tm, tsd, [8, 5])
+            self.p = Field(pm, psd, [5, 2])
+            self.f = Field(fm, fsd, [8, 5])
+            self.x = Field(0, 0, [5, 2])
 
 
         @staticmethod
@@ -230,22 +257,42 @@ class Measure:
             return x*x
 
 
-        @staticmethod
-        def slowdown(res, nat):
-            if res == nat:
-                return (1, 0)
+        def slowdown(self, nat):
+            if self == nat:
+                self.x.m = 1
+                self.x.sd = 0
+                return
 
-            # time based only
-            time_based_only = False
-            if time_based_only:
-                return (1 + (res.tm - nat.tm) / nat.tm, 0)
-
-            sqr = Measure.Result.sqr
+            sqr = self.sqr
             sqrt = math.sqrt
 
-            m = res.fm / nat.fm
-            sd = m * sqrt(sqr(res.fsd/res.fm) + sqr(nat.fsd/nat.fm))
-            return (m, sd)
+            m = self.f.m / nat.f.m
+            sd = m * sqrt(sqr(self.f.sd/self.f.m) + sqr(nat.f.sd/nat.f.m))
+            self.x.m = m
+            self.x.sd = sd
+
+
+        def to_str_list(self, align=True):
+            p100 = self.p
+            p100.m = p100.m * 100
+            p100.sd = p100.sd * 100
+
+            l = (
+                self.t.to_str_list(align) +
+                p100.to_str_list(align) +
+                self.f.to_str_list(align) +
+                self.x.to_str_list(align))
+
+            if align:
+                mode_str = ("{:<" + str(self.ml) + "}").format(self.mode)
+            else:
+                mode_str = self.mode
+
+            return [mode_str] + l
+
+
+        def print(self):
+            print(" ".join(self.to_str_list()))
 
 
     def _measure_target(self, target):
@@ -255,15 +302,12 @@ class Measure:
         N = 10
         times = {}
         lcperfs = {}
-        # some benchs runs too fast, so we need to increase the
-        # sample frequency in this case
-        freq = 200000 if self.prog == "susan-corners" else None
         for prog in progs:
             if self.opts.verbose:
                 print("measuring", prog.name)
             if self.opts.perf_libc:
                 for i in range(N):
-                    prog.perf_libc(freq=freq)
+                    prog.perf_libc()
             for i in range(N):
                 prog.run(i)
             times[prog.mode] = prog.times
@@ -273,37 +317,55 @@ class Measure:
         nat = None
         Result = Measure.Result
 
-        # mode len
-        ml = 8
         # precisions
-        p = [
-                # times
-                8, 5, 8, 5,
-                # %'s
-                5, 2, 5, 2,
-                # final times
-                8, 5, 8, 5,
-                # slowdown
-                5, 2, 5, 2]
-        # caption lengths
-        l = [p[i] for i in range(0, len(p), 2)]
+        r = Result("", [1, 2], [])
+        l0 = [
+            r.t.p[0],
+            r.p.p[0],
+            r.f.p[0],
+            r.x.p[0]]
+        l = [i  for i in l0
+                for j in range(2)]
 
         # format strings
-        header = ("{{:<{}}} " + " {{:<{}}}"  * 8 + " ({{}})").format(ml, *l)
-        row =    ("{{:<{}}}:" + " {{: <{}.{}f}}" * 8).format(ml, *p)
+        header = ("{{:<{}}} " + "{{:<{}}} " * 8 + " ({{}})").format(
+                Result.ml, *l)
 
         print(header.format("mode",
             "tmean", "tsd", "%mean", "%sd", "mean", "sd",
-            "x", "xsd", self.prog))
+            "x", "xsd", self.id))
+        results = []
         for mode in ['native'] + SBT.modes:
-            res = Result(times[mode], lcperfs[mode])
+            res = Result(mode, times[mode], lcperfs[mode])
             if mode == 'native':
                 nat = res
 
-            (x, xsd) = Result.slowdown(res, nat)
-            print(row.format(mode,
-                res.tm, res.tsd, res.pm * 100, res.psd * 100, res.fm, res.fsd,
-                x, xsd))
+            res.slowdown(nat)
+            res.print()
+            results.append(res)
+
+        if self.opts.csv:
+            self._csv_append(results)
+
+
+    def _csv_append(self, results):
+        dir = os.path.split(self.dir)[0]
+        if self.prog.startswith("adpcm"):
+            dir = os.path.split(dir)[0]
+            dir = os.path.split(dir)[1]
+        else:
+            dir = os.path.split(dir)[1]
+
+
+        align = False
+        row = [self.id, dir]
+        for res in results:
+            l = (res.f.to_str_list(align) +
+                 res.x.to_str_list(align))
+            row.extend(l)
+
+        with open("mibench.csv", "a") as f:
+            f.write(",".join(row) + "\n")
 
 
     def _perf_target(self, target):
@@ -360,6 +422,9 @@ if __name__ == "__main__":
     parser.add_argument("--no-perf-libc", action="store_true")
     parser.add_argument("--no-perf", action="store_true",
         help="don't use perf")
+    parser.add_argument("--no-csv", action="store_true",
+        help="don't append output to .csv file")
+    parser.add_argument("--id", type=str)
 
     args = parser.parse_args()
     sargs = [arg.strip() for arg in args.args]
@@ -371,6 +436,8 @@ if __name__ == "__main__":
     opts.freq = args.freq
     opts.perf_libc = not args.no_perf_libc
     opts.perf = not args.no_perf
+    opts.csv = not args.no_csv
+    opts.id = args.id
     measure = Measure(args.dir, args.test, sargs, opts)
 
     if args.perf:
