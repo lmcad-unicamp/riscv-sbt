@@ -23,23 +23,23 @@ int main(void)
   SolveCubic(a1, b1, c1, d1, &solutions, x);  
   printf("Solutions:");
   for(i=0;i<solutions;i++)
-    printf(" %f",x[i]);
+    printf("%d %lf",0, x[i]);
   printf("\n");
   /* should get 1 solution: 2.5           */
   SolveCubic(a2, b2, c2, d2, &solutions, x);  
   printf("Solutions:");
   for(i=0;i<solutions;i++)
-    printf(" %f",x[i]);
+    printf("%d %lf",0, x[i]);
   printf("\n");
   SolveCubic(a3, b3, c3, d3, &solutions, x);
   printf("Solutions:");
   for(i=0;i<solutions;i++)
-    printf(" %f",x[i]);
+    printf("%d %lf",0, x[i]);
   printf("\n");
   SolveCubic(a4, b4, c4, d4, &solutions, x);
   printf("Solutions:");
   for(i=0;i<solutions;i++)
-    printf(" %f",x[i]);
+    printf("%d %lf",0, x[i]);
   printf("\n");
   /* Now solve some random equations */
   for(a1=1;a1<10;a1++) {
@@ -49,7 +49,7 @@ int main(void)
 	  SolveCubic(a1, b1, c1, d1, &solutions, x);  
 	  printf("Solutions:");
 	  for(i=0;i<solutions;i++)
-	    printf(" %f",x[i]);
+            printf("%d %lf",0, x[i]);
 	  printf("\n");
 	}
       }
@@ -73,12 +73,15 @@ int main(void)
 
   printf("********* ANGLE CONVERSION ***********\n");
   /* convert some rads to degrees */
-  for (X = 0.0; X <= 360.0; X += 1.0)
-    printf("%3.0f degrees = %.12f radians\n", X, deg2rad(X));
+  for (X = 0.0; X <= 360.0; X += 1.0) {
+    printf("%d %3.0lf degrees = ", 0, X);
+    printf("%d %.12lf radians\n", 0, deg2rad(X));
+  }
   puts("");
-  for (X = 0.0; X <= (2 * PI + 1e-6); X += (PI / 180))
-    printf("%.12f radians = %3.0f degrees\n", X, rad2deg(X));
-  
+  for (X = 0.0; X <= (2 * PI + 1e-6); X += (PI / 180)) {
+    printf("%d %.12lf radians = ", 0, X);
+    printf("%d %3.0lf degrees\n", 0, rad2deg(X));
+  }
   
   return 0;
 }

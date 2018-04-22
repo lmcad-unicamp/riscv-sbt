@@ -19,8 +19,10 @@ Types::Types(llvm::LLVMContext& ctx) :
     voidFunc(llvm::FunctionType::get(voidT, !VAR_ARG)),
     fp32(llvm::Type::getFloatTy(ctx)),
     fp64(llvm::Type::getDoubleTy(ctx)),
+    fp128(llvm::Type::getFP128Ty(ctx)),
     fp32ptr(llvm::Type::getFloatPtrTy(ctx)),
-    fp64ptr(llvm::Type::getDoublePtrTy(ctx))
+    fp64ptr(llvm::Type::getDoublePtrTy(ctx)),
+    fp128ptr(llvm::Type::getFP128PtrTy(ctx))
 {}
 
 }

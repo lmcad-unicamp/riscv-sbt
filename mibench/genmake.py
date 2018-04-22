@@ -427,7 +427,7 @@ if __name__ == "__main__":
             .set_asc_index([0, 1])
             .set_dec_index([1, 2]),
         Bench("basicmath", "automotive/basicmath",
-            ["basicmath_large.c", "rad2deg.c", "cubic.c", "isqrt.c"]),
+            ["basicmath_large.c", "rad2deg.c", "cubic.c", "isqrt.c"], dbg=True),
         CustomTestBench("bitcount", "automotive/bitcount",
             ["bitcnt_1.c", "bitcnt_2.c", "bitcnt_3.c", "bitcnt_4.c",
                 "bitcnts.c", "bitfiles.c", "bitstrng.c", "bstr_i.c"],

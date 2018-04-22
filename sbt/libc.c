@@ -72,6 +72,28 @@ F(_IO_putc)
 F(__ctype_tolower_loc)
 F(__ctype_toupper_loc)
 
+// soft float
+
+long double __extenddftf2(double);
+F(__extenddftf2)
+
+double __trunctfdf2(long double);
+F(__trunctfdf2)
+
+long double __addtf3(long double, long double);
+F(__addtf3)
+
+long double __subtf3(long double, long double);
+F(__subtf3)
+
+long double __multf3(long double, long double);
+F(__multf3)
+
+long double __divtf3(long double, long double);
+F(__divtf3)
+
+int __lttf2(long double, long double);
+F(__lttf2)
 
 // runtime
 

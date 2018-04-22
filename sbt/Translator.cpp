@@ -266,6 +266,45 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
 }
 
 
+llvm::Value*
+Translator::i32x2ToFP64(Builder* bld, llvm::Value* lo, llvm::Value* hi)
+{
+    llvm::Value* vlo = bld->zext64(lo);
+    llvm::Value* vhi = bld->zext64(hi);
+    vhi = bld->sll(vhi, _ctx->c.i64(32));
+    // merge hi and low
+    llvm::Value* v = bld->_or(vhi, vlo);
+    // then finally cast to double
+    v = bld->bitOrPointerCast(v, _ctx->t.fp64);
+    return v;
+}
+
+
+std::pair<llvm::Value*, llvm::Value*>
+Translator::fp64ToI32x2(Builder* bld, llvm::Value* f)
+{
+    llvm::Value* v = bld->bitOrPointerCast(f, _ctx->t.i64);
+    llvm::Value* vlo = bld->truncOrBitCastI32(v);
+    llvm::Value* vhi = bld->srl(v, _ctx->c.i64(32));
+    vhi = bld->truncOrBitCastI32(vhi);
+    return std::make_pair(vlo, vhi);
+}
+
+
+llvm::Value* Translator::refToFP128(Builder* bld, llvm::Value* ref)
+{
+    llvm::Value* ptr = bld->bitOrPointerCast(ref, _ctx->t.fp128ptr);
+    return bld->load(ptr);
+}
+
+
+void Translator::fp128ToRef(Builder* bld, llvm::Value* f, llvm::Value* ref)
+{
+    llvm::Value* ptr = bld->bitOrPointerCast(ref, _ctx->t.fp128ptr);
+    bld->store(f, ptr);
+}
+
+
 void Translator::genICaller()
 {
     DBGF("entry");
@@ -367,9 +406,22 @@ void Translator::genICaller()
             continue;
         }
 
-        // set args
+        // get pointer to function
+        llvm::PointerType* fty = llft->getPointerTo();
+        llvm::Value* fptr = bld->bitOrPointerCast(sym, fty);
+        // get return type
+        llvm::Type* retty = llft->getReturnType();
+        llvm::Value* retref = nullptr;
+        // get args
         auto argit = ic->arg_begin();
-        argit++;    // skip target
+        ++argit;    // skip target
+
+        // types > 2xi32 are returned by ref and the address is passed by the
+        // caller in the first argument
+        if (retty->isFP128Ty())
+            retref = &*argit++;
+
+        // set args
         for (size_t i = 0; i < totalArgs; i++, ++argit) {
             llvm::Value* v = &*argit;
             llvm::Type* ty = i < fixedArgs? llft->getParamType(i) : t.i32;
@@ -382,58 +434,38 @@ void Translator::genICaller()
                 DBG(ty->dump());
                 DBGS.flush();
 
-                // handle cast to double
-                if (ty->isDoubleTy()) {
-                    // v = low word
-                    v = bld->zext64(v);
-                    ++argit;
-                    // hi = uint64(high word) << 32
-                    llvm::Value *hi = &*argit;
-                    hi = bld->zext64(hi);
-                    hi = bld->sll(hi, c.i64(32));
-                    // merge hi and low
-                    v = bld->_or(hi, v);
-                    // then finally cast to double
+                if (ty->isDoubleTy())
+                    v = i32x2ToFP64(bld, v, &*++argit);
+                // long double: by ref
+                else if (ty->isFP128Ty())
+                    v = refToFP128(bld, v);
+                else
                     v = bld->bitOrPointerCast(v, ty);
-                // all other type casts
-                } else {
-                    v = bld->bitOrPointerCast(v, ty);
-                }
             }
 
             args.push_back(v);
         }
 
         // call
-        llvm::PointerType* ty = llft->getPointerTo();
-        llvm::Value* fptr = bld->bitOrPointerCast(sym, ty);
-        if (llft->getReturnType()->isVoidTy()) {
+        if (retty->isVoidTy()) {
             bld->call(fptr, args);
         // write return value into x10/x11 for libc functions
         } else {
+            // ret: ret will be set if value is returned by ref
             xassert(isExternal);
             llvm::Value* ret = bld->call(fptr, args);
-            llvm::Type* retty = ret->getType();
-            bool retIs64b = false;
-            if (retty != t.i32) {
-                if (retty->isDoubleTy()) {
-                    retIs64b = true;
-                    ret = bld->bitOrPointerCast(ret, t.i64);
-                } else {
-                    ret = bld->bitOrPointerCast(ret, t.i32);
-                }
-            }
-
-            if (retIs64b) {
-                llvm::Value* vlo = bld->truncOrBitCastI32(ret);
-                llvm::Value* vhi = bld->srl(ret, c.i64(32));
-                vhi = bld->truncOrBitCastI32(vhi);
-
+            if (retty->isDoubleTy()) {
+                auto p = fp64ToI32x2(bld, ret);
                 auto& reglo = _ctx->x->getReg(XRegister::A0);
                 auto& reghi = _ctx->x->getReg(XRegister::A1);
-                bld->store(vlo, reglo.getForWrite());
-                bld->store(vhi, reghi.getForWrite());
+                bld->store(p.first, reglo.getForWrite());
+                bld->store(p.second, reghi.getForWrite());
+            } else if (retty->isFP128Ty()) {
+                xassert(retref);
+                fp128ToRef(bld, ret, retref);
             } else {
+                if (retty != t.i32)
+                    ret = bld->bitOrPointerCast(ret, t.i32);
                 auto& reg = _ctx->x->getReg(XRegister::A0);
                 bld->store(ret, reg.getForWrite());
             }

@@ -31,8 +31,10 @@ public:
 
   llvm::Type* fp32;
   llvm::Type* fp64;
+  llvm::Type* fp128;
   llvm::Type* fp32ptr;
   llvm::Type* fp64ptr;
+  llvm::Type* fp128ptr;
 
   Types(llvm::LLVMContext& ctx);
 };

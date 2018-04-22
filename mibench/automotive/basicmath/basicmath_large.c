@@ -20,7 +20,7 @@ int main(void)
   SolveCubic(a1, b1, c1, d1, &solutions, x);  
   printf("Solutions:");
   for(i=0;i<solutions;i++)
-    printf(" %f",x[i]);
+    printf("%d %lf",0, x[i]);
   printf("\n");
 
   a1 = 1.0; b1 = -4.5; c1 = 17.0; d1 = -30.0;
@@ -28,49 +28,49 @@ int main(void)
   SolveCubic(a1, b1, c1, d1, &solutions, x);  
   printf("Solutions:");
   for(i=0;i<solutions;i++)
-    printf(" %f",x[i]);
+    printf("%d %lf",0, x[i]);
   printf("\n");
 
   a1 = 1.0; b1 = -3.5; c1 = 22.0; d1 = -31.0;
   SolveCubic(a1, b1, c1, d1, &solutions, x);
   printf("Solutions:");
   for(i=0;i<solutions;i++)
-    printf(" %f",x[i]);
+    printf("%d %lf",0, x[i]);
   printf("\n");
 
   a1 = 1.0; b1 = -13.7; c1 = 1.0; d1 = -35.0;
   SolveCubic(a1, b1, c1, d1, &solutions, x);
   printf("Solutions:");
   for(i=0;i<solutions;i++)
-    printf(" %f",x[i]);
+    printf("%d %lf",0, x[i]);
   printf("\n");
 
   a1 = 3.0; b1 = 12.34; c1 = 5.0; d1 = 12.0;
   SolveCubic(a1, b1, c1, d1, &solutions, x);
   printf("Solutions:");
   for(i=0;i<solutions;i++)
-    printf(" %f",x[i]);
+    printf("%d %lf",0, x[i]);
   printf("\n");
 
   a1 = -8.0; b1 = -67.89; c1 = 6.0; d1 = -23.6;
   SolveCubic(a1, b1, c1, d1, &solutions, x);
   printf("Solutions:");
   for(i=0;i<solutions;i++)
-    printf(" %f",x[i]);
+    printf("%d %lf",0, x[i]);
   printf("\n");
 
   a1 = 45.0; b1 = 8.67; c1 = 7.5; d1 = 34.0;
   SolveCubic(a1, b1, c1, d1, &solutions, x);
   printf("Solutions:");
   for(i=0;i<solutions;i++)
-    printf(" %f",x[i]);
+    printf("%d %lf",0, x[i]);
   printf("\n");
 
   a1 = -12.0; b1 = -1.7; c1 = 5.3; d1 = 16.0;
   SolveCubic(a1, b1, c1, d1, &solutions, x);
   printf("Solutions:");
   for(i=0;i<solutions;i++)
-    printf(" %f",x[i]);
+    printf("%d %lf",0, x[i]);
   printf("\n");
 
   /* Now solve some random equations */
@@ -81,7 +81,7 @@ int main(void)
 		SolveCubic(a1, b1, c1, d1, &solutions, x);  
 		printf("Solutions:");
 		for(i=0;i<solutions;i++)
-		  printf(" %f",x[i]);
+                  printf("%d %lf",0, x[i]);
 		printf("\n");
 	   }
       }
@@ -111,12 +111,17 @@ int main(void)
   printf("********* ANGLE CONVERSION ***********\n");
   /* convert some rads to degrees */
 /*   for (X = 0.0; X <= 360.0; X += 1.0) */
-  for (X = 0.0; X <= 360.0; X += .001)
-    printf("%3.0f degrees = %.12f radians\n", X, deg2rad(X));
+  for (X = 0.0; X <= 360.0; X += .001) {
+    printf("%d %3.0lf degrees = ", 0, X);
+    printf("%d %.12lf radians\n", 0, deg2rad(X));
+  }
+
   puts("");
 /*   for (X = 0.0; X <= (2 * PI + 1e-6); X += (PI / 180)) */
-  for (X = 0.0; X <= (2 * PI + 1e-6); X += (PI / 5760))
-    printf("%.12f radians = %3.0f degrees\n", X, rad2deg(X));
+  for (X = 0.0; X <= (2 * PI + 1e-6); X += (PI / 5760)) {
+    printf("%d %.12lf radians = ", 0, X);
+    printf("%d %3.0lf degrees\n", 0, rad2deg(X));
+  }
   
   
   return 0;

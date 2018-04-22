@@ -42,7 +42,7 @@ double  fibo(unsigned short term);                    /* Fibo.C         */
 double  frandom(int n);                               /* Frand.C        */
 double  ipow(double x, int n);                        /* Ipow.C         */
 int     ispow2(int x);                                /* Ispow2.C       */
-double  ldfloor(double a);                            /* Ldfloor.C      */
+long    double ldfloor(long double a);                /* Ldfloor.C      */
 int     initlogscale(long dmax, long rmax);           /* Logscale.C     */
 long    logscale(long d);                             /* Logscale.C     */
 

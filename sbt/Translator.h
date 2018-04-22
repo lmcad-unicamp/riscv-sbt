@@ -150,6 +150,13 @@ private:
     // gen indirect function caller
     void genICaller();
     void genIsExternal();
+
+    // helpers
+    llvm::Value* i32x2ToFP64(Builder* bld, llvm::Value* lo, llvm::Value* hi);
+    std::pair<llvm::Value*, llvm::Value*>
+        fp64ToI32x2(Builder* bld, llvm::Value* f);
+    llvm::Value* refToFP128(Builder* bld, llvm::Value* ref);
+    void fp128ToRef(Builder* bld, llvm::Value* f, llvm::Value* ref);
 };
 
 } // sbt
