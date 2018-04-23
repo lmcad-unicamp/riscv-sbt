@@ -10,11 +10,14 @@
 #include "Syscall.h"
 #include "Translator.h"
 
+#include <llvm/IR/InlineAsm.h>
 #include <llvm/Support/FormatVariadic.h>
 
 // LLVM internal instruction info
 #define GET_INSTRINFO_ENUM
 #include <llvm/Target/RISCV/RISCVGenInstrInfo.inc>
+
+#include <cstring>
 
 #undef ENABLE_DBGS
 #define ENABLE_DBGS 1
@@ -1730,16 +1733,52 @@ static std::string getMDName(const llvm::StringRef& s)
     return ss.str();
 }
 
+static char g_dbgComments[1024*1024];
+static int g_dbgCommentsIdx = 0;
 
 void Instruction::dbgprint()
 {
-    DBGS << _ss->str() << nl;
+    std::string dbgstr = _ss->str();
+    DBGS << dbgstr << nl;
     llvm::MDNode* n = llvm::MDNode::get(*_ctx->ctx,
         llvm::MDString::get(*_ctx->ctx, "RISC-V Instruction"));
-    std::string mdname = getMDName(_ss->str());
+    std::string mdname = getMDName(dbgstr);
     // DBGF("mdname={0}, n={1:X+8}, first={2:X+8}", mdname, n, _bld->first());
     xassert(_bld->first());
     _bld->first()->setMetadata(mdname, n);
+
+    // don't add inline asm comments on terminated functions/BBs
+    if (!_ctx->func ||
+        //_ctx->func->terminated() ||
+        !_ctx->bld->getInsertBlock())
+        //_ctx->bld->getInsertBlock()->terminated())
+        return;
+
+    // build comment string
+    dbgstr = "# " + mdname;
+    xassert(g_dbgCommentsIdx + dbgstr.size() + 1 < sizeof(g_dbgComments) &&
+        "g_dbgComments overflow!");
+    char* s = &g_dbgComments[g_dbgCommentsIdx];
+    strcpy(s, dbgstr.c_str());
+    g_dbgCommentsIdx += dbgstr.size() + 1;
+
+    // save current insert point
+    auto* builder = _ctx->builder;
+    auto* bb = builder->GetInsertBlock();
+    auto ip = builder->GetInsertPoint();
+
+    // insert before first instruction
+    builder->SetInsertPoint(_bld->first());
+
+    llvm::InlineAsm* iasm =
+        llvm::InlineAsm::get(_t->voidFunc, s, ""/*constraints*/,
+                false/*hasSideEffects*/, false/*isAlignStack*/);
+    _ctx->builder->CreateCall(iasm);
+
+    // restore insert point
+    builder->SetInsertPoint(bb, ip);
+
+    //_ctx->module->appendModuleInlineAsm(s);
 }
 
 #else
