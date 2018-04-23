@@ -35,7 +35,7 @@ ENV MAKE_OPTS=-j2
 RUN git reset --hard
 
 # XXX fast update
-# RUN git checkout unstable && git pull
+RUN git checkout unstable && git pull
 
 ### SBT ###
 
