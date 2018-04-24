@@ -64,6 +64,7 @@ class Tools:
         self.dis        = "llvm-dis"
         self.link       = "llvm-link"
         self.mc         = "llvm-mc"
+        self.objdump    = "riscv64-unknown-linux-gnu-objdump"
 
         self.build      = path(DIR.auto, "build.py")
         self.run        = path(DIR.auto, "run.py")

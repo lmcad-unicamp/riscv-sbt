@@ -5,6 +5,7 @@ from auto.utils import *
 
 import argparse
 import os
+import re
 import sys
 
 
@@ -139,8 +140,15 @@ def _s2o(arch, srcdir, dstdir, _in, out, opts):
     # generated object file, that would otherwise be fixed only later,
     # at link stage, after it's done with relaxing.
     else:
+        # preserve rv32 source code for debug, by not mixing in
+        # assembly source together
+        if opts.dbg and arch != RV32_LINUX:
+            flags = "-g"
+        else:
+            flags = ""
+
         flags = cat(
-            "-g" if opts.dbg else "",
+            flags,
             opts.sflags,
             "-arch=" + arch.march,
             "-mattr=" + arch.mattr)
@@ -155,7 +163,6 @@ def _s2o(arch, srcdir, dstdir, _in, out, opts):
         #shell(R"printf '\x04\x00\x00\x00' | " +
         #    "dd of=" + opath + " bs=1 seek=$((0x24)) count=4 conv=notrunc" +
         #    " >/dev/null 2>&1")
-
 
 
 def _link(arch, srcdir, dstdir, ins, out, opts):
@@ -198,6 +205,38 @@ def _cnlink(arch, srcdir, dstdir, ins, out, opts):
     _link(arch, dstdir, dstdir, [o], out, opts)
 
 
+def addr2src(dstdir, src, out):
+    with open(path(dstdir, src)) as fin:
+        with open(path(dstdir, out + ".a2s"), "w") as fout:
+            patt = re.compile('([ 0-9a-f]{8}):\t')
+            lns = []
+            for ln in fin:
+                m = patt.match(ln)
+                if m:
+                    if lns:
+                        addr = int(m.group(1), 16)
+                        # print("[{:04X}]:".format(addr))
+                        fout.write("[{:04X}]:\n".format(addr))
+                        for l in lns:
+                            #print(l, end='')
+                            fout.write(l)
+                        lns = []
+                else:
+                    lns.append(ln)
+
+
+def _gen_list(dstdir, out):
+    ipath = path(dstdir, out + ".o")
+    ofile = out + ".list"
+    opath = path(dstdir, ofile)
+
+    cmd = cat(TOOLS.objdump, "-S",
+        ipath, ">", opath)
+    shell(cmd)
+
+    addr2src(dstdir, ofile, out)
+
+
 def build(arch, srcdir, dstdir, ins, out, opts):
     """ *.c/*.s -> bin """
     # create dstdir if needed
@@ -207,6 +246,9 @@ def build(arch, srcdir, dstdir, ins, out, opts):
         _snlink(arch, srcdir, dstdir, ins, out, opts)
     else:
         _cnlink(arch, srcdir, dstdir, ins, out, opts)
+
+    if opts.dbg and arch == RV32_LINUX:
+        _gen_list(dstdir, out)
 
 
 ### main ###
@@ -227,6 +269,7 @@ if __name__ == "__main__":
         help="optional SBT native objs to link with")
     parser.add_argument("--as", dest="_as", help="assembler to use: as || mc",
         default="mc")
+    parser.add_argument("--addr2src", action='store_true')
 
     args = parser.parse_args()
 
@@ -250,5 +293,9 @@ if __name__ == "__main__":
     opts.ldflags = cat(*[SBT.nat_obj(arch, o, opts) for o in args.sbtobjs])
     opts._as = args._as
 
+    # addr2src
+    if args.addr2src:
+        addr2src(dstdir, first, out)
     # build
-    build(arch, srcdir, dstdir, ins, out, opts)
+    else:
+        build(arch, srcdir, dstdir, ins, out, opts)
