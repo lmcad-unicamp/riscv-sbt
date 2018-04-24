@@ -57,6 +57,9 @@ AddressToSource::AddressToSource(const std::string& path, llvm::Error& err)
         {
             if (idx > 0) {
                 DBGS << llvm::formatv("[{0:X+8}]:\n{1}", addr, code);
+                // remove last \n, as llvm will add another one at the end
+                if (*code.rbegin() == '\n')
+                    code.resize(code.size()-1);
                 _a2s.insert({addr, code});
                 code.clear();
             }
@@ -71,7 +74,7 @@ AddressToSource::AddressToSource(const std::string& path, llvm::Error& err)
 
         // else ln is source code
         } else {
-            code += ln.str();
+            code += (ln.size() == 1? "#" : "# ") + ln.str();
         }
 
         idx += n;

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from auto.build import *
+import auto.utils
 
 import argparse
 
@@ -11,7 +12,24 @@ def _translate_obj(arch, dir, _in, out, opts):
     opath = path(dir, out)
     flags = cat(SBT.flags, opts.sbtflags)
 
-    log = DIR.top + "/junk/" + chsuf(out, ".log")
+    if opts.dbg:
+        # strip arch prefix
+        prefix = arch.add_prefix("")
+        prefix = RV32_LINUX.add_prefix(prefix)
+        base = out[len(prefix):]
+        # strip suffix
+        base = auto.utils.chsuf(base, "")
+        # strip mode
+        p = base.rfind("-")
+        if p != -1:
+            base = base[:p]
+        # add rv32 prefix and .a2s suffix
+        a2s = RV32_LINUX.add_prefix(base) + ".a2s"
+        flags = cat(flags, "-a2s", path(dir, a2s))
+
+    logdir = DIR.top + "/junk"
+    auto.utils.mkdir_if_needed(logdir)
+    log = path(logdir, chsuf(out, ".log"))
 
     cmd = "riscv-sbt {} {} -o {} >{} 2>&1".format(
         flags, ipath, opath, log)

@@ -1,5 +1,6 @@
 #include "Instruction.h"
 
+#include "AddressToSource.h"
 #include "BasicBlock.h"
 #include "Builder.h"
 #include "Context.h"
@@ -1754,14 +1755,6 @@ void Instruction::dbgprint()
         //_ctx->bld->getInsertBlock()->terminated())
         return;
 
-    // build comment string
-    dbgstr = "# " + mdname;
-    xassert(g_dbgCommentsIdx + dbgstr.size() + 1 < sizeof(g_dbgComments) &&
-        "g_dbgComments overflow!");
-    char* s = &g_dbgComments[g_dbgCommentsIdx];
-    strcpy(s, dbgstr.c_str());
-    g_dbgCommentsIdx += dbgstr.size() + 1;
-
     // save current insert point
     auto* builder = _ctx->builder;
     auto* bb = builder->GetInsertBlock();
@@ -1770,10 +1763,26 @@ void Instruction::dbgprint()
     // insert before first instruction
     builder->SetInsertPoint(_bld->first());
 
-    llvm::InlineAsm* iasm =
-        llvm::InlineAsm::get(_t->voidFunc, s, ""/*constraints*/,
-                false/*hasSideEffects*/, false/*isAlignStack*/);
-    _ctx->builder->CreateCall(iasm);
+    auto addAsm = [this] (llvm::StringRef s) {
+        llvm::InlineAsm* iasm =
+            llvm::InlineAsm::get(_t->voidFunc, s, ""/*constraints*/,
+                    false/*hasSideEffects*/, false/*isAlignStack*/);
+        _ctx->builder->CreateCall(iasm);
+    };
+
+    // add source code
+    const std::string& code = _ctx->a2s? _ctx->a2s->lookup(_addr) : "";
+    if (!code.empty())
+        addAsm(code);
+
+    // build comment string
+    dbgstr = "# " + dbgstr;
+    xassert(g_dbgCommentsIdx + dbgstr.size() + 1 < sizeof(g_dbgComments) &&
+        "g_dbgComments overflow!");
+    char* s = &g_dbgComments[g_dbgCommentsIdx];
+    strcpy(s, dbgstr.c_str());
+    g_dbgCommentsIdx += dbgstr.size() + 1;
+    addAsm(s);
 
     // restore insert point
     builder->SetInsertPoint(bb, ip);
