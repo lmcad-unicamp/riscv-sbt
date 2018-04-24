@@ -12,6 +12,7 @@
 
 namespace sbt {
 
+class AddressToSource;
 class Builder;
 class Disassembler;
 class FRegister;
@@ -89,6 +90,8 @@ public:
   // function maps
   Map<std::string, FunctionPtr>* _func = nullptr;
   Map<uint64_t, Function*>* _funcByAddr = nullptr;
+  //
+  const AddressToSource* a2s = nullptr;
 
   // get function by name
   Function* funcByName(const std::string& name, bool assertNotNull = true) const

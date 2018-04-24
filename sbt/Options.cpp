@@ -26,6 +26,7 @@ void Options::dump() const
     DBGS << "useLibC=" << useLibC() << nl;
     DBGS << "stackSize=" << stackSize() << nl;
     DBGS << "syncFRegs=" << syncFRegs() << nl;
+    DBGS << "a2s=" << a2s() << nl;
 }
 
 }

@@ -1,6 +1,8 @@
 #ifndef SBT_OPTIONS_H
 #define SBT_OPTIONS_H
 
+#include <string>
+
 #include <cstdint>
 
 namespace sbt {
@@ -49,6 +51,17 @@ public:
         return *this;
     }
 
+    const std::string& a2s() const
+    {
+        return _a2s;
+    }
+
+    Options& setA2S(const std::string& file)
+    {
+        _a2s = file;
+        return *this;
+    }
+
     void dump() const;
 
 private:
@@ -56,6 +69,7 @@ private:
     bool _useLibC;
     std::size_t _stackSize;
     bool _syncFRegs = true;
+    std::string _a2s;
 };
 
 }

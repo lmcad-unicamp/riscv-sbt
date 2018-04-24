@@ -163,6 +163,9 @@ int main(int argc, char* argv[])
 {
     // options
     namespace cl = llvm::cl;
+
+    cl::ResetCommandLineParser();
+
     cl::list<std::string> inputFiles(
             cl::Positional,
             cl::desc("<input object files>"),
@@ -170,7 +173,7 @@ int main(int argc, char* argv[])
 
     cl::opt<std::string> outputFileOpt(
             "o",
-            cl::desc("output filename"));
+            cl::desc("Output filename"));
 
     cl::opt<std::string> regsOpt(
         "regs",
@@ -191,14 +194,25 @@ int main(int argc, char* argv[])
         cl::desc("Stack size"),
         cl::init("4096"));
 
-    cl::opt<bool> testOpt("test");
+    cl::opt<std::string> a2sOpt("a2s",
+        cl::desc("Address to source file to be used to insert source "
+            "C code on generated assembly code"));
 
     // enable debug code
-    // (-debug is used by LLVM already)
-    cl::opt<bool> debugOpt("x");
+    cl::opt<bool> debugOpt("debug", cl::desc("Enable debug code"));
+
+    cl::opt<bool> testOpt("test", cl::desc("For testing purposes only"));
+
+    cl::opt<bool> helpOpt("help",
+        cl::desc("Print this help message"));
 
     // parse args
     cl::ParseCommandLineOptions(argc, argv);
+
+    if (helpOpt) {
+        cl::PrintHelpMessage();
+        return EXIT_SUCCESS;
+    }
 
     sbt::g_debug = debugOpt;
 
@@ -241,7 +255,8 @@ int main(int argc, char* argv[])
 
     // create SBT
     sbt::Options opts(regs, !dontUseLibCOpt, std::atol(stackSizeOpt.c_str()));
-    opts.setSyncFRegs(!dontSyncFRegsOpt);
+    opts.setSyncFRegs(!dontSyncFRegsOpt)
+        .setA2S(a2sOpt);
     auto exp = sbt::create<sbt::SBT>(inputFiles, outputFile, opts);
     if (!exp)
         sbt::handleError(exp.takeError());

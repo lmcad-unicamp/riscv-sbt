@@ -1,5 +1,6 @@
 #include "Translator.h"
 
+#include "AddressToSource.h"
 #include "Builder.h"
 #include "Disassembler.h"
 #include "FRegister.h"
@@ -94,6 +95,13 @@ llvm::Error Translator::start()
     // - doesn't depend on C environment
     _sbtabort.reset(new Function(_ctx, "sbtabort"));
     _sbtabort->create();
+
+    // address to source
+    auto expA2S = sbt::create<AddressToSource*>(_opts.a2s());
+    if (!expA2S)
+        return expA2S.takeError();
+    _a2s.reset(expA2S.get());
+    _ctx->a2s = &*_a2s;
 
     return llvm::Error::success();
 }

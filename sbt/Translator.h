@@ -139,6 +139,8 @@ private:
     FunctionPtr _getTime;
     FunctionPtr _getInstRet;
 
+    //
+    std::unique_ptr<AddressToSource> _a2s;
 
     // methods
 
