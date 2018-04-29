@@ -9,6 +9,7 @@ class Tests():
         self.xarchs = [(RV32_LINUX, X86)]
         self.srcdir = path(DIR.top, "test/sbt")
         self.dstdir = path(DIR.build, "test/sbt")
+        self.sbtdir = path(DIR.top, "sbt")
         self.txt = None
 
 
@@ -46,11 +47,25 @@ x86-syscall-test: {dstdir}/x86-syscall-test
 x86-syscall-test-run:
 	{run} --arch x86 --dir {dstdir} x86-syscall-test
 
+### x86-fp128 ###
+
+.PHONY: x86-fp128
+x86-fp128: {dstdir}/x86-fp128
+
+{dstdir}/x86-fp128: {srcdir}/x86-fp128.c
+	{build} --arch x86 --srcdir {srcdir} --dstdir {dstdir} x86-fp128.c \
+            -o x86-fp128 --cflags="-I{sbtdir}" --dbg
+
+.PHONY: x86-fp128-run
+x86-fp128-run:
+	{run} --arch x86 --dir {dstdir} x86-fp128
+
 """.format(**{
         "build":    TOOLS.build,
         "run":      TOOLS.run,
         "srcdir":   self.srcdir,
         "dstdir":   self.dstdir,
+        "sbtdir":   self.sbtdir,
         })
 
 
@@ -87,7 +102,7 @@ x86-syscall-test-run:
 ### tests targets ###
 
 .PHONY: tests
-tests: x86-syscall-test {names}
+tests: x86-syscall-test x86-fp128 {names}
 
 .PHONY: tests-run
 tests-run: tests x86-syscall-test-run {tests}

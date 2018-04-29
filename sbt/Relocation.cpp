@@ -157,7 +157,8 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
         auto expAddr =_ctx->translator->import(sym->name());
         if (!expAddr)
             return expAddr.takeError();
-        uint64_t saddr = expAddr.get();
+        uint64_t saddr = expAddr.get().first;
+        const std::string& xfunc = expAddr.get().second;
 
         // data
         if (saddr == SYM_TYPE_DATA) {
@@ -174,7 +175,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
         }
 
         if (os)
-            *os << sym->name();
+            *os << xfunc;
 
     // internal function or label case
     // FIXME this part is still a best effort to try to find out if

@@ -1,3 +1,5 @@
+#include "Runtime.h"
+
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
@@ -74,30 +76,16 @@ F(__ctype_toupper_loc)
 
 // soft float
 
-long double __extenddftf2(double);
 F(__extenddftf2)
-
-double __trunctfdf2(long double);
 F(__trunctfdf2)
-
-long double __addtf3(long double, long double);
-F(__addtf3)
-
-long double __subtf3(long double, long double);
-F(__subtf3)
-
-long double __multf3(long double, long double);
-F(__multf3)
-
-long double __divtf3(long double, long double);
-F(__divtf3)
-
-int __lttf2(long double, long double);
+F(sbt__addtf3)
+F(sbt__subtf3)
+F(sbt__multf3)
+F(sbt__divtf3)
 F(__lttf2)
 
 // runtime
 
-int sbt_printf_d(const char*, double);
 F(sbt_printf_d)
 
 // data

@@ -29,6 +29,8 @@
 #include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
 
+#include <map>
+
 #undef ENABLE_DBGS
 #define ENABLE_DBGS 1
 #include "Debug.h"
@@ -217,12 +219,32 @@ llvm::Error Translator::translate()
     return llvm::Error::success();
 }
 
+static std::map<std::string, std::string> g_funcSubst = {
+    {"__addtf3", "sbt__addtf3"},
+    {"__subtf3", "sbt__subtf3"},
+    {"__multf3", "sbt__multf3"},
+    {"__divtf3", "sbt__divtf3"}
+};
 
-llvm::Expected<uint64_t> Translator::import(const std::string& func)
+llvm::Expected<std::pair<uint64_t, std::string>>
+Translator::import(const std::string& func)
 {
+    using RetT = llvm::Expected<std::pair<uint64_t, std::string>>;
+    auto make_ret = [](uint64_t addr, const std::string& xfunc) {
+        return RetT(std::pair<uint64_t, std::string>(addr, xfunc));
+    };
+
+    // replace by another function, if needed
+    std::string xfunc;
+    auto it = g_funcSubst.find(func);
+    if (it != g_funcSubst.end())
+        xfunc = it->second;
+    else
+        xfunc = func;
+
     // check if the function was already processed
-    if (auto f = _funMap[func])
-        return (*f)->addr();
+    if (auto f = _funMap[xfunc])
+        return make_ret((*f)->addr(), xfunc);
 
     // load libc module
     if (!_lcModule) {
@@ -243,13 +265,13 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
     }
 
     // lookup function
-    llvm::Function* lf = _lcModule->getFunction(func);
+    llvm::Function* lf = _lcModule->getFunction(xfunc);
     if (!lf) {
         // check if its data
-        if (_lcModule->getNamedGlobal(func))
-            return SYM_TYPE_DATA;
+        if (_lcModule->getNamedGlobal(xfunc))
+            return make_ret(SYM_TYPE_DATA, xfunc);
         return ERROR2(FunctionNotFound,
-            llvm::formatv("function not found: {0}", func));
+            llvm::formatv("function not found: {0}", xfunc));
     }
     llvm::FunctionType* ft = lf->getFunctionType();
 
@@ -258,10 +280,10 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
 
     // set a fake guest address for the external function
     uint64_t addr = _extFuncAddr;
-    DBGF("{0:X+8} -> {1}", addr, func);
+    DBGF("{0:X+8} -> {1}", addr, xfunc);
 
     // declare imported function in our module
-    Function* f = new Function(_ctx, func, nullptr, addr);
+    Function* f = new Function(_ctx, xfunc, nullptr, addr);
     FunctionPtr fp(f);
     f->create(ft);
 
@@ -270,7 +292,7 @@ llvm::Expected<uint64_t> Translator::import(const std::string& func)
     _funMap(f->name(), std::move(fp));
     _extFuncAddr += Constants::INSTRUCTION_SIZE;
 
-    return addr;
+    return make_ret(addr, xfunc);
 }
 
 

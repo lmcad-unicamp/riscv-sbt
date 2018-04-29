@@ -140,9 +140,9 @@ def _s2o(arch, srcdir, dstdir, _in, out, opts):
     # generated object file, that would otherwise be fixed only later,
     # at link stage, after it's done with relaxing.
     else:
-        # preserve rv32 source code for debug, by not mixing in
+        # preserve rv32/x86 source code for debug, by not mixing in
         # assembly source together
-        if opts.dbg and arch != RV32_LINUX:
+        if opts.dbg and out.startswith('rv32-x86-'):
             flags = "-g"
         else:
             flags = ""

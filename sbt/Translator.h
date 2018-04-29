@@ -59,7 +59,8 @@ public:
     llvm::Error translate();
 
     // import external function
-    llvm::Expected<uint64_t> import(const std::string& func);
+    llvm::Expected<std::pair<uint64_t, std::string>>
+        import(const std::string& func);
 
     // counters
 
