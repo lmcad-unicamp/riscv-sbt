@@ -427,12 +427,13 @@ if __name__ == "__main__":
             .set_asc_index([0, 1])
             .set_dec_index([1, 2]),
         Bench("basicmath", "automotive/basicmath",
-            ["basicmath_large.c", "rad2deg.c", "cubic.c", "isqrt.c"], dbg=True),
+            ["basicmath_large.c", "rad2deg.c", "cubic.c", "isqrt.c"],
+            sbtflags=stack_large),
         CustomTestBench("bitcount", "automotive/bitcount",
             ["bitcnt_1.c", "bitcnt_2.c", "bitcnt_3.c", "bitcnt_4.c",
                 "bitcnts.c", "bitfiles.c", "bitstrng.c", "bstr_i.c"],
             [Args(["1125000"])],
-            sbtflags=["-stack-size=131072"])
+            sbtflags=stack_large)
             .out_filter("sed 's/Time:[^;]*; //;/^Best/d;/^Worst/d'"),
         MultiTestBench("fft", "telecomm/FFT",
             ["main.c", "fftmisc.c", "fourierf.c"],

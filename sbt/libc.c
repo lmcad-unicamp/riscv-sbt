@@ -76,13 +76,13 @@ F(__ctype_toupper_loc)
 
 // soft float
 
-F(__extenddftf2)
-F(__trunctfdf2)
+F(sbt__extenddftf2)
+F(sbt__trunctfdf2)
 F(sbt__addtf3)
 F(sbt__subtf3)
 F(sbt__multf3)
 F(sbt__divtf3)
-F(__lttf2)
+F(sbt__lttf2)
 
 // runtime
 

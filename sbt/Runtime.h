@@ -11,17 +11,17 @@ typedef __float128 fp128;
 typedef long double fp128;
 #endif
 
-double __trunctfdf2(fp128);
-fp128 __extenddftf2(double);
-fp128 __addtf3(fp128, fp128);
-fp128 __subtf3(fp128, fp128);
-fp128 __multf3(fp128, fp128);
-fp128 __divtf3(fp128, fp128);
-int __lttf2(fp128, fp128);
+typedef struct double2_s {
+    double d0;
+    double d1;
+} double2;
 
-void sbt__addtf3(fp128 *r, fp128 *a, fp128 *b);
-void sbt__subtf3(fp128 *r, fp128 *a, fp128 *b);
-void sbt__multf3(fp128 *r, fp128 *a, fp128 *b);
-void sbt__divtf3(fp128 *r, fp128 *a, fp128 *b);
+double sbt__trunctfdf2(double2 *a);
+void sbt__extenddftf2(double2 *r, double a);
+void sbt__addtf3(double2 *r, double2 *a, double2 *b);
+void sbt__subtf3(double2 *r, double2 *a, double2 *b);
+void sbt__multf3(double2 *r, double2 *a, double2 *b);
+void sbt__divtf3(double2 *r, double2 *a, double2 *b);
+int  sbt__lttf2(double2 *a, double2 *b);
 
 #endif

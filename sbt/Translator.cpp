@@ -223,7 +223,10 @@ static std::map<std::string, std::string> g_funcSubst = {
     {"__addtf3", "sbt__addtf3"},
     {"__subtf3", "sbt__subtf3"},
     {"__multf3", "sbt__multf3"},
-    {"__divtf3", "sbt__divtf3"}
+    {"__divtf3", "sbt__divtf3"},
+    {"__extenddftf2", "sbt__extenddftf2"},
+    {"__trunctfdf2",  "sbt__trunctfdf2"},
+    {"__lttf2",  "sbt__lttf2"}
 };
 
 llvm::Expected<std::pair<uint64_t, std::string>>
