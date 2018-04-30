@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
     "Shift and count bits"
   };
   if (argc<2) {
-    fprintf(stderr,"Usage: bitcnts <iterations>\n");
+    printf("Usage: bitcnts <iterations>\n");
     exit(-1);
 	}
   iterations=atoi(argv[1]);
@@ -54,12 +54,12 @@ int main(int argc, char *argv[])
   puts("Bit counter algorithm benchmark\n");
   
   for (i = 0; i < FUNCS; i++) {
-    start = clock();
+    start = 0;
     
     for (j = n = 0, seed = rand(); j < iterations; j++, seed += 13)
 	 n += pBitCntFunc[i](seed);
     
-    stop = clock();
+    stop = 0;
     ct = (stop - start) / (double)CLOCKS_PER_SEC;
     if (ct < cmin) {
 	 cmin = ct;
@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
 	 cmaxix = i;
     }
     
-    printf("%-38s> Time: %7.3f sec.; Bits: %ld\n", text[i], ct, n);
+    printf("%s> Time: %7.3f sec.; Bits: %ld\n", text[i], ct, n);
   }
   printf("\nBest  > %s\n", text[cminix]);
   printf("Worst > %s\n", text[cmaxix]);
