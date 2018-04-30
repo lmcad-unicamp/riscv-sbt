@@ -1,5 +1,14 @@
-susan: susan.c Makefile
-	gcc -static -O4 -o susan susan.c -lm 
+BENCHNAME=susan
+#ARCH=arm
+#MATTR=-mattr=vfp3,d16,a8,-neon -mcpu=cortex-a8 -float-abi=hard
+FILE1 = susan.c
 
-clean:
-	rm -rf susan output*
+TARGETS=susan
+
+SBTOPT?=-optimize -abi-locals
+
+STACKSIZE=400000
+
+include ../../Makefile.common
+
+

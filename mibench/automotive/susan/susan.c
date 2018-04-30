@@ -286,9 +286,9 @@
 /* ********** Optional settings */
 
 #ifndef PPC
-typedef int        TOTAL_TYPE; /* this is faster for "int" but should be "float" for large d masks */
+typedef int        TOTAL_TYPE; /* this is faster for "int" but should be "double" for large d masks */
 #else
-typedef float      TOTAL_TYPE; /* for my PowerPC accelerator only */
+typedef double      TOTAL_TYPE; /* for my PowerPC accelerator only */
 #endif
 
 /*#define FOPENB*/           /* uncomment if using djgpp gnu C for DOS or certain Win95 compilers */
@@ -303,13 +303,17 @@ typedef float      TOTAL_TYPE; /* for my PowerPC accelerator only */
 #include <math.h>
 #include <sys/file.h>    /* may want to remove this line */
 #include <malloc.h>      /* may want to remove this line */
-#define  exit_error(IFB,IFC) { fprintf(stderr,IFB,IFC); exit(0); }
+#define  exit_error(IFB,IFC) { printf(IFB,IFC); exit(0); }
 #define  FTOI(a) ( (a) < 0 ? ((int)(a-0.5)) : ((int)(a+0.5)) )
 typedef  unsigned char uchar;
 typedef  struct {int x,y,info, dx, dy, I;} CORNER_LIST[MAX_CORNERS];
 
 /* }}} */
 /* {{{ usage() */
+
+main(int argc, char **argv) {
+  main2(argc,argv);
+}
 
 usage()
 {
@@ -349,8 +353,10 @@ int getint(fd)
   {
     if (c=='#')    /* if we're at a comment, read to end of line */
       fgets(dummy,9000,fd);
-    if (c==EOF)
-      exit_error("Image %s not binary PGM.\n","is");
+    if (c==EOF) {
+      printf("Image is not binary PGM.\n");
+      exit(0);
+    }
     if (c>='0' && c<='9')
       break;   /* found what we were looking for */
     c = getc(fd);
@@ -384,14 +390,21 @@ int  tmp;
 #else
   if ((fd=fopen(filename,"r")) == NULL)
 #endif
-    exit_error("Can't input image %s.\n",filename);
+    {
+      printf("Can't input image ");
+      puts(filename);
+      exit(0);
+    }
 
   /* {{{ read header */
 
   header[0]=fgetc(fd);
   header[1]=fgetc(fd);
-  if(!(header[0]=='P' && header[1]=='5'))
-    exit_error("Image %s does not have binary PGM header.\n",filename);
+  if(!(header[0]=='P' && header[1]=='5')) {
+    printf("Image does not have binary PGM header: ");
+    puts(filename);
+    exit(0);
+  }
 
   *x_size = getint(fd);
   *y_size = getint(fd);
@@ -401,8 +414,11 @@ int  tmp;
 
   *in = (uchar *) malloc(*x_size * *y_size);
 
-  if (fread(*in,1,*x_size * *y_size,fd) == 0)
-    exit_error("Image %s is wrong size.\n",filename);
+  if (fread(*in,1,*x_size * *y_size,fd) == 0) {
+    printf("Image is wrong size: ");
+    puts(filename);
+    exit(0);
+  }
 
   fclose(fd);
 }
@@ -423,14 +439,21 @@ FILE  *fd;
 #else
   if ((fd=fopen(filename,"w")) == NULL) 
 #endif
-    exit_error("Can't output image%s.\n",filename);
+    {
+      printf("Can't output image ");
+      puts(filename);
+      exit(0);
+    }
 
   fprintf(fd,"P5\n");
   fprintf(fd,"%d %d\n",x_size,y_size);
   fprintf(fd,"255\n");
   
-  if (fwrite(in,x_size*y_size,1,fd) != 1)
-    exit_error("Can't write image %s.\n",filename);
+  if (fwrite(in,x_size*y_size,1,fd) != 1) {
+    printf("Can't write image ");
+    puts(filename);
+    exit(0);
+  }
 
   fclose(fd);
 }
@@ -470,14 +493,14 @@ void setup_brightness_lut(bp,thresh,form)
   int   thresh, form;
 {
 int   k;
-float temp;
+double temp;
 
   *bp=(unsigned char *)malloc(516);
   *bp=*bp+258;
 
   for(k=-256;k<257;k++)
   {
-    temp=((float)k)/((float)thresh);
+    temp=((double)k)/((double)thresh);
     temp=temp*temp;
     if (form==6)
       temp=temp*temp*temp;
@@ -673,11 +696,11 @@ int   i, j;
 void susan_smoothing(three_by_three,in,dt,x_size,y_size,bp)
   int   three_by_three, x_size, y_size;
   uchar *in, *bp;
-  float dt;
+  double dt;
 {
 /* {{{ vars */
 
-float temp;
+double temp;
 int   n_max, increment, mask_size,
       i,j,x,y,area,brightness,tmp,centre;
 uchar *ip, *dp, *dpt, *cp, *out=in,
@@ -698,7 +721,7 @@ TOTAL_TYPE total;
   {
     printf("Distance_thresh (%f) too big for integer arithmetic.\n",dt);
     printf("Either reduce it to <=15 or recompile with variable \"total\"\n");
-    printf("as a float: see top \"defines\" section.\n");
+    printf("as a double: see top \"defines\" section.\n");
     exit(0);
   }
 
@@ -728,7 +751,7 @@ TOTAL_TYPE total;
   for(i=-mask_size; i<=mask_size; i++)
     for(j=-mask_size; j<=mask_size; j++)
     {
-      x = (int) (100.0 * exp( ((float)((i*i)+(j*j))) / temp ));
+      x = (int) (100.0 * exp( ((double)((i*i)+(j*j))) / temp ));
       *dpt++ = (unsigned char)x;
     }
 
@@ -966,7 +989,7 @@ uchar *mp;
               if (b02) { x=1; y=0; }
               else     { x=0; y=1; }
 	    }
-            if (((float)r[(i+y)*x_size+j+x]/(float)centre) > 0.7)
+            if (((double)r[(i+y)*x_size+j+x]/(double)centre) > 0.7)
 	    {
               if ( ( (x==0) && (mid[(i+(2*y))*x_size+j]>7) && (mid[(i+(2*y))*x_size+j-1]>7) && (mid[(i+(2*y))*x_size+j+1]>7) ) ||
                    ( (y==0) && (mid[(i)*x_size+j+(2*x)]>7) && (mid[(i+1)*x_size+j+(2*x)]>7) && (mid[(i-1)*x_size+j+(2*x)]>7) ) )
@@ -1065,7 +1088,7 @@ susan_edges(in,r,mid,bp,max_no,x_size,y_size)
   uchar *in, *bp, *mid;
   int   *r, max_no, x_size, y_size;
 {
-float z;
+double z;
 int   do_symmetry, i, j, m, n, a, b, x, y, w;
 uchar c,*p,*cp;
 
@@ -1196,14 +1219,14 @@ uchar c,*p,*cp;
           c=*(cp-*p++);y+=3*c;
           c=*(cp-*p);x+=c;y+=3*c;
 
-          z = sqrt((float)((x*x) + (y*y)));
-          if (z > (0.9*(float)n)) /* 0.5 */
+          z = sqrt((double)((x*x) + (y*y)));
+          if (z > (0.9*(double)n)) /* 0.5 */
 	  {
             do_symmetry=0;
             if (x==0)
               z=1000000.0;
             else
-              z=((float)y) / ((float)x);
+              z=((double)y) / ((double)x);
             if (z < 0) { z=-z; w=-1; }
             else w=1;
             if (z < 0.5) { /* vert_edge */ a=0; b=1; }
@@ -1282,7 +1305,7 @@ uchar c,*p,*cp;
           if (y==0)
             z = 1000000.0;
           else
-            z = ((float)x) / ((float)y);
+            z = ((double)x) / ((double)y);
           if (z < 0.5) { /* vertical */ a=0; b=1; }
           else { if (z > 2.0) { /* horizontal */ a=1; b=0; }
           else { /* diagonal */ if (w>0) { a=-1; b=1; }
@@ -1302,7 +1325,7 @@ susan_edges_small(in,r,mid,bp,max_no,x_size,y_size)
   uchar *in, *bp, *mid;
   int   *r, max_no, x_size, y_size;
 {
-float z;
+double z;
 int   do_symmetry, i, j, m, n, a, b, x, y, w;
 uchar c,*p,*cp;
 
@@ -1363,14 +1386,14 @@ uchar c,*p,*cp;
           c=*(cp-*p++);y+=c;
           c=*(cp-*p);x+=c;y+=c;
 
-          z = sqrt((float)((x*x) + (y*y)));
-          if (z > (0.4*(float)n)) /* 0.6 */
+          z = sqrt((double)((x*x) + (y*y)));
+          if (z > (0.4*(double)n)) /* 0.6 */
           {
             do_symmetry=0;
             if (x==0)
 	      z=1000000.0;
 	    else
-	      z=((float)y) / ((float)x);
+	      z=((double)y) / ((double)x);
 	    if (z < 0) { z=-z; w=-1; }
             else w=1;
             if (z < 0.5) { /* vert_edge */ a=0; b=1; }
@@ -1412,7 +1435,7 @@ uchar c,*p,*cp;
           if (y==0)
             z = 1000000.0;
           else
-            z = ((float)x) / ((float)y);
+            z = ((double)x) / ((double)y);
           if (z < 0.5) { /* vertical */ a=0; b=1; }
           else { if (z > 2.0) { /* horizontal */ a=1; b=0; }
           else { /* diagonal */ if (w>0) { a=-1; b=1; }
@@ -1441,18 +1464,23 @@ int   n=0;
 
   while(corner_list[n].info != 7)
   {
-    if (drawing_mode==0)
-    {
-      p = in + (corner_list[n].y-1)*x_size + corner_list[n].x - 1;
-      *p++=255; *p++=255; *p=255; p+=x_size-2;
-      *p++=255; *p++=0;   *p=255; p+=x_size-2;
-      *p++=255; *p++=255; *p=255;
+    if (drawing_mode == 0) {
+      p = in + (corner_list[n].y - 1) * x_size + corner_list[n].x - 1;
+      *p++ = 255;
+      *p++ = 255;
+      *p = 255;
+      p += x_size - 2;
+      *p++ = 255;
+      *p++ = 0;
+      *p = 255;
+      p += x_size - 2;
+      *p++ = 255;
+      *p++ = 255;
+      *p = 255;
       n++;
-    }
-    else
-    {
-      p = in + corner_list[n].y*x_size + corner_list[n].x;
-      *p=0;
+    } else {
+      p = in + corner_list[n].y * x_size + corner_list[n].x;
+      *p = 0;
       n++;
     }
   }
@@ -1466,279 +1494,374 @@ susan_corners(in,r,bp,max_no,corner_list,x_size,y_size)
   int         *r, max_no, x_size, y_size;
   CORNER_LIST corner_list;
 {
-int   n,x,y,sq,xx,yy,
-      i,j,*cgx,*cgy;
-float divide;
-uchar c,*p,*cp;
+  int n, x, y, sq, xx, yy, i, j, *cgx, *cgy;
+  double divide;
+  uchar c, *p, *cp;
 
-  memset (r,0,x_size * y_size * sizeof(int));
+  memset(r, 0, x_size * y_size * sizeof(int));
 
-  cgx=(int *)malloc(x_size*y_size*sizeof(int));
-  cgy=(int *)malloc(x_size*y_size*sizeof(int));
+  cgx = (int *)malloc(x_size * y_size * sizeof(int));
+  cgy = (int *)malloc(x_size * y_size * sizeof(int));
 
-  for (i=5;i<y_size-5;i++)
-    for (j=5;j<x_size-5;j++) {
-        n=100;
-        p=in + (i-3)*x_size + j - 1;
-        cp=bp + in[i*x_size+j];
+  for (i = 5; i < y_size - 5; i++)
+    for (j = 5; j < x_size - 5; j++) {
+      n = 100;
+      p = in + (i - 3) * x_size + j - 1;
+      cp = bp + in[i * x_size + j];
 
-        n+=*(cp-*p++);
-        n+=*(cp-*p++);
-        n+=*(cp-*p);
-        p+=x_size-3; 
+      n += *(cp - *p++);
+      n += *(cp - *p++);
+      n += *(cp - *p);
+      p += x_size - 3;
 
-        n+=*(cp-*p++);
-        n+=*(cp-*p++);
-        n+=*(cp-*p++);
-        n+=*(cp-*p++);
-        n+=*(cp-*p);
-        p+=x_size-5;
+      n += *(cp - *p++);
+      n += *(cp - *p++);
+      n += *(cp - *p++);
+      n += *(cp - *p++);
+      n += *(cp - *p);
+      p += x_size - 5;
 
-        n+=*(cp-*p++);
-        n+=*(cp-*p++);
-        n+=*(cp-*p++);
-        n+=*(cp-*p++);
-        n+=*(cp-*p++);
-        n+=*(cp-*p++);
-        n+=*(cp-*p);
-        p+=x_size-6;
+      n += *(cp - *p++);
+      n += *(cp - *p++);
+      n += *(cp - *p++);
+      n += *(cp - *p++);
+      n += *(cp - *p++);
+      n += *(cp - *p++);
+      n += *(cp - *p);
+      p += x_size - 6;
 
-        n+=*(cp-*p++);
-        n+=*(cp-*p++);
-        n+=*(cp-*p);
-      if (n<max_no){    /* do this test early and often ONLY to save wasted computation */
-        p+=2;
-        n+=*(cp-*p++);
-      if (n<max_no){
-        n+=*(cp-*p++);
-      if (n<max_no){
-        n+=*(cp-*p);
-      if (n<max_no){
-        p+=x_size-6;
+      n += *(cp - *p++);
+      n += *(cp - *p++);
+      n += *(cp - *p);
+      if (n < max_no) {/* do this test early and often ONLY to save wasted
+                          computation */
+        p += 2;
+        n += *(cp - *p++);
+        if (n < max_no) {
+          n += *(cp - *p++);
+          if (n < max_no) {
+            n += *(cp - *p);
+            if (n < max_no) {
+              p += x_size - 6;
 
-        n+=*(cp-*p++);
-      if (n<max_no){
-        n+=*(cp-*p++);
-      if (n<max_no){
-        n+=*(cp-*p++);
-      if (n<max_no){
-        n+=*(cp-*p++);
-      if (n<max_no){
-        n+=*(cp-*p++);
-      if (n<max_no){
-        n+=*(cp-*p++);
-      if (n<max_no){
-        n+=*(cp-*p);
-      if (n<max_no){
-        p+=x_size-5;
+              n += *(cp - *p++);
+              if (n < max_no) {
+                n += *(cp - *p++);
+                if (n < max_no) {
+                  n += *(cp - *p++);
+                  if (n < max_no) {
+                    n += *(cp - *p++);
+                    if (n < max_no) {
+                      n += *(cp - *p++);
+                      if (n < max_no) {
+                        n += *(cp - *p++);
+                        if (n < max_no) {
+                          n += *(cp - *p);
+                          if (n < max_no) {
+                            p += x_size - 5;
 
-        n+=*(cp-*p++);
-      if (n<max_no){
-        n+=*(cp-*p++);
-      if (n<max_no){
-        n+=*(cp-*p++);
-      if (n<max_no){
-        n+=*(cp-*p++);
-      if (n<max_no){
-        n+=*(cp-*p);
-      if (n<max_no){
-        p+=x_size-3;
+                            n += *(cp - *p++);
+                            if (n < max_no) {
+                              n += *(cp - *p++);
+                              if (n < max_no) {
+                                n += *(cp - *p++);
+                                if (n < max_no) {
+                                  n += *(cp - *p++);
+                                  if (n < max_no) {
+                                    n += *(cp - *p);
+                                    if (n < max_no) {
+                                      p += x_size - 3;
 
-        n+=*(cp-*p++);
-      if (n<max_no){
-        n+=*(cp-*p++);
-      if (n<max_no){
-        n+=*(cp-*p);
+                                      n += *(cp - *p++);
+                                      if (n < max_no) {
+                                        n += *(cp - *p++);
+                                        if (n < max_no) {
+                                          n += *(cp - *p);
+                                          if (n < max_no) {
+                                            x = 0;
+                                            y = 0;
+                                            p = in + (i - 3) * x_size + j - 1;
 
-        if (n<max_no)
-        {
-            x=0;y=0;
-            p=in + (i-3)*x_size + j - 1;
+                                            c = *(cp - *p++);
+                                            x -= c;
+                                            y -= 3 * c;
+                                            c = *(cp - *p++);
+                                            y -= 3 * c;
+                                            c = *(cp - *p);
+                                            x += c;
+                                            y -= 3 * c;
+                                            p += x_size - 3;
 
-            c=*(cp-*p++);x-=c;y-=3*c;
-            c=*(cp-*p++);y-=3*c;
-            c=*(cp-*p);x+=c;y-=3*c;
-            p+=x_size-3; 
-    
-            c=*(cp-*p++);x-=2*c;y-=2*c;
-            c=*(cp-*p++);x-=c;y-=2*c;
-            c=*(cp-*p++);y-=2*c;
-            c=*(cp-*p++);x+=c;y-=2*c;
-            c=*(cp-*p);x+=2*c;y-=2*c;
-            p+=x_size-5;
-    
-            c=*(cp-*p++);x-=3*c;y-=c;
-            c=*(cp-*p++);x-=2*c;y-=c;
-            c=*(cp-*p++);x-=c;y-=c;
-            c=*(cp-*p++);y-=c;
-            c=*(cp-*p++);x+=c;y-=c;
-            c=*(cp-*p++);x+=2*c;y-=c;
-            c=*(cp-*p);x+=3*c;y-=c;
-            p+=x_size-6;
+                                            c = *(cp - *p++);
+                                            x -= 2 * c;
+                                            y -= 2 * c;
+                                            c = *(cp - *p++);
+                                            x -= c;
+                                            y -= 2 * c;
+                                            c = *(cp - *p++);
+                                            y -= 2 * c;
+                                            c = *(cp - *p++);
+                                            x += c;
+                                            y -= 2 * c;
+                                            c = *(cp - *p);
+                                            x += 2 * c;
+                                            y -= 2 * c;
+                                            p += x_size - 5;
 
-            c=*(cp-*p++);x-=3*c;
-            c=*(cp-*p++);x-=2*c;
-            c=*(cp-*p);x-=c;
-            p+=2;
-            c=*(cp-*p++);x+=c;
-            c=*(cp-*p++);x+=2*c;
-            c=*(cp-*p);x+=3*c;
-            p+=x_size-6;
-    
-            c=*(cp-*p++);x-=3*c;y+=c;
-            c=*(cp-*p++);x-=2*c;y+=c;
-            c=*(cp-*p++);x-=c;y+=c;
-            c=*(cp-*p++);y+=c;
-            c=*(cp-*p++);x+=c;y+=c;
-            c=*(cp-*p++);x+=2*c;y+=c;
-            c=*(cp-*p);x+=3*c;y+=c;
-            p+=x_size-5;
+                                            c = *(cp - *p++);
+                                            x -= 3 * c;
+                                            y -= c;
+                                            c = *(cp - *p++);
+                                            x -= 2 * c;
+                                            y -= c;
+                                            c = *(cp - *p++);
+                                            x -= c;
+                                            y -= c;
+                                            c = *(cp - *p++);
+                                            y -= c;
+                                            c = *(cp - *p++);
+                                            x += c;
+                                            y -= c;
+                                            c = *(cp - *p++);
+                                            x += 2 * c;
+                                            y -= c;
+                                            c = *(cp - *p);
+                                            x += 3 * c;
+                                            y -= c;
+                                            p += x_size - 6;
 
-            c=*(cp-*p++);x-=2*c;y+=2*c;
-            c=*(cp-*p++);x-=c;y+=2*c;
-            c=*(cp-*p++);y+=2*c;
-            c=*(cp-*p++);x+=c;y+=2*c;
-            c=*(cp-*p);x+=2*c;y+=2*c;
-            p+=x_size-3;
+                                            c = *(cp - *p++);
+                                            x -= 3 * c;
+                                            c = *(cp - *p++);
+                                            x -= 2 * c;
+                                            c = *(cp - *p);
+                                            x -= c;
+                                            p += 2;
+                                            c = *(cp - *p++);
+                                            x += c;
+                                            c = *(cp - *p++);
+                                            x += 2 * c;
+                                            c = *(cp - *p);
+                                            x += 3 * c;
+                                            p += x_size - 6;
 
-            c=*(cp-*p++);x-=c;y+=3*c;
-            c=*(cp-*p++);y+=3*c;
-            c=*(cp-*p);x+=c;y+=3*c;
+                                            c = *(cp - *p++);
+                                            x -= 3 * c;
+                                            y += c;
+                                            c = *(cp - *p++);
+                                            x -= 2 * c;
+                                            y += c;
+                                            c = *(cp - *p++);
+                                            x -= c;
+                                            y += c;
+                                            c = *(cp - *p++);
+                                            y += c;
+                                            c = *(cp - *p++);
+                                            x += c;
+                                            y += c;
+                                            c = *(cp - *p++);
+                                            x += 2 * c;
+                                            y += c;
+                                            c = *(cp - *p);
+                                            x += 3 * c;
+                                            y += c;
+                                            p += x_size - 5;
 
-            xx=x*x;
-            yy=y*y;
-            sq=xx+yy;
-            if ( sq > ((n*n)/2) )
-            {
-              if(yy<xx) {
-                divide=(float)y/(float)abs(x);
-                sq=abs(x)/x;
-                sq=*(cp-in[(i+FTOI(divide))*x_size+j+sq]) +
-                   *(cp-in[(i+FTOI(2*divide))*x_size+j+2*sq]) +
-                   *(cp-in[(i+FTOI(3*divide))*x_size+j+3*sq]);}
-              else {
-                divide=(float)x/(float)abs(y);
-                sq=abs(y)/y;
-                sq=*(cp-in[(i+sq)*x_size+j+FTOI(divide)]) +
-                   *(cp-in[(i+2*sq)*x_size+j+FTOI(2*divide)]) +
-                   *(cp-in[(i+3*sq)*x_size+j+FTOI(3*divide)]);}
+                                            c = *(cp - *p++);
+                                            x -= 2 * c;
+                                            y += 2 * c;
+                                            c = *(cp - *p++);
+                                            x -= c;
+                                            y += 2 * c;
+                                            c = *(cp - *p++);
+                                            y += 2 * c;
+                                            c = *(cp - *p++);
+                                            x += c;
+                                            y += 2 * c;
+                                            c = *(cp - *p);
+                                            x += 2 * c;
+                                            y += 2 * c;
+                                            p += x_size - 3;
 
-              if(sq>290){
-                r[i*x_size+j] = max_no-n;
-                cgx[i*x_size+j] = (51*x)/n;
-                cgy[i*x_size+j] = (51*y)/n;}
+                                            c = *(cp - *p++);
+                                            x -= c;
+                                            y += 3 * c;
+                                            c = *(cp - *p++);
+                                            y += 3 * c;
+                                            c = *(cp - *p);
+                                            x += c;
+                                            y += 3 * c;
+
+                                            xx = x * x;
+                                            yy = y * y;
+                                            sq = xx + yy;
+                                            if (sq > ((n * n) / 2)) {
+                                              if (yy < xx) {
+                                                divide =
+                                                    (double)y / (double)abs(x);
+                                                sq = abs(x) / x;
+                                                sq = *(cp -
+                                                       in[(i + FTOI(divide)) *
+                                                              x_size +
+                                                          j + sq]) +
+                                                     *(cp -
+                                                       in[(i +
+                                                           FTOI(2 * divide)) *
+                                                              x_size +
+                                                          j + 2 * sq]) +
+                                                     *(cp -
+                                                       in[(i +
+                                                           FTOI(3 * divide)) *
+                                                              x_size +
+                                                          j + 3 * sq]);
+                                              } else {
+                                                divide =
+                                                    (double)x / (double)abs(y);
+                                                sq = abs(y) / y;
+                                                sq =
+                                                    *(cp -
+                                                      in[(i + sq) * x_size + j +
+                                                         FTOI(divide)]) +
+                                                    *(cp -
+                                                      in[(i + 2 * sq) * x_size +
+                                                         j +
+                                                         FTOI(2 * divide)]) +
+                                                    *(cp -
+                                                      in[(i + 3 * sq) * x_size +
+                                                         j + FTOI(3 * divide)]);
+                                              }
+
+                                              if (sq > 290) {
+                                                r[i * x_size + j] = max_no - n;
+                                                cgx[i * x_size + j] =
+                                                    (51 * x) / n;
+                                                cgy[i * x_size + j] =
+                                                    (51 * y) / n;
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
             }
-	}
-}}}}}}}}}}}}}}}}}}}
+          }
+        }
+      }
+    }
 
   /* to locate the local maxima */
-  n=0;
-  for (i=5;i<y_size-5;i++)
-    for (j=5;j<x_size-5;j++) {
-       x = r[i*x_size+j];
-       if (x>0)  {
-          /* 5x5 mask */
+  n = 0;
+  for (i = 5; i < y_size - 5; i++)
+    for (j = 5; j < x_size - 5; j++) {
+      x = r[i * x_size + j];
+      if (x > 0) {
+/* 5x5 mask */
 #ifdef FIVE_SUPP
-          if (
-              (x>r[(i-1)*x_size+j+2]) &&
-              (x>r[(i  )*x_size+j+1]) &&
-              (x>r[(i  )*x_size+j+2]) &&
-              (x>r[(i+1)*x_size+j-1]) &&
-              (x>r[(i+1)*x_size+j  ]) &&
-              (x>r[(i+1)*x_size+j+1]) &&
-              (x>r[(i+1)*x_size+j+2]) &&
-              (x>r[(i+2)*x_size+j-2]) &&
-              (x>r[(i+2)*x_size+j-1]) &&
-              (x>r[(i+2)*x_size+j  ]) &&
-              (x>r[(i+2)*x_size+j+1]) &&
-              (x>r[(i+2)*x_size+j+2]) &&
-              (x>=r[(i-2)*x_size+j-2]) &&
-              (x>=r[(i-2)*x_size+j-1]) &&
-              (x>=r[(i-2)*x_size+j  ]) &&
-              (x>=r[(i-2)*x_size+j+1]) &&
-              (x>=r[(i-2)*x_size+j+2]) &&
-              (x>=r[(i-1)*x_size+j-2]) &&
-              (x>=r[(i-1)*x_size+j-1]) &&
-	      (x>=r[(i-1)*x_size+j  ]) &&
-	      (x>=r[(i-1)*x_size+j+1]) &&
-	      (x>=r[(i  )*x_size+j-2]) &&
-	      (x>=r[(i  )*x_size+j-1]) &&
-	      (x>=r[(i+1)*x_size+j-2]) )
+        if ((x > r[(i - 1) * x_size + j + 2]) && (x > r[(i)*x_size + j + 1]) &&
+            (x > r[(i)*x_size + j + 2]) && (x > r[(i + 1) * x_size + j - 1]) &&
+            (x > r[(i + 1) * x_size + j]) &&
+            (x > r[(i + 1) * x_size + j + 1]) &&
+            (x > r[(i + 1) * x_size + j + 2]) &&
+            (x > r[(i + 2) * x_size + j - 2]) &&
+            (x > r[(i + 2) * x_size + j - 1]) &&
+            (x > r[(i + 2) * x_size + j]) &&
+            (x > r[(i + 2) * x_size + j + 1]) &&
+            (x > r[(i + 2) * x_size + j + 2]) &&
+            (x >= r[(i - 2) * x_size + j - 2]) &&
+            (x >= r[(i - 2) * x_size + j - 1]) &&
+            (x >= r[(i - 2) * x_size + j]) &&
+            (x >= r[(i - 2) * x_size + j + 1]) &&
+            (x >= r[(i - 2) * x_size + j + 2]) &&
+            (x >= r[(i - 1) * x_size + j - 2]) &&
+            (x >= r[(i - 1) * x_size + j - 1]) &&
+            (x >= r[(i - 1) * x_size + j]) &&
+            (x >= r[(i - 1) * x_size + j + 1]) &&
+            (x >= r[(i)*x_size + j - 2]) && (x >= r[(i)*x_size + j - 1]) &&
+            (x >= r[(i + 1) * x_size + j - 2]))
 #endif
 #ifdef SEVEN_SUPP
-          if ( 
-                (x>r[(i-3)*x_size+j-3]) &&
-                (x>r[(i-3)*x_size+j-2]) &&
-                (x>r[(i-3)*x_size+j-1]) &&
-                (x>r[(i-3)*x_size+j  ]) &&
-                (x>r[(i-3)*x_size+j+1]) &&
-                (x>r[(i-3)*x_size+j+2]) &&
-                (x>r[(i-3)*x_size+j+3]) &&
+          if ((x > r[(i - 3) * x_size + j - 3]) &&
+              (x > r[(i - 3) * x_size + j - 2]) &&
+              (x > r[(i - 3) * x_size + j - 1]) &&
+              (x > r[(i - 3) * x_size + j]) &&
+              (x > r[(i - 3) * x_size + j + 1]) &&
+              (x > r[(i - 3) * x_size + j + 2]) &&
+              (x > r[(i - 3) * x_size + j + 3]) &&
 
-                (x>r[(i-2)*x_size+j-3]) &&
-                (x>r[(i-2)*x_size+j-2]) &&
-                (x>r[(i-2)*x_size+j-1]) &&
-                (x>r[(i-2)*x_size+j  ]) &&
-                (x>r[(i-2)*x_size+j+1]) &&
-                (x>r[(i-2)*x_size+j+2]) &&
-                (x>r[(i-2)*x_size+j+3]) &&
+              (x > r[(i - 2) * x_size + j - 3]) &&
+              (x > r[(i - 2) * x_size + j - 2]) &&
+              (x > r[(i - 2) * x_size + j - 1]) &&
+              (x > r[(i - 2) * x_size + j]) &&
+              (x > r[(i - 2) * x_size + j + 1]) &&
+              (x > r[(i - 2) * x_size + j + 2]) &&
+              (x > r[(i - 2) * x_size + j + 3]) &&
 
-                (x>r[(i-1)*x_size+j-3]) &&
-                (x>r[(i-1)*x_size+j-2]) &&
-                (x>r[(i-1)*x_size+j-1]) &&
-                (x>r[(i-1)*x_size+j  ]) &&
-                (x>r[(i-1)*x_size+j+1]) &&
-                (x>r[(i-1)*x_size+j+2]) &&
-                (x>r[(i-1)*x_size+j+3]) &&
+              (x > r[(i - 1) * x_size + j - 3]) &&
+              (x > r[(i - 1) * x_size + j - 2]) &&
+              (x > r[(i - 1) * x_size + j - 1]) &&
+              (x > r[(i - 1) * x_size + j]) &&
+              (x > r[(i - 1) * x_size + j + 1]) &&
+              (x > r[(i - 1) * x_size + j + 2]) &&
+              (x > r[(i - 1) * x_size + j + 3]) &&
 
-                (x>r[(i)*x_size+j-3]) &&
-                (x>r[(i)*x_size+j-2]) &&
-                (x>r[(i)*x_size+j-1]) &&
-                (x>=r[(i)*x_size+j+1]) &&
-                (x>=r[(i)*x_size+j+2]) &&
-                (x>=r[(i)*x_size+j+3]) &&
+              (x > r[(i)*x_size + j - 3]) && (x > r[(i)*x_size + j - 2]) &&
+              (x > r[(i)*x_size + j - 1]) && (x >= r[(i)*x_size + j + 1]) &&
+              (x >= r[(i)*x_size + j + 2]) && (x >= r[(i)*x_size + j + 3]) &&
 
-                (x>=r[(i+1)*x_size+j-3]) &&
-                (x>=r[(i+1)*x_size+j-2]) &&
-                (x>=r[(i+1)*x_size+j-1]) &&
-                (x>=r[(i+1)*x_size+j  ]) &&
-                (x>=r[(i+1)*x_size+j+1]) &&
-                (x>=r[(i+1)*x_size+j+2]) &&
-                (x>=r[(i+1)*x_size+j+3]) &&
+              (x >= r[(i + 1) * x_size + j - 3]) &&
+              (x >= r[(i + 1) * x_size + j - 2]) &&
+              (x >= r[(i + 1) * x_size + j - 1]) &&
+              (x >= r[(i + 1) * x_size + j]) &&
+              (x >= r[(i + 1) * x_size + j + 1]) &&
+              (x >= r[(i + 1) * x_size + j + 2]) &&
+              (x >= r[(i + 1) * x_size + j + 3]) &&
 
-                (x>=r[(i+2)*x_size+j-3]) &&
-                (x>=r[(i+2)*x_size+j-2]) &&
-                (x>=r[(i+2)*x_size+j-1]) &&
-                (x>=r[(i+2)*x_size+j  ]) &&
-                (x>=r[(i+2)*x_size+j+1]) &&
-                (x>=r[(i+2)*x_size+j+2]) &&
-                (x>=r[(i+2)*x_size+j+3]) &&
+              (x >= r[(i + 2) * x_size + j - 3]) &&
+              (x >= r[(i + 2) * x_size + j - 2]) &&
+              (x >= r[(i + 2) * x_size + j - 1]) &&
+              (x >= r[(i + 2) * x_size + j]) &&
+              (x >= r[(i + 2) * x_size + j + 1]) &&
+              (x >= r[(i + 2) * x_size + j + 2]) &&
+              (x >= r[(i + 2) * x_size + j + 3]) &&
 
-                (x>=r[(i+3)*x_size+j-3]) &&
-                (x>=r[(i+3)*x_size+j-2]) &&
-                (x>=r[(i+3)*x_size+j-1]) &&
-                (x>=r[(i+3)*x_size+j  ]) &&
-                (x>=r[(i+3)*x_size+j+1]) &&
-                (x>=r[(i+3)*x_size+j+2]) &&
-                (x>=r[(i+3)*x_size+j+3]) )
+              (x >= r[(i + 3) * x_size + j - 3]) &&
+              (x >= r[(i + 3) * x_size + j - 2]) &&
+              (x >= r[(i + 3) * x_size + j - 1]) &&
+              (x >= r[(i + 3) * x_size + j]) &&
+              (x >= r[(i + 3) * x_size + j + 1]) &&
+              (x >= r[(i + 3) * x_size + j + 2]) &&
+              (x >= r[(i + 3) * x_size + j + 3]))
 #endif
-{
-corner_list[n].info=0;
-corner_list[n].x=j;
-corner_list[n].y=i;
-corner_list[n].dx=cgx[i*x_size+j];
-corner_list[n].dy=cgy[i*x_size+j];
-corner_list[n].I=in[i*x_size+j];
-n++;
-if(n==MAX_CORNERS){
-      fprintf(stderr,"Too many corners.\n");
-      exit(1);
-         }}}}
-corner_list[n].info=7;
+              {
+            corner_list[n].info = 0;
+            corner_list[n].x = j;
+            corner_list[n].y = i;
+            corner_list[n].dx = cgx[i * x_size + j];
+            corner_list[n].dy = cgy[i * x_size + j];
+            corner_list[n].I = in[i * x_size + j];
+            n++;
+            if (n == MAX_CORNERS) {
+              printf("Too many corners.\n");
+              exit(1);
+            }
+          }
+      }
+    }
+  corner_list[n].info = 7;
 
-free(cgx);
-free(cgy);
-
+  free(cgx);
+  free(cgy);
 }
 
 /* }}} */
@@ -1948,7 +2071,7 @@ corner_list[n].dx=x/15;
 corner_list[n].dy=y/15;
 n++;
 if(n==MAX_CORNERS){
-      fprintf(stderr,"Too many corners.\n");
+      printf("Too many corners.\n");
       exit(1);
          }}}}
 corner_list[n].info=7;
@@ -1959,7 +2082,7 @@ corner_list[n].info=7;
 /* }}} */
 /* {{{ main(argc, argv) */
 
-main(argc, argv)
+main2(argc, argv)
   int   argc;
   char  *argv [];
 {
@@ -1969,7 +2092,7 @@ FILE   *ofp;
 char   filename [80],
        *tcp;
 uchar  *in, *bp, *mid;
-float  dt=4.0;
+double  dt=4.0;
 int    *r,
        argindex=3,
        bt=20,
@@ -1996,49 +2119,90 @@ CORNER_LIST corner_list;
   while (argindex < argc)
   {
     tcp = argv[argindex];
-    if (*tcp == '-')
-      switch (*++tcp)
-      {
-        case 's': /* smoothing */
-          mode=0;
-	  break;
-        case 'e': /* edges */
-          mode=1;
-	  break;
-        case 'c': /* corners */
-          mode=2;
-	  break;
-        case 'p': /* principle */
-          principle=1;
-	  break;
-        case 'n': /* thinning post processing */
-          thin_post_proc=0;
-	  break;
-        case 'b': /* simple drawing mode */
-          drawing_mode=1;
-	  break;
-        case '3': /* 3x3 flat mask */
-          three_by_three=1;
-	  break;
-        case 'q': /* quick susan mask */
-          susan_quick=1;
-	  break;
-	case 'd': /* distance threshold */
-          if (++argindex >= argc){
-	    printf ("No argument following -d\n");
-	    exit(0);}
-	  dt=atof(argv[argindex]);
-          if (dt<0) three_by_three=1;
-	  break;
-	case 't': /* brightness threshold */
-          if (++argindex >= argc){
-	    printf ("No argument following -t\n");
-	    exit(0);}
-	  bt=atoi(argv[argindex]);
-	  break;
-      }	    
-      else
-        usage();
+    if (*tcp == '-') {
+      char opt = *++tcp;
+      if (opt == 's') { /* smoothing */
+        mode=0;
+      }
+      if (opt == 'e') { /* edges */
+        mode=1;
+      }
+      if (opt == 'c') { /* corners */
+        mode=2;
+      }
+      if (opt == 'p') { /* principle */
+        principle=1;
+      }
+      if (opt == 'n') { /* thinning post processing */
+        thin_post_proc=0;
+      }
+      if (opt == 'b') { /* simple drawing mode */
+        drawing_mode=1;
+      }
+      if (opt == '3') { /* 3x3 flat mask */
+        three_by_three=1;
+      }
+      if (opt == 'q') { /* quick susan mask */
+        susan_quick=1;
+      }
+      if (opt == 'd') { /* distance threshold */
+        if (++argindex >= argc){
+          printf ("No argument following -d\n");
+        exit(0);}
+        dt=atof(argv[argindex]);
+        if (dt<0) three_by_three=1;
+      }
+      if (opt == 't') { /* brightness threshold */
+        if (++argindex >= argc){
+          printf ("No argument following -t\n");
+          exit(0);}
+        bt=atoi(argv[argindex]);
+      }
+    }    
+//    /*
+//    switch (*++tcp)
+//      {
+//        case 's': /* smoothing */
+//          mode=0;
+//	  break;
+//        case 'e': /* edges */
+//          mode=1;
+//	  break;
+//        case 'c': /* corners */
+//          mode=2;
+//	  break;
+//        case 'p': /* principle */
+//          principle=1;
+//	  break;
+//        case 'n': /* thinning post processing */
+//          thin_post_proc=0;
+//	  break;
+//        case 'b': /* simple drawing mode */
+//          drawing_mode=1;
+//	  break;
+//        case '3': /* 3x3 flat mask */
+//          three_by_three=1;
+//	  break;
+//        case 'q': /* quick susan mask */
+//          susan_quick=1;
+//	  break;
+//	case 'd': /* distance threshold */
+//          if (++argindex >= argc){
+//	    printf ("No argument following -d\n");
+//	    exit(0);}
+//	  dt=atof(argv[argindex]);
+//          if (dt<0) three_by_three=1;
+//	  break;
+//	case 't': /* brightness threshold */
+//          if (++argindex >= argc){
+//	    printf ("No argument following -t\n");
+//	    exit(0);}
+//	  bt=atoi(argv[argindex]);
+//	  break;
+//      }	    
+//*/
+//      else
+//        usage();
     argindex++;
   }
 
@@ -2048,23 +2212,25 @@ CORNER_LIST corner_list;
 /* }}} */
   /* {{{ main processing */
 
-  switch (mode)
-  {
-    case 0:
+  //  switch (mode)
+  //  {
+  if (mode == 0) {
       /* {{{ smoothing */
-
+    for (int x = 0; x < 10; ++x) {
       setup_brightness_lut(&bp,bt,2);
       susan_smoothing(three_by_three,in,dt,x_size,y_size,bp);
-      break;
-
+      free(bp - 258);
+    }
+  }
 /* }}} */
-    case 1:
+  if (mode == 1) {
       /* {{{ edges */
+    for (int x = 0; x < 100; ++x) {
 
-      r   = (int *) malloc(x_size * y_size * sizeof(int));
-      setup_brightness_lut(&bp,bt,6);
-
-      if (principle)
+    r   = (int *) malloc(x_size * y_size * sizeof(int));
+    setup_brightness_lut(&bp,bt,6);
+    
+    if (principle)
       {
         if (three_by_three)
           susan_principle_small(in,r,bp,max_no_edges,x_size,y_size);
@@ -2085,16 +2251,19 @@ CORNER_LIST corner_list;
           susan_thin(r,mid,x_size,y_size);
         edge_draw(in,mid,x_size,y_size,drawing_mode);
       }
-
-      break;
+    free(r);
+    free(bp - 258);
+    }
+  }
 
 /* }}} */
-    case 2:
+  if (mode == 2) {
       /* {{{ corners */
-
-      r   = (int *) malloc(x_size * y_size * sizeof(int));
-      setup_brightness_lut(&bp,bt,6);
-
+    r   = (int *) malloc(x_size * y_size * sizeof(int));
+    setup_brightness_lut(&bp,bt,6);
+    uchar *out = (uchar *) malloc(x_size * y_size);
+    memcpy(out, in, x_size * y_size);
+    for (int x = 0; x < 100; ++x) {
       if (principle)
       {
         susan_principle(in,r,bp,max_no_corners,x_size,y_size);
@@ -2106,13 +2275,16 @@ CORNER_LIST corner_list;
           susan_corners_quick(in,r,bp,max_no_corners,corner_list,x_size,y_size);
         else
           susan_corners(in,r,bp,max_no_corners,corner_list,x_size,y_size);
-        corner_draw(in,corner_list,x_size,drawing_mode);
+        corner_draw(out,corner_list,x_size,drawing_mode);
       }
-
-      break;
-
+    }
+    put_image(argv[2],out,x_size,y_size);
+    free(bp - 258);
+    free(r);
+    free(out);
+    return 0;
+  }
 /* }}} */
-  }    
 
 /* }}} */
 
