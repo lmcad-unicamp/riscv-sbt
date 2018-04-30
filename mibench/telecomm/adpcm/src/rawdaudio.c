@@ -23,7 +23,7 @@ main() {
 	adpcm_decoder(abuf, sbuf, n*2, &state);
 	write(1, sbuf, n*4);
     }
-    fprintf(stderr, "Final valprev=%d, index=%d\n",
+    printf("Final valprev=%d, index=%d\n",
 	    state.valprev, state.index);
     exit(0);
 }
