@@ -1,5 +1,13 @@
-patricia: patricia.c patricia_test.c
-	gcc -static patricia.c patricia_test.c -O3 -o patricia
+BENCHNAME=patricia
 
-clean:
-	rm -rf patricia output*
+FILE1 = patricia_test.c patricia.c
+
+TARGETS=patricia
+
+SBTOPT?=-debug-ir -nolocals
+
+STACKSIZE=400000
+
+include ../../Makefile.common
+
+

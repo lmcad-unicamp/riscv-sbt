@@ -26,6 +26,12 @@
 #include <string.h>	/* bcopy() */
 #include "patricia.h"
 
+//extern int main(int argc, char **argv);
+
+//void
+//aaaa(int argc, char **argv) {
+//  main(argc, argv);
+//}
 
 /*
  * Private function used to return whether
@@ -319,6 +325,7 @@ pat_search(unsigned long key, struct ptree *head)
 	
 	if (!t)
 		return 0;
+        //        printf("patsearch1\n");
 
 	/*
 	 * Find closest matching leaf node.
@@ -327,14 +334,20 @@ pat_search(unsigned long key, struct ptree *head)
 		/*
 		 * Keep track of most complete match so far.
 		 */
+          //          printf(" -- searching %08x:  %08x %08x ", key, t->p_key, t->p_m->pm_mask);
 		if (t->p_key == (key & t->p_m->pm_mask)) {
 			p = t;
 		}
 		
 		i = t->p_b;
+                //                printf(" -- p_b = %d, bit = %d\n", t->p_b, bit(t->p_b, key));
 		t = bit(t->p_b, key) ? t->p_right : t->p_left;
 	} while (i < t->p_b);
 
+        //        printf("patsearch2\n");
+        //        double d;
+        //        scanf("%lf", &d);
+        //        printf("%d %lf", 0, cos(d));
 	/*
 	 * Compare keys (and masks) to see if this
 	 * is really the node we want.

@@ -43,7 +43,6 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-/* #include <rpc/rpc.h> */
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
@@ -65,7 +64,7 @@ main(int argc, char **argv)
 	char addr_str[16];
 	struct in_addr addr;
 	unsigned long mask=0xffffffff;
-	float time;
+	double time;
 
 	if (argc<2) {
 		printf("Usage: %s <TCP stream>\n", argv[0]);
@@ -120,6 +119,7 @@ main(int argc, char **argv)
 	phead->p_left = phead->p_right = phead;
 
 
+        //                printf("MARKER1");
 	/*
 	 * The main loop to insert nodes.
 	 */
@@ -128,9 +128,12 @@ main(int argc, char **argv)
 		 * Read in each IP address and mask and convert them to
 		 * more usable formats.
 		 */
-		sscanf(line, "%f %d", &time, (unsigned int *)&addr);
+          //                    printf("MARKER2:");
+          //                    puts(line);
+		sscanf(line, "%lf %d", &time, (unsigned int *)&addr);
+                //printf("%08x\n", addr.s_addr);
 		//inet_aton(addr_str, &addr);
-
+                //                printf("MARKER3\n");
 		/*
 		 * Create a Patricia trie node to insert.
 		 */
@@ -140,7 +143,7 @@ main(int argc, char **argv)
 			exit(0);
 		}
 		bzero(p, sizeof(*p));
-
+                //                printf("MARKER4\n");
 		/*
 		 * Allocate the mask data.
 		 */
@@ -151,7 +154,7 @@ main(int argc, char **argv)
 			exit(0);
 		}
 		bzero(p->p_m, sizeof(*p->p_m));
-
+                //                printf("MARKER5\n");
 		/*
 		 * Allocate the data for this node.
 		 * Replace 'struct MyNode' with whatever you'd like.
@@ -171,12 +174,18 @@ main(int argc, char **argv)
 		p->p_key = addr.s_addr;		/* Network-byte order */
 		p->p_m->pm_mask = htonl(mask);
 
+                //                printf("MARKER5.1\n");
+
 		pfind=pat_search(addr.s_addr,phead);
+                //                printf("MARKER5.2\n");
 		//printf("%08x %08x %08x\n",p->p_key, addr.s_addr, p->p_m->pm_mask);
 		//if(pfind->p_key==(addr.s_addr&pfind->p_m->pm_mask))
+                //                printf("After pat_search: addr.s_addr = %08x\n", addr.s_addr);
+                //printf("After pat_search: pfind->p_key = %08x\n", pfind->p_key);
 		if(pfind->p_key==addr.s_addr)
 		{
-			printf("%f %08x: ", time, addr.s_addr);
+                  printf("%d %lf ", 0, time);
+                  printf("%08x: ", addr.s_addr);
 			printf("Found.\n");
 		}
 		else
@@ -185,14 +194,15 @@ main(int argc, char **argv)
 		 	* Insert the node.
 		 	* Returns the node it inserted on success, 0 on failure.
 		 	*/
-			//printf("%08x: ", addr.s_addr);
-			//printf("Inserted.\n");
+                  //			printf("%08x: ", addr.s_addr);
+                  //			printf("Inserted.\n");
 			p = pat_insert(p, phead);
 		}
 		if (!p) {
 			fprintf(stderr, "Failed on pat_insert\n");
 			exit(0);
 		}
+                //                printf("MARKER6\n");
 	}
 
 	exit(1);
