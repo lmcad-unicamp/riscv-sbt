@@ -21,9 +21,11 @@ int main(int argc, char **argv)
 	    if (fin == NULL) {
 		printf("error opening %s for reading\n", *argv);
 	    } else {
-		sha_stream(&sha_info, fin);
-		sha_print(&sha_info);
-		fclose(fin);
+        for (int i = 0; i < 200000; ++i) {
+          sha_stream(&sha_info, fin);
+          sha_print(&sha_info);
+        }
+        fclose(fin);
 	    }
 	}
     }
