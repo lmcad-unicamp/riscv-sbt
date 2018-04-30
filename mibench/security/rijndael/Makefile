@@ -1,5 +1,13 @@
-rijndael: aes.c aes.h aestab.h aesxam.c Makefile
-	gcc -static -O3 -o rijndael aes.c aesxam.c
+BENCHNAME=rijndael
 
-clean:
-	rm -rf rijndael output*
+FILE1 = aesxam.c aes.c
+
+TARGETS=rijndael
+
+SBTOPT?=-debug-ir -optimize
+
+STACKSIZE=400000
+
+include ../../Makefile.common
+
+
