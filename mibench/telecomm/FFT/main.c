@@ -6,12 +6,12 @@ int main(int argc, char *argv[]) {
 	unsigned MAXSIZE;
 	unsigned MAXWAVES;
 	unsigned i,j;
-	float *RealIn;
-	float *ImagIn;
-	float *RealOut;
-	float *ImagOut;
-	float *coeff;
-	float *amp;
+	double *RealIn;
+	double *ImagIn;
+	double *RealOut;
+	double *ImagOut;
+	double *coeff;
+	double *amp;
 	int invfft=0;
 
 	if (argc<3)
@@ -29,12 +29,13 @@ int main(int argc, char *argv[]) {
 		
  srand(1);
 
- RealIn=(float*)malloc(sizeof(float)*MAXSIZE);
- ImagIn=(float*)malloc(sizeof(float)*MAXSIZE);
- RealOut=(float*)malloc(sizeof(float)*MAXSIZE);
- ImagOut=(float*)malloc(sizeof(float)*MAXSIZE);
- coeff=(float*)malloc(sizeof(float)*MAXWAVES);
- amp=(float*)malloc(sizeof(float)*MAXWAVES);
+ for (int ind = 0; ind < 20; ++ind) {
+ RealIn=(double*)malloc(sizeof(double)*MAXSIZE);
+ ImagIn=(double*)malloc(sizeof(double)*MAXSIZE);
+ RealOut=(double*)malloc(sizeof(double)*MAXSIZE);
+ ImagOut=(double*)malloc(sizeof(double)*MAXSIZE);
+ coeff=(double*)malloc(sizeof(double)*MAXWAVES);
+ amp=(double*)malloc(sizeof(double)*MAXWAVES);
 
  /* Makes MAXWAVES waves of random amplitude and period */
 	for(i=0;i<MAXWAVES;i++) 
@@ -60,19 +61,16 @@ int main(int argc, char *argv[]) {
   	 ImagIn[i]=0;
 	 }
  }
-
  /* regular*/
- fft_float (MAXSIZE,invfft,RealIn,ImagIn,RealOut,ImagOut);
- 
+ fft_double (MAXSIZE,invfft,RealIn,ImagIn,RealOut,ImagOut);
+
  printf("RealOut:\n");
  for (i=0;i<MAXSIZE;i++)
-   printf("%f \t", RealOut[i]);
- printf("\n");
+   printf("%d %lf \n", 0, RealOut[i]);
 
 printf("ImagOut:\n");
  for (i=0;i<MAXSIZE;i++)
-   printf("%f \t", ImagOut[i]);
-   printf("\n");
+   printf("%d %lf \n", 0, ImagOut[i]);
 
  free(RealIn);
  free(ImagIn);
@@ -80,6 +78,7 @@ printf("ImagOut:\n");
  free(ImagOut);
  free(coeff);
  free(amp);
+ }
  exit(0);
 
 

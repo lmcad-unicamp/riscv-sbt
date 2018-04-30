@@ -5,7 +5,7 @@
     http://www.intersrv.com/~dcross/fft.html
 
     Helper routines for Fast Fourier Transform implementation.
-    Contains common code for fft_float() and fft_double().
+    Contains common code for fft_double() and fft_double().
 
     See also:
         fourierf.c
@@ -32,6 +32,7 @@
 #define BITS_PER_WORD   (sizeof(unsigned) * 8)
 
 
+
 int IsPowerOfTwo ( unsigned x )
 {
     if ( x < 2 )
@@ -50,8 +51,7 @@ unsigned NumberOfBitsNeeded ( unsigned PowerOfTwo )
 
     if ( PowerOfTwo < 2 )
     {
-        fprintf (
-            stderr,
+        printf (
             ">>> Error in fftmisc.c: argument %d to NumberOfBitsNeeded is too small.\n",
             PowerOfTwo );
 

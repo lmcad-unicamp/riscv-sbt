@@ -7,7 +7,7 @@
     Contains definitions for doing Fourier transforms
     and inverse Fourier transforms.
 
-    This module performs operations on arrays of 'float'.
+    This module performs operations on arrays of 'double'.
 
     Revision history:
 
@@ -30,19 +30,19 @@ static void CheckPointer ( void *p, char *name )
 {
     if ( p == NULL )
     {
-        fprintf ( stderr, "Error in fft_float():  %s == NULL\n", name );
+        printf ( "Error in fft_double():  %s == NULL\n", name );
         exit(1);
     }
 }
 
 
-void fft_float (
+void fft_double (
     unsigned  NumSamples,
     int       InverseTransform,
-    float    *RealIn,
-    float    *ImagIn,
-    float    *RealOut,
-    float    *ImagOut )
+    double    *RealIn,
+    double    *ImagIn,
+    double    *RealOut,
+    double    *ImagOut )
 {
     unsigned NumBits;    /* Number of bits needed to store indices */
     unsigned i, j, k, n;
@@ -53,8 +53,7 @@ void fft_float (
 
     if ( !IsPowerOfTwo(NumSamples) )
     {
-        fprintf (
-            stderr,
+        printf (
             "Error in fft():  NumSamples=%u is not power of two\n",
             NumSamples );
 
