@@ -2738,21 +2738,20 @@ NULL};
 "and recycling it for more than its",
 "worth But trust me on the sunscreen"
 };
-      int i;
-      int j;
+      int i, ind;
 
-      for (j = 0; j < 100; j++)
-          for (i = 0; find_strings[i]; i++)
-          {
-                init_search(find_strings[i]);
-                here = strsearch(search_strings[i]);
-                printf("\"%s\" is%s in \"%s\"", find_strings[i],
-                      here ? "" : " not", search_strings[i]);
-                if (here)
-                      printf(" [\"%s\"]", here);
-                putchar('\n');
-          }
-
+      for (ind = 0; ind < 2000; ++ind) {
+      for (i = 0; find_strings[i]; i++)
+      {
+            init_search(find_strings[i]);
+            here = strsearch(search_strings[i]);
+            printf("\"%s\" is%s in \"%s\"", find_strings[i],
+                  here ? "" : " not", search_strings[i]);
+            if (here)
+                  printf(" [\"%s\"]", here);
+            printf("\n");
+      }
+      }
       return 0;
 }
 

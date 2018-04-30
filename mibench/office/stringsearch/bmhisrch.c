@@ -49,7 +49,7 @@ void bmhi_init(const char *pattern)
       pat = realloc ((void*)pat, patlen);
       if (!pat)
             exit(1);
-      else  atexit(bhmi_cleanup);
+      //      else  atexit(bhmi_cleanup);
       for (i=0; i < patlen; i++)
             pat[i] = toupper(pattern[i]);
 
