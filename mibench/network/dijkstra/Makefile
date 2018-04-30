@@ -1,10 +1,13 @@
-all:  dijkstra_large dijkstra_small
+BENCHNAME=dijkstra_small
+BENCHNAME2=dijkstra_large
+#ARCH=arm
+#MATTR=-mattr=vfp3,d16,a8,-neon -mcpu=cortex-a8 -float-abi=hard
 
-dijkstra_large: dijkstra_large.c Makefile
-	gcc -static dijkstra_large.c -O3 -o dijkstra_large
+FILE1 = dijkstra_small.c
+FILE2 =dijkstra_large.c
 
-dijkstra_small: dijkstra_small.c Makefile
-	gcc -static dijkstra_small.c -O3 -o dijkstra_small 
+TARGETS =dijkstra_small dijkstra_large
 
-clean:
-	rm -rf dijkstra_large dijkstra_small output*
+SBTOPT?=-optimize -oneregion
+
+include ../../Makefile.common

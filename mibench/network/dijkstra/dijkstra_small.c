@@ -19,18 +19,18 @@ struct _QITEM
 };
 typedef struct _QITEM QITEM;
 
-QITEM *qHead = NULL;
+QITEM *qHead = (QITEM*) 0xf;
 
              
              
              
-int AdjMatrix[NUM_NODES][NUM_NODES];
+int **AdjMatrix = (int**) 0xf;
 
-int g_qCount = 0;
-NODE rgnNodes[NUM_NODES];
-int ch;
-int iPrev, iNode;
-int i, iCost, iDist;
+int g_qCount = 5;
+NODE *rgnNodes = (NODE*) 0xf;
+int ch = 5;
+int iPrev = 1, iNode = 2;
+int i = 1, iCost = 2, iDist = 3;
 
 
 void print_path (NODE *rgnNodes, int chNode)
@@ -40,7 +40,7 @@ void print_path (NODE *rgnNodes, int chNode)
       print_path(rgnNodes, rgnNodes[chNode].iPrev);
     }
   printf (" %d", chNode);
-  fflush(stdout);
+  //  fflush(stdout);
 }
 
 
@@ -51,7 +51,7 @@ void enqueue (int iNode, int iDist, int iPrev)
   
   if (!qNew) 
     {
-      fprintf(stderr, "Out of memory.\n");
+      printf("Out of memory.\n");
       exit(1);
     }
   qNew->iNode = iNode;
@@ -145,10 +145,24 @@ int dijkstra(int chStart, int chEnd)
 int main(int argc, char *argv[]) {
   int i,j,k;
   FILE *fp;
+
+  qHead = NULL;
+  AdjMatrix = (int **) malloc(sizeof(int*)*NUM_NODES);
+  for (i = 0; i < NUM_NODES; ++i)
+    AdjMatrix[i] = (int*) malloc(sizeof(int)*NUM_NODES);
+  g_qCount = 0;
+  rgnNodes = (NODE*) malloc(sizeof(NODE) *NUM_NODES);
+  ch = 0;
+  iPrev = 0;
+  iNode = 0;
+  i = 0;
+  iCost = 0;
+  iDist = 0;
+
   
   if (argc<2) {
-    fprintf(stderr, "Usage: dijkstra <filename>\n");
-    fprintf(stderr, "Only supports matrix size is #define'd.\n");
+    printf("Usage: dijkstra <filename>\n");
+    printf("Only supports matrix size is #define'd.\n");
   }
 
   /* open the adjacency matrix file */
@@ -158,10 +172,13 @@ int main(int argc, char *argv[]) {
   for (i=0;i<NUM_NODES;i++) {
     for (j=0;j<NUM_NODES;j++) {
       /* make it more sparce */
+      //puts("%d");
       fscanf(fp,"%d",&k);
+      //      printf("%d", k);
 			AdjMatrix[i][j]= k;
     }
   }
+  //  printf("vazei.\n");
 
   /* finds 10 shortest paths between nodes */
   for (i=0,j=NUM_NODES/2;i<20;i++,j++) {
