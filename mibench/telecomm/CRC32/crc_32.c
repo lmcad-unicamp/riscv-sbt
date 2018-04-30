@@ -181,7 +181,7 @@ main(int argc, char *argv[])
       while(--argc > 0)
       {
             errors |= crc32file(*++argv, &crc, &charcnt);
-            printf("%08lX %7ld %s\n", crc, charcnt, *argv);
+            printf("%08lX %7ld\n", crc, charcnt);
       }
       return(errors != 0);
 }

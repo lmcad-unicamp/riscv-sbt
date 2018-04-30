@@ -1,5 +1,13 @@
-crc: crc_32.c Makefile
-	gcc -static crc_32.c -O3 -o crc 
+BENCHNAME=crc
 
-clean:
-	rm -rf crc output*
+FILE1 = crc_32.c
+
+TARGETS=crc
+
+SBTOPT?=-optimize -oneregion
+
+STACKSIZE=400000
+
+include ../../Makefile.common
+
+
