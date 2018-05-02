@@ -22,6 +22,7 @@ class Options:
         self.perf = True
         self.csv = True
         self.id = None
+        self.save_out = False
 
 
 class Program:
@@ -68,6 +69,8 @@ class Program:
 
 
     def perf_libc(self, verbose=False, freq=None):
+        save_out = self.opts.save_out
+
         args = ["perf", "record", "-q"]
         if freq:
             args.extend(["-F", str(freq)])
@@ -83,7 +86,10 @@ class Program:
             stdin = self.opts.stdin
             if stdin:
                 fin = open(stdin, 'rb')
-            fout = open(self._out(0), 'wb')
+            if save_out:
+                fout = open(self._out(0), 'wb')
+            else:
+                fout = subprocess.DEVNULL
 
             cp = subprocess.call(args, stdin=fin, stdout=fout,
                     stderr=subprocess.DEVNULL)
@@ -91,7 +97,7 @@ class Program:
         finally:
             if fin:
                 fin.close()
-            if fout:
+            if save_out and fout:
                 fout.close()
 
         cp = subprocess.run(["perf", "report", "--sort=dso", "--stdio"],
@@ -120,6 +126,8 @@ class Program:
 
 
     def run(self, i):
+        save_out = self.opts.save_out
+
         fin = None
         fout = None
 
@@ -127,7 +135,10 @@ class Program:
             stdin = self.opts.stdin
             if stdin:
                 fin = open(stdin, 'rb')
-            fout = open(self._out(i), 'wb')
+            if save_out:
+                fout = open(self._out(i), 'wb')
+            else:
+                fout = subprocess.DEVNULL
 
             perf_out = self._perf_out(i)
             perf = self.opts.perf
@@ -151,7 +162,7 @@ class Program:
         finally:
             if fin:
                 fin.close()
-            if fout:
+            if save_out and fout:
                 fout.close()
 
         self.times.append(t)
