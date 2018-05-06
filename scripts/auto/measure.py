@@ -23,6 +23,7 @@ class Options:
         self.csv = True
         self.id = None
         self.save_out = False
+        self.n = None
 
 
 class Program:
@@ -310,7 +311,7 @@ class Measure:
         progs = self._build_programs(target)
 
         # run
-        N = 10
+        N = self.opts.n
         times = {}
         lcperfs = {}
         for prog in progs:
@@ -393,6 +394,8 @@ class Measure:
 
     @staticmethod
     def sd(vals, mean):
+        if len(vals) == 1:
+            return 0
         return math.sqrt(
             sum([math.pow(val - mean, 2) for val in vals])
             / (len(vals) - 1))
@@ -436,6 +439,8 @@ if __name__ == "__main__":
     parser.add_argument("--no-csv", action="store_true",
         help="don't append output to .csv file")
     parser.add_argument("--id", type=str)
+    parser.add_argument("-n", type=int, default=10,
+        help="number of runs")
 
     args = parser.parse_args()
     sargs = [arg.strip() for arg in args.args]
@@ -449,6 +454,7 @@ if __name__ == "__main__":
     opts.perf = not args.no_perf
     opts.csv = not args.no_csv
     opts.id = args.id
+    opts.n = args.n
     measure = Measure(args.dir, args.test, sargs, opts)
 
     if args.perf:

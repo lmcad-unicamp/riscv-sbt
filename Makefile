@@ -51,15 +51,10 @@ alltests:
 
 ### dbg ###
 
-CMD := /mnt/ssd/riscv-sbt/build/mibench/automotive/susan/rv32-x86-susan-globals /mnt/ssd/riscv-sbt/mibench/automotive/susan/input_large.pgm /mnt/ssd/riscv-sbt/build/mibench/automotive/susan/output_large.smoothing.pgm -s
-
-test-prep:
-	echo NOP
-
 .PHONY: test
 test:
-	$(CMD)
+	$(CMD) $(TOPDIR)/scripts/auto/measure.py \
+		$(TOPDIR)/build/mibench/telecomm/CRC32 crc32 \
+		--args $(TOPDIR)/mibench/telecomm/adpcm/data/large.pcm \
+		-n 1
 
-.PHONY: dbg
-dbg:
-	gdb --args $(CMD)
