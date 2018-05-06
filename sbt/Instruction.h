@@ -184,6 +184,9 @@ private:
     // Multiply/divide extension
     llvm::Error translateM(MOp op);
 
+    llvm::Value* leaveFunction(llvm::Value* target);
+    void enterFunction(llvm::Value* ext);
+
     // helpers
 
     // get RISCV destination register number

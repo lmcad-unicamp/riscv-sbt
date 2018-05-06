@@ -381,7 +381,7 @@ void Function::transferBBs(uint64_t from, Function* to)
 }
 
 
-void Function::loadRegisters()
+void Function::loadRegisters(bool retRegsOnly)
 {
     if (!_localRegs)
         return;
@@ -389,13 +389,22 @@ void Function::loadRegisters()
     Builder* bld = _ctx->bld;
     xassert(bld);
 
-    for (size_t i = 1; i < XRegisters::NUM; i++) {
+    auto loadXReg = [&](size_t i) {
         Register& local = getReg(i);
         Register& global = _ctx->x->getReg(i);
         // NOTE don't count this write
         llvm::Value* v = bld->load(global.getForRead());
         bld->store(v, local.get());
+    };
+
+    if (retRegsOnly) {
+        for (size_t i = XRegister::A0; i <= XRegister::A1; i++)
+            loadXReg(i);
+        return;
     }
+
+    for (size_t i = 1; i < XRegisters::NUM; i++)
+        loadXReg(i);
 
     if (!_ctx->opts->syncFRegs())
         return;

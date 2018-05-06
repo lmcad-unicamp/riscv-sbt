@@ -975,37 +975,22 @@ llvm::Error Instruction::handleCall(uint64_t target, unsigned linkReg)
 }
 
 
-llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
+llvm::Value* Instruction::leaveFunction(llvm::Value* target)
 {
-    DBGF("linkReg={1}", linkReg);
-    const bool alwaysSync = true;
-
-    // prepare
-    Translator* translator = _ctx->translator;
     Function* f = _ctx->func;
-    xassert(f);
-    llvm::Function* llf = f->func();
-    xassert(llf);
-    const Function& ie = translator->isExternal();
-    llvm::Function* llie = ie.func();
-    xassert(llie);
-    const Function& ic = translator->icaller();
-    llvm::Function* llic = ic.func();
-    xassert(llic);
+    llvm::Value* ext = nullptr;
 
-    // link
-    link(linkReg);
+    if (_ctx->opts->syncOnExternalCalls())
+        f->storeRegisters();
+    else {
+        const Function& ie = _ctx->translator->isExternal();
+        llvm::Function* llie = ie.func();
+        xassert(llie);
+        BasicBlock* bbICall;
+        BasicBlock* bbSaveRegs;
 
-    // isExternal?
-    llvm::Value* ext;
-    BasicBlock* bbSaveRegs;
-    BasicBlock* bbICall;
-
-
-    // XXX FIXME for debugging only - uncomment this later
-    //ext = _bld->call(llie, target);
-    if (!alwaysSync) {
-        ext = _c->i32(0);
+        // isExternal(target)? icall : save_regs
+        ext = _bld->call(llie, target);
         ext = _bld->eq(ext, _c->i32(1));
         bbSaveRegs = f->newUBB(_addr, "save_regs");
         bbICall = f->newUBB(_addr, "icall");
@@ -1013,14 +998,59 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
 
         // save regs
         _bld->setInsertBlock(bbSaveRegs);
-    }
-
-    f->storeRegisters();
-
-    if (!alwaysSync) {
+        f->storeRegisters();
         _bld->br(bbICall);
         _bld->setInsertBlock(bbICall);
     }
+
+    return ext;
+}
+
+
+void Instruction::enterFunction(llvm::Value* ext)
+{
+    Function* f = _ctx->func;
+
+    // restore regs
+    if (_ctx->opts->syncOnExternalCalls())
+        f->loadRegisters();
+    else {
+        // ext? restore_ret_regs : restore_regs
+        BasicBlock *bbRestoreRegs = f->newUBB(_addr, "restore_regs");
+        BasicBlock *bbRestoreRetRegs = f->newUBB(_addr, "restore_ret_regs");
+        BasicBlock *bbICallEnd = f->newUBB(_addr, "icall_end");
+        _bld->condBr(ext, bbRestoreRetRegs, bbRestoreRegs);
+
+        _bld->setInsertBlock(bbRestoreRegs);
+        f->loadRegisters();
+        _bld->br(bbICallEnd);
+
+        _bld->setInsertBlock(bbRestoreRetRegs);
+        f->loadRegisters(RET_REGS_ONLY);
+        _bld->br(bbICallEnd);
+
+        _bld->setInsertBlock(bbICallEnd);
+    }
+}
+
+
+llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
+{
+    DBGF("linkReg={1}", linkReg);
+
+    // prepare
+    Translator* translator = _ctx->translator;
+    Function* f = _ctx->func;
+    xassert(f);
+    llvm::Function* llf = f->func();
+    xassert(llf);
+    const Function& ic = translator->icaller();
+    llvm::Function* llic = ic.func();
+    xassert(llic);
+
+    // link
+    link(linkReg);
+    llvm::Value* ext = leaveFunction(target);
 
     // set args
     size_t n = llic->arg_size();
@@ -1044,21 +1074,7 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
 
     // call
     _bld->call(llic, args);
-
-    // restore regs
-    if (alwaysSync)
-        f->loadRegisters();
-    else if (!alwaysSync) {
-        BasicBlock *bbRestoreRegs = f->newUBB(_addr, "restore_regs");
-        BasicBlock *bbICallEnd = f->newUBB(_addr, "icall_end");
-        _bld->condBr(ext, bbICallEnd, bbRestoreRegs);
-
-        _bld->setInsertBlock(bbRestoreRegs);
-        f->loadRegisters();
-        _bld->br(bbICallEnd);
-
-        _bld->setInsertBlock(bbICallEnd);
-    }
+    enterFunction(ext);
 
     return llvm::Error::success();
 }

@@ -62,6 +62,17 @@ public:
         return *this;
     }
 
+    bool syncOnExternalCalls() const
+    {
+        return _syncOnExternalCalls;
+    }
+
+    Options& setSyncOnExternalCalls(bool b)
+    {
+        _syncOnExternalCalls = b;
+        return *this;
+    }
+
     void dump() const;
 
 private:
@@ -70,6 +81,7 @@ private:
     std::size_t _stackSize;
     bool _syncFRegs = true;
     std::string _a2s;
+    bool _syncOnExternalCalls = false;
 };
 
 }

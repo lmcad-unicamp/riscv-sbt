@@ -258,7 +258,7 @@ public:
     void cleanRegs();
 
     // sync local register file
-    void loadRegisters();
+    void loadRegisters(bool retRegsOnly = false);
     void storeRegisters();
 
     // setup argc/argv

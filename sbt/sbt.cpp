@@ -198,6 +198,11 @@ int main(int argc, char* argv[])
         cl::desc("Address to source file to be used to insert source "
             "C code on generated assembly code"));
 
+    cl::opt<bool> syncOnExternalCallsOpt(
+        "sync-on-external-calls",
+        cl::desc("Synchronize register file on calls to external "
+            "(non-translated) functions"));
+
     // enable debug code
     cl::opt<bool> debugOpt("debug", cl::desc("Enable debug code"));
 
@@ -256,7 +261,8 @@ int main(int argc, char* argv[])
     // create SBT
     sbt::Options opts(regs, !dontUseLibCOpt, std::atol(stackSizeOpt.c_str()));
     opts.setSyncFRegs(!dontSyncFRegsOpt)
-        .setA2S(a2sOpt);
+        .setA2S(a2sOpt)
+        .setSyncOnExternalCalls(syncOnExternalCallsOpt);
     auto exp = sbt::create<sbt::SBT>(inputFiles, outputFile, opts);
     if (!exp)
         sbt::handleError(exp.takeError());
@@ -272,65 +278,4 @@ int main(int argc, char* argv[])
 
     return hasErrors? EXIT_FAILURE : EXIT_SUCCESS;
 }
-
-
-/*
-// generate hello world IR (for test only)
-llvm::Error SBT::genHello()
-{
-    // constants
-    static const int SYS_EXIT = 1;
-    static const int SYS_WRITE = 4;
-
-    // types
-    Type *Int8 = Type::getInt8Ty(*_context);
-    Type *Int32 = Type::getInt32Ty(*_context);
-
-    // syscall
-    FunctionType *ftSyscall =
-        FunctionType::get(Int32, { Int32, Int32 }, VAR_ARG);
-    Function *fSyscall = Function::Create(ftSyscall,
-            Function::ExternalLinkage, "syscall", &*_module);
-
-    // set data
-    std::string hello("Hello, World!\n");
-    GlobalVariable *msg =
-        new GlobalVariable(
-            *_module,
-            ArrayType::get(Int8, hello.size()),
-            CONSTANT,
-            GlobalVariable::PrivateLinkage,
-            ConstantDataArray::getString(*_context, hello.c_str(), !ADD_NULL),
-            "msg");
-
-    // _start
-    FunctionType *ftStart = FunctionType::get(Int32, {}, !VAR_ARG);
-    Function *fStart =
-        Function::Create(ftStart, Function::ExternalLinkage, "_start", &*_module);
-
-    // entry basic block
-    BasicBlock *bb = BasicBlock::Create(*_context, "entry", fStart);
-    _builder->SetInsertPoint(bb);
-
-    // call write
-    Value *sc = ConstantInt::get(Int32, APInt(32, SYS_WRITE, SIGNED));
-    Value *fd = ConstantInt::get(Int32, APInt(32, 1, SIGNED));
-    Value *ptr = msg;
-    Value *len = ConstantInt::get(Int32, APInt(32, hello.size(), SIGNED));
-    std::vector<Value *> args = { sc, fd, ptr, len };
-    _builder->CreateCall(fSyscall, args);
-
-    // call exit
-    sc = ConstantInt::get(Int32, APInt(32, SYS_EXIT, SIGNED));
-    Value *rc = ConstantInt::get(Int32, APInt(32, 0, SIGNED));
-    args = { sc, rc };
-    _builder->CreateCall(fSyscall, args);
-    _builder->CreateRet(rc);
-
-    _module->dump();
-    std::exit(EXIT_FAILURE);
-
-    return Error::success();
-}
-*/
 

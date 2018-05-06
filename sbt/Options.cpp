@@ -27,6 +27,7 @@ void Options::dump() const
     DBGS << "stackSize=" << stackSize() << nl;
     DBGS << "syncFRegs=" << syncFRegs() << nl;
     DBGS << "a2s=" << a2s() << nl;
+    DBGS << "syncOnExternalCalls=" << syncOnExternalCalls() << nl;
 }
 
 }
