@@ -339,26 +339,41 @@ private:
 class Relocation
 {
 public:
-    Relocation(
+    enum RType : uint64_t {
+        PROXY_HI = 0xFFFF0001,
+        PROXY_LO = 0xFFFF0002
+    };
+
+    virtual ~Relocation() = default;
+    virtual uint64_t type() const = 0;
+    virtual std::string typeName() const = 0;
+    virtual uint64_t offset() const = 0;
+    virtual uint64_t addend() const = 0;
+    virtual bool hasSym() const = 0;
+    virtual uint64_t symAddr() const = 0;
+    virtual std::string symName() const = 0;
+    virtual bool hasSec() const = 0;
+    virtual std::string secName() const = 0;
+    virtual bool isLocalFunction() const = 0;
+    virtual bool isExternal() const = 0;
+    virtual void validate() const {}
+    std::string str() const;
+};
+
+
+class LLVMRelocation : public Relocation
+{
+public:
+    LLVMRelocation(
         ConstObjectPtr obj,
         llvm::object::RelocationRef reloc);
 
-    ConstSymbolPtr symbol() const;
-    ConstSectionPtr section() const;
-
-    uint64_t offset() const
-    {
-        return _reloc.getOffset();
-    }
-
-    uint64_t addend() const;
-
-    uint64_t type() const
+    uint64_t type() const override
     {
         return _reloc.getType();
     }
 
-    std::string typeName() const
+    std::string typeName() const override
     {
         llvm::SmallVector<char, 128> vec;
         _reloc.getTypeName(vec);
@@ -368,13 +383,214 @@ public:
         return s;
     }
 
-    // get string representation
-    std::string str() const;
+    uint64_t offset() const override
+    {
+        return _reloc.getOffset();
+    }
+
+    uint64_t addend() const override;
+
+    bool hasSym() const override
+    {
+        return !!symbol();
+    }
+
+    uint64_t symAddr() const override
+    {
+        xassert(hasSym());
+        return symbol()->address();
+    }
+
+    std::string symName() const override
+    {
+        ConstSymbolPtr sym = symbol();
+
+        return sym? sym->name() : "<null>";
+    }
+
+    bool hasSec() const override
+    {
+        return !!section();
+    }
+
+    std::string secName() const override
+    {
+        ConstSectionPtr sec = section();
+
+        return sec? sec->name() : "<null>";
+    }
+
+    bool isLocalFunction() const override;
+    bool isExternal() const override;
+
+    void validate() const override
+    {
+        bool isLocalFunc = isLocalFunction();
+        bool isExt = isExternal();
+        ConstSymbolPtr sym = symbol();
+        ConstSectionPtr sec = section();
+
+        // we need the symbol for external references
+        xassert(!isExt || sym &&
+                "external symbol relocation but symbol not found");
+
+        // bounds check for non-external symbols
+        xassert(!(sym && !isExt) ||
+                sym->address() < sec->size() &&
+                "out of bounds symbol relocation");
+
+        xassert(sec || !isLocalFunc);
+    }
 
 private:
     ConstObjectPtr _obj;
     llvm::object::RelocationRef _reloc;
+
+    ConstSymbolPtr symbol() const;
+    ConstSectionPtr section() const;
 };
+
+
+class ProxyRelocation : public Relocation
+{
+public:
+    ProxyRelocation(
+        uint64_t type,
+        const std::string& typeName,
+        uint64_t offset,
+        uint64_t addend,
+        bool hasSym,
+        uint64_t symAddr,
+        const std::string& symName,
+        bool hasSec,
+        const std::string& secName,
+        bool isLocalFunc,
+        bool isExt,
+        const std::string& str)
+        :
+        _type(type),
+        _typeName(typeName),
+        _offset(offset),
+        _addend(addend),
+        _hasSym(hasSym),
+        _symAddr(symAddr),
+        _symName(symName),
+        _hasSec(hasSec),
+        _secName(secName),
+        _isLocalFunction(isLocalFunc),
+        _isExternal(isExt),
+        _str(str)
+    {}
+
+    ProxyRelocation(const LLVMRelocation& llrel) :
+        ProxyRelocation(
+            llrel.type(),
+            llrel.typeName(),
+            llrel.offset(),
+            llrel.addend(),
+            llrel.hasSym(),
+            llrel.hasSym()? llrel.symAddr() : 0,
+            llrel.symName(),
+            llrel.hasSec(),
+            llrel.secName(),
+            llrel.isLocalFunction(),
+            llrel.isExternal(),
+            llrel.str())
+    {
+        llrel.validate();
+    }
+
+    uint64_t type() const override
+    {
+        return _type;
+    }
+
+    std::string typeName() const override
+    {
+        return _typeName;
+    }
+
+    uint64_t offset() const override
+    {
+        return _offset;
+    }
+
+    uint64_t addend() const override
+    {
+        return _addend;
+    }
+
+    bool hasSym() const override
+    {
+        return _hasSym;
+    }
+
+    uint64_t symAddr() const override
+    {
+        return _symAddr;
+    }
+
+    std::string symName() const override
+    {
+        return _symName;
+    }
+
+    bool hasSec() const override
+    {
+        return _hasSec;
+    }
+
+    std::string secName() const override
+    {
+        return _secName;
+    }
+
+    bool isLocalFunction() const override
+    {
+        return _isLocalFunction;
+    }
+
+    bool isExternal() const override
+    {
+        return _isExternal;
+    }
+
+    void setOffset(uint64_t offs)
+    {
+        _offset = offs;
+    }
+
+    void setType(uint64_t type)
+    {
+        _type = type;
+
+        switch (type) {
+            case PROXY_HI:
+                _typeName = "PROXY_HI";
+                break;
+            case PROXY_LO:
+                _typeName = "PROXY_LO";
+                break;
+            default:
+                xunreachable("Invalid type");
+        }
+    }
+
+private:
+    uint64_t _type;
+    std::string _typeName;
+    uint64_t _offset;
+    uint64_t _addend;
+    bool _hasSym;
+    uint64_t _symAddr;
+    std::string _symName;
+    bool _hasSec;
+    std::string _secName;
+    bool _isLocalFunction;
+    bool _isExternal;
+    std::string _str;
+};
+
 
 
 /// Object

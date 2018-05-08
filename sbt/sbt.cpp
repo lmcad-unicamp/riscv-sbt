@@ -92,7 +92,7 @@ void SBT::write()
 {
     std::error_code ec;
     llvm::raw_fd_ostream os(_outputFile, ec, llvm::sys::fs::F_None);
-    WriteBitcodeToFile(&*_module, os);
+    WriteBitcodeToFile(*_module, os);
     os.flush();
 }
 

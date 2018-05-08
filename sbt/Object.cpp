@@ -207,7 +207,9 @@ std::string Symbol::str() const
 /// Relocation
 ///
 
-Relocation::Relocation(
+/// LLVMRelocation
+
+LLVMRelocation::LLVMRelocation(
     ConstObjectPtr obj,
     llvm::object::RelocationRef reloc)
     :
@@ -217,7 +219,7 @@ Relocation::Relocation(
 }
 
 
-ConstSymbolPtr Relocation::symbol() const
+ConstSymbolPtr LLVMRelocation::symbol() const
 {
     llvm::object::symbol_iterator symit = _reloc.getSymbol();
     xassert(symit != _obj->symbolEnd());
@@ -225,7 +227,7 @@ ConstSymbolPtr Relocation::symbol() const
 }
 
 
-ConstSectionPtr Relocation::section() const
+ConstSectionPtr LLVMRelocation::section() const
 {
     // DBGF("{0:X+8}", offset());
     ConstSectionPtr sec;
@@ -256,22 +258,7 @@ ConstSectionPtr Relocation::section() const
 }
 
 
-std::string Relocation::str() const
-{
-    std::string s;
-    llvm::raw_string_ostream ss(s);
-    ss  << llvm::formatv("reloc: offset={0:X-8}", offset());
-    ss  << ", type=" << typeName();
-    if (section())
-        ss << llvm::formatv(", section=\"{0}\"", section()->name());
-    if (symbol())
-        ss << llvm::formatv(", symbol=\"{0}\"", symbol()->name());
-    ss  << nl;
-    return s;
-}
-
-
-uint64_t Relocation::addend() const
+uint64_t LLVMRelocation::addend() const
 {
     const llvm::object::ObjectFile* obj = _obj->obj();
     xassert(ELFObj::classof(obj));
@@ -280,6 +267,49 @@ uint64_t Relocation::addend() const
     llvm::object::DataRefImpl impl = _reloc.getRawDataRefImpl();
     const ELFObj::Elf_Rela* rela = elfobj->getRela(impl);
     return rela->r_addend;
+}
+
+
+std::string Relocation::str() const
+{
+    std::string s;
+    llvm::raw_string_ostream ss(s);
+    ss  << llvm::formatv(
+        "reloc: offs={0:X+8}, type={1}, section=\"{2}\", symbol=\"{3}\""
+        ", addend={4:X+8}",
+        offset(), typeName(), secName(), symName(), addend());
+    ss.flush();
+    return s;
+}
+
+
+bool LLVMRelocation::isLocalFunction() const
+{
+    ConstSymbolPtr sym = symbol();
+    ConstSectionPtr sec = section();
+
+    // XXX this may be a bit of cheating
+    if (sym && sym->type() == llvm::object::SymbolRef::ST_Function)
+        return true;
+
+    // If no symbol info is available, then consider the relocation as
+    // referring to a function if it refers to the .text section.
+    // (this won't work for programs that use .text to also store data)
+    if (sec && sec->isText())
+        return true;
+
+    // For external functions sec will be null.
+    // They are handled in other part of relocation code
+
+    return false;
+}
+
+
+bool LLVMRelocation::isExternal() const
+{
+    ConstSymbolPtr sym = symbol();
+
+    return sym && sym->address() == 0 && !section();
 }
 
 
@@ -444,7 +474,7 @@ llvm::Error Object::readSymbols()
                  re = s.relocations().end();
                  rb != re; ++rb)
         {
-            ConstRelocationPtr ptr(new Relocation(this, *rb));
+            ConstRelocationPtr ptr(new LLVMRelocation(this, *rb));
             relocs.push_back(ptr);
         }
         targetSection->setRelocs(std::move(relocs));

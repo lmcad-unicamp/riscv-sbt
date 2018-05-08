@@ -21,35 +21,6 @@
 
 namespace sbt {
 
-static bool isLocalFunction(
-    ConstSymbolPtr sym,
-    ConstSectionPtr sec)
-{
-    // XXX this may be a bit of cheating
-    if (sym && sym->type() == llvm::object::SymbolRef::ST_Function)
-        return true;
-
-    // If no symbol info is available, then consider the relocation as
-    // referring to a function if it refers to the .text section.
-    // (this won't work for programs that use .text to also store data)
-    if (sec && sec->isText())
-        return true;
-
-    // For external functions sec will be null.
-    // They are handled in other part of relocation code
-
-    return false;
-}
-
-
-static bool isExternal(
-    ConstSymbolPtr sym,
-    ConstSectionPtr sec)
-{
-    return sym && sym->address() == 0 && !sec;
-}
-
-
 SBTRelocation::SBTRelocation(
     Context* ctx,
     ConstRelocIter ri,
@@ -64,53 +35,112 @@ SBTRelocation::SBTRelocation(
 }
 
 
-void SBTRelocation::next(uint64_t addr)
+bool SBTRelocation::hasNext() const
 {
+    return _ri != _re || !_proxyRelocs.empty();
+}
+
+
+ConstRelocationPtr SBTRelocation::current() const
+{
+    if (_cur)
+        return _cur;
+
+    if (!_proxyRelocs.empty())
+        _cur = _proxyRelocs.front();
+    else if (_ri != _re)
+        _cur = *_ri;
+    return _cur;
+}
+
+
+ConstRelocationPtr SBTRelocation::next(uint64_t addr)
+{
+    if (!_proxyRelocs.empty() && _cur == _proxyRelocs.front()) {
+        _proxyRelocs.pop();
+        _cur = nullptr;
+        return current();
+    }
+
+    xassert(_cur == *_ri);
     ++_ri;
     xassert(_ri == _re || (**_ri).offset() != addr);
+    if (_ri != _re)
+        _cur = *_ri;
+    else
+        _cur = nullptr;
+    return _cur;
+}
+
+
+ConstRelocationPtr SBTRelocation::getReloc(uint64_t addr)
+{
+    if (!hasNext())
+        return nullptr;
+
+    ConstRelocationPtr cur = current();
+
+    // check if we skipped some addresses and now need to
+    // advance the iterator
+    if (addr > cur->offset()) {
+        while (addr > cur->offset()) {
+            cur = next(addr);
+            if (!cur)
+                return nullptr;
+        }
+        return getReloc(addr);
+    }
+
+    if (cur->offset() == addr)
+        return cur;
+    else
+        return nullptr;
+}
+
+
+void SBTRelocation::skipRelocation(uint64_t addr)
+{
+    // check if there is a relocation for current address
+    if (!getReloc(addr))
+        return;
+
+    next(addr);
+}
+
+
+void SBTRelocation::addProxyReloc(ConstRelocationPtr reloc)
+{
+    const LLVMRelocation* llrel = static_cast<const LLVMRelocation*>(&*reloc);
+    ProxyRelocation* rel1 = new ProxyRelocation(*llrel);
+    ProxyRelocation* rel2 = new ProxyRelocation(*llrel);
+
+    rel1->setType(Relocation::PROXY_HI);
+    rel2->setType(Relocation::PROXY_LO);
+    rel2->setOffset(rel1->offset() + Constants::INSTRUCTION_SIZE);
+
+    _proxyRelocs.emplace(rel1);
+    _proxyRelocs.emplace(rel2);
 }
 
 
 llvm::Expected<llvm::Constant*>
 SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
 {
-    ConstRelocationPtr reloc = nullptr;
+    ConstRelocationPtr reloc = getReloc(addr);
 
     // no more relocations exist
-    if (_ri == _re)
-        return nullptr;
-
-    reloc = *_ri;
-
-    // check if we skipped some addresses and now need to
-    // advance the iterator
-    if (addr > reloc->offset())
-        next(addr);
-
-    // check if there is a relocation for current address
-    if (reloc->offset() != addr)
+    if (!reloc)
         return nullptr;
 
     next(addr);
 
     DBGS << __METHOD_NAME__ << llvm::formatv("({0:X+8})\n", addr);
-
-    // NOTE sym may be null for section relocation
-    ConstSymbolPtr sym = reloc->symbol();
-    // NOTE sec may be null for external symbol relocation
-    ConstSectionPtr sec = reloc->section();
-
-    DBGF("reloc: offs={0:X+8}, type={1}, symbol=\"{2}\", section=\"{3}\", "
-            "addend={4:X+8}",
-        reloc->offset(),
-        reloc->typeName(),
-        sym? sym->name() : "<null>",
-        sec? sec->name() : "<null>",
-        reloc->addend());
+    DBGF("{0}", reloc->str());
 
     std::function<llvm::Constant*(llvm::Constant* addr)> relfn;
 
     switch (reloc->type()) {
+        case Relocation::PROXY_HI:
         case llvm::ELF::R_RISCV_HI20:
             // addr >>= 12
             relfn = [this](llvm::Constant* addr) {
@@ -122,6 +152,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             };
             break;
 
+        case Relocation::PROXY_LO:
         case llvm::ELF::R_RISCV_LO12_I:
         case llvm::ELF::R_RISCV_LO12_S:
             // addr &= 0xFFF
@@ -134,27 +165,23 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             };
             break;
 
+        case llvm::ELF::R_RISCV_CALL:
+            addProxyReloc(reloc);
+            return handleRelocation(addr, os);
+
         default:
             xassert(false && "unknown relocation");
     }
 
-    bool isLocalFunc = isLocalFunction(sym, sec);
-    bool isExt = isExternal(sym, sec);
-
-    // we need the symbol for external references
-    xassert(!isExt || sym &&
-            "external symbol relocation but symbol not found");
-
-    // bounds check for non-external symbols
-    xassert(!(sym && !isExt) ||
-            sym->address() < sec->size() &&
-            "out of bounds symbol relocation");
+    bool isLocalFunc = reloc->isLocalFunction();
+    bool isExt = reloc->isExternal();
+    reloc->validate();
 
     llvm::Constant* c = nullptr;
 
     // external symbol case: handle data or function
     if (isExt) {
-        auto expAddr =_ctx->translator->import(sym->name());
+        auto expAddr =_ctx->translator->import(reloc->symName());
         if (!expAddr)
             return expAddr.takeError();
         uint64_t saddr = expAddr.get().first;
@@ -165,7 +192,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             DBGF("external data: saddr={0:X+8}", saddr);
 
             const Types& t = _ctx->t;
-            c = _ctx->module->getOrInsertGlobal(sym->name(), t.i32);
+            c = _ctx->module->getOrInsertGlobal(reloc->symName(), t.i32);
             c = llvm::ConstantExpr::getPointerCast(c, t.i32);
 
         // handle external function
@@ -181,14 +208,12 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     // FIXME this part is still a best effort to try to find out if
     // the relocation refers to a function or a label
     } else if (isLocalFunc) {
-        xassert(sec);
-
         uint64_t saddr;
         bool isFunc;
 
         // get address
-        if (sym) {
-            saddr = sym->address();
+        if (reloc->hasSym()) {
+            saddr = reloc->symAddr();
             // if there is a symbol, this is most likely a function
             isFunc = true;
         } else {
@@ -240,54 +265,37 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     // other relocations
     // add the relocation offset to ShadowImage to get the final address
     } else {
-        xassert(sec);
+        xassert(reloc->hasSec());
         uint64_t saddr;
 
-        if (sym) {
+        if (reloc->hasSym()) {
             DBGF("symbol reloc: symbol=\"{0}\", addend={1:X+8}, section=\"{2}\"",
-                sym->name(),
-                reloc->addend(),
-                sec->name());
+                reloc->symName(), reloc->addend(), reloc->secName());
 
-            saddr = sym->address() + reloc->addend();
+            saddr = reloc->symAddr() + reloc->addend();
 
             if (os)
-                *os << sym->name();
+                *os << reloc->symName();
 
         } else {
             DBGF("section reloc: section=\"{0}\", addend={1:X+8}",
-                sec->name(),
-                reloc->addend());
+                reloc->secName(), reloc->addend());
 
             saddr = reloc->addend();
 
             if (os)
-                *os << llvm::formatv("{0}+{1:X+8}", sec->name(), reloc->addend());
+                *os << llvm::formatv("{0}+{1:X+8}",
+                    reloc->secName(), reloc->addend());
         }
 
         // TODO speed up section lookup for relocations
         c = llvm::ConstantExpr::getAdd(
-            _ctx->shadowImage->getSection(sec->name()),
+            _ctx->shadowImage->getSection(reloc->secName()),
             _ctx->c.i32(saddr));
     }
 
     c = relfn(c);
     return c;
-}
-
-
-void SBTRelocation::skipRelocation(uint64_t addr)
-{
-    // no more relocations exist
-    if (_ri == _re)
-        return;
-
-    // check if there is a relocation for current address
-    ConstRelocationPtr reloc = *_ri;
-    if (reloc->offset() != addr)
-        return;
-
-    next(addr);
 }
 
 
@@ -308,32 +316,30 @@ llvm::GlobalVariable* SBTRelocation::relocateSection(
             ConstRelocationPtr reloc = *rit;
             switch (reloc->type()) {
                 case llvm::ELF::R_RISCV_32: {
-                    ConstSymbolPtr sym = reloc->symbol();
                     uint64_t addr = reloc->addend();
-                    ConstSectionPtr sec = reloc->section();
-                    xassert(sec);
-                    if (sym) {
-                        addr += sym->address();
+                    xassert(reloc->hasSec());
+                    if (reloc->hasSym()) {
+                        addr += reloc->symAddr();
                         DBGF(
                             "relocating {0:X-8}: "
                             "symbol=\"{1}\", symaddr={2:X+8}, "
                             "section=\"{3}\", addend={4:X+8}, "
                             "addr={5:X-8}",
                             reloc->offset(),
-                            sym->name(), sym->address(),
-                            sec->name(), reloc->addend(),
+                            reloc->symName(), reloc->symAddr(),
+                            reloc->secName(), reloc->addend(),
                             addr);
                     } else {
                         DBGF(
                             "relocating {0:X-8}: "
                             "section=\"{1}\", addend={2:X+8}",
                             reloc->offset(),
-                            sec->name(), reloc->addend());
+                            reloc->secName(), reloc->addend());
                     }
 
                     llvm::Constant* cexpr =
                         llvm::ConstantExpr::getAdd(
-                            shadowImage->getSection(sec->name()),
+                            shadowImage->getSection(reloc->secName()),
                             _ctx->c.u32(addr));
                     cvec.push_back(cexpr);
                     break;

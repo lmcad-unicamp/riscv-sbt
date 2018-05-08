@@ -9,6 +9,9 @@
 #include <llvm/Support/Error.h>
 #include <llvm/Support/raw_ostream.h>
 
+#include <memory>
+#include <queue>
+
 namespace llvm {
 class GlobalVariable;
 }
@@ -81,13 +84,15 @@ private:
     ConstRelocIter _ri;
     ConstRelocIter _re;
     ConstSectionPtr _section;
+    std::queue<ConstRelocationPtr> _proxyRelocs;
+    mutable ConstRelocationPtr _cur = nullptr;
 
-    /**
-     * Move to next relocation.
-     *
-     * @param addr current address
-     */
-    void next(uint64_t addr);
+    ConstRelocationPtr current() const;
+    bool hasNext() const;
+    ConstRelocationPtr next(uint64_t addr);
+    ConstRelocationPtr getReloc(uint64_t addr);
+
+    void addProxyReloc(ConstRelocationPtr rel);
 };
 
 }
