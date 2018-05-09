@@ -340,8 +340,10 @@ class Relocation
 {
 public:
     enum RType : uint64_t {
-        PROXY_HI = 0xFFFF0001,
-        PROXY_LO = 0xFFFF0002
+        PROXY_HI        = 0xFFFF0001,
+        PROXY_LO        = 0xFFFF0002,
+        PROXY_PCREL_HI  = 0xFFFF0003,
+        PROXY_PCREL_LO  = 0xFFFF0004
     };
 
     virtual ~Relocation() = default;
@@ -571,9 +573,25 @@ public:
             case PROXY_LO:
                 _typeName = "PROXY_LO";
                 break;
+            case PROXY_PCREL_HI:
+                _typeName = "PROXY_PCREL_HI";
+                break;
+            case PROXY_PCREL_LO:
+                _typeName = "PROXY_PCREL_LO";
+                break;
             default:
                 xunreachable("Invalid type");
         }
+    }
+
+    void setHiPC(uint64_t hipc)
+    {
+        _hipc = hipc;
+    }
+
+    uint64_t hiPC() const
+    {
+        return _hipc;
     }
 
 private:
@@ -589,6 +607,7 @@ private:
     bool _isLocalFunction;
     bool _isExternal;
     std::string _str;
+    uint64_t _hipc = 0;
 };
 
 

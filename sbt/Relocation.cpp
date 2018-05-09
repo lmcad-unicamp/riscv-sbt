@@ -30,96 +30,86 @@ SBTRelocation::SBTRelocation(
     _ctx(ctx),
     _ri(ri),
     _re(re),
-    _section(section)
+    _section(section),
+    _cur(_ri == _re? nullptr : *_ri),
+    _curP(nullptr)
 {
-}
-
-
-bool SBTRelocation::hasNext() const
-{
-    return _ri != _re || !_proxyRelocs.empty();
-}
-
-
-ConstRelocationPtr SBTRelocation::current() const
-{
-    if (_cur)
-        return _cur;
-
-    if (!_proxyRelocs.empty())
-        _cur = _proxyRelocs.front();
-    else if (_ri != _re)
-        _cur = *_ri;
-    return _cur;
-}
-
-
-ConstRelocationPtr SBTRelocation::next(uint64_t addr)
-{
-    if (!_proxyRelocs.empty() && _cur == _proxyRelocs.front()) {
-        _proxyRelocs.pop();
-        _cur = nullptr;
-        return current();
-    }
-
-    xassert(_cur == *_ri);
-    ++_ri;
-    xassert(_ri == _re || (**_ri).offset() != addr);
-    if (_ri != _re)
-        _cur = *_ri;
-    else
-        _cur = nullptr;
-    return _cur;
 }
 
 
 ConstRelocationPtr SBTRelocation::getReloc(uint64_t addr)
 {
-    if (!hasNext())
+    if (!_cur && !_curP)
         return nullptr;
 
-    ConstRelocationPtr cur = current();
+    auto next = [&]() {
+        xassert(_cur == *_ri);
+        ++_ri;
+        if (_ri != _re)
+            _cur = *_ri;
+        else
+            _cur = nullptr;
+    };
+
+    auto nextP = [&]() {
+        xassert(_curP == _proxyRelocs.front());
+        _proxyRelocs.pop();
+        if (!_proxyRelocs.empty())
+            _curP = _proxyRelocs.front();
+        else
+            _curP = nullptr;
+    };
 
     // check if we skipped some addresses and now need to
     // advance the iterator
-    if (addr > cur->offset()) {
-        while (addr > cur->offset()) {
-            cur = next(addr);
-            if (!cur)
-                return nullptr;
-        }
-        return getReloc(addr);
+    while (_cur && addr > _cur->offset())
+        next();
+    while (_curP && addr > _curP->offset())
+        nextP();
+
+    ConstRelocationPtr ret = nullptr;
+    if (_cur && _cur->offset() == addr) {
+        ret = _cur;
+        next();
+        xassert(!_cur || _cur->offset() != addr);
+    } else if (_curP && _curP->offset() == addr) {
+        ret = _curP;
+        nextP();
+        xassert(!_curP || _curP->offset() != addr);
     }
 
-    if (cur->offset() == addr)
-        return cur;
-    else
-        return nullptr;
+    return ret;
 }
 
 
 void SBTRelocation::skipRelocation(uint64_t addr)
 {
     // check if there is a relocation for current address
-    if (!getReloc(addr))
-        return;
-
-    next(addr);
+    getReloc(addr);
 }
 
 
-void SBTRelocation::addProxyReloc(ConstRelocationPtr reloc)
+void SBTRelocation::addProxyReloc(ConstRelocationPtr reloc, bool pcrel)
 {
     const LLVMRelocation* llrel = static_cast<const LLVMRelocation*>(&*reloc);
-    ProxyRelocation* rel1 = new ProxyRelocation(*llrel);
-    ProxyRelocation* rel2 = new ProxyRelocation(*llrel);
+    ProxyRelocation* hi = new ProxyRelocation(*llrel);
+    ProxyRelocation* lo = new ProxyRelocation(*llrel);
 
-    rel1->setType(Relocation::PROXY_HI);
-    rel2->setType(Relocation::PROXY_LO);
-    rel2->setOffset(rel1->offset() + Constants::INSTRUCTION_SIZE);
+    if (pcrel) {
+        hi->setType(Relocation::PROXY_PCREL_HI);
+        lo->setType(Relocation::PROXY_PCREL_LO);
+        lo->setHiPC(hi->offset());
+    } else {
+        hi->setType(Relocation::PROXY_HI);
+        lo->setType(Relocation::PROXY_LO);
+    }
+    lo->setOffset(hi->offset() + Constants::INSTRUCTION_SIZE);
 
-    _proxyRelocs.emplace(rel1);
-    _proxyRelocs.emplace(rel2);
+    _proxyRelocs.emplace(hi);
+    _proxyRelocs.emplace(lo);
+
+    if (!_curP)
+        _curP = _proxyRelocs.front();
 }
 
 
@@ -131,8 +121,6 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     // no more relocations exist
     if (!reloc)
         return nullptr;
-
-    next(addr);
 
     DBGS << __METHOD_NAME__ << llvm::formatv("({0:X+8})\n", addr);
     DBGF("{0}", reloc->str());
@@ -154,7 +142,6 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
 
         case Relocation::PROXY_LO:
         case llvm::ELF::R_RISCV_LO12_I:
-        case llvm::ELF::R_RISCV_LO12_S:
             // addr &= 0xFFF
             relfn = [this](llvm::Constant* addr) {
                 llvm::Constant* c =
@@ -165,12 +152,39 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             };
             break;
 
+        case Relocation::PROXY_PCREL_HI:
+            // addr = (reladdr-pc) >> 12
+            relfn = [this, addr](llvm::Constant* reladdr) {
+                llvm::Constant* c =
+                    llvm::ConstantExpr::getSub(reladdr, _ctx->c.u32(addr));
+                c = llvm::ConstantExpr::getLShr(c, _ctx->c.i32(12));
+                return c;
+            };
+            break;
+
+        case Relocation::PROXY_PCREL_LO:
+            // addr = (reladdr-hipc) & 0xFFF
+            relfn = [this, &reloc](llvm::Constant* reladdr) {
+                const ProxyRelocation* pr =
+                    static_cast<const ProxyRelocation*>(reloc.get());
+                llvm::Constant* c =
+                    llvm::ConstantExpr::getSub(
+                        reladdr, _ctx->c.u32(pr->hiPC()));
+                c = llvm::ConstantExpr::getAnd(c, _ctx->c.i32(0xFFF));
+                return c;
+            };
+            break;
+
         case llvm::ELF::R_RISCV_CALL:
-            addProxyReloc(reloc);
+            addProxyReloc(reloc, PCREL);
             return handleRelocation(addr, os);
 
+        case llvm::ELF::R_RISCV_LO12_S:
+        case llvm::ELF::R_RISCV_PCREL_HI20:
+        case llvm::ELF::R_RISCV_PCREL_LO12_I:
+        case llvm::ELF::R_RISCV_PCREL_LO12_S:
         default:
-            xassert(false && "unknown relocation");
+            xunreachable("unknown relocation");
     }
 
     bool isLocalFunc = reloc->isLocalFunction();

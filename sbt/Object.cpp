@@ -89,7 +89,7 @@ std::string Section::str() const
         ss << sym->str();
     // dump relocations
     for (ConstRelocationPtr rel : relocs())
-        ss << rel->str();
+        ss << rel->str() << nl;
     return s;
 }
 

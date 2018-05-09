@@ -85,14 +85,11 @@ private:
     ConstRelocIter _re;
     ConstSectionPtr _section;
     std::queue<ConstRelocationPtr> _proxyRelocs;
-    mutable ConstRelocationPtr _cur = nullptr;
+    mutable ConstRelocationPtr _cur;
+    mutable ConstRelocationPtr _curP;
 
-    ConstRelocationPtr current() const;
-    bool hasNext() const;
-    ConstRelocationPtr next(uint64_t addr);
     ConstRelocationPtr getReloc(uint64_t addr);
-
-    void addProxyReloc(ConstRelocationPtr rel);
+    void addProxyReloc(ConstRelocationPtr rel, bool pcrel);
 };
 
 }
