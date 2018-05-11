@@ -239,15 +239,16 @@ rv32tests_status:
 
 """.format(**{"status":status})
 
-
+        dbg = True
         qtests = path(DIR.top, "riscv-qemu-tests")
         incdir = qtests
         srcdir = path(qtests, "rv32i")
         dstdir = path(DIR.build, "riscv-qemu-tests/rv32i")
 
         narchs = [RV32_LINUX]
-        xflags = "-C"
-        bflags = '-C --sflags="-I {}"'.format(incdir)
+        xflags = cat("-C", "--dbg" if dbg else '')
+        bflags = cat('-C --sflags="-I {}"'.format(incdir),
+                    "--dbg" if dbg else '')
         rflags = "-o {}.out"
         for test in tests:
             name = test

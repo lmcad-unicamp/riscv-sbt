@@ -345,7 +345,7 @@ llvm::Expected<llvm::Constant*> Instruction::getImm(int op)
     // case 2: absolute immediate value
     int64_t imm = _inst.getOperand(op).getImm();
     c = _c->i32(imm);
-    *_os << llvm::formatv("0x{0:X-8}", uint32_t(imm));
+    *_os << llvm::formatv("{0}", imm);
     return c;
 }
 

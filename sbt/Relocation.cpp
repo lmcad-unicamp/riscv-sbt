@@ -130,47 +130,58 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     switch (reloc->type()) {
         case Relocation::PROXY_HI:
         case llvm::ELF::R_RISCV_HI20:
-            // addr >>= 12
+            // hi20 = (symbol_address + 0x800) >> 12
             relfn = [this](llvm::Constant* addr) {
-                llvm::Constant* c =
-                    llvm::ConstantExpr::getLShr(
-                        addr,
-                        _ctx->c.i32(12));
+                llvm::Constant* c = llvm::ConstantExpr::getAdd(
+                    addr, _ctx->c.u32(0x800));
+                c = llvm::ConstantExpr::getLShr(c, _ctx->c.u32(12));
                 return c;
             };
             break;
 
         case Relocation::PROXY_LO:
         case llvm::ELF::R_RISCV_LO12_I:
-            // addr &= 0xFFF
+            // lo12 = symbol_address - hi20
+            // hi20 = (symbol_address + 0x800) & 0xFFFFF000
             relfn = [this](llvm::Constant* addr) {
-                llvm::Constant* c =
-                    llvm::ConstantExpr::getAnd(
-                        addr,
-                        _ctx->c.i32(0xFFF));
+                llvm::Constant* hi20 = llvm::ConstantExpr::getAdd(
+                    addr, _ctx->c.u32(0x800));
+                hi20 = llvm::ConstantExpr::getAnd(
+                    hi20, _ctx->c.u32(0xFFFFF000));
+
+                llvm::Constant* c = llvm::ConstantExpr::getSub(addr, hi20);
                 return c;
             };
             break;
 
         case Relocation::PROXY_PCREL_HI:
-            // addr = (reladdr-pc) >> 12
-            relfn = [this, addr](llvm::Constant* reladdr) {
-                llvm::Constant* c =
-                    llvm::ConstantExpr::getSub(reladdr, _ctx->c.u32(addr));
-                c = llvm::ConstantExpr::getLShr(c, _ctx->c.i32(12));
+            // hi20 = (symbol_address - pc + 0x800) >> 12
+            relfn = [this, addr](llvm::Constant* symaddr) {
+                llvm::Constant* c = llvm::ConstantExpr::getSub(
+                    symaddr, _ctx->c.u32(addr));
+                c = llvm::ConstantExpr::getAdd(c, _ctx->c.u32(0x800));
+                c = llvm::ConstantExpr::getLShr(c, _ctx->c.u32(12));
                 return c;
             };
             break;
 
         case Relocation::PROXY_PCREL_LO:
-            // addr = (reladdr-hipc) & 0xFFF
-            relfn = [this, &reloc](llvm::Constant* reladdr) {
+            // lo12 = symbol_address - hipc - hi20
+            // hi20 = (symbol_address - hipc + 0x800) & 0xFFFFF000
+            relfn = [this, &reloc](llvm::Constant* symaddr) {
                 const ProxyRelocation* pr =
                     static_cast<const ProxyRelocation*>(reloc.get());
-                llvm::Constant* c =
-                    llvm::ConstantExpr::getSub(
-                        reladdr, _ctx->c.u32(pr->hiPC()));
-                c = llvm::ConstantExpr::getAnd(c, _ctx->c.i32(0xFFF));
+                llvm::Constant* hipc = _ctx->c.u32(pr->hiPC());
+
+                llvm::Constant* hi20 = llvm::ConstantExpr::getSub(
+                    symaddr, hipc);
+                hi20 = llvm::ConstantExpr::getAdd(hi20, _ctx->c.u32(0x800));
+                hi20 = llvm::ConstantExpr::getAnd(
+                        hi20, _ctx->c.u32(0xFFFFF000));
+
+                llvm::Constant* c = llvm::ConstantExpr::getSub(
+                    symaddr, hipc);
+                c = llvm::ConstantExpr::getSub(c, hi20);
                 return c;
             };
             break;
@@ -309,6 +320,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     }
 
     c = relfn(c);
+    DBG(c->dump());
     return c;
 }
 
