@@ -100,7 +100,9 @@ class Source:
                 shell("git fetch")
 
         with cd(self.dstdir):
-            shell("git checkout " + self.commit)
+            shell((
+                "if [ `git rev-parse HEAD` != {0} ]; then " +
+                    "git checkout {0}; fi").format(self.commit.strip()))
 
 
 class Sources:
@@ -215,20 +217,50 @@ class Images:
             sys.exit("ERROR: component not found: " + args.build)
 
 
-    def copy_build_objs(self):
-        shell("docker volume create " + self.build_vol)
-
+    def _find_img(self, name):
         for img in self.imgs:
-            if img.name in ["riscv-sbt", "dev"]:
-                continue
+            if img.name == name:
+                return img
+        raise Exception("Image " + name + " not found")
 
-            shell("docker run --rm --mount source=" + self.build_vol +
-                    ",destination=/build " + img.img +
-                    " cp -a build /")
+
+    def _copy_build_objs(self, img):
+        if img.name in ["riscv-sbt", "dev"]:
+            return
+
+        shell("docker run --rm --mount source=" + self.build_vol +
+                ",destination=/build " + img.img +
+                " cp -a build /")
+
+
+    def copy_build_objs(self, img_names):
+        if len(img_names) == 0:
+            raise Exception("No images specified")
+
+        # create volume if needed
+        try:
+            shell("docker volume ls | grep " + self.build_vol)
+        except:
+            shell("docker volume create " + self.build_vol)
+
+        # find images
+        if len(img_names) == 1 and img_names[0] == "all":
+            imgs = self.imgs
+        else:
+            imgs = []
+            for img_name in img_names:
+                imgs.append(self._find_img(img_name))
+
+        for img in imgs:
+            self._copy_build_objs(img)
 
 
     def copy_toolchain(self):
-        shell("docker volume create " + self.toolchain_vol)
+        try:
+            shell("docker volume ls | grep " + self.toolchain_vol)
+        except:
+            shell("docker volume create " + self.toolchain_vol)
+
         shell("docker run --rm --mount source=" + self.toolchain_vol +
                 ",destination=/toolchain sbt" +
                 " cp -a toolchain /")
@@ -294,7 +326,7 @@ def run_dev():
         vols_str = cat(vols_str,
                 "--mount type={},source={},destination={}".format(t, v, k))
 
-    shell(prefix + "docker run -it --rm -h dev " + vols_str + " sbt-dev")
+    shell(prefix + "docker run --privileged -it --rm -h dev " + vols_str + " sbt-dev")
 
 
 if __name__ == "__main__":
@@ -307,7 +339,7 @@ if __name__ == "__main__":
     parser.add_argument("--get-srcs", action="store_true",
         help="clone and checkout all needed sources")
     parser.add_argument("--clean", action="store_true",
-        help="remove src/ and done files from every docker build dir")
+        help="remove done files from every docker build dir")
     parser.add_argument("--clean-srcs", action="store_true",
         help="remove downloaded sources dir")
     parser.add_argument("--clean-imgs", action="store_true",
@@ -317,8 +349,10 @@ if __name__ == "__main__":
         help="build img. imgs=[{}]".format(", ".join(names + ["all"])))
     parser.add_argument("--run", action="store_true",
         help="run the sbt container")
-    parser.add_argument("--copy-build-objs", action="store_true",
-        help="copy build objects from intermediate containers")
+    parser.add_argument("--copy-build-objs",
+        metavar="img", type=str, nargs='+',
+        help="copy build objects from intermediate containers" +
+            " (use \"all\" to copy objs from all images)")
     parser.add_argument("--copy-toolchain", action="store_true",
         help="copy toolchain files to volume")
     parser.add_argument("--dev", action="store_true")
@@ -369,7 +403,7 @@ if __name__ == "__main__":
         shell(cmd)
     # --copy-build-objs
     elif args.copy_build_objs:
-        imgs.copy_build_objs()
+        imgs.copy_build_objs(args.copy_build_objs)
     # --copy-toolchain
     elif args.copy_toolchain:
         imgs.copy_toolchain()

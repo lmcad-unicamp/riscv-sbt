@@ -34,6 +34,11 @@ docker-img:
 		./build.py --get-srcs && \
 		./build.py --build all
 
+docker-dev:
+	cd docker && \
+		export TOPDIR=$(TOPDIR) PYTHONPATH=$(TOPDIR)/scripts && \
+		./build.py --dev
+
 ###
 
 clean:
