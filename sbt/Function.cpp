@@ -302,6 +302,26 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
 }
 
 
+static bool isFunction(ConstSymbolPtr sym)
+{
+    return
+        (sym &&
+            ((sym->type() & llvm::object::SymbolRef::ST_Function) ||
+             (sym->flags() & llvm::object::SymbolRef::SF_Global)));
+}
+
+
+bool Function::isFunction(Context* ctx, uint64_t addr)
+{
+    if (auto fp = ctx->funcByAddr(addr, !ASSERT_NOT_NULL))
+        return true;
+
+    // get symbol by offset
+    ConstSymbolPtr sym = ctx->sec->section()->lookup(addr);
+    return sbt::isFunction(sym);
+}
+
+
 Function* Function::getByAddr(Context* ctx, uint64_t addr)
 {
     if (auto fp = ctx->funcByAddr(addr, !ASSERT_NOT_NULL))
@@ -315,12 +335,9 @@ Function* Function::getByAddr(Context* ctx, uint64_t addr)
 
     // create a new function
     std::string name;
-    if (!sym ||
-        (!(sym->type() & llvm::object::SymbolRef::ST_Function) &&
-            !(sym->flags() & llvm::object::SymbolRef::SF_Global)))
-    {
+    if (!sbt::isFunction(sym))
         name = "f" + llvm::Twine::utohexstr(addr).str();
-    } else
+    else
         name = sym->name();
     FunctionPtr f(new Function(ctx, name, ctx->sec, addr));
     f->create();

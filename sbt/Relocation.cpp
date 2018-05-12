@@ -230,47 +230,25 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             *os << xfunc;
 
     // internal function or label case
-    // FIXME this part is still a best effort to try to find out if
-    // the relocation refers to a function or a label
+    // XXX we rely on symbol information to distinguish
+    //     between function or label (see isFunction())
     } else if (isLocalFunc) {
-        uint64_t saddr;
-        bool isFunc;
-
         // get address
-        if (reloc->hasSym()) {
+        uint64_t saddr;
+        if (reloc->hasSym())
             saddr = reloc->symAddr();
-            // if there is a symbol, this is most likely a function
-            isFunc = true;
-        } else {
+        else
             saddr = reloc->addend();
-            isFunc = false;
-        }
 
-        // check for existing functions
+        bool isFunc = Function::isFunction(_ctx, saddr);
         Function* f = _ctx->funcByAddr(saddr, !ASSERT_NOT_NULL);
-        if (f)
-            isFunc = true;
-
-        // no relocation symbol found: try to find a section symbol
-        if (!isFunc)
-            isFunc = !!_ctx->sec->section()->lookup(addr);
 
         if (isFunc && !f) {
-            // function not found: create one only if it's ahead of
-            // current translation address
-            if (saddr > _ctx->addr)
-                f = Function::getByAddr(_ctx, saddr);
-            // Otherwise, currently the SBT does not create a new function for
-            // an already translated code, so the best we can do for now is to
-            // just return the address of where the function would be located.
-            // If the function is never called, there will be no problem.
-            // Otherwise, either the SBT will abort when trying to call a
-            // non-existing function or a new function with an unique name
-            // will be declared but never defined, resulting in a link error
-            // later.
-        }
+            // function not found: it should be ahead of current
+            // translation address
+            xassert(saddr > _ctx->addr);
+            f = Function::getByAddr(_ctx, saddr);
 
-        if (f) {
             DBGF("internal function: name=\"{0}\", saddr={1:X+8}",
                 f->name(), saddr);
             if (os)
@@ -285,7 +263,6 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
         //     indirectly, via icaller, so return just their
         //     original guest address
         c = _ctx->c.i32(saddr);
-
 
     // other relocations
     // add the relocation offset to ShadowImage to get the final address

@@ -267,6 +267,8 @@ public:
     // look up function by address
     static Function* getByAddr(Context* ctx, uint64_t addr);
 
+    static bool isFunction(Context* ctx, uint64_t addr);
+
 private:
     Context* _ctx;
     std::string _name;

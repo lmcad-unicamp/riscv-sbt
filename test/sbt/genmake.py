@@ -239,7 +239,7 @@ rv32tests_status:
 
 """.format(**{"status":status})
 
-        dbg = True
+        dbg = False
         qtests = path(DIR.top, "riscv-qemu-tests")
         incdir = qtests
         srcdir = path(qtests, "rv32i")

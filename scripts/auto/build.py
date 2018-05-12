@@ -140,6 +140,14 @@ def _s2o(arch, srcdir, dstdir, _in, out, opts):
     # generated object file, that would otherwise be fixed only later,
     # at link stage, after it's done with relaxing.
     else:
+        # XXX temporary workaround for x86 debugging
+        #     (upstream llvm-mc is not generating debug info)
+        #if opts.dbg and out.find('x86-') >= 0:
+        #    mc = "/usr/bin/llvm-mc-3.9"
+        #else:
+        #    mc = TOOLS.mc
+        mc = TOOLS.mc
+
         # preserve rv32/x86 source code for debug, by not mixing in
         # assembly source together
         if opts.dbg and out.startswith('rv32-x86-'):
@@ -152,11 +160,8 @@ def _s2o(arch, srcdir, dstdir, _in, out, opts):
             opts.sflags,
             "-arch=" + arch.march,
             "-mattr=" + arch.mattr)
-        cmd = cat(
-            TOOLS.mc,
-            flags,
-            "-assemble",
-            "-filetype=obj",
+        cmd = cat(mc, flags,
+            "-assemble", "-filetype=obj",
             ipath, "-o", opath)
         shell(cmd)
         # temporary workaround: set double-float ABI flag in ELF object file
