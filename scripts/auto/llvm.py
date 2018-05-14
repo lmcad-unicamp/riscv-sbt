@@ -11,6 +11,10 @@ class LLVM(auto.pkg.Package):
         link = path(DIR.submodules, "llvm/tools/clang")
         if not os.path.exists(link):
             shell("ln -sf {}/clang {}".format(DIR.submodules, link))
+        if not os.path.exists(path(link, ".patched")):
+            with cd(link):
+                shell("patch -p0 < baremetal.patch")
+                shell("touch .patched")
 
 
     def _build(self):
@@ -49,9 +53,9 @@ def _pkgs():
         "-DLLVM_BUILD_TESTS=True",
         "-DCMAKE_C_COMPILER=/usr/bin/clang-3.9",
         "-DCMAKE_CXX_COMPILER=/usr/bin/clang++-3.9",
-        "-DDEFAULT_SYSROOT=" + path(gnu_toolchain_prefix, RV32.triple),
+        "-DDEFAULT_SYSROOT=" + RV32_LINUX.sysroot,
         "-DGCC_INSTALL_PREFIX=" + gnu_toolchain_prefix,
-        "-DLLVM_DEFAULT_TARGET_TRIPLE=" + RV32.triple,
+        "-DLLVM_DEFAULT_TARGET_TRIPLE=" + RV32_LINUX.triple,
         '-DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="RISCV"',
         "-DCMAKE_INSTALL_PREFIX=" + prefix,
         path(DIR.submodules, "llvm")

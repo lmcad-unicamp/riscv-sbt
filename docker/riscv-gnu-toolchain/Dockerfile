@@ -14,9 +14,11 @@ RUN apt-get update \
     flex \
     gawk \
     gperf \
+    libexpat-dev \
     libgmp-dev \
     libmpc-dev \
     libmpfr-dev \
+    libncursesw5-dev \
     libtool \
     patchutils \
     texinfo \
