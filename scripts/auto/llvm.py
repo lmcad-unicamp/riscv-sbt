@@ -13,7 +13,7 @@ class LLVM(auto.pkg.Package):
             shell("ln -sf {}/clang {}".format(DIR.submodules, link))
         if not os.path.exists(path(link, ".patched")):
             with cd(link):
-                shell("patch -p0 < baremetal.patch")
+                shell("patch -p0 < " + path(DIR.patches, "baremetal.patch"))
                 shell("touch .patched")
 
 
