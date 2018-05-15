@@ -141,6 +141,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
 
         case Relocation::PROXY_LO:
         case llvm::ELF::R_RISCV_LO12_I:
+        case llvm::ELF::R_RISCV_LO12_S:
             // lo12 = symbol_address - hi20
             // hi20 = (symbol_address + 0x800) & 0xFFFFF000
             relfn = [this](llvm::Constant* addr) {
@@ -190,7 +191,6 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             addProxyReloc(reloc, PCREL);
             return handleRelocation(addr, os);
 
-        case llvm::ELF::R_RISCV_LO12_S:
         case llvm::ELF::R_RISCV_PCREL_HI20:
         case llvm::ELF::R_RISCV_PCREL_LO12_I:
         case llvm::ELF::R_RISCV_PCREL_LO12_S:
