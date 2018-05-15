@@ -7,7 +7,9 @@ RUN_PY   := $(TOPDIR)/scripts/auto/run.py
 SRCDIR   := $(shell pwd)
 DSTDIR   := $(TOPDIR)/build/test
 
-BINS   := rv32-hello-asm rv32-linux-hello x86-hello
+# spike is broken
+# BINS   := rv32-hello-asm rv32-linux-hello x86-hello
+BINS   := rv32-linux-hello x86-hello
 
 all:  $(BINS)
 run:  $(addsuffix -run,$(BINS))
