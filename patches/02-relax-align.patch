@@ -1,0 +1,313 @@
+Index: include/llvm/MC/MCAsmBackend.h
+===================================================================
+--- include/llvm/MC/MCAsmBackend.h
++++ include/llvm/MC/MCAsmBackend.h
+@@ -76,6 +76,12 @@
+     return false;
+   }
+ 
++  /// Hook to disable nop insertion for .align padding.
++  /// RISCV .align need insert extra NOPs and R_RISCV_ALIGN relocation type
++  /// when linker relaxation enabled. So we need to disable generic padding
++  /// and let RISCV PseudoNOPs to deal with it.
++  virtual bool disablePaddingAlignment(void) { return false; }
++
+   /// Apply the \p Value for given \p Fixup into the provided data fragment, at
+   /// the offset specified by the fixup and following the fixup kind as
+   /// appropriate. Errors (such as an out of range fixup value) should be
+Index: lib/MC/MCAssembler.cpp
+===================================================================
+--- lib/MC/MCAssembler.cpp
++++ lib/MC/MCAssembler.cpp
+@@ -315,6 +315,10 @@
+     const MCAlignFragment &AF = cast<MCAlignFragment>(F);
+     unsigned Offset = Layout.getFragmentOffset(&AF);
+     unsigned Size = OffsetToAlignment(Offset, AF.getAlignment());
++
++    if (getBackend().disablePaddingAlignment())
++      return 0;
++
+     // If we are padding with nops, force the padding to be larger than the
+     // minimum nop size.
+     if (Size > 0 && AF.hasEmitNops()) {
+Index: lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp
+===================================================================
+--- lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp
++++ lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp
+@@ -17,6 +17,7 @@
+ #include "llvm/MC/MCContext.h"
+ #include "llvm/MC/MCExpr.h"
+ #include "llvm/MC/MCInst.h"
++#include "llvm/MC/MCInstBuilder.h"
+ #include "llvm/MC/MCParser/MCAsmLexer.h"
+ #include "llvm/MC/MCParser/MCParsedAsmOperand.h"
+ #include "llvm/MC/MCParser/MCTargetAsmParser.h"
+@@ -40,6 +41,9 @@
+ 
+   SMLoc getLoc() const { return getParser().getTok().getLoc(); }
+   bool isRV64() const { return getSTI().hasFeature(RISCV::Feature64Bit); }
++  bool enableLinkerRelax() const {
++    return getSTI().hasFeature(RISCV::FeatureRelax);
++  }
+ 
+   RISCVTargetStreamer &getTargetStreamer() {
+     MCTargetStreamer &TS = *getParser().getStreamer().getTargetStreamer();
+@@ -77,6 +81,7 @@
+   bool parseOperand(OperandVector &Operands, bool ForceImmediate);
+ 
+   bool parseDirectiveOption();
++  bool parseDirectiveAlign(SMLoc L);
+ 
+   void setFeatureBits(uint64_t Feature, StringRef FeatureString) {
+     if (!(getSTI().getFeatureBits()[Feature])) {
+@@ -1034,10 +1039,45 @@
+ 
+   if (IDVal == ".option")
+     return parseDirectiveOption();
++  // We need to insert R_RISCV_ALIGN relocation type if the linker
++  // relaxation enabled. So then linker could fixup the alignment
++  // after relaxation changed code size.
++  else if (enableLinkerRelax() &&
++           ((IDVal == ".align") || (IDVal == ".p2align")))
++    return parseDirectiveAlign(DirectiveID.getLoc());
+ 
+   return true;
+ }
+ 
++bool RISCVAsmParser::parseDirectiveAlign(SMLoc L) {
++  StringRef AlignStr = getParser().parseStringToEndOfStatement().trim();
++  unsigned Align, Padding;
++  if (AlignStr.getAsInteger(10, Align))
++    return true;
++
++  unsigned AlignInBytes = 1 << Align;
++  // Always insert AlignInBytes - 2 bytes NOPs because RV32IMA object file
++  // may have chance linking with RV32IMAC object file.
++  // Currently, RISCV ABI not restrict linking RV32IMA with RV32IMAC yet.
++  // If RV32IMA can't link with RV32IMAC, we could padding AlignInBytes - 4
++  // bytes NOPs for RV32IMA.
++  Padding = AlignInBytes - 2;
++
++  if ((Padding == 0) || (Padding > AlignInBytes))
++    return true;
++
++  const MCSection *Section = getStreamer().getCurrentSectionOnly();
++  assert(Section && "must have section to emit alignment");
++  if (Section->UseCodeAlign()) {
++    MCInst NOPs = MCInstBuilder(RISCV::PseudoNOPs).addImm(Padding);
++    getStreamer().EmitInstruction(NOPs, getSTI());
++    getStreamer().EmitCodeAlignment(AlignInBytes, 0);
++  } else
++    getStreamer().EmitValueToAlignment(AlignInBytes, 0, 1, 0);
++
++  return false;
++}
++
+ bool RISCVAsmParser::parseDirectiveOption() {
+   MCAsmParser &Parser = getParser();
+   // Get the option token.
+Index: lib/Target/RISCV/MCTargetDesc/RISCVAsmBackend.cpp
+===================================================================
+--- lib/Target/RISCV/MCTargetDesc/RISCVAsmBackend.cpp
++++ lib/Target/RISCV/MCTargetDesc/RISCVAsmBackend.cpp
+@@ -50,14 +50,28 @@
+     return STI.getFeatureBits()[RISCV::FeatureRelax];
+   }
+ 
++  // We need to insert extra NOPs and R_RISCV_ALIGN relocation type for
++  // .align and .p2align when linker relaxation enabled. So we disable
++  // generic padding for alignment directive and let PseudoNOPs to deal
++  // with it.
++  bool disablePaddingAlignment(void) override {
++    return STI.getFeatureBits()[RISCV::FeatureRelax];
++  }
++
+   bool fixupNeedsRelaxation(const MCFixup &Fixup, uint64_t Value,
+                             const MCRelaxableFragment *DF,
+                             const MCAsmLayout &Layout) const override;
+ 
+   unsigned getNumFixupKinds() const override {
+     return RISCV::NumTargetFixupKinds;
+   }
+ 
++  Optional<MCFixupKind> getFixupKind(StringRef Name) const override {
++    return StringSwitch<Optional<MCFixupKind>>(Name)
++        .Case("R_RISCV_ALIGN", (MCFixupKind)RISCV::fixup_riscv_align)
++        .Default(MCAsmBackend::getFixupKind(Name));
++  }
++
+   const MCFixupKindInfo &getFixupKindInfo(MCFixupKind Kind) const override {
+     const static MCFixupKindInfo Infos[RISCV::NumTargetFixupKinds] = {
+       // This table *must* be in the order that the fixup_* kinds are defined in
+Index: lib/Target/RISCV/MCTargetDesc/RISCVELFObjectWriter.cpp
+===================================================================
+--- lib/Target/RISCV/MCTargetDesc/RISCVELFObjectWriter.cpp
++++ lib/Target/RISCV/MCTargetDesc/RISCVELFObjectWriter.cpp
+@@ -80,6 +80,8 @@
+     return ELF::R_RISCV_CALL;
+   case RISCV::fixup_riscv_relax:
+     return ELF::R_RISCV_RELAX;
++  case RISCV::fixup_riscv_align:
++    return ELF::R_RISCV_ALIGN;
+   }
+ }
+ 
+Index: lib/Target/RISCV/MCTargetDesc/RISCVFixupKinds.h
+===================================================================
+--- lib/Target/RISCV/MCTargetDesc/RISCVFixupKinds.h
++++ lib/Target/RISCV/MCTargetDesc/RISCVFixupKinds.h
+@@ -53,6 +53,10 @@
+   // fixup_riscv_relax - Used to generate an R_RISCV_RELAX relocation type,
+   // which indicates the linker may relax the instruction pair.
+   fixup_riscv_relax,
++  // fixup_riscv_align - Used to generate an R_RISCV_ALIGN relocation type,
++  // which indicates the linker should fixup the alignment after linker
++  // relaxation.
++  fixup_riscv_align,
+ 
+   // fixup_riscv_invalid - used as a sentinel and a marker, must be last fixup
+   fixup_riscv_invalid,
+Index: lib/Target/RISCV/MCTargetDesc/RISCVMCCodeEmitter.cpp
+===================================================================
+--- lib/Target/RISCV/MCTargetDesc/RISCVMCCodeEmitter.cpp
++++ lib/Target/RISCV/MCTargetDesc/RISCVMCCodeEmitter.cpp
+@@ -57,6 +57,10 @@
+                           SmallVectorImpl<MCFixup> &Fixups,
+                           const MCSubtargetInfo &STI) const;
+ 
++  unsigned expandNOPs(const MCInst &MI, raw_ostream &OS,
++                      SmallVectorImpl<MCFixup> &Fixups,
++                      const MCSubtargetInfo &STI) const;
++
+   /// TableGen'erated function for getting the binary encoding for an
+   /// instruction.
+   uint64_t getBinaryCodeForInstr(const MCInst &MI,
+@@ -121,6 +125,62 @@
+   support::endian::Writer<support::little>(OS).write(Binary);
+ }
+ 
++// Expand PseudoNOPs to NOPs with R_RISCV_ALIGN relocation type for
++// .align directive when the linker relaxation enabled.
++unsigned RISCVMCCodeEmitter::expandNOPs(const MCInst &MI, raw_ostream &OS,
++                                        SmallVectorImpl<MCFixup> &Fixups,
++                                        const MCSubtargetInfo &STI) const {
++  bool EnableRelax = STI.getFeatureBits()[RISCV::FeatureRelax];
++  int64_t Count = MI.getOperand(0).getImm();
++  unsigned Zero = RISCV::X0;
++  uint32_t Binary32Bit;
++  uint16_t Binary16Bit;
++  bool isFirstNOP = true;
++  unsigned MCNum = 0;
++  const MCExpr *TotalBytes = MCConstantExpr::create(Count, Ctx);
++  MCInst NOP, C_NOP;
++  SMLoc FirstNOPLoc;
++
++  assert(EnableRelax && "Expected PseudoNOPs when linker relaxation enabled");
++
++  assert(((Count % 2) == 0) && "Expected multiple of two");
++
++  // Emit 32-bit NOP.
++  uint64_t Nop32Count = Count / 4;
++  for (uint64_t i = Nop32Count; i != 0; --i) {
++    NOP = MCInstBuilder(RISCV::ADDI).addReg(Zero).addReg(Zero).addImm(0);
++    Binary32Bit = getBinaryCodeForInstr(NOP, Fixups, STI);
++    support::endian::Writer<support::little>(OS).write(Binary32Bit);
++    ++MCNum;
++
++    if (isFirstNOP) {
++      isFirstNOP = false;
++      FirstNOPLoc = NOP.getLoc();
++    }
++  }
++
++  // Emit 16-bit C_NOP.
++  uint64_t Nop16Count = (Count - Nop32Count * 4) / 2;
++  for (uint64_t i = Nop16Count; i != 0; --i) {
++    C_NOP = MCInstBuilder(RISCV::C_NOP);
++    Binary16Bit = getBinaryCodeForInstr(C_NOP, Fixups, STI);
++    support::endian::Writer<support::little>(OS).write<uint16_t>(Binary16Bit);
++    ++MCNum;
++
++    if (isFirstNOP) {
++      isFirstNOP = false;
++      FirstNOPLoc = C_NOP.getLoc();
++    }
++  }
++
++  // Attach R_RISCV_ALIGN relocation type to the first NOP.
++  Fixups.push_back(MCFixup::create(
++      0, TotalBytes, MCFixupKind(RISCV::fixup_riscv_align), FirstNOPLoc));
++  ++MCNumFixups;
++
++  return MCNum;
++}
++
+ void RISCVMCCodeEmitter::encodeInstruction(const MCInst &MI, raw_ostream &OS,
+                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            const MCSubtargetInfo &STI) const {
+@@ -132,6 +192,9 @@
+     expandFunctionCall(MI, OS, Fixups, STI);
+     MCNumEmitted += 2;
+     return;
++  } else if (MI.getOpcode() == RISCV::PseudoNOPs) {
++    MCNumEmitted += expandNOPs(MI, OS, Fixups, STI);
++    return;
+   }
+ 
+   switch (Size) {
+Index: lib/Target/RISCV/RISCVInstrInfo.td
+===================================================================
+--- lib/Target/RISCV/RISCVInstrInfo.td
++++ lib/Target/RISCV/RISCVInstrInfo.td
+@@ -705,6 +705,9 @@
+                               [(CallSeqEnd timm:$amt1, timm:$amt2)]>;
+ } // Defs = [X2], Uses = [X2]
+ 
++let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
++def PseudoNOPs : Pseudo<(outs), (ins i32imm:$bytes), []>;
++
+ //===----------------------------------------------------------------------===//
+ // Standard extensions
+ //===----------------------------------------------------------------------===//
+Index: test/MC/RISCV/align.s
+===================================================================
+--- /dev/null
++++ test/MC/RISCV/align.s
+@@ -0,0 +1,37 @@
++# RUN: llvm-mc -filetype=obj -triple riscv32 -mattr=+c,+relax < %s \
++# RUN:     | llvm-objdump -d -riscv-no-aliases - \
++# RUN:     | FileCheck -check-prefix=RELAX-INST %s
++# RUN: llvm-mc -filetype=obj -triple riscv32 -mattr=+c,+relax < %s \
++# RUN:     | llvm-readobj -r | FileCheck -check-prefix=RELAX-RELOC %s
++# RUN: llvm-mc -filetype=obj -triple riscv32 -mattr=+c < %s \
++# RUN:     | llvm-objdump -d -riscv-no-aliases - \
++# RUN:     | FileCheck -check-prefix=INST %s
++# RUN: llvm-mc -filetype=obj -triple riscv32 -mattr=+c < %s \
++# RUN:     | llvm-readobj -r | FileCheck -check-prefix=RELOC %s
++
++# We need to insert N-2 bytes NOPs for and R_RISCV_ALIGN relocation type
++# for .align N directive when linker relaxation enabled.
++# Linker could satisfy alignment by removing NOPs after linker relaxation.
++test:               
++	.p2align 2
++# RELAX-RELOC: R_RISCV_ALIGN - 0x2
++# RELAX-INST: c.nop
++	c.bnez  a0, .LBB0_2
++	mv	a0, zero
++# RELAX-RELOC: R_RISCV_ALIGN - 0x6
++# RELAX-INST: addi    zero, zero, 0
++# RELAX-INST: c.nop
++# INST: addi    zero, zero, 0
++	.p2align 3
++	add	a0, a0, a1
++# RELAX-RELOC: R_RISCV_ALIGN - 0xE
++# RELAX-INST: addi    zero, zero, 0
++# RELAX-INST: addi    zero, zero, 0
++# RELAX-INST: addi    zero, zero, 0
++# RELAX-INST: c.nop
++# INST: addi    zero, zero, 0
++# INST: c.nop
++# RELOC-NOT: R_RISCV
++	.align 4
++.LBB0_2:
++	ret

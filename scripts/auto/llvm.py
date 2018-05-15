@@ -11,10 +11,12 @@ class LLVM(auto.pkg.Package):
         link = path(DIR.submodules, "llvm/tools/clang")
         if not os.path.exists(link):
             shell("ln -sf {}/clang {}".format(DIR.submodules, link))
+        """ Apply patches
         if not os.path.exists(path(link, ".patched")):
             with cd(link):
                 shell("patch -p0 < " + path(DIR.patches, "baremetal.patch"))
                 shell("touch .patched")
+        """
 
 
     def _build(self):

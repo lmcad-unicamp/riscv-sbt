@@ -1,0 +1,400 @@
+diff --git a/include/llvm/MC/MCAsmBackend.h b/include/llvm/MC/MCAsmBackend.h
+index 55581fb7921..c892f4a98dc 100644
+--- a/include/llvm/MC/MCAsmBackend.h
++++ b/include/llvm/MC/MCAsmBackend.h
+@@ -105,7 +105,8 @@ public:
+   virtual bool fixupNeedsRelaxationAdvanced(const MCFixup &Fixup, bool Resolved,
+                                             uint64_t Value,
+                                             const MCRelaxableFragment *DF,
+-                                            const MCAsmLayout &Layout) const;
++                                            const MCAsmLayout &Layout,
++                                            const bool WasForced) const;
+ 
+   /// Simple predicate for targets where !Resolved implies requiring relaxation
+   virtual bool fixupNeedsRelaxation(const MCFixup &Fixup, uint64_t Value,
+diff --git a/include/llvm/MC/MCAssembler.h b/include/llvm/MC/MCAssembler.h
+index 2951f5ace1b..6a35bc1ed8c 100644
+--- a/include/llvm/MC/MCAssembler.h
++++ b/include/llvm/MC/MCAssembler.h
+@@ -162,12 +162,14 @@ private:
+   /// evaluates to.
+   /// \param Value [out] On return, the value of the fixup as currently laid
+   /// out.
++  /// \param WasForced [out] On return, the value in the fixup is set to the
++  /// correct value if WasForced is true, even if evaluateFixup returns false.
+   /// \return Whether the fixup value was fully resolved. This is true if the
+   /// \p Value result is fixed, otherwise the value may change due to
+   /// relocation.
+   bool evaluateFixup(const MCAsmLayout &Layout, const MCFixup &Fixup,
+                      const MCFragment *DF, MCValue &Target,
+-                     uint64_t &Value) const;
++                     uint64_t &Value, bool &WasForced) const;
+ 
+   /// Check whether a fixup can be satisfied, or whether it needs to be relaxed
+   /// (increased in size, in order to hold its value correctly).
+diff --git a/lib/MC/MCAsmBackend.cpp b/lib/MC/MCAsmBackend.cpp
+index b4a4d0a8996..d675a98542f 100644
+--- a/lib/MC/MCAsmBackend.cpp
++++ b/lib/MC/MCAsmBackend.cpp
+@@ -58,7 +58,8 @@ const MCFixupKindInfo &MCAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
+ 
+ bool MCAsmBackend::fixupNeedsRelaxationAdvanced(
+     const MCFixup &Fixup, bool Resolved, uint64_t Value,
+-    const MCRelaxableFragment *DF, const MCAsmLayout &Layout) const {
++    const MCRelaxableFragment *DF, const MCAsmLayout &Layout,
++    const bool WasForced) const {
+   if (!Resolved)
+     return true;
+   return fixupNeedsRelaxation(Fixup, Value, DF, Layout);
+@@ -84,4 +85,4 @@ void MCAsmBackend::handleCodePaddingInstructionEnd(const MCInst &Inst) {
+ 
+ bool MCAsmBackend::relaxFragment(MCPaddingFragment *PF, MCAsmLayout &Layout) {
+   return CodePadder->relaxFragment(PF, Layout);
+-}
+\ No newline at end of file
++}
+diff --git a/lib/MC/MCAssembler.cpp b/lib/MC/MCAssembler.cpp
+index 31f66383548..e1c7de71c53 100644
+--- a/lib/MC/MCAssembler.cpp
++++ b/lib/MC/MCAssembler.cpp
+@@ -197,7 +197,8 @@ const MCSymbol *MCAssembler::getAtom(const MCSymbol &S) const {
+ 
+ bool MCAssembler::evaluateFixup(const MCAsmLayout &Layout,
+                                 const MCFixup &Fixup, const MCFragment *DF,
+-                                MCValue &Target, uint64_t &Value) const {
++                                MCValue &Target, uint64_t &Value,
++                                bool &WasForced) const {
+   ++stats::evaluateFixup;
+ 
+   // FIXME: This code has some duplication with recordRelocation. We should
+@@ -209,6 +210,7 @@ bool MCAssembler::evaluateFixup(const MCAsmLayout &Layout,
+   const MCExpr *Expr = Fixup.getValue();
+   MCContext &Ctx = getContext();
+   Value = 0;
++  WasForced = false;
+   if (!Expr->evaluateAsRelocatable(Target, &Layout, &Fixup)) {
+     Ctx.reportError(Fixup.getLoc(), "expected relocatable expression");
+     return true;
+@@ -273,8 +275,10 @@ bool MCAssembler::evaluateFixup(const MCAsmLayout &Layout,
+   }
+ 
+   // Let the backend force a relocation if needed.
+-  if (IsResolved && getBackend().shouldForceRelocation(*this, Fixup, Target))
++  if (IsResolved && Backend.shouldForceRelocation(*this, Fixup, Target)) {
+     IsResolved = false;
++    WasForced = true;
++  }
+ 
+   return IsResolved;
+ }
+@@ -693,7 +697,9 @@ MCAssembler::handleFixup(const MCAsmLayout &Layout, MCFragment &F,
+   // Evaluate the fixup.
+   MCValue Target;
+   uint64_t FixedValue;
+-  bool IsResolved = evaluateFixup(Layout, Fixup, &F, Target, FixedValue);
++  bool WasForced;
++  bool IsResolved = evaluateFixup(Layout, Fixup, &F, Target, FixedValue,
++                                  WasForced);
+   if (!IsResolved) {
+     // The fixup was unresolved, we need a relocation. Inform the object
+     // writer of the relocation, and give it an opportunity to adjust the
+@@ -808,13 +814,14 @@ bool MCAssembler::fixupNeedsRelaxation(const MCFixup &Fixup,
+   assert(getBackendPtr() && "Expected assembler backend");
+   MCValue Target;
+   uint64_t Value;
+-  bool Resolved = evaluateFixup(Layout, Fixup, DF, Target, Value);
++  bool WasForced;
++  bool Resolved = evaluateFixup(Layout, Fixup, DF, Target, Value, WasForced);
+   if (Target.getSymA() &&
+       Target.getSymA()->getKind() == MCSymbolRefExpr::VK_X86_ABS8 &&
+       Fixup.getKind() == FK_Data_1)
+     return false;
+   return getBackend().fixupNeedsRelaxationAdvanced(Fixup, Resolved, Value, DF,
+-                                                   Layout);
++                                                   Layout, WasForced);
+ }
+ 
+ bool MCAssembler::fragmentNeedsRelaxation(const MCRelaxableFragment *F,
+diff --git a/lib/Target/Hexagon/MCTargetDesc/HexagonAsmBackend.cpp b/lib/Target/Hexagon/MCTargetDesc/HexagonAsmBackend.cpp
+index 584f35e0051..b950da2c169 100644
+--- a/lib/Target/Hexagon/MCTargetDesc/HexagonAsmBackend.cpp
++++ b/lib/Target/Hexagon/MCTargetDesc/HexagonAsmBackend.cpp
+@@ -569,7 +569,8 @@ public:
+   bool fixupNeedsRelaxationAdvanced(const MCFixup &Fixup, bool Resolved,
+                                     uint64_t Value,
+                                     const MCRelaxableFragment *DF,
+-                                    const MCAsmLayout &Layout) const override {
++                                    const MCAsmLayout &Layout,
++                                    const bool WasForced) const override {
+     MCInst const &MCB = DF->getInst();
+     assert(HexagonMCInstrInfo::isBundle(MCB));
+ 
+diff --git a/lib/Target/RISCV/MCTargetDesc/RISCVAsmBackend.cpp b/lib/Target/RISCV/MCTargetDesc/RISCVAsmBackend.cpp
+index beb37b50032..e8d8baece7f 100644
+--- a/lib/Target/RISCV/MCTargetDesc/RISCVAsmBackend.cpp
++++ b/lib/Target/RISCV/MCTargetDesc/RISCVAsmBackend.cpp
+@@ -61,7 +61,15 @@ public:
+ 
+   bool fixupNeedsRelaxation(const MCFixup &Fixup, uint64_t Value,
+                             const MCRelaxableFragment *DF,
+-                            const MCAsmLayout &Layout) const override;
++                            const MCAsmLayout &Layout) const override {
++    llvm_unreachable("Handled by fixupNeedsRelaxationAdvanced");
++  }
++
++  bool fixupNeedsRelaxationAdvanced(const MCFixup &Fixup, bool Resolved,
++                                    uint64_t Value,
++                                    const MCRelaxableFragment *DF,
++                                    const MCAsmLayout &Layout,
++                                    const bool WasForced) const override;
+ 
+   unsigned getNumFixupKinds() const override {
+     return RISCV::NumTargetFixupKinds;
+@@ -112,10 +120,19 @@ public:
+ };
+ 
+ 
+-bool RISCVAsmBackend::fixupNeedsRelaxation(const MCFixup &Fixup,
+-                                           uint64_t Value,
+-                                           const MCRelaxableFragment *DF,
+-                                           const MCAsmLayout &Layout) const {
++bool RISCVAsmBackend::fixupNeedsRelaxationAdvanced(const MCFixup &Fixup,
++                                                   bool Resolved,
++                                                   uint64_t Value,
++                                                   const MCRelaxableFragment *DF,
++                                                   const MCAsmLayout &Layout,
++                                                   const bool WasForced) const {
++  // Return true if the symbol is actually unresolved.
++  // Resolved could be always false when shouldForceRelocation return true.
++  // We use !WasForced to indicate that the symbol is unresolved and not forced
++  // by shouldForceRelocation.
++  if (!Resolved && !WasForced)
++    return true;
++
+   int64_t Offset = int64_t(Value);
+   switch ((unsigned)Fixup.getKind()) {
+   default:
+diff --git a/test/MC/RISCV/compressed-relocations.s b/test/MC/RISCV/compressed-relocations.s
+index 832a2085e61..31c398ef84e 100644
+--- a/test/MC/RISCV/compressed-relocations.s
++++ b/test/MC/RISCV/compressed-relocations.s
+@@ -2,6 +2,8 @@
+ # RUN:     | FileCheck -check-prefix=INSTR -check-prefix=FIXUP %s
+ # RUN: llvm-mc -filetype=obj -triple riscv32 -mattr=+c < %s \
+ # RUN:     | llvm-readobj -r | FileCheck -check-prefix=RELOC %s
++# RUN: llvm-mc -filetype=obj -triple riscv32 -mattr=+c,+relax < %s \
++# RUN:     | llvm-readobj -r | FileCheck -check-prefix=RELOC %s
+ 
+ # Check prefixes:
+ # RELOC - Check the relocation in the object.
+diff --git a/test/MC/RISCV/rv32-relaxation.s b/test/MC/RISCV/rv32-relaxation.s
+index 8b1675d3389..09a833a790f 100644
+--- a/test/MC/RISCV/rv32-relaxation.s
++++ b/test/MC/RISCV/rv32-relaxation.s
+@@ -1,5 +1,9 @@
+ # RUN: llvm-mc -filetype=obj -triple riscv32 -mattr=+c < %s \
+ # RUN:     | llvm-objdump -d -riscv-no-aliases - | FileCheck -check-prefix=INSTR %s
++# RUN: llvm-mc -filetype=obj -triple riscv32 -mattr=+c,+relax < %s \
++# RUN:     | llvm-objdump -d -riscv-no-aliases - | FileCheck -check-prefix=RELAX-INSTR %s
++# RUN: llvm-mc -filetype=obj -triple riscv32 -mattr=+c,+relax < %s \
++# RUN:     | llvm-readobj -r | FileCheck -check-prefix=RELAX-RELOC %s
+ 
+ FAR_JUMP_NEGATIVE:
+   c.nop
+@@ -15,55 +19,103 @@ NEAR_NEGATIVE:
+ start:
+   c.bnez a0, NEAR
+ #INSTR: c.bnez a0, 72
++#RELAX-INSTR: c.bnez a0, 0
++#RELAX-RELOC: R_RISCV_RVC_BRANCH
+   c.bnez a0, NEAR_NEGATIVE
+ #INSTR: c.bnez a0, -4
++#RELAX-INSTR: c.bnez a0, 0
++#RELAX-RELOC: R_RISCV_RVC_BRANCH
+   c.bnez a0, FAR_BRANCH
+ #INSTR-NEXT: bne a0, zero, 326
++#RELAX-INSTR-NEXT: bne a0, zero, 0
++#RELAX-RELOC: R_RISCV_BRANCH
+   c.bnez a0, FAR_BRANCH_NEGATIVE
+ #INSTR-NEXT: bne a0, zero, -268
++#RELAX-INSTR-NEXT: bne a0, zero, 0
++#RELAX-RELOC: R_RISCV_BRANCH
+   c.bnez a0, FAR_JUMP
+ #INSTR-NEXT: bne a0, zero, 2320
++#RELAX-INSTR-NEXT: bne a0, zero, 0
++#RELAX-RELOC: R_RISCV_BRANCH
+   c.bnez a0, FAR_JUMP_NEGATIVE
+ #INSTR-NEXT: bne a0, zero, -2278
++#RELAX-INSTR-NEXT: bne a0, zero, 0
++#RELAX-RELOC: R_RISCV_BRANCH
+ 
+   c.beqz a0, NEAR
+ #INSTR-NEXT: c.beqz a0, 52
++#RELAX-INSTR-NEXT: c.beqz a0, 0
++#RELAX-RELOC: R_RISCV_RVC_BRANCH
+   c.beqz a0, NEAR_NEGATIVE
+ #INSTR-NEXT: c.beqz a0, -24
++#RELAX-INSTR-NEXT: c.beqz a0, 0
++#RELAX-RELOC: R_RISCV_RVC_BRANCH
+   c.beqz a0, FAR_BRANCH
+ #INSTR-NEXT: beq a0, zero, 306
++#RELAX-INSTR-NEXT: beq a0, zero, 0
++#RELAX-RELOC: R_RISCV_BRANCH
+   c.beqz a0, FAR_BRANCH_NEGATIVE
+ #INSTR-NEXT: beq a0, zero, -288
++#RELAX-INSTR-NEXT: beq a0, zero, 0
++#RELAX-RELOC: R_RISCV_BRANCH
+   c.beqz a0, FAR_JUMP
+ #INSTR-NEXT: beq a0, zero, 2300
++#RELAX-INSTR-NEXT: beq a0, zero, 0
++#RELAX-RELOC: R_RISCV_BRANCH
+   c.beqz a0, FAR_JUMP_NEGATIVE
+ #INSTR-NEXT: beq a0, zero, -2298
++#RELAX-INSTR-NEXT: beq a0, zero, 0
++#RELAX-RELOC: R_RISCV_BRANCH
+ 
+   c.j NEAR
+ #INSTR-NEXT: c.j 32
++#RELAX-INSTR-NEXT: c.j 0
++#RELAX-RELOC: R_RISCV_RVC_JUMP
+   c.j NEAR_NEGATIVE
+ #INSTR-NEXT: c.j -44
++#RELAX-INSTR-NEXT: c.j 0
++#RELAX-RELOC: R_RISCV_RVC_JUMP
+   c.j FAR_BRANCH
+ #INSTR-NEXT: c.j 286
++#RELAX-INSTR-NEXT: c.j 0
++#RELAX-RELOC: R_RISCV_RVC_JUMP
+   c.j FAR_BRANCH_NEGATIVE
+ #INSTR-NEXT: c.j -306
++#RELAX-INSTR-NEXT: c.j 0
++#RELAX-RELOC: R_RISCV_RVC_JUMP
+   c.j FAR_JUMP
+ #INSTR-NEXT: jal zero, 2284
++#RELAX-INSTR-NEXT: jal zero, 0
++#RELAX-RELOC: R_RISCV_JAL
+   c.j FAR_JUMP_NEGATIVE
+ #INSTR-NEXT: jal zero, -2314
++#RELAX-INSTR-NEXT: jal zero, 0
++#RELAX-RELOC: R_RISCV_JAL
+ 
+   c.jal NEAR
+ #INSTR: c.jal 16
++#RELAX-INSTR: c.jal 0
++#RELAX-RELOC: R_RISCV_RVC_JUMP
+   c.jal NEAR_NEGATIVE
+ #INSTR: c.jal -60
++#RELAX-INSTR: c.jal 0
++#RELAX-RELOC: R_RISCV_RVC_JUMP
+   c.jal FAR_BRANCH
+ #INSTR-NEXT: c.jal 270
++#RELAX-INSTR-NEXT: c.jal 0
++#RELAX-RELOC: R_RISCV_RVC_JUMP
+   c.jal FAR_BRANCH_NEGATIVE
+ #INSTR-NEXT: c.jal -322
++#RELAX-INSTR-NEXT: c.jal 0
++#RELAX-RELOC: R_RISCV_RVC_JUMP
+   c.jal FAR_JUMP
+ #INSTR-NEXT: jal ra, 2268
++#RELAX-INSTR-NEXT: jal ra, 0
++#RELAX-RELOC: R_RISCV_JAL
+   c.jal FAR_JUMP_NEGATIVE
+ #INSTR-NEXT: jal ra, -2330
++#RELAX-INSTR-NEXT: jal ra, 0
++#RELAX-RELOC: R_RISCV_JAL
+ 
+ NEAR:
+   c.nop
+diff --git a/test/MC/RISCV/rv64-relaxation.s b/test/MC/RISCV/rv64-relaxation.s
+index f0551244665..202cbafa785 100644
+--- a/test/MC/RISCV/rv64-relaxation.s
++++ b/test/MC/RISCV/rv64-relaxation.s
+@@ -1,5 +1,9 @@
+ # RUN: llvm-mc -filetype=obj -triple riscv64 -mattr=+c < %s \
+ # RUN:     | llvm-objdump -d -riscv-no-aliases - | FileCheck -check-prefix=INSTR %s
++# RUN: llvm-mc -filetype=obj -triple riscv64 -mattr=+c,+relax < %s \
++# RUN:     | llvm-objdump -d -riscv-no-aliases - | FileCheck -check-prefix=RELAX-INSTR %s
++# RUN: llvm-mc -filetype=obj -triple riscv64 -mattr=+c,+relax < %s \
++# RUN:     | llvm-readobj -r | FileCheck -check-prefix=RELAX-RELOC %s
+ 
+ FAR_JUMP_NEGATIVE:
+   c.nop
+@@ -15,42 +19,78 @@ NEAR_NEGATIVE:
+ start:
+   c.bnez a0, NEAR
+ #INSTR: c.bnez a0, 56
++#RELAX-INSTR: c.bnez a0, 0
++#RELAX-RELOC: R_RISCV_RVC_BRANCH
+   c.bnez a0, NEAR_NEGATIVE
+ #INSTR: c.bnez a0, -4
++#RELAX-INSTR: c.bnez a0, 0
++#RELAX-RELOC: R_RISCV_RVC_BRANCH
+   c.bnez a0, FAR_BRANCH
+ #INSTR-NEXT: bne a0, zero, 310
++#RELAX-INSTR-NEXT: bne a0, zero, 0
++#RELAX-RELOC: R_RISCV_BRANCH
+   c.bnez a0, FAR_BRANCH_NEGATIVE
+ #INSTR-NEXT: bne a0, zero, -268
++#RELAX-INSTR-NEXT: bne a0, zero, 0
++#RELAX-RELOC: R_RISCV_BRANCH
+   c.bnez a0, FAR_JUMP
+ #INSTR-NEXT: bne a0, zero, 2304
++#RELAX-INSTR-NEXT: bne a0, zero, 0
++#RELAX-RELOC: R_RISCV_BRANCH
+   c.bnez a0, FAR_JUMP_NEGATIVE
+ #INSTR-NEXT: bne a0, zero, -2278
++#RELAX-INSTR-NEXT: bne a0, zero, 0
++#RELAX-RELOC: R_RISCV_BRANCH
+ 
+   c.beqz a0, NEAR
+ #INSTR-NEXT: c.beqz a0, 36
++#RELAX-INSTR-NEXT: c.beqz a0, 0
++#RELAX-RELOC: R_RISCV_RVC_BRANCH
+   c.beqz a0, NEAR_NEGATIVE
+ #INSTR-NEXT: c.beqz a0, -24
++#RELAX-INSTR-NEXT: c.beqz a0, 0
++#RELAX-RELOC: R_RISCV_RVC_BRANCH
+   c.beqz a0, FAR_BRANCH
+ #INSTR-NEXT: beq a0, zero, 290
++#RELAX-INSTR-NEXT: beq a0, zero, 0
++#RELAX-RELOC: R_RISCV_BRANCH
+   c.beqz a0, FAR_BRANCH_NEGATIVE
+ #INSTR-NEXT: beq a0, zero, -288
++#RELAX-INSTR-NEXT: beq a0, zero, 0
++#RELAX-RELOC: R_RISCV_BRANCH
+   c.beqz a0, FAR_JUMP
+ #INSTR-NEXT: beq a0, zero, 2284
++#RELAX-INSTR-NEXT: beq a0, zero, 0
++#RELAX-RELOC: R_RISCV_BRANCH
+   c.beqz a0, FAR_JUMP_NEGATIVE
+ #INSTR-NEXT: beq a0, zero, -2298
++#RELAX-INSTR-NEXT: beq a0, zero, 0
++#RELAX-RELOC: R_RISCV_BRANCH
+ 
+   c.j NEAR
+ #INSTR-NEXT: c.j 16
++#RELAX-INSTR-NEXT: c.j 0
++#RELAX-RELOC: R_RISCV_RVC_JUMP
+   c.j NEAR_NEGATIVE
+ #INSTR-NEXT: c.j -44
++#RELAX-INSTR-NEXT: c.j 0
++#RELAX-RELOC: R_RISCV_RVC_JUMP
+   c.j FAR_BRANCH
+ #INSTR-NEXT: c.j 270
++#RELAX-INSTR-NEXT: c.j 0
++#RELAX-RELOC: R_RISCV_RVC_JUMP
+   c.j FAR_BRANCH_NEGATIVE
+ #INSTR-NEXT: c.j -306
++#RELAX-INSTR-NEXT: c.j 0
++#RELAX-RELOC: R_RISCV_RVC_JUMP
+   c.j FAR_JUMP
+ #INSTR-NEXT: jal zero, 2268
++#RELAX-INSTR-NEXT: jal zero, 0
++#RELAX-RELOC: R_RISCV_JAL
+   c.j FAR_JUMP_NEGATIVE
+ #INSTR-NEXT: jal zero, -2314
++#RELAX-INSTR-NEXT: jal zero, 0
++#RELAX-RELOC: R_RISCV_JAL
+ 
+ NEAR:
+   c.nop
