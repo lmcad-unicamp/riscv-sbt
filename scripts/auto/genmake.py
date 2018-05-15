@@ -4,11 +4,19 @@ from auto.config import *
 from auto.utils import *
 
 def bld(arch, srcdir, dstdir, ins, out, bflags=None):
+    out_is_obj = out.endswith(".o")
+
+    objs = []
+    aobjs = []
     if len(ins) == 1:
-        objs = [arch.out2objname(out)]
-        aobjs = [path(dstdir, objs[0])]
+        if not out_is_obj:
+            objs = [arch.out2objname(out)]
+            aobjs = [path(dstdir, objs[0])]
     else:
-        objs = [arch.src2objname(src) for src in ins]
+        for src in ins:
+            obj = arch.src2objname(src)
+            if not out_is_obj or obj != out:
+                objs.append(obj)
         aobjs = [path(dstdir, obj) for obj in objs]
 
     ains = [path(srcdir, i) for i in ins]

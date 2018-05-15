@@ -162,6 +162,9 @@ RV32 = Arch(
 
 RV32_LINUX_SYSROOT  = DIR.toolchain_release + "/opt/riscv/sysroot"
 RV32_LINUX_ABI      = "ilp32"
+RV32_LINUX_GCC_FLAGS    = "-march=rv32g -mabi=" + RV32_LINUX_ABI
+RV32_LINUX_AS_FLAGS     = "-march=rv32g -mabi=" + RV32_LINUX_ABI
+RV32_LINUX_LD_FLAGS     = "-m elf32lriscv"
 
 RV32_LINUX = Arch(
         name="rv32-linux",
@@ -169,18 +172,20 @@ RV32_LINUX = Arch(
         triple="riscv64-unknown-linux-gnu",
         run="qemu-riscv32 -L " + RV32_LINUX_SYSROOT,
         march=RV32_MARCH,
-        gcc_flags="-march=rv32g -mabi=" + RV32_LINUX_ABI,
+        gcc_flags=RV32_LINUX_GCC_FLAGS,
         clang_flags="--target=riscv32 -D__riscv_xlen=32",
         sysroot=RV32_LINUX_SYSROOT,
         isysroot=RV32_LINUX_SYSROOT + "/usr/include",
         llc_flags=RV32_LLC_FLAGS,
-        as_flags="-march=rv32g -mabi=" + RV32_LINUX_ABI,
-        ld_flags="-m elf32lriscv",
+        as_flags=RV32_LINUX_AS_FLAGS,
+        ld_flags=RV32_LINUX_LD_FLAGS,
         mattr=RV32_MATTR)
 
 
-X86_MARCH = "x86"
-X86_MATTR = "avx"
+X86_MARCH       = "x86"
+X86_MATTR       = "avx"
+X86_SYSROOT     = "/"
+X86_ISYSROOT    = "/usr/include"
 
 X86 = Arch(
         name="x86",
@@ -190,12 +195,28 @@ X86 = Arch(
         march=X86_MARCH,
         gcc_flags="-m32",
         clang_flags="--target=x86_64-unknown-linux-gnu -m32",
-        sysroot="/",
-        isysroot="/usr/include",
+        sysroot=X86_SYSROOT,
+        isysroot=X86_ISYSROOT,
         llc_flags=cat("-march=" + X86_MARCH, "-mattr=" + X86_MATTR),
         as_flags="--32",
         ld_flags="-m elf_i386",
         mattr=X86_MATTR)
+
+
+RV32_FOR_X86 = Arch(
+        name="rv32-for-x86",
+        prefix="rv32-for-x86",
+        triple=RV32_LINUX.triple,
+        run="",
+        march=RV32_MARCH,
+        gcc_flags=RV32_LINUX_GCC_FLAGS,
+        clang_flags="--target=riscv32",
+        sysroot=X86_SYSROOT,
+        isysroot=X86_ISYSROOT,
+        llc_flags=RV32_LLC_FLAGS,
+        as_flags=RV32_LINUX_AS_FLAGS,
+        ld_flags=RV32_LINUX_LD_FLAGS,
+        mattr=RV32_MATTR)
 
 
 # arch map
@@ -203,6 +224,7 @@ ARCH = {
     "rv32"          : RV32,
     "rv32-linux"    : RV32_LINUX,
     "x86"           : X86,
+    "rv32-for-x86"  : RV32_FOR_X86,
 }
 
 ###

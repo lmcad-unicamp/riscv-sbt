@@ -22,6 +22,7 @@ class Opts:
         self.sbtflags = None
         #
         self._as = None
+        self.obj = False
 
 
 def _c2bc(arch, srcdir, dstdir, _in, out, opts):
@@ -247,6 +248,17 @@ def build(arch, srcdir, dstdir, ins, out, opts):
     # create dstdir if needed
     shell("mkdir -p " + dstdir)
 
+    if opts.obj:
+        if opts.asm:
+            if len(ins) > 1:
+                raise Exception("Can't generate .o for more than 1 .s")
+            _s2o(arch, srcdir, dstdir, ins[0], out, opts)
+        else:
+            s = chsuf(out, '.s')
+            _c2s(arch, srcdir, dstdir, ins, s, opts)
+            _s2o(arch, dstdir, dstdir, s, out, opts)
+        return
+
     if opts.asm:
         _snlink(arch, srcdir, dstdir, ins, out, opts)
     else:
@@ -292,6 +304,7 @@ if __name__ == "__main__":
     # use first file's suffix to find out if we need to assemble
     # or compile
     opts.asm = first.endswith(".s")
+    opts.obj = out.endswith(".o")
     opts.dbg = args.dbg
     opts.cflags = args.cflags
     opts.sflags = args.sflags

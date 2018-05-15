@@ -55,7 +55,6 @@ def _pkgs():
         "-DLLVM_BUILD_TESTS=True",
         "-DCMAKE_C_COMPILER=/usr/bin/clang-3.9",
         "-DCMAKE_CXX_COMPILER=/usr/bin/clang++-3.9",
-        "-DDEFAULT_SYSROOT=" + RV32_LINUX.sysroot,
         "-DGCC_INSTALL_PREFIX=" + gnu_toolchain_prefix,
         "-DLLVM_DEFAULT_TARGET_TRIPLE=" + RV32_LINUX.triple,
         '-DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="RISCV"',

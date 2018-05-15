@@ -127,6 +127,24 @@ clean:
         return ret
 
 
+    def _gen_xinout(self, xarch, name):
+        use_native_sysroot = False
+
+        (farch, narch) = xarch
+        out = farch.add_prefix(narch.add_prefix(name))
+
+        if use_native_sysroot:
+            arch = ARCH[farch.prefix + "-for-" + narch.prefix]
+            obj = arch.out2objname(name)
+            # build rv32 binary for translation
+            txt = bld(arch, self.srcdir, self.dstdir, self.ins, obj, self.bflags)
+        else:
+            obj = farch.out2objname(name)
+            txt = None
+
+        return (obj, out, txt)
+
+
     def gen_build(self):
         name = self.name
         srcdir = self.srcdir
@@ -143,14 +161,15 @@ clean:
 
         # translations
         for xarch in self.xarchs:
-            (farch, narch) = xarch
-            fmod  = farch.out2objname(name)
-            nmod  = farch.add_prefix(narch.add_prefix(name))
+            (fin, fout, rtxt) = self._gen_xinout(xarch, name)
+            if rtxt:
+                txt = txt + rtxt
 
+            (farch, narch) = xarch
             for mode in SBT.modes:
                 txt = txt + \
                     xlate(narch, srcdir, dstdir,
-                        fmod, nmod, mode, self.xflags,
+                        fin, fout, mode, self.xflags,
                         sbtflags=self.sbtflags)
         return txt
 
