@@ -5,4 +5,4 @@ riscv-gnu-toolchain 994cafdbe00b25fa3442efa163503b616fcfdcac
 riscv-isa-sim d48f107dba6a96fb827cb47fdf290261feadeb35
 riscv-pk 9d0911092df8e9bd483edf495a9a780e5f0e660f
 riscv-qemu-tests 92f007e7c145976dbf64de43d99679461272d108
-riscv-sbt 1e8f62aac251c2b86be0de0663ed24e93cb2a16b
+riscv-sbt c08cb752300dfacb40683cfd02cca377b75f9160
