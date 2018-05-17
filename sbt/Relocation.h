@@ -89,7 +89,7 @@ private:
     mutable ConstRelocationPtr _curP;
 
     ConstRelocationPtr getReloc(uint64_t addr);
-    void addProxyReloc(ConstRelocationPtr rel, bool pcrel);
+    void addProxyReloc(ConstRelocationPtr rel, Relocation::RType rtype);
 };
 
 }

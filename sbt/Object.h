@@ -342,8 +342,13 @@ public:
     enum RType : uint64_t {
         PROXY_HI        = 0xFFFF0001,
         PROXY_LO        = 0xFFFF0002,
+        PROXY           = PROXY_HI,
         PROXY_PCREL_HI  = 0xFFFF0003,
-        PROXY_PCREL_LO  = 0xFFFF0004
+        PROXY_PCREL_LO  = 0xFFFF0004,
+        PROXY_PCREL     = PROXY_PCREL_HI,
+        PROXY_CALL_HI   = 0xFFFF0005,
+        PROXY_CALL_LO   = 0xFFFF0006,
+        PROXY_CALL      = PROXY_CALL_HI
     };
 
     virtual ~Relocation() = default;
@@ -578,6 +583,12 @@ public:
                 break;
             case PROXY_PCREL_LO:
                 _typeName = "PROXY_PCREL_LO";
+                break;
+            case PROXY_CALL_HI:
+                _typeName = "PROXY_CALL_HI";
+                break;
+            case PROXY_CALL_LO:
+                _typeName = "PROXY_CALL_LO";
                 break;
             default:
                 xunreachable("Invalid type");

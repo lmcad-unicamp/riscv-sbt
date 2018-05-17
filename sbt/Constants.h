@@ -22,7 +22,6 @@ C CONSTANT = true;
 C DECL = true;
 C ERROR = true;
 C NO_FIRST = true;
-C PCREL = true;
 C RET_REGS_ONLY = true;
 C SIGNED = true;
 C VAR_ARG = true;

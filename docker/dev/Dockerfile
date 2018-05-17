@@ -9,7 +9,8 @@ ENV PATH=$TOPDIR/toolchain/release/bin:$PATH
 ENV PATH=$TOPDIR/toolchain/debug/bin:$PATH
 ENV MAKE_OPTS=-j2
 
-RUN apt-get update \
+RUN dpkg --add-architecture i386 \
+    && apt-get update \
     && apt-get install -y \
     build-essential \
     clang-3.9 \
@@ -19,12 +20,18 @@ RUN apt-get update \
     gdb \
     git \
     libglib2.0-0 \
+    libunwind8:i386 \
+    linux-headers-amd64 \
+    linux-perf-4.9:i386 \
     man \
+    ninja-build \
     vim \
     python3 \
     python3-numpy \
     && rm -rf /var/lib/apt/lists/*
 
-RUN echo "alias ls='ls --color'" >> /root/.bashrc
+RUN echo "alias ls='ls --color'" >> /root/.bashrc \
+    && echo "echo 0 > /proc/sys/kernel/kptr_restrict" >> /root/.bashrc \
+    && echo "source scripts/env.sh" >> /root/.bashrc
 
 CMD ["/bin/bash"]

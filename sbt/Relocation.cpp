@@ -89,20 +89,31 @@ void SBTRelocation::skipRelocation(uint64_t addr)
 }
 
 
-void SBTRelocation::addProxyReloc(ConstRelocationPtr reloc, bool pcrel)
+void SBTRelocation::addProxyReloc(ConstRelocationPtr reloc,
+    Relocation::RType rtype)
 {
     const LLVMRelocation* llrel = static_cast<const LLVMRelocation*>(&*reloc);
     ProxyRelocation* hi = new ProxyRelocation(*llrel);
     ProxyRelocation* lo = new ProxyRelocation(*llrel);
 
-    if (pcrel) {
-        hi->setType(Relocation::PROXY_PCREL_HI);
-        lo->setType(Relocation::PROXY_PCREL_LO);
-        lo->setHiPC(hi->offset());
-    } else {
-        hi->setType(Relocation::PROXY_HI);
-        lo->setType(Relocation::PROXY_LO);
+    switch (rtype) {
+        case Relocation::PROXY:
+            hi->setType(Relocation::PROXY_HI);
+            lo->setType(Relocation::PROXY_LO);
+            break;
+        case Relocation::PROXY_PCREL:
+            hi->setType(Relocation::PROXY_PCREL_HI);
+            lo->setType(Relocation::PROXY_PCREL_LO);
+            lo->setHiPC(hi->offset());
+            break;
+        case Relocation::PROXY_CALL:
+            hi->setType(Relocation::PROXY_CALL_HI);
+            lo->setType(Relocation::PROXY_CALL_LO);
+            break;
+        default:
+            xunreachable("Unknown proxy relocation type");
     }
+
     lo->setOffset(hi->offset() + Constants::INSTRUCTION_SIZE);
 
     _proxyRelocs.emplace(hi);
@@ -155,6 +166,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             };
             break;
 
+        case Relocation::PROXY_CALL_HI:
         case Relocation::PROXY_PCREL_HI:
             // hi20 = (symbol_address - pc + 0x800) >> 12
             relfn = [this, addr](llvm::Constant* symaddr) {
@@ -163,6 +175,12 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
                 c = llvm::ConstantExpr::getAdd(c, _ctx->c.u32(0x800));
                 c = llvm::ConstantExpr::getLShr(c, _ctx->c.u32(12));
                 return c;
+            };
+            break;
+
+        case Relocation::PROXY_CALL_LO:
+            relfn = [](llvm::Constant* symaddr) {
+                return symaddr;
             };
             break;
 
@@ -188,7 +206,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             break;
 
         case llvm::ELF::R_RISCV_CALL:
-            addProxyReloc(reloc, PCREL);
+            addProxyReloc(reloc, Relocation::PROXY_CALL);
             return handleRelocation(addr, os);
 
         case llvm::ELF::R_RISCV_PCREL_HI20:
