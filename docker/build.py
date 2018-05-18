@@ -281,8 +281,7 @@ def is_cygwin():
     except:
         return False
 
-
-def run_dev():
+def get_volstr():
     workdir = mpath(DOCKER_DIR, "riscv-sbt", "src", "riscv-sbt")
     emu = mpath(DOCKER_DIR, "emu", "src")
     llvm = mpath(DOCKER_DIR, "llvm", "src")
@@ -305,8 +304,6 @@ def run_dev():
         return key in ["/riscv-sbt/build", "/riscv-sbt/toolchain"]
 
     if is_cygwin():
-        prefix = "winpty "
-
         def cygpath(path):
             return shell("cygpath -m " + path, save_out=True).strip()
 
@@ -314,8 +311,6 @@ def run_dev():
             if is_vol(k):
                 continue
             vols[k] = cygpath(v)
-    else:
-        prefix = ''
 
     vols_str = ''
     for k, v in vols.items():
@@ -325,8 +320,20 @@ def run_dev():
             t="bind"
         vols_str = cat(vols_str,
                 "--mount type={},source={},destination={}".format(t, v, k))
+    return vols_str
 
-    shell(prefix + "docker run --privileged -it --rm -h dev " + vols_str + " sbt-dev")
+
+def run_dev(n):
+    if is_cygwin():
+        prefix = "winpty "
+    else:
+        prefix = ''
+
+    if n == 1:
+        shell(prefix + "docker run --privileged -it --rm -h dev --name dev " +
+                get_volstr() + " sbt-dev")
+    elif n == 2:
+        shell(prefix + "docker exec -it dev /bin/bash")
 
 
 if __name__ == "__main__":
@@ -356,6 +363,7 @@ if __name__ == "__main__":
     parser.add_argument("--copy-toolchain", action="store_true",
         help="copy toolchain files to volume")
     parser.add_argument("--dev", action="store_true")
+    parser.add_argument("--dev2", action="store_true")
     args = parser.parse_args()
 
 
@@ -409,7 +417,10 @@ if __name__ == "__main__":
         imgs.copy_toolchain()
     # --dev
     elif args.dev:
-        run_dev()
+        run_dev(1)
+    # --dev2
+    elif args.dev2:
+        run_dev(2)
     # error
     else:
         sys.exit("ERROR: no command specified")

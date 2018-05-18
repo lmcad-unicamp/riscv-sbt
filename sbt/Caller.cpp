@@ -55,23 +55,26 @@ llvm::Value* Caller::nextArg()
     if (_passZero)
         return _ctx->c.ZERO;
 
+    llvm::Value* v;
     if (_args) {
         if (_argit == _args->end()) {
             _passZero = true;
             return _ctx->c.ZERO;
         }
-        llvm::Value* v = *_argit;
+        v = *_argit;
         ++_argit;
         return v;
     }
 
-    Register& x = _curF->getReg(_reg++);
+    Register& x = _curF->getReg(_reg);
     if (!x.touched()) {
         _passZero = true;
-        return _ctx->c.ZERO;
-    }
+        v = _ctx->c.ZERO;
+    } else
+        v = _bld->load(_reg);
+    _reg++;
 
-    return _bld->load(_reg);
+    return v;
 }
 
 

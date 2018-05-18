@@ -856,8 +856,13 @@ llvm::Error Instruction::translateBranch(BranchType bt)
     // JALR
     if (bt == JALR) {
         // no base reg
-        if (jregn == XRegister::ZERO) {
+        if (jregn == XRegister::ZERO)
             xunreachable("unexpected JALR with base register equal to zero!");
+
+        // target is known
+        if (isCall && func) {
+            act = CALL;
+            target = jimm;
 
         // no immediate
         } else if (jimm->isZeroValue()) {
@@ -869,16 +874,21 @@ llvm::Error Instruction::translateBranch(BranchType bt)
 
         // base + offset
         } else {
+            auto* ci = llvm::dyn_cast<llvm::ConstantInt>(jimm);
+            if (ci) {
+                uint64_t val = ci->getValue().getZExtValue();
+                // FIXME
+                uint64_t hipc = _ctx->addr - Constants::INSTRUCTION_SIZE;
+                uint64_t hi20 = ((val - hipc + 0x800) & 0xFFFFF000);
+                uint64_t lo = val - hipc - hi20;
+                jimm = _ctx->c.u32(lo);
+            }
+
             v = _bld->add(jreg, jimm);
             if (isCall)
                 act = ICALL;
             else
                 act = IJUMP;
-        }
-
-        if (act == ICALL && func) {
-            act = CALL;
-            target = jimm;
         }
 
     // JAL/branches to PC offsets

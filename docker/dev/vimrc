@@ -1,0 +1,27 @@
+" :source $MYVIMRC
+set bg=dark
+syntax enable       " syntax hl on
+set tw=78
+set bs=2            " backspace mode = 2 (erases any char)
+set ts=4            " tab stop = 4 spaces
+set sw=4            " indentation shift width = 4 spaces
+set expandtab       " tab -> spaces
+set autoindent
+set cindent
+set nobackup
+set history=100
+set ruler
+set showcmd
+set splitright
+set splitbelow
+autocmd FileType text setlocal textwidth=78
+set visualbell      " no bell sound
+set t_vb=           " visual bell termcap code
+set list            " show tab and trailing chars
+set listchars=tab:>-,trail:@    " chars to use in list mode
+set modeline        " enable embedded vim options in files
+set hlsearch
+set incsearch
+
+" clear highlight
+nnoremap <silent> <leader>/ :nohlsearch<CR>

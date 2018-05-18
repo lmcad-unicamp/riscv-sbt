@@ -34,4 +34,6 @@ RUN echo "alias ls='ls --color'" >> /root/.bashrc \
     && echo "echo 0 > /proc/sys/kernel/kptr_restrict" >> /root/.bashrc \
     && echo "source scripts/env.sh" >> /root/.bashrc
 
+COPY vimrc /root/.vimrc
+
 CMD ["/bin/bash"]

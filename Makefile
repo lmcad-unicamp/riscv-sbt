@@ -39,6 +39,11 @@ docker-dev:
 		export TOPDIR=$(TOPDIR) PYTHONPATH=$(TOPDIR)/scripts && \
 		./build.py --dev
 
+docker-dev2:
+	cd docker && \
+		export TOPDIR=$(TOPDIR) PYTHONPATH=$(TOPDIR)/scripts && \
+		./build.py --dev2
+
 ###
 
 clean:
