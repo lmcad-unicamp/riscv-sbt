@@ -3,6 +3,7 @@
 #include "AddressToSource.h"
 #include "BasicBlock.h"
 #include "Builder.h"
+#include "Caller.h"
 #include "Context.h"
 #include "Disassembler.h"
 #include "Relocation.h"
@@ -850,6 +851,7 @@ llvm::Error Instruction::translateBranch(BranchType bt)
 
     bool isCall = (bt == JAL || bt == JALR) &&
         linkReg != XRegister::ZERO;
+    Function* func = findFunction(jimm);
 
     // JALR
     if (bt == JALR) {
@@ -872,6 +874,11 @@ llvm::Error Instruction::translateBranch(BranchType bt)
                 act = ICALL;
             else
                 act = IJUMP;
+        }
+
+        if (act == ICALL && func) {
+            act = CALL;
+            target = jimm;
         }
 
     // JAL/branches to PC offsets
@@ -962,15 +969,25 @@ llvm::Error Instruction::handleCall(uint64_t target, unsigned linkReg)
 {
     DBGF("target={0:X+8}, linkReg={1}", target, linkReg);
 
-    // find function
     Function* f = Function::getByAddr(_ctx, target);
+    bool isExt = Translator::isExternalFunc(target);
+    bool sync = !isExt || _ctx->opts->syncOnExternalCalls();
 
+    // link
     link(linkReg);
-
+    // write regs
+    if (sync)
+        _ctx->func->storeRegisters();
     // call
-    _ctx->func->storeRegisters();
-    _bld->call(f->func());
-    _ctx->func->loadRegisters();
+    if (isExt) {
+        Caller caller(_ctx, _bld, f, _ctx->func);
+        caller.callExternal();
+    } else
+        _bld->call(f->func());
+    // read regs
+    if (sync)
+        _ctx->func->loadRegisters();
+
     return llvm::Error::success();
 }
 
@@ -1718,6 +1735,14 @@ llvm::Error Instruction::translateFMV(FType ft, IType it)
     return llvm::Error::success();
 }
 
+
+Function* Instruction::findFunction(llvm::Constant* c) const
+{
+    auto* ci = llvm::dyn_cast<llvm::ConstantInt>(c);
+    if (!ci)
+        return nullptr;
+    return _ctx->funcByAddr(ci->getZExtValue(), !ASSERT_NOT_NULL);
+}
 
 #if SBT_DEBUG
 // MD: metadata

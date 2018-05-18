@@ -2,6 +2,7 @@
 
 #include "AddressToSource.h"
 #include "Builder.h"
+#include "Caller.h"
 #include "Disassembler.h"
 #include "FRegister.h"
 #include "Instruction.h"
@@ -87,6 +88,7 @@ llvm::Error Translator::start()
     for (size_t i = 0; i < n; i++)
         args.push_back(t.i32);
     _iCaller.create(llvm::FunctionType::get(t.voidT, args, !VAR_ARG));
+    Caller::MAX_ARGS = _iCaller.func()->arg_size() - 1;
 
     _isExternal.create(llvm::FunctionType::get(t.i32, { t.i32 }, !VAR_ARG));
 
@@ -299,59 +301,15 @@ Translator::import(const std::string& func)
 }
 
 
-llvm::Value*
-Translator::i32x2ToFP64(Builder* bld, llvm::Value* lo, llvm::Value* hi)
-{
-    llvm::Value* vlo = bld->zext64(lo);
-    llvm::Value* vhi = bld->zext64(hi);
-    vhi = bld->sll(vhi, _ctx->c.i64(32));
-    // merge hi and low
-    llvm::Value* v = bld->_or(vhi, vlo);
-    // then finally cast to double
-    v = bld->bitOrPointerCast(v, _ctx->t.fp64);
-    return v;
-}
-
-
-std::pair<llvm::Value*, llvm::Value*>
-Translator::fp64ToI32x2(Builder* bld, llvm::Value* f)
-{
-    llvm::Value* v = bld->bitOrPointerCast(f, _ctx->t.i64);
-    llvm::Value* vlo = bld->truncOrBitCastI32(v);
-    llvm::Value* vhi = bld->srl(v, _ctx->c.i64(32));
-    vhi = bld->truncOrBitCastI32(vhi);
-    return std::make_pair(vlo, vhi);
-}
-
-
-llvm::Value* Translator::refToFP128(Builder* bld, llvm::Value* ref)
-{
-    llvm::Value* ptr = bld->bitOrPointerCast(ref, _ctx->t.fp128ptr);
-    return bld->load(ptr);
-}
-
-
-void Translator::fp128ToRef(Builder* bld, llvm::Value* f, llvm::Value* ref)
-{
-    llvm::Value* ptr = bld->bitOrPointerCast(ref, _ctx->t.fp128ptr);
-    bld->store(f, ptr);
-}
-
-
 void Translator::genICaller()
 {
     DBGF("entry");
 
     // prepare
     const Constants& c = _ctx->c;
-    const Types& t = _ctx->t;
     Builder bldi(_ctx, NO_FIRST);
     Builder* bld = &bldi;
     llvm::Function* ic = _iCaller.func();
-    const size_t maxArgs = ic->arg_size() - 1;
-    xassert(ic);
-
-    xassert(!ic->arg_empty());
     llvm::Argument& target = *ic->arg_begin();
 
     // basic blocks
@@ -403,31 +361,10 @@ void Translator::genICaller()
     for (const auto& p : _funcByAddr) {
         Function* f = p.val;
         uint64_t addr = f->addr();
-        bool isExternal = addr >= FIRST_EXT_FUNC_ADDR;
         DBGF("function={0}, addr={1:X+8}", f->name(), addr);
         xassert(addr != Constants::INVALID_ADDR);
 
-        // get function by symbol
-        // XXX this may fail for internal functions
         std::string caseStr = "case_" + f->name();
-        llvm::Value* sym =
-            _ctx->module->getValueSymbolTable().lookup(f->name());
-        xassert(sym);
-
-        // prepare
-        llvm::Function* llf = f->func();
-        llvm::FunctionType* llft = llf->getFunctionType();
-        size_t fixedArgs = llft->getNumParams();
-        size_t totalArgs;
-        // varArgs: passing 4 extra args for now
-        if (llft->isVarArg())
-            totalArgs = MIN(fixedArgs + 4, maxArgs);
-        else
-            totalArgs = fixedArgs;
-        std::vector<llvm::Value*> args;
-        args.reserve(totalArgs);
-
-        // BB
         BasicBlock dest(_ctx, caseStr, ic, bbDfl.bb());
         bld->setInsertBlock(&dest);
 
@@ -439,72 +376,27 @@ void Translator::genICaller()
             continue;
         }
 
-        // get pointer to function
-        llvm::PointerType* fty = llft->getPointerTo();
-        llvm::Value* fptr = bld->bitOrPointerCast(sym, fty);
-        // get return type
-        llvm::Type* retty = llft->getReturnType();
-        llvm::Value* retref = nullptr;
-        // get args
-        auto argit = ic->arg_begin();
-        ++argit;    // skip target
-
-        // types > 2xi32 are returned by ref and the address is passed by the
-        // caller in the first argument
-        if (retty->isFP128Ty())
-            retref = &*argit++;
-
-        // set args
-        for (size_t i = 0; i < totalArgs; i++, ++argit) {
-            llvm::Value* v = &*argit;
-            llvm::Type* ty = i < fixedArgs? llft->getParamType(i) : t.i32;
-
-            // need to cast?
-            if (ty != t.i32) {
-                DBGF("cast from:");
-                DBG(v->getType()->dump());
-                DBGF("cast to:");
-                DBG(ty->dump());
-                DBGS.flush();
-
-                if (ty->isDoubleTy())
-                    v = i32x2ToFP64(bld, v, &*++argit);
-                // long double: by ref
-                else if (ty->isFP128Ty())
-                    v = refToFP128(bld, v);
-                else
-                    v = bld->bitOrPointerCast(v, ty);
-            }
-
-            args.push_back(v);
-        }
-
-        // call
-        if (retty->isVoidTy()) {
-            bld->call(fptr, args);
-        // write return value into x10/x11 for libc functions
+        if (!isExternalFunc(addr)) {
+            bld->call(f->func());
         } else {
-            // ret: ret will be set if value is returned by ref
-            xassert(isExternal);
-            llvm::Value* ret = bld->call(fptr, args);
-            if (retty->isDoubleTy()) {
-                auto p = fp64ToI32x2(bld, ret);
-                auto& reglo = _ctx->x->getReg(XRegister::A0);
-                auto& reghi = _ctx->x->getReg(XRegister::A1);
-                bld->store(p.first, reglo.getForWrite());
-                bld->store(p.second, reghi.getForWrite());
-            } else if (retty->isFP128Ty()) {
-                xassert(retref);
-                fp128ToRef(bld, ret, retref);
-            } else {
-                if (retty != t.i32)
-                    ret = bld->bitOrPointerCast(ret, t.i32);
-                auto& reg = _ctx->x->getReg(XRegister::A0);
-                bld->store(ret, reg.getForWrite());
-            }
-        }
-        bld->retVoid();
+            Caller caller(_ctx, bld, f, &_iCaller);
 
+            // get args
+            std::vector<llvm::Value*> args;
+            auto argit = ic->arg_begin();
+            ++argit;    // skip target
+
+            // set args
+            for (size_t i = 0; i < caller.getTotalArgs(); i++, ++argit)
+                args.push_back(&*argit);
+
+            caller.setRetInGlobal(true);
+            caller.setArgs(&args);
+            caller.callExternal();
+
+        }
+
+        bld->retVoid();
         bld->setInsertBlock(&bbBeg);
         sw->addCase(c.i32(addr), dest.bb());
     }

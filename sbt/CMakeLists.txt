@@ -92,6 +92,7 @@ target_link_libraries(PrintfBreak ${SBT_LIBS} ${SBT_SYS_LIBS})
 add_executable(riscv-sbt
     AddressToSource.cpp
     BasicBlock.cpp
+    Caller.cpp
     Constants.cpp
     Context.cpp
     Disassembler.cpp

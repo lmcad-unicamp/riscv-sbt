@@ -18,6 +18,7 @@ namespace sbt {
 class Builder;
 class Constants;
 class Context;
+class Function;
 class Types;
 
 class Instruction
@@ -203,6 +204,8 @@ private:
     // add RV instr metadata and print it in debug mode
     // (no-op in release mode)
     void dbgprint();
+
+    Function* findFunction(llvm::Constant* c) const;
 
 
     // float
