@@ -79,6 +79,9 @@ public:
         const std::vector<uint8_t>& bytes,
         const ShadowImage* shadowImage);
 
+    bool isCall(uint64_t addr) const;
+    llvm::Constant* lastSymVal() const;
+
 private:
     Context* _ctx;
     ConstRelocIter _ri;
@@ -87,6 +90,8 @@ private:
     std::queue<ConstRelocationPtr> _proxyRelocs;
     mutable ConstRelocationPtr _cur;
     mutable ConstRelocationPtr _curP;
+    ConstRelocationPtr _last = nullptr;
+    llvm::Constant* _lastSymVal = nullptr;
 
     ConstRelocationPtr getReloc(uint64_t addr);
     void addProxyReloc(ConstRelocationPtr rel, Relocation::RType rtype);

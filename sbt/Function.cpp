@@ -302,12 +302,23 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
 }
 
 
-static bool isFunction(ConstSymbolPtr sym)
+static int isFunction(ConstSymbolPtrVec symv)
 {
-    return
-        (sym &&
-            ((sym->type() & llvm::object::SymbolRef::ST_Function) ||
-             (sym->flags() & llvm::object::SymbolRef::SF_Global)));
+    int i = 1;
+    for (const auto& sym : symv) {
+        DBGF("{0}: sym={1}, ST_Function={2}, SF_Global={3}: {4}",
+            i, !!sym,
+            sym? (sym->type() == llvm::object::SymbolRef::ST_Function) : false,
+            sym? (sym->flags() & llvm::object::SymbolRef::SF_Global) : false,
+            sym? sym->str() : "");
+
+        if (sym &&
+            ((sym->type() == llvm::object::SymbolRef::ST_Function) ||
+            (sym->flags() & llvm::object::SymbolRef::SF_Global)))
+            return i;
+        i++;
+    }
+    return 0;
 }
 
 
@@ -317,8 +328,8 @@ bool Function::isFunction(Context* ctx, uint64_t addr)
         return true;
 
     // get symbol by offset
-    ConstSymbolPtr sym = ctx->sec->section()->lookup(addr);
-    return sbt::isFunction(sym);
+    ConstSymbolPtrVec symv = ctx->sec->section()->lookup(addr);
+    return sbt::isFunction(symv);
 }
 
 
@@ -328,17 +339,18 @@ Function* Function::getByAddr(Context* ctx, uint64_t addr)
         return fp;
 
     // get symbol by offset
-    ConstSymbolPtr sym = ctx->sec->section()->lookup(addr);
+    ConstSymbolPtrVec symv = ctx->sec->section()->lookup(addr);
     // XXX lookup by symbol name
-    if (!sym)
+    if (symv.empty())
         DBGF("WARNING: symbol not found at {0:X+8}", addr);
 
     // create a new function
     std::string name;
-    if (!sbt::isFunction(sym))
+    int n;
+    if (!(n=sbt::isFunction(symv)))
         name = "f" + llvm::Twine::utohexstr(addr).str();
     else
-        name = sym->name();
+        name = symv.at(--n)->name();
     FunctionPtr f(new Function(ctx, name, ctx->sec, addr));
     f->create();
     // insert in maps

@@ -128,13 +128,16 @@ uint64_t LLVMSection::getELFOffset() const
 }
 
 
-ConstSymbolPtr Section::lookup(uint64_t addr) const
+ConstSymbolPtrVec Section::lookup(uint64_t addr) const
 {
+    ConstSymbolPtrVec ret;
+
     auto it = std::lower_bound(_symbols.begin(), _symbols.end(), addr,
         [](ConstSymbolPtr sym, uint64_t addr) { return sym->address() < addr; });
-    if (it != _symbols.end() && (*it)->address() == addr)
-        return *it;
-    return nullptr;
+
+    for (; it != _symbols.end() && (*it)->address() == addr; ++it)
+        ret.push_back(*it);
+    return ret;
 }
 
 

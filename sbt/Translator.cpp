@@ -387,7 +387,7 @@ void Translator::genICaller()
             ++argit;    // skip target
 
             // set args
-            for (size_t i = 0; i < caller.getTotalArgs(); i++, ++argit)
+            for (size_t i = 0; i < caller.getNumWordArgs(); i++, ++argit)
                 args.push_back(&*argit);
 
             caller.setRetInGlobal(true);

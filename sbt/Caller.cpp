@@ -41,10 +41,18 @@ Caller::Caller(
 
     // prepare args
     _fixedArgs = _llft->getNumParams();
+    _wordArgs = 0;
+    for (const auto& ty : _llft->params())
+        if (ty->isDoubleTy())
+            _wordArgs += 2;
+        else
+            _wordArgs += 1;
+
     // varArgs: passing 4 extra args for now
-    if (_llft->isVarArg())
+    if (_llft->isVarArg()) {
         _totalArgs = MIN(_fixedArgs + 4, MAX_ARGS);
-    else
+        _wordArgs = MIN(_wordArgs + 4, MAX_ARGS);
+    } else
         _totalArgs = _fixedArgs;
 }
 

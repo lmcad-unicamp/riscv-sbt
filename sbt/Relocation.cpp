@@ -179,11 +179,6 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             break;
 
         case Relocation::PROXY_CALL_LO:
-            relfn = [](llvm::Constant* symaddr) {
-                return symaddr;
-            };
-            break;
-
         case Relocation::PROXY_PCREL_LO:
             // lo12 = symbol_address - hipc - hi20
             // hi20 = (symbol_address - hipc + 0x800) & 0xFFFFF000
@@ -261,11 +256,13 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
         bool isFunc = Function::isFunction(_ctx, saddr);
         Function* f = _ctx->funcByAddr(saddr, !ASSERT_NOT_NULL);
 
-        if (isFunc && !f) {
-            // function not found: it should be ahead of current
-            // translation address
-            xassert(saddr > _ctx->addr);
-            f = Function::getByAddr(_ctx, saddr);
+        if (isFunc) {
+            if (!f) {
+                // function not found: it should be ahead of current
+                // translation address
+                xassert(saddr > _ctx->addr);
+                f = Function::getByAddr(_ctx, saddr);
+            }
 
             DBGF("internal function: name=\"{0}\", saddr={1:X+8}",
                 f->name(), saddr);
@@ -314,9 +311,25 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             _ctx->c.i32(saddr));
     }
 
+    _lastSymVal = c;
     c = relfn(c);
     DBG(c->dump());
+    _last = reloc;
     return c;
+}
+
+
+bool SBTRelocation::isCall(uint64_t addr) const
+{
+    return _last && _last->offset() == addr &&
+        _last->type() == Relocation::PROXY_CALL_LO;
+}
+
+
+llvm::Constant* SBTRelocation::lastSymVal() const
+{
+    xassert(_lastSymVal);
+    return _lastSymVal;
 }
 
 

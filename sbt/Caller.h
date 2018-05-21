@@ -19,9 +19,9 @@ public:
     void callExternal();
     void setArgs(std::vector<llvm::Value*>* args);
 
-    size_t getTotalArgs() const
+    size_t getNumWordArgs() const
     {
-        return _totalArgs;
+        return _wordArgs;
     }
 
     void setRetInGlobal(bool b)
@@ -45,6 +45,7 @@ private:
     std::vector<llvm::Value*>::const_iterator _argit;
     size_t _fixedArgs;
     size_t _totalArgs;
+    size_t _wordArgs;
     llvm::Value* _retref = nullptr;
     bool _retInGlobal = false;
 

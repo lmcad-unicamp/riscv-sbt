@@ -851,7 +851,6 @@ llvm::Error Instruction::translateBranch(BranchType bt)
 
     bool isCall = (bt == JAL || bt == JALR) &&
         linkReg != XRegister::ZERO;
-    Function* func = findFunction(jimm);
 
     // JALR
     if (bt == JALR) {
@@ -859,10 +858,15 @@ llvm::Error Instruction::translateBranch(BranchType bt)
         if (jregn == XRegister::ZERO)
             xunreachable("unexpected JALR with base register equal to zero!");
 
+        Function* func = _ctx->reloc->isCall(_ctx->addr)?
+            findFunction(_ctx->reloc->lastSymVal()) : nullptr;
+
         // target is known
+        // NOTE querying the relocator is needed to disambiguate between
+        //      calls to funtions at 0 offset and indirect calls
         if (isCall && func) {
             act = CALL;
-            target = jimm;
+            target = _ctx->c.u32(func->addr());
 
         // no immediate
         } else if (jimm->isZeroValue()) {
@@ -874,16 +878,6 @@ llvm::Error Instruction::translateBranch(BranchType bt)
 
         // base + offset
         } else {
-            auto* ci = llvm::dyn_cast<llvm::ConstantInt>(jimm);
-            if (ci) {
-                uint64_t val = ci->getValue().getZExtValue();
-                // FIXME
-                uint64_t hipc = _ctx->addr - Constants::INSTRUCTION_SIZE;
-                uint64_t hi20 = ((val - hipc + 0x800) & 0xFFFFF000);
-                uint64_t lo = val - hipc - hi20;
-                jimm = _ctx->c.u32(lo);
-            }
-
             v = _bld->add(jreg, jimm);
             if (isCall)
                 act = ICALL;
@@ -1063,7 +1057,7 @@ void Instruction::enterFunction(llvm::Value* ext)
 
 llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
 {
-    DBGF("linkReg={1}", linkReg);
+    DBGF("NOTE: icall: linkReg={1}", linkReg);
 
     // prepare
     Translator* translator = _ctx->translator;

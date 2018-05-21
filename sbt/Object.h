@@ -124,7 +124,17 @@ public:
     }
 
     // lookup symbol by address
-    ConstSymbolPtr lookup(uint64_t addr) const;
+    ConstSymbolPtr lookupFirst(uint64_t addr) const
+    {
+        ConstSymbolPtrVec r = lookup(addr);
+        xassert(r.size() < 2);
+        if (r.empty())
+            return nullptr;
+        else
+            return r.front();
+    }
+
+    ConstSymbolPtrVec lookup(uint64_t addr) const;
 
     // ELF offset
     virtual uint64_t getELFOffset() const
@@ -351,14 +361,30 @@ public:
         PROXY_CALL      = PROXY_CALL_HI
     };
 
+    bool hasSym() const
+    {
+        return !!symbol();
+    }
+
+    uint64_t symAddr() const
+    {
+        xassert(hasSym());
+        return symbol()->address();
+    }
+
+    std::string symName() const
+    {
+        ConstSymbolPtr sym = symbol();
+
+        return sym? sym->name() : "<null>";
+    }
+
     virtual ~Relocation() = default;
     virtual uint64_t type() const = 0;
     virtual std::string typeName() const = 0;
     virtual uint64_t offset() const = 0;
     virtual uint64_t addend() const = 0;
-    virtual bool hasSym() const = 0;
-    virtual uint64_t symAddr() const = 0;
-    virtual std::string symName() const = 0;
+    virtual ConstSymbolPtr symbol() const = 0;
     virtual bool hasSec() const = 0;
     virtual std::string secName() const = 0;
     virtual bool isLocalFunction() const = 0;
@@ -397,24 +423,6 @@ public:
 
     uint64_t addend() const override;
 
-    bool hasSym() const override
-    {
-        return !!symbol();
-    }
-
-    uint64_t symAddr() const override
-    {
-        xassert(hasSym());
-        return symbol()->address();
-    }
-
-    std::string symName() const override
-    {
-        ConstSymbolPtr sym = symbol();
-
-        return sym? sym->name() : "<null>";
-    }
-
     bool hasSec() const override
     {
         return !!section();
@@ -449,11 +457,12 @@ public:
         xassert(sec || !isLocalFunc);
     }
 
+    ConstSymbolPtr symbol() const override;
+
 private:
     ConstObjectPtr _obj;
     llvm::object::RelocationRef _reloc;
 
-    ConstSymbolPtr symbol() const;
     ConstSectionPtr section() const;
 };
 
@@ -466,9 +475,7 @@ public:
         const std::string& typeName,
         uint64_t offset,
         uint64_t addend,
-        bool hasSym,
-        uint64_t symAddr,
-        const std::string& symName,
+        ConstSymbolPtr sym,
         bool hasSec,
         const std::string& secName,
         bool isLocalFunc,
@@ -479,9 +486,7 @@ public:
         _typeName(typeName),
         _offset(offset),
         _addend(addend),
-        _hasSym(hasSym),
-        _symAddr(symAddr),
-        _symName(symName),
+        _sym(sym),
         _hasSec(hasSec),
         _secName(secName),
         _isLocalFunction(isLocalFunc),
@@ -495,9 +500,7 @@ public:
             llrel.typeName(),
             llrel.offset(),
             llrel.addend(),
-            llrel.hasSym(),
-            llrel.hasSym()? llrel.symAddr() : 0,
-            llrel.symName(),
+            llrel.symbol(),
             llrel.hasSec(),
             llrel.secName(),
             llrel.isLocalFunction(),
@@ -527,19 +530,9 @@ public:
         return _addend;
     }
 
-    bool hasSym() const override
+    ConstSymbolPtr symbol() const override
     {
-        return _hasSym;
-    }
-
-    uint64_t symAddr() const override
-    {
-        return _symAddr;
-    }
-
-    std::string symName() const override
-    {
-        return _symName;
+        return _sym;
     }
 
     bool hasSec() const override
@@ -610,9 +603,7 @@ private:
     std::string _typeName;
     uint64_t _offset;
     uint64_t _addend;
-    bool _hasSym;
-    uint64_t _symAddr;
-    std::string _symName;
+    ConstSymbolPtr _sym;
     bool _hasSec;
     std::string _secName;
     bool _isLocalFunction;
