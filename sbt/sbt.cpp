@@ -203,6 +203,9 @@ int main(int argc, char* argv[])
         cl::desc("Synchronize register file on calls to external "
             "(non-translated) functions"));
 
+    cl::opt<bool> commentedAsmOpt("commented-asm",
+        cl::desc("Insert comments in final translated assembly code"));
+
     // enable debug code
     cl::opt<bool> debugOpt("debug", cl::desc("Enable debug code"));
 
@@ -262,7 +265,8 @@ int main(int argc, char* argv[])
     sbt::Options opts(regs, !dontUseLibCOpt, std::atol(stackSizeOpt.c_str()));
     opts.setSyncFRegs(!dontSyncFRegsOpt)
         .setA2S(a2sOpt)
-        .setSyncOnExternalCalls(syncOnExternalCallsOpt);
+        .setSyncOnExternalCalls(syncOnExternalCallsOpt)
+        .setCommentedAsm(commentedAsmOpt);
     auto exp = sbt::create<sbt::SBT>(inputFiles, outputFile, opts);
     if (!exp)
         sbt::handleError(exp.takeError());

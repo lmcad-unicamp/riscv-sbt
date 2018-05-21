@@ -1794,7 +1794,8 @@ void Instruction::dbgprint()
     _bld->first()->setMetadata(mdname, n);
 
     // don't add inline asm comments on terminated functions/BBs
-    if (!_ctx->func ||
+    if (!_ctx->opts->commentedAsm() ||
+        !_ctx->func ||
         //_ctx->func->terminated() ||
         !_ctx->bld->getInsertBlock())
         //_ctx->bld->getInsertBlock()->terminated())

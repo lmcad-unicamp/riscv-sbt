@@ -25,7 +25,7 @@ def _translate_obj(arch, dir, _in, out, opts):
             base = base[:p]
         # add rv32 prefix and .a2s suffix
         a2s = RV32_LINUX.add_prefix(base) + ".a2s"
-        flags = cat(flags, "-a2s", path(dir, a2s))
+        flags = cat(flags, "-commented-asm", "-a2s", path(dir, a2s))
 
     logdir = DIR.top + "/junk"
     auto.utils.mkdir_if_needed(logdir)

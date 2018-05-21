@@ -73,6 +73,17 @@ public:
         return *this;
     }
 
+    bool commentedAsm() const
+    {
+        return _commentedAsm;
+    }
+
+    Options& setCommentedAsm(bool b)
+    {
+        _commentedAsm = b;
+        return *this;
+    }
+
     void dump() const;
 
 private:
@@ -82,6 +93,7 @@ private:
     bool _syncFRegs = true;
     std::string _a2s;
     bool _syncOnExternalCalls = false;
+    bool _commentedAsm = false;
 };
 
 }
