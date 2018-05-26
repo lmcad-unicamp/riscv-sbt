@@ -72,7 +72,7 @@ def bldnrun(arch, srcdir, dstdir, ins, out, bflags=None, rflags=None):
 
 
 def xlate(arch, srcdir, dstdir, _in, out, mode, xflags=None, sbtflags=[]):
-    flags = '--flags " -regs={}"'.format(mode)
+    flags = '--xflags " -regs={}"'.format(mode)
     for flag in sbtflags:
         flags = flags + ' " {}"'.format(flag)
 

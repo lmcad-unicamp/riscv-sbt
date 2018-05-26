@@ -10,8 +10,8 @@ import os
 CFLAGS          = "-fno-rtti -fno-exceptions"
 _O              = "-O3"
 
-emit_llvm       = lambda opts: \
-    "-emit-llvm -c -O0 -g -mllvm -disable-llvm-optzns" if opts.dbg \
+emit_llvm       = lambda dbg: \
+    "-emit-llvm -c -O0 -g -mllvm -disable-llvm-optzns" if dbg \
     else "-emit-llvm -c {} -mllvm -disable-llvm-optzns".format(_O)
 RV32_TRIPLE     = "riscv32-unknown-elf"
 
@@ -45,10 +45,10 @@ class Sbt:
         self.share_dir = DIR.toolchain + "/share/riscv-sbt"
         self.modes = ["globals", "locals"]
 
-    def nat_obj(self, arch, name, opts):
+    def nat_obj(self, arch, name, clink):
         if arch == RV32 or arch == RV32_LINUX and name != "runtime":
             return ""
-        if name == "runtime" and not opts.clink:
+        if name == "runtime" and not clink:
             return ""
         return "{}/{}-{}.o".format(self.share_dir, arch.prefix, name)
 
@@ -60,7 +60,7 @@ class Tools:
     def __init__(self):
         self.cmake      = "cmake"
         self.opt        = "opt"
-        self.opt_flags  = lambda opts: "-O0" if opts.dbg else _O
+        self.opt_flags  = lambda dbg: "-O0" if dbg else _O
         self.dis        = "llvm-dis"
         self.link       = "llvm-link"
         self.mc         = "llvm-mc"
@@ -86,9 +86,9 @@ class Arch:
         self.march = march
         # gcc
         self.gcc = triple + "-gcc"
-        self.gcc_flags = lambda opts: \
+        self.gcc_flags = lambda dbg: \
             "{} {} {}".format(
-                ("-O0 -g" if opts.dbg else _O),
+                ("-O0 -g" if dbg else _O),
                 CFLAGS,
                 gcc_flags)
         # clang
@@ -100,9 +100,9 @@ class Arch:
             sysroot, isysroot)
         # llc
         self.llc = "llc"
-        self.llc_flags = lambda opts: \
+        self.llc_flags = lambda dbg: \
             cat("-relocation-model=static",
-                ("-O0" if opts.dbg else _O),
+                ("-O0" if dbg else _O),
                 llc_flags)
         # as
         self._as = triple + "-as"

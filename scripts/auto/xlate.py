@@ -1,93 +1,90 @@
 #!/usr/bin/env python3
 
-from auto.build import *
-import auto.utils
+from auto.build import Builder, BuildOpts
+from auto.config import DIR, RV32_LINUX, SBT
+from auto.utils import cat, chsuf, mkdir_if_needed, path, shell
 
 import argparse
 
-
-def _translate_obj(arch, dir, _in, out, opts):
-    """ .o -> .bc """
-    ipath = path(dir, _in)
-    opath = path(dir, out)
-    flags = cat(SBT.flags, opts.sbtflags)
-
-    if opts.dbg:
-        # strip arch prefix
-        prefix = arch.add_prefix("")
-        prefix = RV32_LINUX.add_prefix(prefix)
-        base = out[len(prefix):]
-        # strip suffix
-        base = auto.utils.chsuf(base, "")
-        # strip mode
-        p = base.rfind("-")
-        if p != -1:
-            base = base[:p]
-        # add rv32 prefix and .a2s suffix
-        a2s = RV32_LINUX.add_prefix(base) + ".a2s"
-        flags = cat(flags, "-commented-asm", "-a2s", path(dir, a2s))
-
-    logdir = DIR.top + "/junk"
-    auto.utils.mkdir_if_needed(logdir)
-    log = path(logdir, chsuf(out, ".log"))
-
-    cmd = "riscv-sbt {} {} -o {} >{} 2>&1".format(
-        flags, ipath, opath, log)
-    shell(cmd)
+class Translator:
+    def __init__(self, opts):
+        self.opts = opts
 
 
-def translate(arch, srcdir, dstdir, _in, out, opts):
-    """ .o -> bin """
-    obj = _in
-    bc = out + ".bc"
-    s = out + ".s"
+    def _translate_obj(self, dir, obj, out):
+        """ .o -> .bc """
 
-    _translate_obj(arch, dstdir, obj, bc, opts)
-    dis(arch, dstdir, bc)
+        opts = self.opts
+        arch = opts.arch
+        ipath = path(dir, obj)
+        opath = path(dir, out)
+        flags = cat(SBT.flags, opts.xflags)
 
-    if opts.dbg:
-        bc2s(arch, dstdir, bc, s, opts)
-    else:
-        opt1 = out + ".opt.bc"
-        opt(arch, dstdir, bc, opt1, opts, printf_break=False)
-        dis(arch, dstdir, opt1)
-        bc2s(arch, dstdir, opt1, s, opts)
+        if opts.dbg:
+            # strip arch prefix
+            prefix = arch.add_prefix("")
+            prefix = RV32_LINUX.add_prefix(prefix)
+            base = out[len(prefix):]
+            # strip suffix
+            base = chsuf(base, "")
+            # strip mode
+            p = base.rfind("-")
+            if p != -1:
+                base = base[:p]
+            # add rv32 prefix and .a2s suffix
+            a2s = RV32_LINUX.add_prefix(base) + ".a2s"
+            flags = cat(flags, "-commented-asm", "-a2s", path(dir, a2s))
 
-    opts.asm = True
-    build(arch, dstdir, dstdir, [s], out, opts)
+        logdir = DIR.top + "/junk"
+        mkdir_if_needed(logdir)
+        log = path(logdir, chsuf(out, ".log"))
+
+        cmd = "riscv-sbt {} {} -o {} >{} 2>&1".format(
+            flags, ipath, opath, log)
+        shell(cmd)
+
+
+    def translate(self):
+        """ .o -> bin """
+
+        opts = self.opts
+        obj = opts.first
+        dstdir = opts.dstdir
+        out = opts.out
+
+        bc = out + ".bc"
+        s = out + ".s"
+
+        # translate obj to .bc
+        self._translate_obj(dstdir, obj, bc)
+        # gen .ll
+        bld = Builder(opts)
+        bld.dis(dstdir, bc)
+
+        # gen .s
+        if opts.dbg:
+            bld.bc2s(dstdir, bc, s)
+        else:
+            opt1 = out + ".opt.bc"
+            bld.opt(dstdir, bc, opt1, printf_break=False)
+            bld.dis(dstdir, opt1)
+            bld.bc2s(dstdir, opt1, s)
+
+        # build .s
+        opts.asm = True
+        opts.srcdir = dstdir
+        opts.dstdir = dstdir
+        opts.ins = [s]
+        opts.out = out
+        bld.build()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="translate obj")
-    parser.add_argument("_in", metavar="in", help="input object file")
-    parser.add_argument("--arch", default="rv32")
-    parser.add_argument("--srcdir", default=".")
-    parser.add_argument("--dstdir", default=".")
-    parser.add_argument("-o", help="output")
-    parser.add_argument("--flags", nargs="+", metavar="flag")
-    parser.add_argument("-C", action='store_false', help="don't link with C libs")
-    parser.add_argument("--dbg", action='store_true', help="build for debug")
-    parser.add_argument("--sbtobjs", nargs="+", default=["syscall", "runtime"],
-        help="optional SBT native objs to link with")
-
+    BuildOpts.add_to_parser(parser)
     args = parser.parse_args()
 
-    # get args
-    _in = args._in
-    arch = ARCH[args.arch]
-    srcdir = args.srcdir
-    dstdir = args.dstdir
-    out = args.o if args.o else chsuf(_in, '')
-
-    # set xlate opts
-    opts = Opts()
-    opts.clink = args.C
-    opts.dbg = args.dbg
-    opts.cflags = ""
-    opts.sflags = ""
-    opts.ldflags = cat(*[SBT.nat_obj(arch, o, opts) for o in args.sbtobjs])
-    opts.sbtflags = cat(" ".join(args.flags).strip(),
-            "-dont-use-libc" if not opts.clink else "")
-
+    # set xlator opts
+    xltr = Translator(BuildOpts.parse(args))
     # translate
-    translate(arch, srcdir, dstdir, _in, out, opts)
+    xltr.translate()
