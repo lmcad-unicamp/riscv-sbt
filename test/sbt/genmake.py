@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-from auto.config import *
-from auto.genmake import *
+from auto.config import DIR, RV32_LINUX, TOOLS, X86
+from auto.genmake import GenMake, Module
+from auto.utils import cat, path
 
 class Tests():
     def __init__(self):
@@ -89,11 +90,10 @@ x86-fp128-run:
             bflags = cat(mod.bflags, "--dbg" if dbg else '')
             rflags = mod.rflags
             # do_mod
-            self.txt = self.txt + do_mod(
-                self.narchs, self.xarchs,
-                name, src,
-                self.srcdir, self.dstdir,
-                xflags, bflags, rflags)
+            gm = GenMake(self.narchs, self.xarchs,
+                    self.srcdir, self.dstdir,
+                    xflags, bflags, rflags)
+            self.txt = self.txt + gm.do_mod(name, src)
 
         names = [mod.name for mod in mods]
         tests = [name + "-test" for name in names]
@@ -111,9 +111,10 @@ tests-run: tests x86-syscall-test-run {tests}
 
         # rv32-test
         mod = Module("test", "rv32-test.s", rflags=rflags)
-        self.txt = self.txt + do_mod(self.narchs, self.xarchs,
-            mod.name, mod.src, self.srcdir, self.dstdir,
-            mod.xflags, mod.bflags, mod.rflags)
+        gm = GenMake(self.narchs, self.xarchs,
+                self.srcdir, self.dstdir,
+                mod.xflags, mod.bflags, mod.rflags)
+        self.txt = self.txt + gm.do_mod(mod.name, mod.src)
 
 
     def gen_utests(self):
@@ -144,11 +145,10 @@ tests-run: tests x86-syscall-test-run {tests}
         for mod in mods:
             name = mod
             src = "rv32-" + name + ".s"
-            self.txt = self.txt + do_mod(
-                narchs, self.xarchs,
-                name, src,
+            gm = GenMake(narchs, self.xarchs,
                 self.srcdir, self.dstdir,
                 xflags, bflags, rflags)
+            self.txt = self.txt + gm.do_mod(name, src)
 
         utests = [mod + "-test" for mod in mods if mod != "system"]
 
@@ -253,10 +253,10 @@ rv32tests_status:
         for test in tests:
             name = test
             src = name + ".s"
-            self.txt = self.txt + do_mod(
-                narchs, self.xarchs,
-                name, src, srcdir, dstdir,
+            gm = GenMake(narchs, self.xarchs,
+                srcdir, dstdir,
                 xflags, bflags, rflags)
+            self.txt = self.txt + gm.do_mod(name, src)
 
         fmtdata = {
             "tests":        " ".join(tests),

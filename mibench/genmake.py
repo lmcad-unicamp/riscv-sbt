@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
-from auto.genmake import *
+from auto.config import DIR, RV32_LINUX, SBT, TOOLS, X86
+from auto.genmake import ArchAndMode, GenMake, Run, Runs
+from auto.utils import cat, mpath, path, xassert
 
 # Mibench source
 # http://vhosts.eecs.umich.edu/mibench//automotive.tar.gz
@@ -10,124 +12,34 @@ from auto.genmake import *
 # http://vhosts.eecs.umich.edu/mibench//office.tar.gz
 # http://vhosts.eecs.umich.edu/mibench//consumer.tar.gz
 
-# arguments for a given run
-class Args:
-    def __init__(self, args, id=None, outidx=None):
-        self.id = id
-        self._args = args
-        self.outidx = outidx
-
-
-    # add prefix and mode to arguments, if needed
-    def args(self, prefix, mode):
-        fmtdata = {
-            "prefix":   prefix + "-" if prefix else '',
-            "mode":     "-" + mode if mode else ''
-        }
-
-        return [arg.format(**fmtdata) for arg in self._args]
-
-    def raw_args(self):
-        return self._args
-
-
-class ArchAndMode:
-    def __init__(self, farch, narch, mode=None):
-        self.farch = farch
-        self.narch = narch
-        self.mode = mode
-
-    # get arch prefix string
-    def prefix(self):
-        if not self.farch:
-            return self.narch.prefix
-        else:
-            return self.farch.add_prefix(self.narch.prefix)
-
-    # get output file name for this ArchAndMode
-    def out(self, name):
-        return (self.prefix() + "-" + name +
-            ("-" + self.mode if self.mode else ""));
-
 
 class Bench:
-    narchs = [RV32_LINUX, X86]
-    xarchs = [(RV32_LINUX, X86)]
-    srcdir = path(DIR.top, "mibench")
-    dstdir = path(DIR.build, "mibench")
-    xflags = None
-    bflags = None
-    rflags_var = "-o {}.out"
-
-    PROLOGUE = """\
-### MIBENCH ###
-
-all: benchs
-
-clean:
-\trm -rf {}
-
-""".format(dstdir)
-
-    # args: list of Args
-    def __init__(self, name, dir, ins, args=None, dbg=False,
-            stdin=None, sbtflags=[], rflags=None, mflags=None,
-            dstdir=None):
+    def __init__(self, name, dir, ins, runs=None, dbg=False,
+            sbtflags=[], rflags=None, mflags=None,
+            srcdir=None, dstdir=None, narchs=None, xarchs=None):
         self.name = name
         self.dir = dir
         self.ins = ins
-        self.srcdir = path(srcdir, dir)
-        if dstdir == None:
-            self.dstdir = path(Bench.dstdir, dir)
-        else:
-            self.dstdir = dstdir
-        self.args = args if args else [Args([])]
-        self.stdin = stdin
+        self.runs = runs
+        self.runs.name = name
         self.sbtflags = sbtflags
         self.dbg = dbg
-        self.rflags_suffix = rflags
-        self.mflags = mflags
 
+        bflags = None
+        xflags = None
         if dbg:
-            self.bflags = cat(Bench.bflags, "--dbg")
-            self.xflags = cat(Bench.xflags, "--dbg")
+            bflags = "--dbg"
+            xflags = "--dbg"
+        self.narchs = narchs
+        self.xarchs = xarchs
+
+        self.gm = GenMake(narchs, xarchs,
+                srcdir, dstdir, self.name,
+                xflags, bflags, rflags, mflags, self.sbtflags)
 
 
-    def _escape_args(self, args):
-        args2 = []
-        for arg in args:
-            if len(arg) > 0 and arg[0] == '-':
-                arg = '" {}"'.format(arg)
-            args2.append(arg)
-        return args2
-
-
-    def args_str(self, args):
-        if not args:
-            return ''
-
-        args2 = ["--args"]
-        args2.extend(self._escape_args(args))
-        return " ".join(args2)
-
-
-    def rflags(self, args_obj, prefix, mode):
-        if args_obj:
-            args = args_obj.args(prefix, mode)
-            args_str = self.args_str(args)
-        else:
-            args_str = ''
-
-        if self.stdin:
-            args_str = cat(args_str, "<", self.stdin)
-
-        ret = cat(Bench.rflags_var, self.rflags_suffix, args_str)
-        out = prefix + "-" + self.name + ("-" + mode if mode else "")
-        ret = ret.format(out)
-        return ret
-
-
-    def _gen_xinout(self, xarch, name):
+    def _gen_xinout(self, xarch):
+        name = self.name
         use_native_sysroot = False
 
         (farch, narch) = xarch
@@ -137,46 +49,28 @@ clean:
             arch = ARCH[farch.prefix + "-for-" + narch.prefix]
             obj = arch.out2objname(name)
             # build rv32 binary for translation
-            txt = bld(arch, self.srcdir, self.dstdir, self.ins, obj, self.bflags)
+            self.gm.bld(arch, self.ins, obj)
         else:
             obj = farch.out2objname(name)
-            txt = None
 
-        return (obj, out, txt)
+        return (obj, out)
 
 
     def gen_build(self):
-        name = self.name
-        srcdir = self.srcdir
-        dstdir = self.dstdir
-
-        # module comment
-        txt = "### {} ###\n\n".format(name)
-
         # native builds
         for arch in self.narchs:
-            out = arch.add_prefix(name)
-            txt = txt + \
-                bld(arch, srcdir, dstdir, self.ins, out, self.bflags)
+            out = arch.add_prefix(self.name)
+            self.gm.bld(arch, self.ins, out)
 
         # translations
         for xarch in self.xarchs:
-            (fin, fout, rtxt) = self._gen_xinout(xarch, name)
-            if rtxt:
-                txt = txt + rtxt
-
+            (fin, fout) = self._gen_xinout(xarch)
             (farch, narch) = xarch
             for mode in SBT.modes:
-                txt = txt + \
-                    xlate(narch, srcdir, dstdir,
-                        fin, fout, mode, self.xflags,
-                        sbtflags=self.sbtflags)
-        return txt
+                self.gm.xlate(narch, fin, fout, mode)
 
 
     def gen_run(self):
-        txt = ''
-
         # prepare archs and modes
         ams = [ArchAndMode(None, arch) for arch in self.narchs]
         ams.extend(
@@ -186,316 +80,295 @@ clean:
 
         # runs
         for am in ams:
-            arch = am.narch
-            prefix = am.prefix()
-            mode = am.mode
-            out = am.out(self.name)
-
-            # runs
-            for args_obj in self.args:
-                suffix = "-" + args_obj.id if args_obj.id else ""
-                # run
-                txt = txt + run(arch, self.dstdir, out,
-                        self.rflags(args_obj, prefix, mode), suffix)
-        return txt
+            for run in self.runs:
+                self.gm.run(self.runs.name, run, am)
 
 
     def gen_test(self):
-        return test(self.xarchs, self.dstdir, self.name, ntest=True)
-
-
-    def measure(self, args_obj=None):
-        suffix = None
-        if args_obj:
-            args = args_obj.args(prefix='', mode='')
-            args_str = self.args_str(args)
-            suffix = args_obj.id
-        else:
-            args_str = ''
-
-        mflags = self.mflags
-        if suffix:
-            if not mflags:
-                mflags = []
-            mflags.extend(["--id", self.name + '-' + suffix])
-        fmtdata = {
-            "measure":  TOOLS.measure,
-            "dstdir":   self.dstdir,
-            "name":     self.name,
-            "suffix":   "-" + suffix if suffix else "",
-            "args":     " " + args_str if args_str else "",
-            "stdin":    " --stdin=" + self.stdin if self.stdin else "",
-            "mflags":   " " + " ".join(mflags) if mflags else "",
-        }
-
-        return """\
-.PHONY: {name}{suffix}-measure
-{name}{suffix}-measure: {name}
-\t{measure} {dstdir} {name}{args}{stdin}{mflags}
-
-""".format(**fmtdata)
+        return self.gm.test(ntest=True)
 
 
     def gen_measure(self):
-        txt = ""
-
         # measures
         measures = []
-        for args_obj in self.args:
-            txt = txt + self.measure(args_obj)
+        for run in self.runs:
+            self.gm.measure(run)
             m = self.name
-            if args_obj.id:
-                m = m + "-" + args_obj.id
+            if run.id:
+                m = m + "-" + run.id
             m = m + "-measure"
             measures.append(m)
 
         if len(measures) > 1:
-            txt = txt + alias(self.name + "-measure", measures)
-
-        return txt
-
-
-    def gen_clean(self):
-        # clean
-        return """\
-.phony: {name}-clean
-{name}-clean:
-\trm -rf {dstdir}
-
-""".format(**{
-        "name":     self.name,
-        "dstdir":   self.dstdir})
+            self.gm.alias(self.name + "-measure", measures)
 
 
     def gen_alias(self):
         # aliases
-        txt = alias_build_all(self.narchs, self.xarchs, self.name)
-        suffixes = [o.id if o.id else '' for o in self.args]
-        txt = txt + alias_run_all(self.narchs, self.xarchs, self.name,
-                suffixes)
-        return txt
+        self.gm.alias_build_all()
+        self.gm.alias_run_all(self.runs)
 
 
     def gen(self):
-        txt = self.gen_build()
-        txt = txt + self.gen_run()
-        txt = txt + self.gen_test()
-        txt = txt + self.gen_measure()
-        txt = txt + self.gen_clean()
-        txt = txt + self.gen_alias()
-        return txt
+        self.gen_build()
+        self.gen_run()
+        self.gen_test()
+        self.gen_measure()
+        self.gm.clean()
+        self.gen_alias()
+        return self.gm.txt
 
 
 class EncDecBench(Bench):
-    def set_asc_index(self, index):
-        self.asc_index = index
-        return self
+    def gen_single_test(self, tgt, runs, asc, dec):
+        fmtdata = {
+            "tgt":  tgt,
+            "runs": " ".join(runs),
+            "asc":  asc,
+            "dec":  dec,
+        }
 
-    def set_dec_index(self, index):
-        self.dec_index = index
-        return self
+        self.gm.append("""\
+.PHONY: {tgt}-test
+{tgt}-test: {runs}
+\tdiff {dec} {asc}
 
-    def test1(self, prefix, mode, suffixes, asc, dec):
-        out = prefix + "-" + self.name + ("-" + mode if mode else '')
-        runs = [out + "-" + suf + "-run" for suf in suffixes]
+""".format(**fmtdata))
 
-        return (
-            ".PHONY: {out}-test\n" +
-            "{out}-test: {runs}\n" +
-            "\tdiff {dec} {asc}\n\n").format(
-            **{
-                "out":  out,
-                "runs": " ".join(runs),
-                "asc":  asc,
-                "dec":  dec,
-            })
+        return tgt + self.gm.test_suffix()
 
 
     def gen_test(self):
-        txt = ''
-        asc_i = self.asc_index[0]
-        asc_j = self.asc_index[1]
-        dec_i = self.dec_index[0]
-        dec_j = self.dec_index[1]
+        asc = self.runs.asc
+        dec = self.runs.dec
+        if not asc or not dec:
+            raise Exception("Missing asc/dec")
 
-        suffixes = [o.id for o in self.args]
         tests = []
-        for arch in self.narchs + self.xarchs:
-            is_xarch = isinstance(arch, tuple)
-            if is_xarch:
-                (farch, narch) = arch
-                prefix = farch.prefix + "-" + narch.prefix
-                modes = SBT.modes
-            else:
-                prefix = arch.prefix
-                modes = ['']
-
-            for mode in modes:
-                asc = self.args[asc_i].args(prefix, mode)[asc_j]
-                dec = self.args[dec_i].args(prefix, mode)[dec_j]
-                txt = txt + self.test1(prefix, mode, suffixes, asc, dec)
-                tests.append(prefix + "-" + self.name +
-                    ("-" + mode if mode else "") + "-test")
-
-        txt = txt + alias(self.name + "-test", tests)
-        return txt
+        for am in self.gm.ams():
+            tgt = am.bin(self.name)
+            runs = self.gm.get_runs(self.runs, am, self.name)
+            tests.append(self.gen_single_test(tgt, runs, asc, am.fmt(dec)))
+        self.gm.alias(self.name + self.gm.test_suffix(), tests)
 
 
 class CustomTestBench(Bench):
     def out_filter(self, of):
-        self.out_filter = of
+        self.gm.out_filter = of
         return self
 
     def gen_test(self):
-        return test(self.xarchs, self.dstdir, self.name, ntest=True,
-                out_filter=self.out_filter)
+        self.gm.test(ntest=True)
+
 
 class MultiTestBench(Bench):
     def gen_test(self):
-        txt = ''
+        tsuf = self.gm.test_suffix()
+
         aliasees = []
-        for args_obj in self.args:
-            id = args_obj.id
-            if args_obj.outidx:
-                outname = args_obj.raw_args()[args_obj.outidx]
-            else:
-                outname = None
-            txt = txt + test(self.xarchs, self.dstdir, self.name, ntest=True,
-                id=id, outname=outname)
-            aliasees.append(self.name + '-' + id + "-test")
-        txt = txt + alias(self.name + "-test", aliasees)
-        return txt
+        for run in self.runs:
+            id = run.id
+            xassert(id)
+            self.gm.test(ntest=True, id=id, outname=run.out())
+            aliasees.append(cat(self.name, '-', id, tsuf))
+        self.gm.alias(self.name + tsuf, aliasees)
 
 
-if __name__ == "__main__":
-    srcdir = Bench.srcdir
-    dstdir = Bench.dstdir
+class MiBench:
+    def __init__(self):
+        self.narchs = [RV32_LINUX, X86]
+        self.xarchs = [(RV32_LINUX, X86)]
+        self.srcdir = path(DIR.top, "mibench")
+        self.dstdir = path(DIR.build, "mibench")
+        self.stack_large = ["-stack-size=131072"]    # 128K
+        self.stack_huge = ["-stack-size=1048576"]    # 1M
+        self.txt = ''
+        self.benchs = None
 
-    # rijndael args
-    rijndael_dir = "security/rijndael"
-    rijndael_asc = mpath(srcdir, rijndael_dir, "input_large.asc")
-    rijndael_enc = mpath(dstdir, rijndael_dir, "{prefix}output_large{mode}.enc")
-    rijndael_dec = mpath(dstdir, rijndael_dir, "{prefix}output_large{mode}.dec")
-    rijndael_key = "1234567890abcdeffedcba09876543211234567890abcdeffedcba0987654321"
-    rijndael_args = [
-        Args([rijndael_asc, rijndael_enc, "e", rijndael_key], "encode"),
-        Args([rijndael_enc, rijndael_dec, "d", rijndael_key], "decode")]
 
-    # blowfish args
-    bf_dir = "security/blowfish"
-    bf_asc = mpath(srcdir, bf_dir, "input_large.asc")
-    bf_enc = mpath(dstdir, bf_dir, "{prefix}output_large{mode}.enc")
-    bf_dec = mpath(dstdir, bf_dir, "{prefix}output_large{mode}.asc")
-    bf_key = "1234567890abcdeffedcba0987654321"
-    bf_args = [
-        Args(["e", bf_asc, bf_enc, bf_key], "encode"),
-        Args(["d", bf_enc, bf_dec, bf_key], "decode")]
+    def append(self, txt):
+        self.txt = self.txt + txt
 
-    # susan args
-    susan_dir = "automotive/susan"
-    susan_in  = mpath(srcdir, susan_dir, "input_large.pgm")
-    susan_out = mpath(dstdir, susan_dir, "{prefix}output_large{mode}.")
-    susan_args = [
-        Args([susan_in, susan_out + "smoothing.pgm", "-s"], "smoothing", 1),
-        Args([susan_in, susan_out + "edges.pgm", "-e"], "edges", 1),
-        Args([susan_in, susan_out + "corners.pgm", "-c"], "corners", 1)]
 
-    stack_large = ["-stack-size=131072"]    # 128K
-    stack_huge = ["-stack-size=1048576"]    # 1M
-    benchs = [
-        Bench("dijkstra", "network/dijkstra",
-            ["dijkstra_large.c"],
-            [Args([path(srcdir, "network/dijkstra/input.dat")])]),
-        Bench("crc32", "telecomm/CRC32",
-            ["crc_32.c"],
-            [Args([path(srcdir, "telecomm/adpcm/data/large.pcm")])]),
-        EncDecBench("rijndael", rijndael_dir,
-            ["aes.c", "aesxam.c"],
-            rijndael_args)
-            .set_asc_index([0, 0])
-            .set_dec_index([1, 1]),
-        Bench("sha", "security/sha",
-            ["sha_driver.c", "sha.c"],
-            [Args([path(srcdir, "security/sha/input_large.asc")])],
-            sbtflags=["-stack-size=16384"]),
-        Bench("adpcm-encode", "telecomm/adpcm/src",
-            ["rawcaudio.c", "adpcm.c"],
-            dstdir=path(Bench.dstdir, "telecomm/adpcm/rawcaudio"),
-            stdin=path(srcdir, "telecomm/adpcm/data/large.pcm"),
-            rflags="--bin"),
-        Bench("adpcm-decode", "telecomm/adpcm/src",
-            ["rawdaudio.c", "adpcm.c"],
-            dstdir=path(Bench.dstdir, "telecomm/adpcm/rawdaudio"),
-            stdin=path(srcdir, "telecomm/adpcm/data/large.adpcm"),
-            rflags="--bin"),
-        Bench("stringsearch", "office/stringsearch",
-            ["bmhasrch.c", "bmhisrch.c", "bmhsrch.c", "pbmsrch_large.c"],
-            sbtflags=stack_large),
-        EncDecBench("blowfish", bf_dir,
-            ["bf.c",
-            "bf_skey.c",
-            "bf_ecb.c",
-            "bf_enc.c",
-            "bf_cbc.c",
-            "bf_cfb64.c",
-            "bf_ofb64.c"],
-            bf_args,
-            sbtflags=stack_large,
-            rflags="--exp-rc=1",
-            mflags=["--exp-rc=1"])
-            .set_asc_index([0, 1])
-            .set_dec_index([1, 2]),
-        Bench("basicmath", "automotive/basicmath",
-            ["basicmath_large.c", "rad2deg.c", "cubic.c", "isqrt.c"],
-            sbtflags=stack_large),
-        CustomTestBench("bitcount", "automotive/bitcount",
-            ["bitcnt_1.c", "bitcnt_2.c", "bitcnt_3.c", "bitcnt_4.c",
-                "bitcnts.c", "bitfiles.c", "bitstrng.c", "bstr_i.c"],
-            [Args(["1125000"])],
-            sbtflags=stack_large)
-            .out_filter("sed 's/Time:[^;]*; //;/^Best/d;/^Worst/d'"),
-        MultiTestBench("fft", "telecomm/FFT",
-            ["main.c", "fftmisc.c", "fourierf.c"],
-            [Args(["8", "32768"], "std"), Args(["8", "32768", "-i"], "inv")],
-            sbtflags=stack_large),
-        Bench("patricia", "network/patricia",
-            ["patricia.c", "patricia_test.c"],
-            [Args([path(srcdir, "network/patricia/large.udp")])],
-            rflags="--exp-rc=1",
-            mflags=["--exp-rc=1"]),
-        MultiTestBench("susan", susan_dir,
-            ["susan.c"],
-            susan_args,
-            sbtflags=stack_huge),
-    ]
+    def _gen_prologue(self):
+        self.append("""\
+### MIBENCH ###
 
-    header = []
+all: benchs
 
-    ispace = ["", "", ""]
-    l = ["Mibench Benchmarks", ""]
-    l.extend(["Native x86"] + ispace)
-    l.extend(["Globals"] + ispace)
-    l.extend(["Locals"] + ispace)
-    header.append(l)
+clean:
+\trm -rf {}
 
-    tm = "Time"
-    tsd = "Time SD"
-    x = "Slowdown"
-    xsd = "Slowdown SD"
-    item = [tm, tsd, x, xsd]
+""".format(self.dstdir))
 
-    l = ["Name", "Set"]
-    l.extend(item * 3)
-    header.append(l)
 
-    # footer = ["Geometric Average:", ""]
+    def _bench(self, name, dir, ins, runs, dstdir=None, ctor=Bench, **kwargs):
+        dstdir = dstdir if dstdir else path(self.dstdir, dir)
 
-    names = [b.name for b in benchs]
-    txt = Bench.PROLOGUE
-    for bench in benchs:
-        txt = txt + bench.gen()
+        return ctor(
+            name=name, dir=dir, ins=ins, runs=runs,
+            srcdir=path(self.srcdir, dir),
+            dstdir=dstdir,
+            narchs=self.narchs,
+            xarchs=self.xarchs,
+            **kwargs)
 
-    txt = txt + """\
+
+    def _rijndael(self):
+        dir = "security/rijndael"
+        asc = mpath(self.srcdir, dir, "input_large.asc")
+        enc = mpath(self.dstdir, dir, "{prefix}output_large{mode}.enc")
+        dec = mpath(self.dstdir, dir, "{prefix}output_large{mode}.dec")
+        key = "1234567890abcdeffedcba09876543211234567890abcdeffedcba0987654321"
+        runs = Runs([
+            Run([asc, enc, "e", key], "encode"),
+            Run([enc, dec, "d", key], "decode")])
+        runs.asc = asc
+        runs.dec = dec
+
+        return self._bench("rijndael", dir,
+            ["aes.c", "aesxam.c"], runs, ctor=EncDecBench)
+
+
+    def _bf(self):
+        dir = "security/blowfish"
+        asc = mpath(self.srcdir, dir, "input_large.asc")
+        enc = mpath(self.dstdir, dir, "{prefix}output_large{mode}.enc")
+        dec = mpath(self.dstdir, dir, "{prefix}output_large{mode}.asc")
+        key = "1234567890abcdeffedcba0987654321"
+        runs = Runs([
+            Run(["e", asc, enc, key], "encode"),
+            Run(["d", enc, dec, key], "decode")])
+        runs.asc = asc
+        runs.dec = dec
+
+        return self._bench("blowfish", dir,
+                ["bf.c", "bf_skey.c",
+                "bf_ecb.c", "bf_enc.c", "bf_cbc.c",
+                "bf_cfb64.c", "bf_ofb64.c"],
+                runs,
+                ctor=EncDecBench,
+                sbtflags=self.stack_large,
+                rflags="--exp-rc=1",
+                mflags=["--exp-rc=1"])
+
+
+    def _susan(self):
+        # susan args
+        dir = "automotive/susan"
+        _in  = mpath(self.srcdir, dir, "input_large.pgm")
+        out = mpath(self.dstdir, dir, "{prefix}output_large{mode}.")
+        runs = Runs([
+            Run([_in, out + "smoothing.pgm", "-s"], "smoothing", outidx=1),
+            Run([_in, out + "edges.pgm", "-e"], "edges", outidx=1),
+            Run([_in, out + "corners.pgm", "-c"], "corners", outidx=1)])
+
+        return self._bench("susan", dir,
+                ["susan.c"], runs,
+                ctor=MultiTestBench,
+                sbtflags=self.stack_huge)
+
+
+    def _single_run(self, args, stdin=None):
+        return Runs([Run(args, stdin=stdin)])
+
+
+    def gen(self):
+        self._gen_prologue()
+
+        self.benchs = [
+            self._bench("dijkstra", "network/dijkstra",
+                ["dijkstra_large.c"],
+                self._single_run(
+                    [path(self.srcdir, "network/dijkstra/input.dat")])),
+            self._bench("crc32", "telecomm/CRC32",
+                ["crc_32.c"],
+                self._single_run(
+                    [path(self.srcdir, "telecomm/adpcm/data/large.pcm")])),
+            self._rijndael(),
+            self._bench("sha", "security/sha",
+                ["sha_driver.c", "sha.c"],
+                self._single_run(
+                    [path(self.srcdir, "security/sha/input_large.asc")]),
+                sbtflags=["-stack-size=16384"]),
+            self._bench("adpcm-encode", "telecomm/adpcm/src",
+                ["rawcaudio.c", "adpcm.c"],
+                self._single_run([],
+                    stdin=path(self.srcdir, "telecomm/adpcm/data/large.pcm")),
+                dstdir=path(self.dstdir, "telecomm/adpcm/rawcaudio"),
+                rflags="--bin"),
+            self._bench("adpcm-decode", "telecomm/adpcm/src",
+                ["rawdaudio.c", "adpcm.c"],
+                self._single_run([],
+                    stdin=path(self.srcdir, "telecomm/adpcm/data/large.adpcm")),
+                dstdir=path(self.dstdir, "telecomm/adpcm/rawdaudio"),
+                rflags="--bin"),
+            self._bench("stringsearch", "office/stringsearch",
+                ["bmhasrch.c", "bmhisrch.c", "bmhsrch.c", "pbmsrch_large.c"],
+                self._single_run([]),
+                sbtflags=self.stack_large),
+            self._bf(),
+            self._bench("basicmath", "automotive/basicmath",
+                ["basicmath_large.c", "rad2deg.c", "cubic.c", "isqrt.c"],
+                self._single_run([]),
+                sbtflags=self.stack_large),
+            self._bench("bitcount", "automotive/bitcount",
+                ["bitcnt_1.c", "bitcnt_2.c", "bitcnt_3.c", "bitcnt_4.c",
+                    "bitcnts.c", "bitfiles.c", "bitstrng.c", "bstr_i.c"],
+                self._single_run(["1125000"]),
+                ctor=CustomTestBench,
+                sbtflags=self.stack_large)
+                .out_filter("sed 's/Time:[^;]*; //;/^Best/d;/^Worst/d'"),
+            self._bench("fft", "telecomm/FFT",
+                ["main.c", "fftmisc.c", "fourierf.c"],
+                Runs([
+                    Run(["8", "32768"], "std"),
+                    Run(["8", "32768", "-i"], "inv") ]),
+                ctor=MultiTestBench,
+                sbtflags=self.stack_large),
+            self._bench("patricia", "network/patricia",
+                ["patricia.c", "patricia_test.c"],
+                self._single_run(
+                    [path(self.srcdir, "network/patricia/large.udp")]),
+                rflags="--exp-rc=1",
+                mflags=["--exp-rc=1"]),
+            self._susan(),
+        ]
+
+        for bench in self.benchs:
+            self.append(bench.gen())
+
+        self._gen_epilogue()
+        self._write()
+
+    def _gen_csv_header(self):
+        header = []
+
+        ispace = ["", "", ""]
+        l = ["Mibench Benchmarks", ""]
+        l.extend(["Native x86"] + ispace)
+        l.extend(["Globals"] + ispace)
+        l.extend(["Locals"] + ispace)
+        header.append(l)
+
+        tm = "Time"
+        tsd = "Time SD"
+        x = "Slowdown"
+        xsd = "Slowdown SD"
+        item = [tm, tsd, x, xsd]
+
+        l = ["Name", "Set"]
+        l.extend(item * 3)
+        header.append(l)
+
+        return header
+
+
+    def _gen_epilogue(self):
+        names = [b.name for b in self.benchs]
+        csv_header = self._gen_csv_header()
+
+        self.append("""\
 .PHONY: benchs
 benchs: {}
 
@@ -511,16 +384,23 @@ csv-header:
 benchs-measure: benchs csv-header {}
 
 """.format(
-        " ".join(names),
-        " ".join([name + "-test" for name in names]),
-        ",".join(header[0]),
-        ",".join(header[1]),
-        " ".join([name + "-measure" for name in names]),
-    )
+            " ".join(names),
+            " ".join([name + "-test" for name in names]),
+            ",".join(csv_header[0]),
+            ",".join(csv_header[1]),
+            " ".join([name + "-measure" for name in names]),
+        ))
 
-    # write txt to Makefile
-    with open("Makefile", "w") as f:
-        f.write(txt)
+
+    def _write(self):
+        # write txt to Makefile
+        with open("Makefile", "w") as f:
+            f.write(self.txt)
+
+
+if __name__ == "__main__":
+    mb = MiBench()
+    mb.gen()
 
 
 """

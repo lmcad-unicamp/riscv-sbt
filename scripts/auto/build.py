@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-from auto.config import *
-from auto.utils import *
+from auto.config import ARCH, RV32_LINUX, SBT, TOOLS, emit_llvm
+from auto.utils import cat, chsuf, path, shell
 
 import argparse
 import os
@@ -35,7 +35,7 @@ class BuildOpts:
         opts.sflags = args.sflags
         opts.ldflags = cat(*[SBT.nat_obj(opts.arch, o, opts.clink)
             for o in args.sbtobjs])
-        opts.xflags = cat(" ".join(args.xflags).strip(),
+        opts.sbtflags = cat(" ".join(args.sbtflags).strip(),
             "-dont-use-libc" if not opts.clink else "")
         opts.dbg = args.dbg
 
@@ -63,13 +63,13 @@ class BuildOpts:
         parser.add_argument("--cflags", help="compiler flags")
         parser.add_argument("--sflags", help="assembler flags")
         parser.add_argument("--ldflags", help="linker flags")
-        parser.add_argument("--xflags", nargs="+", metavar="flag",
+        parser.add_argument("--sbtflags", nargs="+", metavar="flag",
             help="translator flags", default=[])
         parser.add_argument("--dbg", action='store_true',
             help="build for debug")
 
 
-class Builder:
+class LLVMBuilder:
     def __init__(self, opts):
         self.opts = opts
 
@@ -157,8 +157,9 @@ class Builder:
                 shell(cmd)
 
 
-    def _c2s(self, srcdir, dstdir, ins, out):
+    def c2s(self, srcdir, dstdir, ins, out):
         """ *.c -> .s """
+
         bc = chsuf(out, ".bc")
         self._c2lbc(srcdir, dstdir, ins, bc)
 
@@ -178,8 +179,26 @@ class Builder:
             self.bc2s(dstdir, opt2, out)
 
 
+class GCCBuilder:
+    def __init__(self, opts):
+        self.opts = opts
+
+    def c2s(self):
+        raise Exception("Unimplemented!!!")
+
+
+class Builder:
+    def __init__(self, opts):
+        self.opts = opts
+        if opts.cc == "clang":
+            self.bldr = LLVMBuilder(opts)
+        else:
+            self.bldr = GCCBuilder(opts)
+
+
     def _s2o(self, srcdir, dstdir, _in, out):
         """ .s -> .o """
+
         opts = self.opts
         arch = opts.arch
         ipath = path(srcdir, _in)
@@ -249,6 +268,7 @@ class Builder:
 
     def _snlink(self):
         """ *.s -> bin """
+
         opts = self.opts
         if len(opts.ins) == 1:
             obj = opts.out + ".o"
@@ -263,11 +283,12 @@ class Builder:
 
     def _cnlink(self):
         """ *.c -> bin """
+
         opts = self.opts
         s = opts.out + ".s"
         o = opts.out + ".o"
 
-        self._c2s(opts.srcdir, opts.dstdir, opts.ins, s)
+        self.bldr.c2s(opts.srcdir, opts.dstdir, opts.ins, s)
         self._s2o(opts.dstdir, opts.dstdir, s, o)
         self._link(opts.dstdir, opts.dstdir, [o], opts.out)
 
@@ -298,7 +319,7 @@ class Builder:
                 self._s2o(opts.srcdir, opts.dstdir, opts.ins[0], opts.out)
             else:
                 s = chsuf(opts.out, '.s')
-                self._c2s(opts.srcdir, opts.dstdir, opts.ins, s)
+                self.bldr.c2s(opts.srcdir, opts.dstdir, opts.ins, s)
                 self._s2o(opts.dstdir, opts.dstdir, s, out)
             return
 

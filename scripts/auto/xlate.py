@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from auto.build import Builder, BuildOpts
+from auto.build import Builder, BuildOpts, LLVMBuilder
 from auto.config import DIR, RV32_LINUX, SBT
 from auto.utils import cat, chsuf, mkdir_if_needed, path, shell
 
@@ -18,7 +18,7 @@ class Translator:
         arch = opts.arch
         ipath = path(dir, obj)
         opath = path(dir, out)
-        flags = cat(SBT.flags, opts.xflags)
+        flags = cat(SBT.flags, opts.sbtflags)
 
         if opts.dbg:
             # strip arch prefix
@@ -58,17 +58,17 @@ class Translator:
         # translate obj to .bc
         self._translate_obj(dstdir, obj, bc)
         # gen .ll
-        bld = Builder(opts)
-        bld.dis(dstdir, bc)
+        llbld = LLVMBuilder(opts)
+        llbld.dis(dstdir, bc)
 
         # gen .s
         if opts.dbg:
-            bld.bc2s(dstdir, bc, s)
+            llbld.bc2s(dstdir, bc, s)
         else:
             opt1 = out + ".opt.bc"
-            bld.opt(dstdir, bc, opt1, printf_break=False)
-            bld.dis(dstdir, opt1)
-            bld.bc2s(dstdir, opt1, s)
+            llbld.opt(dstdir, bc, opt1, printf_break=False)
+            llbld.dis(dstdir, opt1)
+            llbld.bc2s(dstdir, opt1, s)
 
         # build .s
         opts.asm = True
@@ -76,6 +76,7 @@ class Translator:
         opts.dstdir = dstdir
         opts.ins = [s]
         opts.out = out
+        bld = Builder(opts)
         bld.build()
 
 

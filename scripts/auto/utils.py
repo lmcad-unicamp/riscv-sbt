@@ -99,3 +99,8 @@ def xarch_brk(xarch):
 def mkdir_if_needed(dir):
     if not os.path.exists(dir):
         shell("mkdir -p " + dir)
+
+
+def xassert(v):
+    if v == None:
+        raise Exception("v is None")
