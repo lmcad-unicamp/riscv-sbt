@@ -101,6 +101,16 @@ def mkdir_if_needed(dir):
         shell("mkdir -p " + dir)
 
 
+def unique(l):
+    u = []
+    for i in l:
+        if not i in u:
+            u.append(i)
+    return u
+
+
 def xassert(v):
     if v == None:
         raise Exception("v is None")
+    if not v:
+        raise Exception("not v")

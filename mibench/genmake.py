@@ -15,7 +15,7 @@ from auto.utils import cat, mpath, path, xassert
 
 class Bench:
     def __init__(self, name, dir, ins, runs=None, dbg=False,
-            sbtflags=[], rflags=None, mflags=None,
+            sbtflags=[], mflags=None,
             srcdir=None, dstdir=None, narchs=None, xarchs=None):
         self.name = name
         self.dir = dir
@@ -35,7 +35,12 @@ class Bench:
 
         self.gm = GenMake(narchs, xarchs,
                 srcdir, dstdir, self.name,
-                xflags, bflags, rflags, mflags, self.sbtflags)
+                xflags, bflags, mflags, self.sbtflags)
+
+
+    def out_filter(self, of):
+        self.gm.out_filter = of
+        return self
 
 
     def _gen_xinout(self, xarch):
@@ -85,7 +90,7 @@ class Bench:
 
 
     def gen_test(self):
-        return self.gm.test(ntest=True)
+        return self.gm.test(self.runs)
 
 
     def gen_measure(self):
@@ -152,28 +157,6 @@ class EncDecBench(Bench):
         self.gm.alias(self.name + self.gm.test_suffix(), tests)
 
 
-class CustomTestBench(Bench):
-    def out_filter(self, of):
-        self.gm.out_filter = of
-        return self
-
-    def gen_test(self):
-        self.gm.test(ntest=True)
-
-
-class MultiTestBench(Bench):
-    def gen_test(self):
-        tsuf = self.gm.test_suffix()
-
-        aliasees = []
-        for run in self.runs:
-            id = run.id
-            xassert(id)
-            self.gm.test(ntest=True, id=id, outname=run.out())
-            aliasees.append(cat(self.name, '-', id, tsuf))
-        self.gm.alias(self.name + tsuf, aliasees)
-
-
 class MiBench:
     def __init__(self):
         self.narchs = [RV32_LINUX, X86]
@@ -231,14 +214,15 @@ clean:
 
 
     def _bf(self):
+        rflags = "--exp-rc=1"
         dir = "security/blowfish"
         asc = mpath(self.srcdir, dir, "input_large.asc")
         enc = mpath(self.dstdir, dir, "{prefix}output_large{mode}.enc")
         dec = mpath(self.dstdir, dir, "{prefix}output_large{mode}.asc")
         key = "1234567890abcdeffedcba0987654321"
         runs = Runs([
-            Run(["e", asc, enc, key], "encode"),
-            Run(["d", enc, dec, key], "decode")])
+            Run(["e", asc, enc, key], "encode", rflags=rflags),
+            Run(["d", enc, dec, key], "decode", rflags=rflags)])
         runs.asc = asc
         runs.dec = dec
 
@@ -249,8 +233,7 @@ clean:
                 runs,
                 ctor=EncDecBench,
                 sbtflags=self.stack_large,
-                rflags="--exp-rc=1",
-                mflags=["--exp-rc=1"])
+                mflags=[rflags])
 
 
     def _susan(self):
@@ -265,12 +248,11 @@ clean:
 
         return self._bench("susan", dir,
                 ["susan.c"], runs,
-                ctor=MultiTestBench,
                 sbtflags=self.stack_huge)
 
 
-    def _single_run(self, args, stdin=None):
-        return Runs([Run(args, stdin=stdin)])
+    def _single_run(self, args, stdin=None, rflags=None):
+        return Runs([Run(args, stdin=stdin, rflags=rflags)])
 
 
     def gen(self):
@@ -294,15 +276,15 @@ clean:
             self._bench("adpcm-encode", "telecomm/adpcm/src",
                 ["rawcaudio.c", "adpcm.c"],
                 self._single_run([],
-                    stdin=path(self.srcdir, "telecomm/adpcm/data/large.pcm")),
-                dstdir=path(self.dstdir, "telecomm/adpcm/rawcaudio"),
-                rflags="--bin"),
+                    stdin=path(self.srcdir, "telecomm/adpcm/data/large.pcm"),
+                    rflags="--bin"),
+                dstdir=path(self.dstdir, "telecomm/adpcm/rawcaudio")),
             self._bench("adpcm-decode", "telecomm/adpcm/src",
                 ["rawdaudio.c", "adpcm.c"],
                 self._single_run([],
-                    stdin=path(self.srcdir, "telecomm/adpcm/data/large.adpcm")),
-                dstdir=path(self.dstdir, "telecomm/adpcm/rawdaudio"),
-                rflags="--bin"),
+                    stdin=path(self.srcdir, "telecomm/adpcm/data/large.adpcm"),
+                    rflags="--bin"),
+                dstdir=path(self.dstdir, "telecomm/adpcm/rawdaudio")),
             self._bench("stringsearch", "office/stringsearch",
                 ["bmhasrch.c", "bmhisrch.c", "bmhsrch.c", "pbmsrch_large.c"],
                 self._single_run([]),
@@ -316,7 +298,6 @@ clean:
                 ["bitcnt_1.c", "bitcnt_2.c", "bitcnt_3.c", "bitcnt_4.c",
                     "bitcnts.c", "bitfiles.c", "bitstrng.c", "bstr_i.c"],
                 self._single_run(["1125000"]),
-                ctor=CustomTestBench,
                 sbtflags=self.stack_large)
                 .out_filter("sed 's/Time:[^;]*; //;/^Best/d;/^Worst/d'"),
             self._bench("fft", "telecomm/FFT",
@@ -324,13 +305,12 @@ clean:
                 Runs([
                     Run(["8", "32768"], "std"),
                     Run(["8", "32768", "-i"], "inv") ]),
-                ctor=MultiTestBench,
                 sbtflags=self.stack_large),
             self._bench("patricia", "network/patricia",
                 ["patricia.c", "patricia_test.c"],
                 self._single_run(
-                    [path(self.srcdir, "network/patricia/large.udp")]),
-                rflags="--exp-rc=1",
+                    [path(self.srcdir, "network/patricia/large.udp")],
+                    rflags="--exp-rc=1"),
                 mflags=["--exp-rc=1"]),
             self._susan(),
         ]
@@ -377,8 +357,8 @@ benchs-test: benchs {}
 
 .PHONY: csv-header
 csv-header:
-\techo {} > mibench.csv
-\techo {} >> mibench.csv
+\techo "{}" > mibench.csv
+\techo "{}" >> mibench.csv
 
 .PHONY: benchs-measure
 benchs-measure: benchs csv-header {}

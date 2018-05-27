@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from auto.config import SBT, TOOLS
-from auto.utils import cat, path
+from auto.utils import cat, path, unique
 
 class Module:
     def __init__(self, name, src, xflags=None, bflags=None, rflags=None):
@@ -22,6 +22,8 @@ class ArchAndMode:
     def prefix(self):
         if not self.farch:
             return self.narch.prefix
+        elif not self.narch:
+            return self.farch.prefix
         else:
             return self.farch.add_prefix(self.narch.prefix)
 
@@ -34,6 +36,14 @@ class ArchAndMode:
 
         return (self.prefix() + "-" + name +
             ("-" + self.mode if self.mode else ""));
+
+
+    @staticmethod
+    def sfmt(templ, prefix, mode):
+        return templ.format(**{
+            "prefix":   prefix,
+            "mode":     mode,
+            })
 
 
     def fmt(self, templ):
@@ -49,10 +59,7 @@ class ArchAndMode:
         else:
             mode = ''
 
-        return templ.format(**{
-            "prefix":   prefix,
-            "mode":     mode,
-            })
+        return self.sfmt(templ, prefix, mode)
 
 
 # arguments for a given run
@@ -62,29 +69,44 @@ class Run:
         self.rflags_arg = rflags
         self.id = id
         self.outidx = outidx
-        self.stdin = None
+        self.stdin = stdin
+
+
+    @staticmethod
+    def out_suffix():
+        return ".out"
+
+
+    @staticmethod
+    def build_name(am, base, id, suffix):
+        if am:
+            r = am.bin(base)
+        else:
+            r = base
+        if id:
+            r = r + '-' + id
+        if suffix:
+            r = r + suffix
+        return r
 
 
     def bin(self, am, name):
         return am.bin(name)
 
 
-    def out(self):
+    def out(self, am, name):
         if self.outidx == None:
-            return None
-        return self.args[self.outidx]
+            if am:
+                return self.build_name(am, name, self.id, self.out_suffix())
+            else:
+                return None
+        return am.fmt(self.args[self.outidx])
 
 
     def build(self, am):
-        prefix = am.prefix() if am else ''
-        mode = am.mode if am else None
-
-        fmtdata = {
-            "prefix":   prefix,
-            "mode":     "-" + mode if mode else ''
-        }
-
-        return [arg.format(**fmtdata) for arg in self.args]
+        if am:
+            return [am.fmt(arg) for arg in self.args]
+        return [ArchAndMode.sfmt(arg, '', '') for arg in self.args]
 
 
     @staticmethod
@@ -107,8 +129,11 @@ class Run:
         return " ".join(args2)
 
 
-    def rflags(self, am):
+    def rflags(self, am, name):
         args_str = self.str(am)
+        out = self.out(am, name)
+        if not self.outidx:
+            args_str = cat('-o', out, args_str)
 
         if self.stdin:
             args_str = cat(args_str, "<", self.stdin)
@@ -131,7 +156,7 @@ class Runs:
 class GenMake:
     def __init__(self, narchs, xarchs,
             srcdir, dstdir, name,
-            xflags, bflags, rflags, mflags, sbtflags=[]):
+            xflags, bflags, mflags, sbtflags=[]):
         self.narchs = narchs
         self.xarchs = xarchs
         self.srcdir = srcdir
@@ -139,7 +164,6 @@ class GenMake:
         self.name = name
         self.xflags = xflags
         self.bflags = bflags
-        self.rflags = rflags
         self.mflags = mflags
         self.sbtflags = sbtflags
         #
@@ -162,7 +186,6 @@ class GenMake:
         for arch in self.narchs:
             _in = self._srcname(src, arch)
             out = arch.add_prefix(name)
-            # rflags.format(out)
             self.bldnrun(arch, [_in], out)
 
         # translations
@@ -170,12 +193,11 @@ class GenMake:
             fmod = farch.out2objname(name)
             nmod = farch.add_prefix(narch.add_prefix(name))
 
-            # rflags.format(nmod + "-" + mode)
             for mode in SBT.modes:
                 self.xlatenrun(narch, fmod, nmod, mode)
 
         # tests
-        self.test(name, ntest=len(self.narchs) > 1)
+        self.test(name)
 
         # aliases
         self.alias_build_all(name)
@@ -229,17 +251,18 @@ class GenMake:
 """.format(**fmtdata))
 
 
-    def run(self, name, robj, am):
+    def run(self, name, robj, am, stdin=None):
         dir = self.dstdir
+        bin = robj.bin(am, name)
 
         suffix = "-" + robj.id if robj.id else ""
-        rflags = robj.rflags(am)
+        rflags = robj.rflags(am, name)
         narch = am.narch
 
         fmtdata = {
             "arch":     narch.name,
             "dir":      dir,
-            "bin":      robj.bin(am, name),
+            "bin":      bin,
             "suffix":   suffix,
             "rflags":   " " + rflags if rflags else "",
             "run":      TOOLS.run,
@@ -285,89 +308,44 @@ class GenMake:
         self.run(arch, out + "-" + mode)
 
 
-    def test(self, ntest=False, id=None, outname=None):
-        name = self.name
-        dir = self.dstdir
-
-        def build_name(base, prefix, mode, id, suffix):
-            r = base
-            if prefix:
-                r = prefix + '-' + r
-            if mode:
-                r = r + '-' + mode
-            if id:
-                r = r + '-' + id
-            if suffix:
-                r = r + suffix
-            return r
-
-        def fmt_name(base, prefix, mode):
-            return base.format(**{
-                "prefix" : prefix + '-',
-                "mode"   : '-' + mode if mode else ''})
-
-        def xprefix(farch, narch):
-            return farch.prefix + '-' + narch.prefix
-
-        if outname:
-            fname = lambda prefix: fmt_name(outname, prefix, "")
-            nname = fname
-            xname = lambda prefix, mode: fmt_name(outname, prefix, mode)
+    def _diff(self, f0, f1):
+        if self.out_filter:
+            return (
+                "\tcat {0} | {2} >{0}.filt\n" +
+                "\tcat {1} | {2} >{1}.filt\n" +
+                "\tdiff {0}.filt {1}.filt").format(
+                    f0, f1, self.out_filter)
         else:
-            outname = name
-            suffix = ".out"
-            fname = lambda prefix: path(dir,
-                        build_name(outname, prefix, None, id, suffix))
-            nname = fname
-            xname = lambda prefix, mode: path(dir,
-                        build_name(outname, prefix, mode, id, suffix))
+            return "\tdiff {0} {1}".format(f0, f1)
 
+
+    def test1(self, run):
+        id = run.id
+
+        if run.outidx:
+            name = lambda am: run.out(am, name=self.name)
+        else:
+            name = lambda am: path(self.dstdir,
+                Run.build_name(am, self.name, id, Run.out_suffix()))
+
+        # gen diffs
         diffs = []
-        def diff(out1, out2):
-            if self.out_filter:
-                diff = (
-                    "\tcat {0} | {2} >{0}.filt\n" +
-                    "\tcat {1} | {2} >{1}.filt\n" +
-                    "\tdiff {0}.filt {1}.filt").format(
-                        out1, out2, self.out_filter)
-            else:
-                diff = "\tdiff {0} {1}".format(out1, out2)
-            diffs.append(diff)
+        def diff(f0, f1):
+            diffs.append(self._diff(f0, f1))
 
-
-        farchs = []
-        narchs = []
-        for xarch in self.xarchs:
-            (farch, narch) = xarch
-            farchs.append(farch)
-            narchs.append(narch)
-
-            fout = fname(farch.prefix)
-
-            for mode in SBT.modes:
-                xout = xname(xprefix(farch, narch), mode)
+        for xam in self._xams():
+            xout = name(xam)
+            for fam in self._ufams():
+                fout = name(fam)
                 diff(fout, xout)
-                if ntest:
-                    nout = nname(narch.prefix)
-                    diff(nout, xout)
+            for nam in self._unams():
+                nout = name(nam)
+                diff(nout, xout)
 
-        def run_name(prefix):
-            return build_name(name, prefix, None, id, "-run")
-
-        def xrun_name(prefix, mode):
-            return build_name(name, prefix, mode, id, "-run")
-
-        runs = [run_name(arch.prefix)
-                for arch in farchs + (narchs if ntest else [])]
-
-        runs.extend(
-            [xrun_name(xprefix(farch, narch), mode)
-                for (farch, narch) in self.xarchs
-                for mode in SBT.modes])
-
+        tname = Run.build_name(None, self.name, id, None)
         fmtdata = {
-            "name":     build_name(name, None, None, id, None),
-            "runs":     " ".join(runs),
+            "name":     tname,
+            "runs":     " ".join(self.get_all_runs(Runs([run]), self.name)),
             "diffs":    "\n".join(diffs)
         }
 
@@ -377,6 +355,18 @@ class GenMake:
 {diffs}
 
 """.format(**fmtdata))
+
+        return tname + self.test_suffix()
+
+
+    def test(self, runs):
+        tests = []
+        for run in runs:
+            tests.append(self.test1(run))
+
+        if len(tests) > 1:
+            tsuf = self.test_suffix()
+            self.alias(self.name + tsuf, tests)
 
 
     def measure(self, robj):
@@ -448,6 +438,14 @@ class GenMake:
                 for (farch, narch) in self.xarchs
                 for mode in SBT.modes]
 
+    def _ufams(self):
+        farchs = unique([am.farch for am in self._xams() if am.farch])
+        return [ArchAndMode(farch, None) for farch in farchs]
+
+    def _unams(self):
+        narchs = unique([am.narch for am in self._xams() if am.narch])
+        return [ArchAndMode(None, narch) for narch in narchs]
+
     def ams(self):
         return self._nams() + self._xams()
 
@@ -462,10 +460,11 @@ class GenMake:
 
     def apply_suffixes(self, tgts, suffixes, gsuf=None):
         a = []
+        gsuf = gsuf if gsuf else ''
         for tgt in tgts:
             for suffix in suffixes:
                 suf = "-" + suffix if suffix else ""
-                a.append(cat(tgt, suf, gsuf))
+                a.append(tgt + suf + gsuf)
         return a
 
     @staticmethod
@@ -489,6 +488,11 @@ class GenMake:
         return self.apply_suffixes(self.tgts(name),
                 self.run_suffixes(runs),
                 self.run_suffix())
+
+    def get_all_tests(self, runs, name):
+        return self.apply_suffixes(self.tgts(name),
+                self.run_suffixes(runs),
+                self.test_suffix())
 
     def alias_run_all(self, runs):
         fmtdata = {
