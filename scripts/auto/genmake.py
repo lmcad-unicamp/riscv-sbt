@@ -158,7 +158,6 @@ class GenMake:
         self.mflags = mflags
         self.sbtflags = sbtflags
         #
-        self.stdin = None
         self.out_filter = None
         #
         self.txt = "### {} ###\n\n".format(name)
@@ -208,7 +207,7 @@ class GenMake:
 """.format(**fmtdata))
 
 
-    def run(self, name, robj, am, stdin=None):
+    def run(self, name, robj, am):
         dir = self.dstdir
         bin = robj.bin(am, name)
 
@@ -343,16 +342,16 @@ class GenMake:
             "name":     self.name,
             "suffix":   "-" + suffix if suffix else "",
             "args":     " " + args_str if args_str else "",
-            "stdin":    " --stdin=" + self.stdin if self.stdin else "",
+            "stdin":    " --stdin=" + robj.stdin if robj.stdin else "",
             "mflags":   " " + " ".join(mflags) if mflags else "",
         }
 
-        return """\
+        self.append("""\
 .PHONY: {name}{suffix}-measure
 {name}{suffix}-measure: {name}
 \t{measure} {dstdir} {name}{args}{stdin}{mflags}
 
-""".format(**fmtdata)
+""".format(**fmtdata))
 
 
     def alias(self, name, aliasees):
