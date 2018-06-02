@@ -3,15 +3,6 @@
 from auto.config import SBT, TOOLS
 from auto.utils import cat, path, unique
 
-class Module:
-    def __init__(self, name, src, xflags=None, bflags=None, rflags=None):
-        self.name = name
-        self.src = src
-        self.xflags = xflags
-        self.bflags = bflags
-        self.rflags = rflags
-
-
 class ArchAndMode:
     def __init__(self, farch, narch, mode=None):
         self.farch = farch
@@ -177,40 +168,6 @@ class GenMake:
         self.txt = self.txt + txt
 
 
-    def _srcname(self, templ, arch):
-        return templ.format(arch.prefix)
-
-
-    def do_mod(self, name, src):
-        # native builds
-        for arch in self.narchs:
-            _in = self._srcname(src, arch)
-            out = arch.add_prefix(name)
-            self.bldnrun(arch, [_in], out)
-
-        # translations
-        for (farch, narch) in self.xarchs:
-            fmod = farch.out2objname(name)
-            nmod = farch.add_prefix(narch.add_prefix(name))
-
-            for mode in SBT.modes:
-                self.xlatenrun(narch, fmod, nmod, mode)
-
-        # tests
-        self.test(name)
-
-        # aliases
-        self.alias_build_all(name)
-        self.alias_run_all(name)
-
-        return self.txt
-
-
-    def bldnrun(self, arch, ins, out):
-        self.bld(arch, ins, out)
-        self.run(arch, out)
-
-
     def bld(self, arch, ins, out):
         out_is_obj = out.endswith(".o")
 
@@ -276,18 +233,18 @@ class GenMake:
 """.format(**fmtdata))
 
 
-    def xlate(self, arch, _in, out, mode):
-        flags = '--sbtflags " -regs={}"'.format(mode)
+    def xlate(self, am, _in, out):
+        flags = '--sbtflags " -regs={}"'.format(am.mode)
         for flag in self.sbtflags:
             flags = flags + ' " {}"'.format(flag)
         xflags = self.xflags
 
         fmtdata = {
-            "arch":     arch.name,
+            "arch":     am.narch.name,
             "srcdir":   self.srcdir,
             "dstdir":   self.dstdir,
             "in":       _in,
-            "out":      out + "-" + mode,
+            "out":      out,
             "xflags":   " " + xflags if xflags else "",
             "flags":    flags,
             "xlate":    TOOLS.xlate,
@@ -301,11 +258,6 @@ class GenMake:
 \t{xlate} --arch {arch} --srcdir {srcdir} --dstdir {dstdir} {in} -o {out}{xflags} {flags}
 
 """.format(**fmtdata))
-
-
-    def xlatenrun(self, arch, _in, out, mode):
-        self.xlate(arch, _in, out, mode)
-        self.run(arch, out + "-" + mode)
 
 
     def _diff(self, f0, f1):
@@ -333,12 +285,19 @@ class GenMake:
         def diff(f0, f1):
             diffs.append(self._diff(f0, f1))
 
-        for xam in self._xams():
+        xams = self._xams()
+        fams = self._ufams()
+        nams = self._unams()
+        farchs = self._farchs()
+
+        for xam in xams:
             xout = name(xam)
-            for fam in self._ufams():
+            for fam in fams:
                 fout = name(fam)
                 diff(fout, xout)
-            for nam in self._unams():
+            for nam in nams:
+                if nam.narch in farchs:
+                    continue
                 nout = name(nam)
                 diff(nout, xout)
 
@@ -430,6 +389,9 @@ class GenMake:
 """.format(**fmtdata))
 
 
+    def _farchs(self):
+        return unique([farch for (farch, narch) in self.xarchs])
+
     def _nams(self):
         return [ArchAndMode(None, narch) for narch in self.narchs]
 
@@ -443,7 +405,7 @@ class GenMake:
         return [ArchAndMode(farch, None) for farch in farchs]
 
     def _unams(self):
-        narchs = unique([am.narch for am in self._xams() if am.narch])
+        narchs = unique([narch for narch in self.narchs])
         return [ArchAndMode(None, narch) for narch in narchs]
 
     def ams(self):

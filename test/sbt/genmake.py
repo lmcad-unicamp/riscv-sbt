@@ -1,8 +1,77 @@
 #!/usr/bin/env python3
 
-from auto.config import DIR, RV32_LINUX, TOOLS, X86
-from auto.genmake import GenMake, Module
+from auto.config import DIR, RV32_LINUX, SBT, TOOLS, X86
+from auto.genmake import ArchAndMode, GenMake, Run, Runs
 from auto.utils import cat, path
+
+class Module:
+    def __init__(self,
+            name, src,
+            xarchs, narchs,
+            srcdir, dstdir,
+            xflags=None, bflags=None, rflags=None, dbg=True):
+        self.name = name
+        self.src = src
+        self.xarchs = xarchs
+        self.narchs = narchs
+        self.srcdir = srcdir
+        self.dstdir = dstdir
+        self.xflags = cat(xflags, "--dbg" if dbg else '')
+        self.bflags = cat(bflags, "--dbg" if dbg else '')
+        self.rflags = rflags
+        self.gm = GenMake(
+            self.narchs, self.xarchs,
+            self.srcdir, self.dstdir, name,
+            xflags, bflags, mflags=None)
+
+        self.robj = Run(args=[], rflags=self.rflags)
+        self.runs = Runs([self.robj], name)
+
+
+    def _srcname(self, templ, arch):
+        return templ.format(arch.prefix)
+
+
+    def _bldnrun(self, am, ins, out):
+        self.gm.bld(am.narch, ins, out)
+        self.gm.run(self.name, self.robj, am)
+
+
+    def _xlatenrun(self, am):
+        name = self.name
+        fmod = am.farch.out2objname(name)
+        nmod = am.bin(name)
+
+        self.gm.xlate(am, fmod, nmod)
+        self.gm.run(name, self.robj, am)
+
+
+    def gen(self):
+        name = self.name
+        src = self.src
+
+        # native builds
+        for arch in self.narchs:
+            _in = self._srcname(src, arch)
+            out = arch.add_prefix(name)
+            am = ArchAndMode(None, arch)
+            self._bldnrun(am, [_in], out)
+
+        # translations
+        for (farch, narch) in self.xarchs:
+            for mode in SBT.modes:
+                am = ArchAndMode(farch, narch, mode)
+                self._xlatenrun(am)
+
+        # tests
+        self.gm.test(self.runs)
+
+        # aliases
+        self.gm.alias_build_all()
+        self.gm.alias_run_all(self.runs)
+
+        return self.gm.txt
+
 
 class Tests():
     def __init__(self):
@@ -11,11 +80,15 @@ class Tests():
         self.srcdir = path(DIR.top, "test/sbt")
         self.dstdir = path(DIR.build, "test/sbt")
         self.sbtdir = path(DIR.top, "sbt")
-        self.txt = None
+        self.txt = ''
+
+
+    def append(self, txt):
+        self.txt = self.txt + txt
 
 
     def gen_prologue(self):
-        self.txt = """\
+        self.append("""\
 all: elf tests utests
 
 ### elf ###
@@ -25,13 +98,13 @@ CXXFLAGS = -m32 -Wall -Werror -g -std=c++11 -pedantic
 LDFLAGS  = -m32
 
 {dstdir}:
-	mkdir -p $@
+\tmkdir -p $@
 
 {dstdir}/elf.o: elf.cpp elf.hpp
-	$(CXX) $(CXXFLAGS) -o $@ -c $<
+\t$(CXX) $(CXXFLAGS) -o $@ -c $<
 
 {dstdir}/elf: {dstdir} {dstdir}/elf.o
-	$(CXX) $(LDFLAGS) -o $@ {dstdir}/elf.o
+\t$(CXX) $(LDFLAGS) -o $@ {dstdir}/elf.o
 
 .PHONY: elf
 elf: {dstdir}/elf
@@ -42,11 +115,11 @@ elf: {dstdir}/elf
 x86-syscall-test: {dstdir}/x86-syscall-test
 
 {dstdir}/x86-syscall-test: {srcdir}/x86-syscall-test.s
-	{build} --arch x86 --srcdir {srcdir} --dstdir {dstdir} x86-syscall-test.s -o x86-syscall-test
+\t{build} --arch x86 --srcdir {srcdir} --dstdir {dstdir} x86-syscall-test.s -o x86-syscall-test
 
 .PHONY: x86-syscall-test-run
 x86-syscall-test-run:
-	{run} --arch x86 --dir {dstdir} x86-syscall-test
+\t{run} --arch x86 --dir {dstdir} x86-syscall-test
 
 ### x86-fp128 ###
 
@@ -54,12 +127,12 @@ x86-syscall-test-run:
 x86-fp128: {dstdir}/x86-fp128
 
 {dstdir}/x86-fp128: {srcdir}/x86-fp128.c
-	{build} --arch x86 --srcdir {srcdir} --dstdir {dstdir} x86-fp128.c \
-            -o x86-fp128 --cflags="-I{sbtdir}" --dbg
+\t{build} --arch x86 --srcdir {srcdir} --dstdir {dstdir} x86-fp128.c \
+    -o x86-fp128 --cflags="-I{sbtdir}" --dbg
 
 .PHONY: x86-fp128-run
 x86-fp128-run:
-	{run} --arch x86 --dir {dstdir} x86-fp128
+\t{run} --arch x86 --dir {dstdir} x86-fp128
 
 """.format(**{
         "build":    TOOLS.build,
@@ -67,38 +140,44 @@ x86-fp128-run:
         "srcdir":   self.srcdir,
         "dstdir":   self.dstdir,
         "sbtdir":   self.sbtdir,
-        })
+        }))
+
+
+    def _module(self, name, src,
+            xarchs=None, narchs=None,
+            srcdir=None, dstdir=None,
+            xflags=None, bflags=None, rflags=None, dbg=True):
+        if not xarchs and not narchs:
+            xarchs = self.xarchs
+            narchs = self.narchs
+        if not srcdir and not dstdir:
+            srcdir = self.srcdir
+            dstdir = self.dstdir
+        return Module(name, src,
+                xarchs, narchs, srcdir, dstdir,
+                xflags, bflags, rflags, dbg)
 
 
     def gen_basic(self):
-        dbg = True
-
         # tests
-        rflags = "-o {}.out --tee"
+        rflags = "--tee"
         mods = [
-            Module("hello", "{}-hello.s", xflags="-C", bflags="-C", rflags=rflags),
-            Module("argv", "argv.c", rflags="--args one two three " + rflags),
-            Module("mm", "mm.c", bflags='--cflags="-DROWS=4"', rflags=rflags),
-            Module("fp", "fp.c", rflags=rflags),
-            Module("printf", "printf.c", rflags=rflags),
+            self._module("hello", "{}-hello.s", xflags="-C", bflags="-C", rflags=rflags),
+            self._module("argv", "argv.c", rflags="--args one two three " + rflags),
+            self._module("mm", "mm.c", bflags='--cflags="-DROWS=4"', rflags=rflags),
+            self._module("fp", "fp.c", rflags=rflags),
+            self._module("printf", "printf.c", rflags=rflags),
+            self._module("test", "rv32-test.s",
+                xarchs=[], narchs=[RV32_LINUX], rflags=rflags),
         ]
 
         for mod in mods:
-            name = mod.name
-            src = mod.src
-            xflags = cat(mod.xflags, "--dbg" if dbg else '')
-            bflags = cat(mod.bflags, "--dbg" if dbg else '')
-            rflags = mod.rflags
-            # do_mod
-            gm = GenMake(self.narchs, self.xarchs,
-                    self.srcdir, self.dstdir,
-                    xflags, bflags, rflags)
-            self.txt = self.txt + gm.do_mod(name, src)
+            self.append(mod.gen())
 
         names = [mod.name for mod in mods]
-        tests = [name + "-test" for name in names]
+        tests = [name + GenMake.test_suffix() for name in names]
 
-        self.txt = self.txt + """\
+        self.append("""\
 ### tests targets ###
 
 .PHONY: tests
@@ -107,23 +186,14 @@ tests: x86-syscall-test x86-fp128 {names}
 .PHONY: tests-run
 tests-run: tests x86-syscall-test-run {tests}
 
-""".format(**{"names": " ".join(names), "tests": " ".join(tests)})
-
-        # rv32-test
-        mod = Module("test", "rv32-test.s", rflags=rflags)
-        gm = GenMake(self.narchs, self.xarchs,
-                self.srcdir, self.dstdir,
-                mod.xflags, mod.bflags, mod.rflags)
-        self.txt = self.txt + gm.do_mod(mod.name, mod.src)
+""".format(**{"names": " ".join(names), "tests": " ".join(tests)}))
 
 
     def gen_utests(self):
-        dbg = True
-
         # utests
-        self.txt = self.txt + "### RV32 Translator unit tests ###\n\n"
+        self.append("### RV32 Translator unit tests ###\n\n")
 
-        mods = [
+        utests = [
             "load-store",
             "alu-ops",
             "branch",
@@ -134,95 +204,64 @@ tests-run: tests x86-syscall-test-run {tests}
         ]
 
         narchs = [RV32_LINUX]
+        xarchs = self.xarchs
         xflags = "--sbtobjs syscall runtime counters"
-        bflags = None
-        rflags = "-o {}.out --tee"
+        rflags = "--tee"
 
-        if dbg:
-            bflags = cat(bflags, "--dbg")
-            xflags = cat(xflags, "--dbg")
-
-        for mod in mods:
-            name = mod
+        for utest in utests:
+            name = utest
             src = "rv32-" + name + ".s"
-            gm = GenMake(narchs, self.xarchs,
-                self.srcdir, self.dstdir,
-                xflags, bflags, rflags)
-            self.txt = self.txt + gm.do_mod(name, src)
+            mod = self._module(name, src, xarchs=xarchs, narchs=narchs,
+                    xflags=xflags, rflags=rflags)
+            self.append(mod.gen())
 
-        utests = [mod + "-test" for mod in mods if mod != "system"]
+        utests_run = [utest + GenMake.test_suffix()
+                    for utest in utests if utest != "system"]
 
         fmtdata = {
-            "mods":     " ".join(mods),
-            "utests":   " ".join(utests),
+            "utests":       " ".join(utests),
+            "utests_run":   " ".join(utests_run),
         }
 
-        self.txt = self.txt + """\
+        self.append("""\
 .PHONY: utests
-utests: {mods}
+utests: {utests}
 
 # NOTE removed system from utests to run (need MSR access and performance
 # counters support (not always available in VMs))
-utests-run: utests {utests}
-	@echo "All unit tests passed!"
+utests-run: utests {utests_run}
+\t@echo "All unit tests passed!"
 
-""".format(**fmtdata)
+""".format(**fmtdata))
 
 
     def gen_qemu(self):
         tests = [
-            "add",
-            "addi",
+            "add", "addi",
             "aiupc",
-            "and",
-            "andi",
-            "beq",
-            "bge",
-            "bgeu",
-            "blt",
-            "bltu",
-            "bne",
-            "jal",
-            "jalr",
-            "lb",
-            "lbu",
-            "lhu",
-            "lui",
-            "lw",
-            "or",
-            "ori",
+            "and", "andi",
+            "beq", "bge", "bgeu", "blt", "bltu", "bne",
+            "jal", "jalr",
+            "lb", "lbu", "lhu", "lui", "lw",
+            "or", "ori",
             "sb",
-            "sll",
-            "slli",
-            "slt",
-            "slti",
-            "sltiu",
-            "sltu",
-            "sra",
-            "srai",
-            "srl",
-            "srli",
+            "sll", "slli",
+            "slt", "slti", "sltiu", "sltu",
+            "sra", "srai", "srl", "srli",
             "sub",
             "sw",
-            "xor",
-            "xori",
+            "xor", "xori",
         ]
 
         failing = []
 
         missing = [
-            "csrrc",
-            "csrrci",
-            "csrrs",
-            "csrrsi",
-            "csrrw",
-            "csrrwi",
-            "ebreak",
-            "ecall",
-            "fence",
-            "fence.i",
-            "lh",
-            "sh",
+            "csrrc", "csrrci",
+            "csrrs", "csrrsi",
+            "csrrw", "csrrwi",
+            "ebreak", "ecall",
+            "fence", "fence.i",
+            "lh", "sh",
         ]
 
         status = "passing: {}\\n{}\\n".format(len(tests), " ".join(tests)) + \
@@ -230,51 +269,51 @@ utests-run: utests {utests}
                 "missing: {}\\n{}\\n".format(len(missing), " ".join(missing)) + \
                 "total: {}\\n".format(len(tests + failing + missing))
 
-        self.txt = self.txt + """\
+        self.append("""\
 ### QEMU tests
 
 .PHONY: rv32tests_status
 rv32tests_status:
-	@printf "{status}"
+\t@printf "{status}"
 
-""".format(**{"status":status})
+""".format(**{"status":status}))
 
         dbg = False
+        xarchs = self.xarchs
+        narchs = [RV32_LINUX]
         qtests = path(DIR.top, "riscv-qemu-tests")
         incdir = qtests
         srcdir = path(qtests, "rv32i")
-        dstdir = path(DIR.build, "riscv-qemu-tests/rv32i")
+        dstdir = path(DIR.build, "test/qemu")
+        xflags = "-C"
+        bflags = '-C --sflags="-I {}"'.format(incdir)
 
-        narchs = [RV32_LINUX]
-        xflags = cat("-C", "--dbg" if dbg else '')
-        bflags = cat('-C --sflags="-I {}"'.format(incdir),
-                    "--dbg" if dbg else '')
-        rflags = "-o {}.out"
         for test in tests:
             name = test
             src = name + ".s"
-            gm = GenMake(narchs, self.xarchs,
-                srcdir, dstdir,
-                xflags, bflags, rflags)
-            self.txt = self.txt + gm.do_mod(name, src)
+            mod = self._module(name, src,
+                    xarchs=xarchs, narchs=narchs,
+                    srcdir=srcdir, dstdir=dstdir,
+                    xflags=xflags, bflags=bflags)
+            self.append(mod.gen())
 
         fmtdata = {
             "tests":        " ".join(tests),
             "dstdir":       dstdir,
-            "teststgts":    " ".join([t + "-test" for t in tests]),
+            "teststgts":    " ".join([t + GenMake.test_suffix() for t in tests]),
         }
 
-        self.txt = self.txt + """\
+        self.append("""\
 .PHONY: rv32tests
 rv32tests: {tests}
 
 rv32tests-run: rv32tests {teststgts}
-	@echo "All rv32tests passed!"
+\t@echo "All rv32tests passed!"
 
 rv32tests-clean:
-	rm -rf {dstdir}
+\trm -rf {dstdir}
 
-""".format(**fmtdata)
+""".format(**fmtdata))
 
 
     def gen_epilogue(self):
@@ -285,34 +324,34 @@ rv32tests-clean:
             "measure":  path(DIR.auto, "measure.py"),
         }
 
-        self.txt = self.txt + """\
+        self.append("""\
 ### TEST targets
 
 .PHONY: basic-test
 basic-test:
-	$(MAKE) -C {top}/test all run
+\t$(MAKE) -C {top}/test all run
 
 .PHONY: setmsr
 setmsr:
-	sudo {top}/scripts/setmsr.sh
+\tsudo {top}/scripts/setmsr.sh
 
 ### matrix multiply test
 
 mmm:
-	{measure} --no-perf --no-csv {dstdir} mm
+\t{measure} --no-perf --no-csv {dstdir} mm
 
 ### everything ###
 
-clean: rv32tests-clean
-	$(MAKE) -C {top}/test clean
-	rm -rf {dstdir}
+clean:
+\t$(MAKE) -C {top}/test clean
+\trm -rf {dstdir}
 
 .PHONY: almost-alltests
 almost-alltests: basic-test tests-run utests-run mmm rv32tests-run
 
 .PHONY: alltests
 alltests: setmsr almost-alltests system-test
-""".format(**fmtdata)
+""".format(**fmtdata))
 
 
     def gen(self):

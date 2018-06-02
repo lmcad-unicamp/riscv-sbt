@@ -43,20 +43,18 @@ class Bench:
         return self
 
 
-    def _gen_xinout(self, xarch):
+    def _gen_xinout(self, am):
         name = self.name
         use_native_sysroot = False
-
-        (farch, narch) = xarch
-        out = farch.add_prefix(narch.add_prefix(name))
+        out = am.bin(name)
 
         if use_native_sysroot:
-            arch = ARCH[farch.prefix + "-for-" + narch.prefix]
+            arch = ARCH[am.farch.prefix + "-for-" + am.narch.prefix]
             obj = arch.out2objname(name)
             # build rv32 binary for translation
             self.gm.bld(arch, self.ins, obj)
         else:
-            obj = farch.out2objname(name)
+            obj = am.farch.out2objname(name)
 
         return (obj, out)
 
@@ -69,10 +67,11 @@ class Bench:
 
         # translations
         for xarch in self.xarchs:
-            (fin, fout) = self._gen_xinout(xarch)
-            (farch, narch) = xarch
             for mode in SBT.modes:
-                self.gm.xlate(narch, fin, fout, mode)
+                (farch, narch) = xarch
+                am = ArchAndMode(farch, narch, mode)
+                (fin, fout) = self._gen_xinout(am)
+                self.gm.xlate(am, fin, fout)
 
 
     def gen_run(self):
