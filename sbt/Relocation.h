@@ -93,6 +93,8 @@ private:
     ConstRelocationPtr _last = nullptr;
     llvm::Constant* _lastSymVal = nullptr;
 
+    ConstRelocationPtr nextReloc(bool init = false);
+    ConstRelocationPtr nextPReloc();
     ConstRelocationPtr getReloc(uint64_t addr);
     void addProxyReloc(ConstRelocationPtr rel, Relocation::RType rtype);
 };

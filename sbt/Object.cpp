@@ -7,6 +7,10 @@
 
 #include <algorithm>
 
+#undef ENABLE_DBGS
+#define ENABLE_DBGS 1
+#include "Debug.h"
+
 namespace sbt {
 
 // for now, only ELF 32 LE object files are supported
@@ -80,6 +84,8 @@ static std::string getTypeStr(Symbol::Type type)
 
 std::string Section::str() const
 {
+    DBGF("name={0}", name());
+
     std::string s;
     llvm::raw_string_ostream ss(s);
     ss  << "section:"
@@ -225,7 +231,10 @@ LLVMRelocation::LLVMRelocation(
 ConstSymbolPtr LLVMRelocation::symbol() const
 {
     llvm::object::symbol_iterator symit = _reloc.getSymbol();
-    xassert(symit != _obj->symbolEnd());
+    // NOTE some relocations, such as RELAX, doesn't have associated
+    // symbols/sections in them
+    if (symit == _obj->symbolEnd())
+        return nullptr;
     return _obj->lookupSymbol(*symit);
 }
 
@@ -237,7 +246,10 @@ ConstSectionPtr LLVMRelocation::section() const
 
     // get symbol iter
     llvm::object::symbol_iterator symit = _reloc.getSymbol();
-    xassert(symit != _obj->symbolEnd());
+    // NOTE some relocations, such as RELAX, doesn't have associated
+    // symbols/sections in them
+    if (symit == _obj->symbolEnd())
+        return nullptr;
 
     // get section iter
     auto expSecIt = symit->getSection();
@@ -450,36 +462,44 @@ llvm::Error Object::readSymbols()
 
     // relocs
     const std::string rela = ".rela";
+    DBGF("Looking for relocations...");
     for (const llvm::object::SectionRef& s : _obj->sections()) {
         // get section name
         llvm::StringRef sref;
         auto ec = s.getName(sref);
-        if (ec)
+        if (ec) {
+            DBGF("failed to get section name");
             continue;
-        // strip ".rela"
+        }
         std::string name = sref.str();
-        if (name.find(rela) != 0)
-            continue;
-        name = name.substr(rela.size());
+        DBGF("section={0}", name);
         // skip debug sections
-        if (name.find(".debug") != std::string::npos)
+        if (name.find(".debug") != std::string::npos) {
+            DBGF("skipped: debug section");
             continue;
-
+        }
+        // strip ".rela"
+        if (name.find(rela) == 0) {
+            DBGF(".rela section found");
+            name = name.substr(rela.size());
+        }
         // get target section
         auto it = sectionByName.find(name);
-        xassert(it != sectionByName.end() &&
-            "relocation section not found");
+        if (it == sectionByName.end()) {
+            DBGF("target section not found");
+            continue;
+        }
         SectionPtr targetSection = it->second;
 
         // add each relocation
+        auto rb = s.relocations().begin();
+        auto re = s.relocations().end();
         ConstRelocationPtrVec relocs;
-        for (auto rb = s.relocations().begin(),
-                 re = s.relocations().end();
-                 rb != re; ++rb)
-        {
+        for (; rb != re; ++rb) {
             ConstRelocationPtr ptr(new LLVMRelocation(this, *rb));
             relocs.push_back(ptr);
         }
+        DBGF("{0} relocation(s) found", relocs.size());
         targetSection->setRelocs(std::move(relocs));
     }
 

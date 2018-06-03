@@ -31,9 +31,41 @@ SBTRelocation::SBTRelocation(
     _ri(ri),
     _re(re),
     _section(section),
-    _cur(_ri == _re? nullptr : *_ri),
+    _cur(nextReloc(true)),
     _curP(nullptr)
 {
+}
+
+
+ConstRelocationPtr SBTRelocation::nextReloc(bool init)
+{
+    if (init)
+        _cur = _ri == _re? nullptr : *_ri;
+    else {
+        xassert(_cur == *_ri);
+        ++_ri;
+        if (_ri != _re)
+            _cur = *_ri;
+        else
+            _cur = nullptr;
+    }
+
+    // skip relax
+    if (_cur && _cur->type() == llvm::ELF::R_RISCV_RELAX)
+        return nextReloc();
+    return _cur;
+}
+
+
+ConstRelocationPtr SBTRelocation::nextPReloc()
+{
+    xassert(_curP == _proxyRelocs.front());
+    _proxyRelocs.pop();
+    if (!_proxyRelocs.empty())
+        _curP = _proxyRelocs.front();
+    else
+        _curP = nullptr;
+    return _curP;
 }
 
 
@@ -42,42 +74,23 @@ ConstRelocationPtr SBTRelocation::getReloc(uint64_t addr)
     if (!_cur && !_curP)
         return nullptr;
 
-    auto next = [&]() {
-        xassert(_cur == *_ri);
-        ++_ri;
-        if (_ri != _re)
-            _cur = *_ri;
-        else
-            _cur = nullptr;
-    };
-
-    auto nextP = [&]() {
-        xassert(_curP == _proxyRelocs.front());
-        _proxyRelocs.pop();
-        if (!_proxyRelocs.empty())
-            _curP = _proxyRelocs.front();
-        else
-            _curP = nullptr;
-    };
-
     // check if we skipped some addresses and now need to
     // advance the iterator
     while (_cur && addr > _cur->offset())
-        next();
+        nextReloc();
     while (_curP && addr > _curP->offset())
-        nextP();
+        nextPReloc();
 
-    ConstRelocationPtr ret = nullptr;
+    ConstRelocationPtr ret = nullptr, next = nullptr;
     if (_cur && _cur->offset() == addr) {
         ret = _cur;
-        next();
-        xassert(!_cur || _cur->offset() != addr);
+        next = nextReloc();
     } else if (_curP && _curP->offset() == addr) {
         ret = _curP;
-        nextP();
-        xassert(!_curP || _curP->offset() != addr);
+        next = nextPReloc();
     }
 
+    xassert(!next || next->offset() != addr);
     return ret;
 }
 

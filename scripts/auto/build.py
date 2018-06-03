@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from auto.config import ARCH, RV32_LINUX, SBT, TOOLS, emit_llvm
+from auto.config import ARCH, RV32, RV32_LINUX, SBT, TOOLS, emit_llvm
 from auto.utils import cat, cd, chsuf, path, shell
 
 import argparse

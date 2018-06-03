@@ -16,13 +16,13 @@ class Module:
         self.narchs = narchs
         self.srcdir = srcdir
         self.dstdir = dstdir
-        self.xflags = cat(xflags, "--dbg" if dbg else '')
         self.bflags = cat(bflags, "--dbg" if dbg else '')
+        self.xflags = cat(self.bflags, xflags)
         self.rflags = rflags
         self.gm = GenMake(
             self.narchs, self.xarchs,
             self.srcdir, self.dstdir, name,
-            xflags, bflags, mflags=None)
+            self.xflags, self.bflags, mflags=None)
 
         self.robj = Run(args=[], rflags=self.rflags)
         self.runs = Runs([self.robj], name)
@@ -80,6 +80,7 @@ class Tests():
         self.srcdir = path(DIR.top, "test/sbt")
         self.dstdir = path(DIR.build, "test/sbt")
         self.sbtdir = path(DIR.top, "sbt")
+        self.bflags = "--cc=gcc"
         self.txt = ''
 
 
@@ -153,6 +154,7 @@ x86-fp128-run:
         if not srcdir and not dstdir:
             srcdir = self.srcdir
             dstdir = self.dstdir
+        bflags = cat(self.bflags, bflags)
         return Module(name, src,
                 xarchs, narchs, srcdir, dstdir,
                 xflags, bflags, rflags, dbg)
@@ -162,7 +164,7 @@ x86-fp128-run:
         # tests
         rflags = "--tee"
         mods = [
-            self._module("hello", "{}-hello.s", xflags="-C", bflags="-C", rflags=rflags),
+            self._module("hello", "{}-hello.s", bflags="-C", rflags=rflags),
             self._module("argv", "argv.c", rflags="--args one two three " + rflags),
             self._module("mm", "mm.c", bflags='--cflags="-DROWS=4"', rflags=rflags),
             self._module("fp", "fp.c", rflags=rflags),
@@ -285,7 +287,6 @@ rv32tests_status:
         incdir = qtests
         srcdir = path(qtests, "rv32i")
         dstdir = path(DIR.build, "test/qemu")
-        xflags = "-C"
         bflags = '-C --sflags="-I {}"'.format(incdir)
 
         for test in tests:
@@ -294,7 +295,7 @@ rv32tests_status:
             mod = self._module(name, src,
                     xarchs=xarchs, narchs=narchs,
                     srcdir=srcdir, dstdir=dstdir,
-                    xflags=xflags, bflags=bflags)
+                    bflags=bflags)
             self.append(mod.gen())
 
         fmtdata = {
