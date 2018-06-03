@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from auto.config import ARCH, RV32_LINUX, SBT, TOOLS, emit_llvm
-from auto.utils import cat, chsuf, path, shell
+from auto.utils import cat, cd, chsuf, path, shell
 
 import argparse
 import os
@@ -29,8 +29,13 @@ class BuildOpts:
         opts.asm = opts.first.endswith(".s")
         opts.obj = opts.out.endswith(".o")
 
-        opts._as = args._as
         opts.cc = args.cc
+        if args._as:
+            opts._as = args._as
+        elif opts.cc == "gcc":
+            opts._as = "as"
+        else:
+            opts._as = "mc"
         opts.cflags = args.cflags
         opts.sflags = args.sflags
         opts.ldflags = cat(*[SBT.nat_obj(opts.arch, o, opts.clink)
@@ -56,10 +61,10 @@ class BuildOpts:
             default=["syscall", "runtime"],
             help="optional SBT native objs to link with")
 
+        parser.add_argument("--cc", help="compiler to use",
+            choices=["clang", "gcc"], default="clang")
         parser.add_argument("--as", dest="_as",
-            help="assembler to use: as || mc", default="mc")
-        parser.add_argument("--cc", help="compiler to use: gcc || clang",
-            default="clang")
+            choices=["as", "mc"], help="assembler to use")
         parser.add_argument("--cflags", help="compiler flags")
         parser.add_argument("--sflags", help="assembler flags")
         parser.add_argument("--ldflags", help="linker flags")
@@ -183,8 +188,16 @@ class GCCBuilder:
     def __init__(self, opts):
         self.opts = opts
 
-    def c2s(self):
-        raise Exception("Unimplemented!!!")
+    def c2s(self, srcdir, dstdir, ins, out):
+        opts = self.opts
+        arch = opts.arch
+
+        cmd = cat(arch.gcc, arch.gcc_flags(opts.dbg))
+        for i in ins:
+            cmd = cat(cmd, i)
+        cmd = cat(cmd, "-S", "-o", path(dstdir, out))
+        with cd(srcdir):
+            shell(cmd)
 
 
 class Builder:

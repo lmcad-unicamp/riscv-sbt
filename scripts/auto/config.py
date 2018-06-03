@@ -7,7 +7,8 @@ import os
 ### config ###
 
 # flags
-CFLAGS          = "-fno-rtti -fno-exceptions"
+CFLAGS          = "-fno-exceptions"
+CLANG_CFLAGS    = "-fno-rtti"
 _O              = "-O3"
 
 emit_llvm       = lambda dbg: \
@@ -151,7 +152,7 @@ RV32 = Arch(
             DIR.toolchain_release, PK32),
         march=RV32_MARCH,
         gcc_flags="",
-        clang_flags="--target=riscv32",
+        clang_flags=cat(CLANG_CFLAGS, "--target=riscv32"),
         sysroot=RV32_SYSROOT,
         isysroot=RV32_SYSROOT + "/include",
         llc_flags=RV32_LLC_FLAGS,
@@ -173,7 +174,7 @@ RV32_LINUX = Arch(
         run="qemu-riscv32 -L " + RV32_LINUX_SYSROOT,
         march=RV32_MARCH,
         gcc_flags=RV32_LINUX_GCC_FLAGS,
-        clang_flags="--target=riscv32 -D__riscv_xlen=32",
+        clang_flags=cat(CLANG_CFLAGS, "--target=riscv32 -D__riscv_xlen=32"),
         sysroot=RV32_LINUX_SYSROOT,
         isysroot=RV32_LINUX_SYSROOT + "/usr/include",
         llc_flags=RV32_LLC_FLAGS,
@@ -194,7 +195,8 @@ X86 = Arch(
         run="",
         march=X86_MARCH,
         gcc_flags="-m32",
-        clang_flags="--target=x86_64-unknown-linux-gnu -m32",
+        clang_flags=cat(CLANG_CFLAGS,
+            "--target=x86_64-unknown-linux-gnu -m32"),
         sysroot=X86_SYSROOT,
         isysroot=X86_ISYSROOT,
         llc_flags=cat("-march=" + X86_MARCH, "-mattr=" + X86_MATTR),
@@ -210,7 +212,7 @@ RV32_FOR_X86 = Arch(
         run="",
         march=RV32_MARCH,
         gcc_flags=RV32_LINUX_GCC_FLAGS,
-        clang_flags="--target=riscv32",
+        clang_flags=cat(CLANG_CFLAGS, "--target=riscv32"),
         sysroot=X86_SYSROOT,
         isysroot=X86_ISYSROOT,
         llc_flags=RV32_LLC_FLAGS,
