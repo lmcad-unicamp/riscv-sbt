@@ -97,7 +97,7 @@ public:
      */
     void addInstr(uint64_t addr, llvm::Instruction* instr)
     {
-        _instrMap(addr, std::move(instr));
+        _instrMap.upsert(addr, std::move(instr));
     }
 
     /**

@@ -376,7 +376,7 @@ void Function::transferBBs(uint64_t from, Function* to)
     while (it != end) {
         auto key = it->key;
         DBGF("key={0:X+8}", key);
-        to->_bbMap(key, std::move(it->val));
+        to->_bbMap.upsert(key, std::move(it->val));
 
         DBG(BasicBlockPtr* val = to->_bbMap[key];
             xassert(val);
@@ -401,7 +401,7 @@ void Function::transferBBs(uint64_t from, Function* to)
     while (uit != uend) {
         auto ukey = uit->key;
         DBGF("ukey={0:X+8}", ukey);
-        to->_ubbMap(ukey, std::move(uit->val));
+        to->_ubbMap.upsert(ukey, std::move(uit->val));
         ++uit;
     }
     DBGF("erasing our ubbMap...");

@@ -87,7 +87,7 @@ public:
   }
 
   // insert/update
-  void operator()(const Key& key, Value&& val)
+  void upsert(const Key& key, Value&& val)
   {
     // static asserts to help with compiler errors
     static_assert(std::is_copy_constructible<Key>::value,
@@ -106,7 +106,7 @@ public:
       insert(Item(key, std::move(val)));
   }
 
-  void operator()(Key&& key, Value&& val)
+  void upsert(Key&& key, Value&& val)
   {
     static_assert(std::is_move_constructible<Key>::value,
       "key is not move constructible");

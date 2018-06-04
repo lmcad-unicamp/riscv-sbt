@@ -19,9 +19,9 @@ Context::~Context()
 
 void Context::addFunc(FunctionPtr&& f)
 {
-    (*_funcByAddr)(f->addr(), std::move(&*f));
+    _funcByAddr->upsert(f->addr(), std::move(&*f));
     std::string fname = f->name();
-    (*_func)(std::move(fname), std::move(f));
+    _func->upsert(std::move(fname), std::move(f));
 }
 
 }

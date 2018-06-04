@@ -6,6 +6,7 @@
 #include <llvm/Support/FormatVariadic.h>
 
 #include <algorithm>
+#include <map>
 
 #undef ENABLE_DBGS
 #define ENABLE_DBGS 1
@@ -111,18 +112,16 @@ void CommonSection::symbols(ConstSymbolPtrVec&& s)
 
 LLVMSection::LLVMSection(
     ConstObjectPtr obj,
-    llvm::object::SectionRef sec,
-    llvm::Error& err)
+    llvm::object::SectionRef sec)
     :
     Section(obj, ""),
     _sec(sec)
 {
     // get section name
     llvm::StringRef nameRef;
-    if (_sec.getName(nameRef))
-        err = ERROR("failed to get section name");
-    else
-        _name = nameRef;
+    std::error_code ec = _sec.getName(nameRef);
+    xassert(!ec && "failed to get section name");
+    _name = nameRef;
 }
 
 
@@ -153,18 +152,14 @@ ConstSymbolPtrVec Section::lookup(uint64_t addr) const
 
 Symbol::Symbol(
     ConstObjectPtr obj,
-    llvm::object::SymbolRef sym,
-    llvm::Error& err)
+    llvm::object::SymbolRef sym)
     :
     _obj(obj),
     _sym(sym)
 {
     // get name
     auto expSymName = _sym.getName();
-    if (!expSymName) {
-        err = ERROR("failed to get symbol name");
-        return;
-    }
+    xassert(expSymName && "failed to get symbol name");
     _name = std::move(expSymName.get());
 
     // serr
@@ -174,28 +169,19 @@ Symbol::Symbol(
 
     // get section
     auto expSecI = sym.getSection();
-    if (!expSecI) {
-        err = ERRORF("{0}: could not get section", prefix);
-        return;
-    }
+    xassert(expSecI && "could not get section");
     llvm::object::section_iterator sit = expSecI.get();
     if (sit != _obj->sectionEnd())
         _sec = _obj->lookupSection(*sit);
 
     // address
     auto expAddr = _sym.getAddress();
-    if (!expAddr) {
-        err = ERRORF("{0}: could not get address", prefix);
-        return;
-    }
+    xassert(expAddr && "could not get address");
     _address = expAddr.get();
 
     // type
     auto expType = _sym.getType();
-    if (!expType) {
-        err = ERRORF("{0}: could not get type", prefix);
-        return;
-    }
+    xassert(expType && "could not get type");
     _type = expType.get();
 }
 
@@ -385,37 +371,31 @@ llvm::Error Object::readSymbols()
     SectionPtrVec sections;
 
     // read sections
-    for (const llvm::object::SectionRef& s : _obj->sections()) {
-        auto expSec = create<LLVMSection*>(this, s);
-        if (!expSec)
-            return expSec.takeError();
-        Section *sec = expSec.get();
-        SectionPtr ptr(sec);
+    for (const llvm::object::SectionRef s : _obj->sections()) {
+        SectionPtr sec(new LLVMSection(this, s));
+        ConstSectionPtr ptr(sec);
         // add to maps
-        _ptrToSection(s.getRawDataRefImpl().p, ConstSectionPtr(ptr));
+        _ptrToSection.upsert(s.getRawDataRefImpl().p, ConstSectionPtr(ptr));
         // add to sections vector
-        sections.push_back(ptr);
+        sections.push_back(sec);
     }
 
     // add common section
     SectionPtr commonSec(new CommonSection(this));
-    _ptrToSection(~0ULL, ConstSectionPtr(commonSec));
+    _ptrToSection.upsert(~0ULL, ConstSectionPtr(commonSec));
     sections.push_back(commonSec);
     uint64_t commonOffs = 0;
 
     // read symbols
-    Map<llvm::StringRef, ConstSymbolPtrVec> sectionToSymbols;
-    for (const llvm::object::SymbolRef& s : _obj->symbols()) {
-        auto expSym = create<Symbol*>(this, s);
-        if (!expSym)
-            return expSym.takeError();
-        Symbol* sym = expSym.get();
+    std::map<std::string, ConstSymbolPtrVec> sectionToSymbols;
+    for (const llvm::object::SymbolRef s : _obj->symbols()) {
+        Symbol* sym = new Symbol(this, s);
         ConstSymbolPtr ptr(sym);
         // skip debug symbols
         if (sym->type() == llvm::object::SymbolRef::ST_Debug)
             continue;
         // add to maps
-        _ptrToSymbol(s.getRawDataRefImpl().p, ConstSymbolPtr(ptr));
+        _ptrToSymbol.upsert(s.getRawDataRefImpl().p, ConstSymbolPtr(ptr));
 
         // add symbol to corresponding section vector
         ConstSectionPtr sec = nullptr;
@@ -430,28 +410,29 @@ llvm::Error Object::readSymbols()
             sec = sym->section();
 
         if (sec) {
-            llvm::StringRef sectionName = sec->name();
-            ConstSymbolPtrVec *p = sectionToSymbols[sectionName];
+            std::string sectionName = sec->name();
+            auto it = sectionToSymbols.find(sectionName);
             // new section
-            if (!p)
-                sectionToSymbols(sectionName, { ptr });
+            if (it == sectionToSymbols.end()) {
+                ConstSymbolPtrVec vec = { ptr };
+                sectionToSymbols.insert(std::make_pair(sectionName, vec));
             // existing section
-            else
-                p->push_back(ptr);
+            } else
+                it->second.push_back(ptr);
         }
     }
 
     // set symbols in sections
     for (SectionPtr sec : sections) {
-        llvm::StringRef sectionName = sec->name();
-        ConstSymbolPtrVec *vec = sectionToSymbols[sectionName];
-        if (vec) {
+        std::string sectionName = sec->name();
+        auto it = sectionToSymbols.find(sectionName);
+        if (it != sectionToSymbols.end()) {
             // sort symbols by address
-            std::sort(vec->begin(), vec->end(),
+            std::sort(it->second.begin(), it->second.end(),
                 [](const ConstSymbolPtr& s1, const ConstSymbolPtr& s2) {
                     return s1->address() < s2->address();
                 });
-            sec->symbols(std::move(*vec));
+            sec->symbols(std::move(it->second));
         }
     }
 
@@ -463,7 +444,7 @@ llvm::Error Object::readSymbols()
     // relocs
     const std::string rela = ".rela";
     DBGF("Looking for relocations...");
-    for (const llvm::object::SectionRef& s : _obj->sections()) {
+    for (const llvm::object::SectionRef s : _obj->sections()) {
         // get section name
         llvm::StringRef sref;
         auto ec = s.getName(sref);

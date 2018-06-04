@@ -293,8 +293,8 @@ Translator::import(const std::string& func)
     f->create(ft);
 
     // add to maps
-    _funcByAddr(_extFuncAddr, std::move(f));
-    _funMap(f->name(), std::move(fp));
+    _funcByAddr.upsert(_extFuncAddr, std::move(f));
+    _funMap.upsert(f->name(), std::move(fp));
     _extFuncAddr += Constants::INSTRUCTION_SIZE;
 
     return make_ret(addr, xfunc);

@@ -98,7 +98,7 @@ public:
      */
     BasicBlock* newBB(uint64_t addr, BasicBlock* beforeBB = nullptr)
     {
-        _bbMap(addr, BasicBlockPtr(
+        _bbMap.upsert(addr, BasicBlockPtr(
             new BasicBlock(_ctx, addr, _f,
                 beforeBB? beforeBB->bb() : nullptr)));
         return &**_bbMap[addr];
@@ -109,7 +109,7 @@ public:
      */
     BasicBlock* addBB(uint64_t addr, BasicBlockPtr&& bb)
     {
-        _bbMap(addr, std::move(bb));
+        _bbMap.upsert(addr, std::move(bb));
         return &**_bbMap[addr];
     }
 
@@ -134,7 +134,7 @@ public:
         if (!p) {
             std::vector<BasicBlockPtr> vec;
             vec.emplace_back(std::move(bbptr));
-            _ubbMap(addr, std::move(vec));
+            _ubbMap.upsert(addr, std::move(vec));
         } else
             p->emplace_back(std::move(bbptr));
         return bb;

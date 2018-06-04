@@ -38,6 +38,7 @@ using ConstSectionPtr = std::shared_ptr<const Section>;
 
 // vectors
 using SectionPtrVec = std::vector<SectionPtr>;
+using ConstSectionPtrVec = std::vector<ConstSectionPtr>;
 using ConstSymbolPtrVec = std::vector<ConstSymbolPtr>;
 using ConstRelocationPtrVec = std::vector<ConstRelocationPtr>;
 
@@ -209,8 +210,7 @@ public:
     // ctor
     LLVMSection(
         ConstObjectPtr obj,
-        llvm::object::SectionRef sec,
-        llvm::Error& err);
+        llvm::object::SectionRef sec);
 
     // get llvm::object::SectionRef
     const llvm::object::SectionRef section() const override
@@ -271,8 +271,7 @@ public:
     // ctor
     Symbol(
         ConstObjectPtr obj,
-        llvm::object::SymbolRef sym,
-        llvm::Error& err);
+        llvm::object::SymbolRef sym);
 
     // name
     const llvm::StringRef& name() const
