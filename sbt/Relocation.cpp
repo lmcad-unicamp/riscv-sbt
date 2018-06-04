@@ -31,9 +31,10 @@ SBTRelocation::SBTRelocation(
     _ri(ri),
     _re(re),
     _section(section),
-    _cur(nextReloc(true)),
+    _cur(nullptr),
     _curP(nullptr)
 {
+    _cur = nextReloc(true);
 }
 
 
