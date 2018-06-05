@@ -1,5 +1,6 @@
 #include "Object.h"
 
+#include "Options.h"
 #include "SBTError.h"
 
 #include <llvm/Object/ELFObjectFile.h>
@@ -314,6 +315,27 @@ bool LLVMRelocation::isExternal() const
 }
 
 
+void LLVMRelocation::validate() const
+{
+    bool isLocalFunc = isLocalFunction();
+    bool isExt = isExternal();
+    ConstSymbolPtr sym = symbol();
+    ConstSectionPtr sec = section();
+
+    // we need the symbol for external references
+    xassert(!isExt || sym &&
+            "external symbol relocation but symbol not found");
+
+    // bounds check for non-external symbols
+    xassert(!_obj->opts->symBoundsCheck() ||
+            !(sym && !isExt) ||
+            sym->address() < sec->size() &&
+            "out of bounds symbol relocation");
+
+    xassert(sec || !isLocalFunc);
+}
+
+
 ///
 /// Object
 ///
@@ -332,7 +354,10 @@ void Object::finish()
 
 Object::Object(
     const llvm::StringRef& filePath,
+    const Options* opts,
     llvm::Error& err)
+    :
+    opts(opts)
 {
     // atempt to open the binary
     auto expObj = llvm::object::createBinary(filePath);
@@ -354,6 +379,7 @@ Object::Object(
 
 
 Object::Object(Object&& o) :
+    opts(o.opts),
     _bin(std::move(o._bin)),
     _obj(nullptr)
 {}

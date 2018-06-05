@@ -40,7 +40,7 @@ void Module::start()
 llvm::Error Module::translate(const std::string& file)
 {
     // parse object file
-    auto expObj = create<Object>(file);
+    auto expObj = create<Object>(file, _ctx->opts);
     if (!expObj)
         return expObj.takeError();
     if (auto err = expObj.get().readSymbols())

@@ -143,7 +143,6 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
 {
     ConstRelocationPtr reloc = getReloc(addr);
 
-    // no more relocations exist
     if (!reloc)
         return nullptr;
 
@@ -182,6 +181,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
 
         case Relocation::PROXY_CALL_HI:
         case Relocation::PROXY_PCREL_HI:
+        case llvm::ELF::R_RISCV_PCREL_HI20:
             // hi20 = (symbol_address - pc + 0x800) >> 12
             relfn = [this, addr](llvm::Constant* symaddr) {
                 llvm::Constant* c = llvm::ConstantExpr::getSub(
@@ -194,6 +194,8 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
 
         case Relocation::PROXY_CALL_LO:
         case Relocation::PROXY_PCREL_LO:
+        case llvm::ELF::R_RISCV_PCREL_LO12_I:
+        case llvm::ELF::R_RISCV_PCREL_LO12_S:
             // lo12 = symbol_address - hipc - hi20
             // hi20 = (symbol_address - hipc + 0x800) & 0xFFFFF000
             relfn = [this, &reloc](llvm::Constant* symaddr) {
@@ -218,9 +220,10 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             addProxyReloc(reloc, Relocation::PROXY_CALL);
             return handleRelocation(addr, os);
 
-        case llvm::ELF::R_RISCV_PCREL_HI20:
-        case llvm::ELF::R_RISCV_PCREL_LO12_I:
-        case llvm::ELF::R_RISCV_PCREL_LO12_S:
+        // these can be ignored
+        case llvm::ELF::R_RISCV_BRANCH:
+            return nullptr;
+
         default:
             xunreachable("unknown relocation");
     }

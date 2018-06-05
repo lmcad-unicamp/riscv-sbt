@@ -84,6 +84,16 @@ public:
         return *this;
     }
 
+    bool symBoundsCheck() const
+    {
+        return _symBoundsCheck;
+    }
+
+    void setSymBoundsCheck(bool b)
+    {
+        _symBoundsCheck = b;
+    }
+
     void dump() const;
 
 private:
@@ -94,6 +104,7 @@ private:
     std::string _a2s;
     bool _syncOnExternalCalls = false;
     bool _commentedAsm = false;
+    bool _symBoundsCheck = true;
 };
 
 }

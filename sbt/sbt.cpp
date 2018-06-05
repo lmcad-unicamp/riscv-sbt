@@ -148,7 +148,8 @@ static void test()
     SBT::init();
     SBTFinish fini;
     llvm::StringRef filePath = "sbt/test/rv32-hello.o";
-    auto expObj = create<Object>(filePath);
+    Options opts;
+    auto expObj = create<Object>(filePath, &opts);
     if (!expObj)
         handleError(expObj.takeError());
     else
@@ -205,6 +206,10 @@ int main(int argc, char* argv[])
 
     cl::opt<bool> commentedAsmOpt("commented-asm",
         cl::desc("Insert comments in final translated assembly code"));
+
+    cl::opt<bool> noSymBoundsCheckOpt("no-sym-bounds-check",
+        cl::desc("Don't check if non-external symbols are within their "
+            "section bounds"));
 
     // enable debug code
     cl::opt<bool> debugOpt("debug", cl::desc("Enable debug code"));
@@ -266,7 +271,8 @@ int main(int argc, char* argv[])
     opts.setSyncFRegs(!dontSyncFRegsOpt)
         .setA2S(a2sOpt)
         .setSyncOnExternalCalls(syncOnExternalCallsOpt)
-        .setCommentedAsm(commentedAsmOpt);
+        .setCommentedAsm(commentedAsmOpt)
+        .setSymBoundsCheck(!noSymBoundsCheckOpt);
     auto exp = sbt::create<sbt::SBT>(inputFiles, outputFile, opts);
     if (!exp)
         sbt::handleError(exp.takeError());

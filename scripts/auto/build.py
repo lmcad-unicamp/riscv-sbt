@@ -192,7 +192,7 @@ class GCCBuilder:
         opts = self.opts
         arch = opts.arch
 
-        cmd = cat(arch.gcc, arch.gcc_flags(opts.dbg))
+        cmd = cat(arch.gcc, arch.gcc_flags(opts.dbg), opts.cflags)
         for i in ins:
             cmd = cat(cmd, i)
         cmd = cat(cmd, "-S", "-o", path(dstdir, out))

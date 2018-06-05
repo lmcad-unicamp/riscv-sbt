@@ -9,7 +9,8 @@ class Module:
             name, src,
             xarchs, narchs,
             srcdir, dstdir,
-            xflags=None, bflags=None, rflags=None, dbg=True):
+            xflags=None, bflags=None, rflags=None, sbtflags=[],
+            dbg=True):
         self.name = name
         self.src = src
         self.xarchs = xarchs
@@ -22,7 +23,7 @@ class Module:
         self.gm = GenMake(
             self.narchs, self.xarchs,
             self.srcdir, self.dstdir, name,
-            self.xflags, self.bflags, mflags=None)
+            self.xflags, self.bflags, mflags=None, sbtflags=sbtflags)
 
         self.robj = Run(args=[], rflags=self.rflags)
         self.runs = Runs([self.robj], name)
@@ -147,7 +148,8 @@ x86-fp128-run:
     def _module(self, name, src,
             xarchs=None, narchs=None,
             srcdir=None, dstdir=None,
-            xflags=None, bflags=None, rflags=None, dbg=True):
+            xflags=None, bflags=None, rflags=None, sbtflags=[],
+            dbg=True):
         if not xarchs and not narchs:
             xarchs = self.xarchs
             narchs = self.narchs
@@ -157,7 +159,7 @@ x86-fp128-run:
         bflags = cat(self.bflags, bflags)
         return Module(name, src,
                 xarchs, narchs, srcdir, dstdir,
-                xflags, bflags, rflags, dbg)
+                xflags, bflags, rflags, sbtflags, dbg)
 
 
     def gen_basic(self):
@@ -289,13 +291,18 @@ rv32tests_status:
         dstdir = path(DIR.build, "test/qemu")
         bflags = '-C --sflags="-I {}"'.format(incdir)
 
+        def sbtflags(test):
+            if test == "aiupc":
+                return ["-no-sym-bounds-check"]
+            return []
+
         for test in tests:
             name = test
             src = name + ".s"
             mod = self._module(name, src,
                     xarchs=xarchs, narchs=narchs,
                     srcdir=srcdir, dstdir=dstdir,
-                    bflags=bflags)
+                    bflags=bflags, sbtflags=sbtflags(name))
             self.append(mod.gen())
 
         fmtdata = {

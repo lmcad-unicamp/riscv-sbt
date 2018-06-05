@@ -20,6 +20,8 @@
 
 namespace sbt {
 
+class Options;
+
 // forward decls
 class Object;
 class Relocation;
@@ -437,25 +439,7 @@ public:
 
     bool isLocalFunction() const override;
     bool isExternal() const override;
-
-    void validate() const override
-    {
-        bool isLocalFunc = isLocalFunction();
-        bool isExt = isExternal();
-        ConstSymbolPtr sym = symbol();
-        ConstSectionPtr sec = section();
-
-        // we need the symbol for external references
-        xassert(!isExt || sym &&
-                "external symbol relocation but symbol not found");
-
-        // bounds check for non-external symbols
-        xassert(!(sym && !isExt) ||
-                sym->address() < sec->size() &&
-                "out of bounds symbol relocation");
-
-        xassert(sec || !isLocalFunc);
-    }
+    void validate() const override;
 
     ConstSymbolPtr symbol() const override;
 
@@ -623,7 +607,10 @@ public:
     static void finish();
 
     // ctor
-    Object(const llvm::StringRef& filePath, llvm::Error& err);
+    Object(
+        const llvm::StringRef& filePath,
+        const Options* opts,
+        llvm::Error& err);
 
     // disallow copy
     Object(const Object&) = delete;
@@ -699,6 +686,8 @@ public:
     {
             return _obj;
     }
+
+    const Options* const opts;
 
 private:
     std::pair<

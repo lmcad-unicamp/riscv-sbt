@@ -29,6 +29,7 @@ void Options::dump() const
     DBGS << "a2s=" << a2s() << nl;
     DBGS << "syncOnExternalCalls=" << syncOnExternalCalls() << nl;
     DBGS << "commentedAsm=" << commentedAsm() << nl;
+    DBGS << "symBoundsCheck=" << symBoundsCheck() << nl;
 }
 
 }
