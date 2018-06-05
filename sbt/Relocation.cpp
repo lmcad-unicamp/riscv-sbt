@@ -222,6 +222,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
 
         // these can be ignored
         case llvm::ELF::R_RISCV_BRANCH:
+        case llvm::ELF::R_RISCV_JAL:
             return nullptr;
 
         default:

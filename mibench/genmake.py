@@ -15,7 +15,7 @@ from auto.utils import cat, mpath, path, xassert
 
 class Bench:
     def __init__(self, name, dir, ins, runs=None, dbg=False,
-            sbtflags=[], mflags=None,
+            bflags=None, xflags=None, sbtflags=[], mflags=None,
             srcdir=None, dstdir=None, narchs=None, xarchs=None):
         self.name = name
         self.dir = dir
@@ -25,11 +25,9 @@ class Bench:
         self.sbtflags = sbtflags
         self.dbg = dbg
 
-        bflags = None
-        xflags = None
         if dbg:
-            bflags = "--dbg"
-            xflags = "--dbg"
+            bflags = cat(bflags, "--dbg")
+            xflags = cat(bflags, xflags, "--dbg")
         self.narchs = narchs
         self.xarchs = xarchs
 
@@ -164,6 +162,7 @@ class MiBench:
         self.dstdir = path(DIR.build, "mibench")
         self.stack_large = ["-stack-size=131072"]    # 128K
         self.stack_huge = ["-stack-size=1048576"]    # 1M
+        self.bflags = "--cc=gcc"
         self.txt = ''
         self.benchs = None
 
@@ -184,13 +183,18 @@ clean:
 """.format(self.dstdir))
 
 
-    def _bench(self, name, dir, ins, runs, dstdir=None, ctor=Bench, **kwargs):
+    def _bench(self, name, dir, ins, runs,
+            dstdir=None, ctor=Bench,
+            bflags=None, xflags=None,
+            **kwargs):
         dstdir = dstdir if dstdir else path(self.dstdir, dir)
+        bflags = cat(self.bflags, bflags)
 
         return ctor(
             name=name, dir=dir, ins=ins, runs=runs,
             srcdir=path(self.srcdir, dir),
             dstdir=dstdir,
+            bflags=bflags, xflags=xflags,
             narchs=self.narchs,
             xarchs=self.xarchs,
             **kwargs)

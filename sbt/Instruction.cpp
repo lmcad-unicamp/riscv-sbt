@@ -864,7 +864,7 @@ llvm::Error Instruction::translateBranch(BranchType bt)
         // target is known
         // NOTE querying the relocator is needed to disambiguate between
         //      calls to funtions at 0 offset and indirect calls
-        if (isCall && func) {
+        if (func) {
             act = CALL;
             target = _ctx->c.u32(func->addr());
 
@@ -975,7 +975,14 @@ llvm::Error Instruction::handleCall(uint64_t target, unsigned linkReg)
 
     Function* f = Function::getByAddr(_ctx, target);
     bool isExt = Translator::isExternalFunc(target);
-    bool sync = !isExt || _ctx->opts->syncOnExternalCalls();
+    bool isTailCall = linkReg == XRegister::ZERO;
+    bool sync;
+    if (_ctx->opts->syncOnExternalCalls())
+        sync = true;
+    else if (!isExt)
+        sync = true;
+    else
+        sync = false;
 
     // link
     link(linkReg);
@@ -991,6 +998,10 @@ llvm::Error Instruction::handleCall(uint64_t target, unsigned linkReg)
     // read regs
     if (sync)
         _ctx->func->loadRegisters();
+    if (isTailCall) {
+        xassert(!_ctx->inMain);
+        _bld->retVoid();
+    }
 
     return llvm::Error::success();
 }
