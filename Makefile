@@ -63,8 +63,8 @@ alltests:
 
 .PHONY: test
 test:
-	$(CMD) $(TOPDIR)/scripts/auto/measure.py \
-		$(TOPDIR)/build/mibench/telecomm/CRC32 crc32 \
-		--args $(TOPDIR)/mibench/telecomm/adpcm/data/large.pcm \
-		-n 1
-
+	valgrind --leak-check=yes riscv-sbt -debug -regs=globals -commented-asm \
+		-a2s /mnt/ssd/riscv-sbt/build/test/sbt/rv32-mm.a2s \
+		/mnt/ssd/riscv-sbt/build/test/sbt/rv32-mm.o \
+		-o /mnt/ssd/riscv-sbt/build/test/sbt/rv32-x86-mm-globals.bc \
+		>/mnt/ssd/riscv-sbt/junk/rv32-x86-mm-globals.log 2>&1

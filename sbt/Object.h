@@ -35,6 +35,7 @@ using SymbolPtr = std::shared_ptr<Symbol>;
 using ConstSymbolPtr = std::shared_ptr<const Symbol>;
 using SectionPtr = std::shared_ptr<Section>;
 using ConstSectionPtr = std::shared_ptr<const Section>;
+using ConstSectionWeakPtr = std::weak_ptr<const Section>;
 
 // vectors
 using SectionPtrVec = std::vector<SectionPtr>;
@@ -288,10 +289,10 @@ public:
     // section
     ConstSectionPtr section() const
     {
-        return _sec;
+        return _sec.lock();
     }
 
-    void section(ConstSectionPtr s)
+    void section(ConstSectionWeakPtr s)
     {
         _sec = s;
     }
@@ -338,7 +339,7 @@ private:
     llvm::object::SymbolRef _sym;
     llvm::StringRef _name;
     Type _type;
-    ConstSectionPtr _sec;
+    ConstSectionWeakPtr _sec;
     uint64_t _address = 0;
 };
 
