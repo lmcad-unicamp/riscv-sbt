@@ -2,10 +2,11 @@
 #define SBT_BASICBLOCK_H
 
 #include "Context.h"
-#include "Map.h"
 
 #include <llvm/IR/Function.h>
 #include <llvm/Support/raw_ostream.h>
+
+#include <map>
 
 namespace sbt {
 
@@ -56,12 +57,14 @@ public:
     BasicBlock(
         Context* ctx,
         llvm::BasicBlock* bb,
-        uint64_t addr)
+        uint64_t addr,
+        std::map<uint64_t, llvm::Instruction*>&& instrMap)
         :
         _ctx(ctx),
         _bb(bb),
         _name(bb->getName()),
-        _addr(addr)
+        _addr(addr),
+        _instrMap(std::move(instrMap))
     {}
 
 public:
@@ -97,7 +100,7 @@ public:
      */
     void addInstr(uint64_t addr, llvm::Instruction* instr)
     {
-        _instrMap.upsert(addr, std::move(instr));
+        _instrMap[addr] = instr;
     }
 
     /**
@@ -146,7 +149,7 @@ private:
     llvm::BasicBlock* _bb;
     std::string _name;
     uint64_t _addr = ~0ULL;
-    Map<uint64_t, llvm::Instruction*> _instrMap;
+    std::map<uint64_t, llvm::Instruction*> _instrMap;
     bool _untracked = false;
 };
 

@@ -188,16 +188,23 @@ class GCCBuilder:
     def __init__(self, opts):
         self.opts = opts
 
+    def _c2u(self, srcdir, dstdir, ins, out):
+        with open(path(dstdir, out), "w") as fout:
+            for src in ins:
+                ln = '#include "{0}"\n'.format(path(srcdir, src))
+                fout.write(ln)
+
+
     def c2s(self, srcdir, dstdir, ins, out):
         opts = self.opts
         arch = opts.arch
 
-        cmd = cat(arch.gcc, arch.gcc_flags(opts.dbg), opts.cflags)
-        for i in ins:
-            cmd = cat(cmd, i)
-        cmd = cat(cmd, "-S", "-o", path(dstdir, out))
-        with cd(srcdir):
-            shell(cmd)
+        u = chsuf(out, ".c")
+        self._c2u(srcdir, dstdir, ins, u)
+
+        cmd = cat(arch.gcc, arch.gcc_flags(opts.dbg), opts.cflags,
+                path(dstdir, u), "-S", "-o", path(dstdir, out))
+        shell(cmd)
 
 
 class Builder:

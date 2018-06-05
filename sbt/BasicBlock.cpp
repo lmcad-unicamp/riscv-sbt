@@ -39,14 +39,36 @@ BasicBlock::~BasicBlock()
 }
 
 
+template <typename M, typename K>
+static M splitMap(M& map, const K& key)
+{
+    M map2;
+
+    auto it = map.begin();
+    auto end = map.end();
+    for (; it != end; ++it)
+        if (it->first >= key)
+            break;
+
+    if (it == end)
+        return map2;
+
+    auto it2 = it;
+    for (; it2 != end; ++it2)
+        map2.insert(*it2);
+    map.erase(it, end);
+    return map2;
+}
+
+
 BasicBlockPtr BasicBlock::split(uint64_t addr)
 {
     DBGF("addr={0:X+8}: 1st_addr={1:X+8}, name={2}",
         addr, this->addr(), name());
 
-    auto res = _instrMap[addr];
-    xassert(res && "instruction not found!");
-    const llvm::Instruction* tgtInstr = *res;
+    auto res = _instrMap.find(addr);
+    xassert(res != _instrMap.end() && "instruction not found!");
+    const llvm::Instruction* tgtInstr = res->second;
 
     // point i to target instruction
     llvm::BasicBlock::iterator i, e;
@@ -73,7 +95,7 @@ BasicBlockPtr BasicBlock::split(uint64_t addr)
             empty.push_back(it);
 
             bld->saveInsertBlock();
-            BasicBlock tmpBB(_ctx, *it, 0);
+            BasicBlock tmpBB(_ctx, *it, 0, {});
             bld->setInsertBlock(&tmpBB);
             bld->retVoid();
             bld->restoreInsertBlock();
@@ -101,8 +123,11 @@ BasicBlockPtr BasicBlock::split(uint64_t addr)
         xassert(it->empty());
     }
 
+    std::map<uint64_t, llvm::Instruction*> instrMap2 =
+        splitMap(_instrMap, addr);
+
     DBGF("done");
-    return BasicBlockPtr(new BasicBlock(_ctx, bb2, addr));
+    return BasicBlockPtr(new BasicBlock(_ctx, bb2, addr, std::move(instrMap2)));
 }
 
 
