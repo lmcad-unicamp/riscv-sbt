@@ -207,6 +207,23 @@ class GCCBuilder:
         shell(cmd)
 
 
+    def merge_text(self, dstdir, obj):
+        opts = self.opts
+        arch = opts.arch
+
+        if arch != RV32_LINUX:
+            raise Exception("unexpected arch")
+
+        old = chsuf(obj, ".old.o")
+        ipath = path(dstdir, old)
+        opath = path(dstdir, obj)
+        shell("mv {} {}".format(opath, ipath))
+
+        cmd = cat(arch.ld, arch.ld_flags, "-r {} -o {} -T {}")
+        cmd = cmd.format(ipath, opath, path(SBT.share_dir, "elf32lriscv.x"))
+        shell(cmd)
+
+
 class Builder:
     def __init__(self, opts):
         self.opts = opts
@@ -263,6 +280,9 @@ class Builder:
             #shell(R"printf '\x04\x00\x00\x00' | " +
             #    "dd of=" + opath + " bs=1 seek=$((0x24)) count=4 conv=notrunc" +
             #    " >/dev/null 2>&1")
+
+        if opts.cc == "gcc" and arch == RV32_LINUX:
+            self.bldr.merge_text(dstdir, out)
 
 
     def _link(self, srcdir, dstdir, ins, out):
