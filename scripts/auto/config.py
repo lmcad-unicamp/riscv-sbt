@@ -11,9 +11,9 @@ CFLAGS          = "-fno-exceptions"
 CLANG_CFLAGS    = "-fno-rtti"
 _O              = "-O3"
 
-emit_llvm       = lambda dbg: \
-    "-emit-llvm -c -O0 -g -mllvm -disable-llvm-optzns" if dbg \
-    else "-emit-llvm -c {} -mllvm -disable-llvm-optzns".format(_O)
+emit_llvm       = lambda dbg, opt: \
+    "-emit-llvm -c {}{} -mllvm -disable-llvm-optzns".format(
+        "-g " if dbg else "", _O if opt else "-O0")
 RV32_TRIPLE     = "riscv32-unknown-elf"
 
 
@@ -61,7 +61,7 @@ class Tools:
     def __init__(self):
         self.cmake      = "cmake"
         self.opt        = "opt"
-        self.opt_flags  = lambda dbg: "-O0" if dbg else _O
+        self.opt_flags  = lambda opt: _O if opt else "-O0"
         self.dis        = "llvm-dis"
         self.link       = "llvm-link"
         self.mc         = "llvm-mc"
@@ -87,9 +87,10 @@ class Arch:
         self.march = march
         # gcc
         self.gcc = triple + "-gcc"
-        self.gcc_flags = lambda dbg: \
-            "{} {} {}".format(
-                ("-O0 -g" if dbg else _O),
+        self.gcc_flags = lambda dbg, opt: \
+            "{}{} {} {}".format(
+                ("-g " if dbg else ""),
+                (_O if opt else "-O0"),
                 CFLAGS,
                 gcc_flags)
         # clang
@@ -101,9 +102,9 @@ class Arch:
             sysroot, isysroot)
         # llc
         self.llc = "llc"
-        self.llc_flags = lambda dbg: \
+        self.llc_flags = lambda opt: \
             cat("-relocation-model=static",
-                ("-O0" if dbg else _O),
+                (_O if opt else "-O0"),
                 llc_flags)
         # as
         self._as = triple + "-as"

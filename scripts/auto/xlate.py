@@ -62,7 +62,7 @@ class Translator:
         llbld.dis(dstdir, bc)
 
         # gen .s
-        if opts.dbg:
+        if not opts.opt:
             llbld.bc2s(dstdir, bc, s)
         else:
             opt1 = out + ".opt.bc"

@@ -14,7 +14,7 @@ from auto.utils import cat, mpath, path, xassert
 
 
 class Bench:
-    def __init__(self, name, dir, ins, runs=None, dbg=False,
+    def __init__(self, name, dir, ins, runs=None, dbg=None,
             bflags=None, xflags=None, sbtflags=[], mflags=None,
             srcdir=None, dstdir=None, narchs=None, xarchs=None):
         self.name = name
@@ -25,9 +25,13 @@ class Bench:
         self.sbtflags = sbtflags
         self.dbg = dbg
 
-        if dbg:
+        xflags = cat(bflags, xflags)
+        if dbg == "dbg":
             bflags = cat(bflags, "--dbg")
-            xflags = cat(bflags, xflags, "--dbg")
+            xflags = cat(xflags, "--dbg")
+        if dbg == "opt":
+            bflags = cat(bflags, "--dbg --opt")
+            xflags = cat(xflags, "--dbg --opt")
         self.narchs = narchs
         self.xarchs = xarchs
 
@@ -281,7 +285,8 @@ clean:
                 self._single_run([],
                     stdin=path(self.srcdir, "telecomm/adpcm/data/large.pcm"),
                     rflags="--bin"),
-                dstdir=path(self.dstdir, "telecomm/adpcm/rawcaudio")),
+                dstdir=path(self.dstdir, "telecomm/adpcm/rawcaudio"),
+                dbg="opt"),
             self._bench("adpcm-decode", "telecomm/adpcm/src",
                 ["rawdaudio.c", "adpcm.c"],
                 self._single_run([],

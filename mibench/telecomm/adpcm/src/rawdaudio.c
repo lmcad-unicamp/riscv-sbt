@@ -2,6 +2,8 @@
 
 #include "adpcm.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 struct adpcm_state state;
 
@@ -10,7 +12,7 @@ struct adpcm_state state;
 char	abuf[NSAMPLES/2];
 short	sbuf[NSAMPLES];
 
-main() {
+int main() {
     int n;
 
     while(1) {

@@ -43,6 +43,7 @@ class BuildOpts:
         opts.sbtflags = cat(" ".join(args.sbtflags).strip(),
             "-dont-use-libc" if not opts.clink else "")
         opts.dbg = args.dbg
+        opts.opt = True if args.opt or not args.dbg else False
 
         return opts
 
@@ -72,6 +73,8 @@ class BuildOpts:
             help="translator flags", default=[])
         parser.add_argument("--dbg", action='store_true',
             help="build for debug")
+        parser.add_argument("--opt", action='store_true',
+            help="optmize code, even if debug is enabled")
 
 
 class LLVMBuilder:
@@ -87,7 +90,7 @@ class LLVMBuilder:
             arch.clang_flags,
             (arch.sysroot_flag if opts.setsysroot else ""),
             opts.cflags,
-            emit_llvm(opts.dbg))
+            emit_llvm(opts.dbg, opts.opt))
 
         ipath = path(srcdir, _in)
         opath = path(dstdir, out)
@@ -119,7 +122,7 @@ class LLVMBuilder:
         ipath = path(dir, _in)
         opath = path(dir, out)
 
-        flags = TOOLS.opt_flags(self.opts.dbg)
+        flags = TOOLS.opt_flags(self.opts.opt)
         if printf_break:
             flags = cat(flags,
                 "-load", "libPrintfBreak.so", "-printf-break")
@@ -151,7 +154,7 @@ class LLVMBuilder:
         arch = opts.arch
         ipath = path(dir, _in)
         opath = path(dir, out)
-        flags = arch.llc_flags(opts.dbg)
+        flags = arch.llc_flags(opts.opt)
 
         cmd = cat(arch.llc, flags, ipath, "-o", opath)
         shell(cmd)
@@ -168,10 +171,11 @@ class LLVMBuilder:
         bc = chsuf(out, ".bc")
         self._c2lbc(srcdir, dstdir, ins, bc)
 
-        if self.opts.dbg:
+        if not self.opts.opt:
             self.opt(dstdir, bc, bc, printf_break=True)
             self.dis(dstdir, bc)
             self.bc2s(dstdir, bc, out)
+
         else:
             opt1 = chsuf(bc, ".opt.bc")
             opt2 = chsuf(bc, ".opt2.bc")
@@ -202,7 +206,7 @@ class GCCBuilder:
         u = chsuf(out, ".c")
         self._c2u(srcdir, dstdir, ins, u)
 
-        cmd = cat(arch.gcc, arch.gcc_flags(opts.dbg), opts.cflags,
+        cmd = cat(arch.gcc, arch.gcc_flags(opts.dbg, opts.opt), opts.cflags,
                 path(dstdir, u), "-S", "-o", path(dstdir, out))
         shell(cmd)
 
@@ -281,6 +285,7 @@ class Builder:
             #    "dd of=" + opath + " bs=1 seek=$((0x24)) count=4 conv=notrunc" +
             #    " >/dev/null 2>&1")
 
+
         if opts.cc == "gcc" and arch == RV32_LINUX:
             self.bldr.merge_text(dstdir, out)
 
@@ -292,7 +297,7 @@ class Builder:
         arch = opts.arch
         if opts.clink:
             tool = arch.gcc
-            flags = arch.gcc_flags(opts.dbg)
+            flags = arch.gcc_flags(opts.dbg, opts.opt)
         else:
             tool = arch.ld
             flags = arch.ld_flags
@@ -304,6 +309,7 @@ class Builder:
         opath = path(dstdir, out)
         cmd = cat(tool, " ".join(ipaths), "-o", opath, flags)
         shell(cmd)
+
 
 
     def _snlink(self):
@@ -377,7 +383,7 @@ class Builder:
 
         with open(path(opts.dstdir, _in)) as fin, \
             open(path(opts.dstdir, out + ".a2s"), "w") as fout:
-                patt = re.compile('([ 0-9a-f]{8}):\t')
+                patt = re.compile('([ 0-9a-f]{4,8}):\t')
                 lns = []
                 for ln in fin:
                     m = patt.match(ln)
