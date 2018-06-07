@@ -58,11 +58,12 @@ class Translator:
         # translate obj to .bc
         self._translate_obj(dstdir, obj, bc)
         # gen .ll
+        opts.opt = opts.xopt
         llbld = LLVMBuilder(opts)
         llbld.dis(dstdir, bc)
 
         # gen .s
-        if not opts.opt:
+        if not opts.xopt:
             llbld.bc2s(dstdir, bc, s)
         else:
             opt1 = out + ".opt.bc"
@@ -83,9 +84,16 @@ class Translator:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="translate obj")
     BuildOpts.add_to_parser(parser)
+    parser.add_argument("--xopt", action="store_true",
+        help="optimize translated code")
     args = parser.parse_args()
 
     # set xlator opts
-    xltr = Translator(BuildOpts.parse(args))
+    opts = BuildOpts.parse(args)
+    if args.xopt or (opts.opt and not opts.dbg):
+        opts.xopt = True
+    else:
+        opts.xopt = False
+    xltr = Translator(opts)
     # translate
     xltr.translate()

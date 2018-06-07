@@ -458,9 +458,6 @@ void Function::storeRegisters()
 
     for (size_t i = 1; i < XRegisters::NUM; i++) {
         Register& local = getReg(i);
-        if (!local.hasWrite())
-            continue;
-
         Register& global = _ctx->x->getReg(i);
         // NOTE don't count this read
         llvm::Value* v = bld->load(local.get());
@@ -472,9 +469,6 @@ void Function::storeRegisters()
 
     for (size_t i = 0; i < FRegisters::NUM; i++) {
         Register& local = getFReg(i);
-        if (!local.hasWrite())
-            continue;
-
         Register& global = _ctx->f->getReg(i);
         // NOTE don't count this read
         llvm::Value* v = bld->load(local.get());
