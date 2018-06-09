@@ -950,7 +950,7 @@ llvm::Error Instruction::translateBranch(BranchType bt)
             break;
 
         case IJUMP:
-            err = handleIJump(v, linkReg);
+            err = handleIJump(v);
             break;
     }
 
@@ -1215,9 +1215,12 @@ llvm::Error Instruction::handleJump(
 }
 
 
-llvm::Error Instruction::handleIJump(llvm::Value* target, unsigned linkReg)
+llvm::Error Instruction::handleIJump(llvm::Value* target)
 {
-    xassert(false && "indirect jump translation not implemented!");
+    DBGF("NOTE: indirect branch");
+
+    _bld->indBr(target);
+    return llvm::Error::success();
 }
 
 

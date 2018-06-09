@@ -171,7 +171,7 @@ private:
     llvm::Error handleJump(uint64_t target,
         llvm::Value* cond, unsigned linkReg);
     // indirect jump
-    llvm::Error handleIJump(llvm::Value* target, unsigned linkReg);
+    llvm::Error handleIJump(llvm::Value* target);
 
     // syscall
     llvm::Error handleSyscall();
