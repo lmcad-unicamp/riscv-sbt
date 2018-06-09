@@ -142,6 +142,11 @@ private:
         F_SUB
     };
 
+    enum FFPUOp {
+        F_MADD,
+        F_MSUB
+    };
+
     enum IType {
         F_W,
         F_WU
@@ -180,6 +185,8 @@ private:
     llvm::Error translateFence(bool fi);
 
     // CSR ops
+    llvm::Value* getCSRValue(uint64_t csr);
+    void setCSRValue(uint64_t csr, llvm::Value* v);
     llvm::Error translateCSR(CSROp op, bool imm);
 
     // Multiply/divide extension
@@ -191,15 +198,15 @@ private:
     // helpers
 
     // get RISCV destination register number
-    unsigned getRD();
+    unsigned getRD(bool out = true);
     // get RISCV register number (input is operand index)
-    unsigned getRegNum(unsigned op);
+    unsigned getRegNum(unsigned op, bool out = true);
     // get register value (input is operand index)
-    llvm::Value* getReg(int op);
+    llvm::Value* getReg(int op, bool out = true);
     // get immediate value
-    llvm::Expected<llvm::Constant*> getImm(int op);
+    llvm::Expected<llvm::Constant*> getImm(int op, bool out = true);
     // get register or immediate
-    llvm::Expected<llvm::Value*> getRegOrImm(int op);
+    llvm::Expected<llvm::Value*> getRegOrImm(int op, bool out = true);
 
     // add RV instr metadata and print it in debug mode
     // (no-op in release mode)
@@ -219,6 +226,8 @@ private:
 
     // FPU op
     llvm::Error translateFPUOp(FPUOp op, FType ft);
+    // fused FPU op
+    llvm::Error translateFFPUOp(FFPUOp op, FType ft);
 
     // CVT
     // fp to int

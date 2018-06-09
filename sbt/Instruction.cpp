@@ -289,22 +289,23 @@ llvm::Error Instruction::translate()
 }
 
 
-unsigned Instruction::getRD()
+unsigned Instruction::getRD(bool out)
 {
-    return getRegNum(0);
+    return getRegNum(0, out);
 }
 
 
-unsigned Instruction::getRegNum(unsigned op)
+unsigned Instruction::getRegNum(unsigned op, bool out)
 {
     const llvm::MCOperand& r = _inst.getOperand(op);
     unsigned nr = XRegister::num(r.getReg());
-    *_os << _ctx->x->getReg(nr).name() << ", ";
+    if (out)
+        *_os << _ctx->x->getReg(nr).name() << ", ";
     return nr;
 }
 
 
-llvm::Value* Instruction::getReg(int op)
+llvm::Value* Instruction::getReg(int op, bool out)
 {
     const llvm::MCOperand& mcop = _inst.getOperand(op);
     unsigned nr = XRegister::num(mcop.getReg());
@@ -314,27 +315,29 @@ llvm::Value* Instruction::getReg(int op)
     else
         v = _bld->load(nr);
 
-    *_os << _ctx->x->getReg(nr).name();
-    if (op < 2)
-         *_os << ", ";
+    if (out) {
+        *_os << _ctx->x->getReg(nr).name();
+        if (op < 2)
+             *_os << ", ";
+    }
     return v;
 }
 
 
-llvm::Expected<llvm::Value*> Instruction::getRegOrImm(int op)
+llvm::Expected<llvm::Value*> Instruction::getRegOrImm(int op, bool out)
 {
     const llvm::MCOperand& o = _inst.getOperand(op);
     if (o.isReg())
-        return getReg(op);
+        return getReg(op, out);
     else if (o.isImm())
-        return getImm(op);
+        return getImm(op, out);
     xunreachable("operand is neither a register nor immediate");
 }
 
 
-llvm::Expected<llvm::Constant*> Instruction::getImm(int op)
+llvm::Expected<llvm::Constant*> Instruction::getImm(int op, bool out)
 {
-    auto expC = _ctx->reloc->handleRelocation(_addr, _os);
+    auto expC = _ctx->reloc->handleRelocation(_addr, out? _os : nullptr);
     if (!expC)
         return expC.takeError();
 
@@ -346,7 +349,8 @@ llvm::Expected<llvm::Constant*> Instruction::getImm(int op)
     // case 2: absolute immediate value
     int64_t imm = _inst.getOperand(op).getImm();
     c = _c->i32(imm);
-    *_os << llvm::formatv("{0}", imm);
+    if (out)
+        *_os << llvm::formatv("{0}", imm);
     return c;
 }
 
@@ -670,14 +674,51 @@ llvm::Error Instruction::translateFence(bool fi)
 }
 
 
+llvm::Value* Instruction::getCSRValue(uint64_t csr)
+{
+    switch (csr) {
+        case CSR::RDCYCLE:
+            return _bld->call(_ctx->translator->getCycles().func());
+        case CSR::RDTIME:
+            return _bld->call(_ctx->translator->getTime().func());
+        case CSR::RDINSTRET:
+            return _bld->call(_ctx->translator->getInstRet().func());
+        case CSR::RDCYCLEH:
+        case CSR::RDTIMEH:
+        case CSR::RDINSTRETH:
+        case CSR::FFLAGS: // ignoring it for now
+            return _c->ZERO;
+        default:
+            DBGF("CSR=0x{0:X-8}", csr);
+            xunreachable("Unsupported CSR read!");
+    }
+}
+
+
+void Instruction::setCSRValue(uint64_t csr, llvm::Value* srcval)
+{
+    switch (csr) {
+        case CSR::FFLAGS: // ignoring it for now
+            break;
+
+        case CSR::RDCYCLE:
+        case CSR::RDTIME:
+        case CSR::RDINSTRET:
+        case CSR::RDCYCLEH:
+        case CSR::RDTIMEH:
+        case CSR::RDINSTRETH:
+        default:
+            DBGF("CSR=0x{0:X-8}", csr);
+            xunreachable("Unsupported CSR write!");
+    }
+}
+
+
 llvm::Error Instruction::translateCSR(CSROp op, bool imm)
 {
-#define assert_nowr(cond) \
-        xassert(cond && "no CSR write support for base I instructions!")
-
     switch (op) {
         case RW:
-            assert_nowr(false);
+            *_os << "csrrw";
             break;
 
         case RS:
@@ -695,49 +736,59 @@ llvm::Error Instruction::translateCSR(CSROp op, bool imm)
     unsigned rd = getRegNum(0);
     uint64_t csr = _inst.getOperand(1).getImm();
     uint64_t src;
+    llvm::Value* srcval;
     if (imm) {
-        src = _inst.getOperand(2).getImm();
-        assert_nowr(src == 0);
+        auto expImm = getImm(2);
+        if (!expImm)
+            return expImm.takeError();
+        srcval = expImm.get();
+        llvm::ConstantInt* ci = llvm::cast<llvm::ConstantInt>(srcval);
+        src = ci->getZExtValue();
     } else {
-        src = getRegNum(2);
-        assert_nowr(src == XRegister::ZERO);
+        src = getRegNum(2, false);
+        srcval = getReg(2);
     }
-    *_os << llvm::formatv("0x{0:X-8} = ", csr);
+    *_os << CSR::name(static_cast<CSR::Num>(csr));
 
-    Translator* translator = _ctx->translator;
-    translator->initCounters();
-    llvm::Value* v = _c->ZERO;
+    // validate CSR and access
+    bool noSrc = (imm && src == 0) || (!imm && src == XRegister::ZERO);
     switch (csr) {
+        case CSR::FFLAGS:
+            break;
+
+        // counters
         case CSR::RDCYCLE:
-            *_os << "RDCYCLE";
-            v = _bld->call(_ctx->translator->getCycles().func());
-            break;
         case CSR::RDCYCLEH:
-            *_os << "RDCYCLEH";
-            break;
         case CSR::RDTIME:
-            *_os << "RDTIME";
-            v = _bld->call(_ctx->translator->getTime().func());
-            break;
         case CSR::RDTIMEH:
-            *_os << "RDTIMEH";
-            break;
         case CSR::RDINSTRET:
-            *_os << "RDINSTRET";
-            v = _bld->call(_ctx->translator->getInstRet().func());
-            break;
         case CSR::RDINSTRETH:
-            *_os << "RDINSTRETH";
-            break;
+            _ctx->translator->initCounters();
+        // fall through
+        // validate write
         default:
-            xassert(false && "not implemented!");
+            xassert(noSrc && "CSR write not allowed!");
+    }
+
+    llvm::Value* csrval = getCSRValue(csr);
+    switch (op) {
+        case RW:
+            setCSRValue(csr, srcval);
+            break;
+
+        case RS:
+            if (!noSrc)
+                setCSRValue(csr, _bld->_or(csrval, srcval));
+            break;
+
+        case RC:
+            if (!noSrc)
+                setCSRValue(csr, _bld->_and(csrval, _bld->_not(srcval)));
             break;
     }
 
-    _bld->store(v, rd);
-
+    _bld->store(csrval, rd);
     return llvm::Error::success();
-#undef assert_nowr
 }
 
 
@@ -758,30 +809,6 @@ llvm::Error Instruction::translateBranch(BranchType bt)
 
     llvm::Error err = noError();
 
-    auto getRegNoLog = [this](int op) {
-        // save os
-        auto sos = _os;
-        // set _os to nulls(), just to avoid producing incorrect debug output
-        _os = &llvm::nulls();
-        // get reg
-        llvm::Value* v = getReg(op);
-        // restore os
-        _os = sos;
-        return v;
-    };
-
-    auto getRegNumNoLog = [this](unsigned op) {
-        // save os
-        auto sos = _os;
-        // set _os to nulls(), just to avoid producing incorrect debug output
-        _os = &llvm::nulls();
-        // get reg num
-        unsigned n = getRegNum(op);
-        // restore os
-        _os = sos;
-        return n;
-    };
-
     // get operands
     unsigned linkReg;
     llvm::Value* o0 = nullptr;
@@ -800,7 +827,7 @@ llvm::Error Instruction::translateBranch(BranchType bt)
 
         case JALR:
             linkReg = getRegNum(0);
-            jregn = getRegNumNoLog(1);
+            jregn = getRegNum(1, false);
             jreg = getReg(1);
             if (!exp(getImm(2), jimm, err))
                 return err;
@@ -813,7 +840,7 @@ llvm::Error Instruction::translateBranch(BranchType bt)
         case BLT:
         case BLTU:
             linkReg = XRegister::ZERO;
-            o0 = getRegNoLog(0);
+            o0 = getReg(0, false);
             o1 = getReg(1);
             if (!exp(getImm(2), jimm, err))
                 return err;
@@ -1290,6 +1317,20 @@ llvm::Error Instruction::translateF()
             err = translateFPUOp(F_MAX, F_DOUBLE);
             break;
 
+        // fused ops
+        case RISCV::FMADD_S:
+            err = translateFFPUOp(F_MADD, F_SINGLE);
+            break;
+        case RISCV::FMADD_D:
+            err = translateFFPUOp(F_MADD, F_DOUBLE);
+            break;
+        case RISCV::FMSUB_S:
+            err = translateFFPUOp(F_MSUB, F_SINGLE);
+            break;
+        case RISCV::FMSUB_D:
+            err = translateFFPUOp(F_MSUB, F_DOUBLE);
+            break;
+
         // sign injection
         case RISCV::FSGNJ_S:
             err = translateFPUOp(F_SGNJ, F_SINGLE);
@@ -1627,6 +1668,41 @@ llvm::Error Instruction::translateFPUOp(FPUOp op, FType ft)
         fstore(v, o, ft);
     return llvm::Error::success();
 }
+
+
+llvm::Error Instruction::translateFFPUOp(FFPUOp op, FType ft)
+{
+    switch (op) {
+        case F_MADD:    *_os << "fmadd";     break;
+        case F_MSUB:    *_os << "fmsub";     break;
+    }
+    switch (ft) {
+        case F_SINGLE:  *_os << ".s";   break;
+        case F_DOUBLE:  *_os << ".d";   break;
+    }
+    *_os << '\t';
+
+    unsigned o = getFRD();
+
+    llvm::Value* o1 = getFReg(1, ft);
+    llvm::Value* o2 = getFReg(2, ft);
+    llvm::Value* o3 = getFReg(3, ft);
+    llvm::Value* v;
+
+    switch (op) {
+        case F_MADD:
+            v = _bld->fmadd(o1, o2, o3);
+            break;
+
+        case F_MSUB:
+            v = _bld->fmsub(o1, o2, o3);
+            break;
+    }
+
+    fstore(v, o, ft);
+    return llvm::Error::success();
+}
+
 
 
 llvm::Error Instruction::translateCVT(IType it, FType ft)

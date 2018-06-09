@@ -136,6 +136,7 @@ class CSR
 {
 public:
     enum Num : unsigned {
+        FFLAGS      = 0x001,
         RDCYCLE     = 0xC00,
         RDTIME      = 0xC01,
         RDINSTRET   = 0xC02,
@@ -143,6 +144,22 @@ public:
         RDTIMEH     = 0xC81,
         RDINSTRETH  = 0xC82
     };
+
+    static const char* name(Num csr)
+    {
+#define CASE(csr) case csr: return #csr
+        switch (csr) {
+            CASE(FFLAGS);
+            CASE(RDCYCLE);
+            CASE(RDTIME);
+            CASE(RDINSTRET);
+            CASE(RDCYCLEH);
+            CASE(RDTIMEH);
+            CASE(RDINSTRETH);
+        }
+        xunreachable("invalid CSR");
+#undef CASE
+    }
 };
 
 }

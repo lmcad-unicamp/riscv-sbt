@@ -102,10 +102,7 @@ public:
     // nop
     void nop()
     {
-        llvm::Function* f = llvm::Intrinsic::
-            getDeclaration(_ctx->module, llvm::Intrinsic::donothing);
-        call(f);
-        xassert(_first);
+        callIntrinsic(llvm::Intrinsic::donothing, {});
     }
 
     // sign extend
@@ -247,6 +244,9 @@ public:
         return v;
     }
 
+    llvm::Value* _not(llvm::Value* a) {
+        return _xor(a, _ctx->c.i32(~0));
+    }
 
     // comparisons
 
@@ -701,32 +701,27 @@ public:
 
     llvm::Value* fmin(llvm::Value* a, llvm::Value* b)
     {
-        llvm::Function* f = llvm::Intrinsic::
-            getDeclaration(_ctx->module, llvm::Intrinsic::minnum,
-                {a->getType()});
-        llvm::Value* v = call(f, {a, b});
-        xassert(_first);
-        return v;
+        return callIntrinsic(llvm::Intrinsic::minnum, {a, b});
     }
 
     llvm::Value* fmax(llvm::Value* a, llvm::Value* b)
     {
-        llvm::Function* f = llvm::Intrinsic::
-            getDeclaration(_ctx->module, llvm::Intrinsic::maxnum,
-                {a->getType()});
-        llvm::Value* v = call(f, {a, b});
-        xassert(_first);
-        return v;
+        return callIntrinsic(llvm::Intrinsic::maxnum, {a, b});
     }
 
     llvm::Value* fsqrt(llvm::Value* a)
     {
-        llvm::Function* f = llvm::Intrinsic::
-            getDeclaration(_ctx->module, llvm::Intrinsic::sqrt,
-                {a->getType()});
-        llvm::Value* v = call(f, {a});
-        xassert(_first);
-        return v;
+        return callIntrinsic(llvm::Intrinsic::sqrt, {a});
+    }
+
+    llvm::Value* fmadd(llvm::Value* a, llvm::Value* b, llvm::Value* c)
+    {
+        return callIntrinsic(llvm::Intrinsic::fmuladd, {a, b, c});
+    }
+
+    llvm::Value* fmsub(llvm::Value* a, llvm::Value* b, llvm::Value* c)
+    {
+        return fsub(fadd(a, b), c);
     }
 
 private:
@@ -748,6 +743,25 @@ private:
             sgn = _c->i64(1ULL<<63);
             nsgn = _c->i64((1ULL<<63) -1);
         }
+    }
+
+    llvm::Function* getIntrinsic(
+        llvm::Intrinsic::ID id,
+        llvm::ArrayRef<llvm::Type*> tys)
+    {
+        return llvm::Intrinsic::getDeclaration(_ctx->module, id, tys);
+    }
+
+    llvm::Value* callIntrinsic(
+        llvm::Intrinsic::ID id,
+        llvm::ArrayRef<llvm::Value*> args)
+    {
+        xassert(!args.empty());
+        llvm::Value* a = args[0];
+        llvm::Function* f = getIntrinsic(id, {a->getType()});
+        llvm::Value* v = call(f, args);
+        xassert(_first);
+        return v;
     }
 
 public:
