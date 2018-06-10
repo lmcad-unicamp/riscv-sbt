@@ -214,6 +214,9 @@ int main(int argc, char* argv[])
     cl::opt<bool> enableFCSROpt("enable-fcsr",
         cl::desc("Enable FCSR register emulation"));
 
+    cl::opt<bool> enableFCVTValidationOpt("enable-fcvt-validation",
+        cl::desc("Enable input validation on fcvt instructions"));
+
     // enable debug code
     cl::opt<bool> debugOpt("debug", cl::desc("Enable debug code"));
 
@@ -276,7 +279,8 @@ int main(int argc, char* argv[])
         .setSyncOnExternalCalls(syncOnExternalCallsOpt)
         .setCommentedAsm(commentedAsmOpt)
         .setSymBoundsCheck(!noSymBoundsCheckOpt)
-        .setEnableFCSR(enableFCSROpt);
+        .setEnableFCSR(enableFCSROpt)
+        .setEnableFCVTValidation(enableFCVTValidationOpt);
     auto exp = sbt::create<sbt::SBT>(inputFiles, outputFile, opts);
     if (!exp)
         sbt::handleError(exp.takeError());

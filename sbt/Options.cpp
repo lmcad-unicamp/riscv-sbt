@@ -31,6 +31,7 @@ void Options::dump() const
     DBGS << "commentedAsm=" << commentedAsm() << nl;
     DBGS << "symBoundsCheck=" << symBoundsCheck() << nl;
     DBGS << "enableFCSR=" << enableFCSR() << nl;
+    DBGS << "enableFCVTValidation=" << enableFCVTValidation() << nl;
 }
 
 }

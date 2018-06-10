@@ -106,6 +106,17 @@ public:
         return *this;
     }
 
+    bool enableFCVTValidation() const
+    {
+        return _enableFCVTValidation;
+    }
+
+    Options& setEnableFCVTValidation(bool b)
+    {
+        _enableFCVTValidation = b;
+        return *this;
+    }
+
     void dump() const;
 
 private:
@@ -118,6 +129,7 @@ private:
     bool _commentedAsm = false;
     bool _symBoundsCheck = true;
     bool _enableFCSR = false;
+    bool _enableFCVTValidation = false;
 };
 
 }

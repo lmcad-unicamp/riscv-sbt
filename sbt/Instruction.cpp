@@ -20,6 +20,7 @@
 #include <llvm/Target/RISCV/RISCVGenInstrInfo.inc>
 
 #include <cstring>
+#include <limits>
 
 #undef ENABLE_DBGS
 #define ENABLE_DBGS 1
@@ -1889,7 +1890,6 @@ llvm::Error Instruction::translateFFPUOp(FFPUOp op, FType ft)
     *_os << '\t';
 
     unsigned o = getFRD();
-
     llvm::Value* o1 = getFReg(1, ft);
     llvm::Value* o2 = getFReg(2, ft);
     llvm::Value* o3 = getFReg(3, ft);
@@ -1919,6 +1919,93 @@ llvm::Error Instruction::translateFFPUOp(FFPUOp op, FType ft)
 }
 
 
+BasicBlock*
+Instruction::validateRangeBegin(
+        llvm::Value* in,
+        unsigned out,
+        FType ft,
+        IType it)
+{
+    if (!_ctx->opts->enableFCVTValidation())
+        return nullptr;
+
+    llvm::Type* ty = ft == F_SINGLE? _t->fp32 : _t->fp64;
+
+    auto fp = [ty](double val) -> llvm::Constant* {
+        return llvm::ConstantFP::get(ty, val);
+    };
+
+    llvm::Constant* min;
+    llvm::Constant* max;
+    llvm::Constant* ninf = llvm::ConstantFP::getInfinity(ty, true);
+    llvm::Constant* pinf = llvm::ConstantFP::getInfinity(ty, false);
+
+    if (it == F_W) {
+        min = fp(std::numeric_limits<int32_t>::min());
+        max = fp(std::numeric_limits<int32_t>::max());
+    } else {
+        min = fp(std::numeric_limits<uint32_t>::min());
+        max = fp(std::numeric_limits<uint32_t>::max());
+    }
+
+    Function* f = _ctx->func;
+    // BasicBlock *bbCur = _bld->getInsertBlock();
+    BasicBlock *bbOORNeg    = f->newUBB(_addr, "oor_neg");
+    BasicBlock *bbNotOORNeg = f->newUBB(_addr, "not_oor_neg");
+    BasicBlock *bbNegInf    = f->newUBB(_addr, "neg_inf");
+    BasicBlock *bbNotNegInf = f->newUBB(_addr, "not_neg_inf");
+    BasicBlock *bbOORPos    = f->newUBB(_addr, "oor_pos");
+    BasicBlock *bbNotOORPos = f->newUBB(_addr, "not_oor_pos");
+    BasicBlock *bbPosInf    = f->newUBB(_addr, "pos_inf");
+    BasicBlock *bbNotPosInf = f->newUBB(_addr, "not_pos_inf");
+    BasicBlock *bbEnd       = f->newUBB(_addr, "end");
+
+    // test: OOR neg
+    llvm::Value* cond = _bld->flt(in, min);
+    _bld->condBr(cond, bbOORNeg, bbNotOORNeg);
+    // OOR neg
+    _bld->setInsertBlock(bbOORNeg);
+    _bld->store(min, out);
+    _bld->br(bbEnd);
+    // not OOR neg: test neg inf
+    _bld->setInsertBlock(bbNotOORNeg);
+    cond = _bld->feq(in, ninf);
+    _bld->condBr(cond, bbNegInf, bbNotNegInf);
+    // neg inf
+    _bld->setInsertBlock(bbNegInf);
+    _bld->store(min, out);
+    _bld->br(bbEnd);
+    // not neg inf: test OOR pos
+    _bld->setInsertBlock(bbNotNegInf);
+    cond = _bld->flt(max, in);
+    _bld->condBr(cond, bbOORPos, bbNotOORPos);
+    // OOR pos
+    _bld->setInsertBlock(bbOORPos);
+    _bld->store(max, out);
+    _bld->br(bbEnd);
+    // not OOR pos: test pos inf
+    _bld->setInsertBlock(bbNotOORPos);
+    cond = _bld->feq(in, pinf);
+    _bld->condBr(cond, bbPosInf, bbNotPosInf);
+    // pos inf
+    _bld->setInsertBlock(bbPosInf);
+    _bld->store(max, out);
+    _bld->br(bbEnd);
+    // not pos inf (input is valid)
+    _bld->setInsertBlock(bbNotPosInf);
+    return bbEnd;
+}
+
+
+void Instruction::validateRangeEnd(BasicBlock* bbEnd)
+{
+    if (bbEnd) {
+        _bld->br(bbEnd);
+        _bld->setInsertBlock(bbEnd);
+    }
+}
+
+
 llvm::Error Instruction::translateCVT(IType it, FType ft)
 {
     *_os << "fcvt";
@@ -1932,14 +2019,13 @@ llvm::Error Instruction::translateCVT(IType it, FType ft)
     }
     *_os << '\t';
 
-    // TODO handle overflows
-
     llvm::Type* ty =_t->i32;
     unsigned rd = getRD();
     llvm::Value* fr = getFReg(1, ft);
     FRM::get(_rawInst);
     llvm::Value* v;
 
+    BasicBlock* bbEnd = validateRangeBegin(fr, rd, ft, it);
     switch (it) {
         case F_W:
             v = _bld->fpToSI(fr, ty);
@@ -1949,8 +2035,9 @@ llvm::Error Instruction::translateCVT(IType it, FType ft)
             v = _bld->fpToUI(fr, ty);
             break;
     }
-
     _bld->store(v, rd);
+    validateRangeEnd(bbEnd);
+
     return llvm::Error::success();
 }
 
@@ -1967,8 +2054,6 @@ llvm::Error Instruction::translateCVT(FType ft, IType it)
         case F_WU:  *_os << ".wu";  break;
     }
     *_os << '\t';
-
-    // TODO handle overflows
 
     llvm::Type* ty = ft == F_SINGLE? _t->fp32 : _t->fp64;
     unsigned rd = getFRD();

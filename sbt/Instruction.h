@@ -15,6 +15,7 @@ class StoreInst;
 
 namespace sbt {
 
+class BasicBlock;
 class Builder;
 class Constants;
 class Context;
@@ -239,6 +240,12 @@ private:
     llvm::Error translateFFPUOp(FFPUOp op, FType ft);
 
     // CVT
+    BasicBlock* validateRangeBegin(
+        llvm::Value* in,
+        unsigned out,
+        FType ft,
+        IType it);
+    void validateRangeEnd(BasicBlock* bbEnd);
     // fp to int
     llvm::Error translateCVT(IType it, FType ft);
     // int to fp
