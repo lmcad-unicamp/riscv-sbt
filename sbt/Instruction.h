@@ -142,6 +142,13 @@ private:
         F_SUB
     };
 
+    enum FPUOpAlias {
+        FA_NONE,
+        FA_MV,
+        FA_NEG,
+        FA_ABS
+    };
+
     enum FFPUOp {
         F_MADD,
         F_NMADD,
@@ -249,9 +256,9 @@ private:
 
     llvm::LoadInst* fload(unsigned reg, FType ty);
     llvm::StoreInst* fstore(llvm::Value* v, unsigned reg, FType ty);
-    unsigned getFRD();
-    unsigned getFRegNum(unsigned op);
-    llvm::Value* getFReg(int op, FType ty);
+    unsigned getFRD(bool out = true);
+    unsigned getFRegNum(unsigned op, bool out = true);
+    llvm::Value* getFReg(int op, FType ty, bool out = true);
     bool hasRM(FPUOp op) const;
 };
 

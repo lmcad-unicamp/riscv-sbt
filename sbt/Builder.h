@@ -741,100 +741,9 @@ public:
         return fneg(fmsub(a, b, c));
     }
 
-private:
-    void fsgnj_init(
-        llvm::Value* v,
-        llvm::Type*& fty,
-        llvm::Type*& ity,
-        llvm::Constant*& sgn,
-        llvm::Constant*& nsgn)
+    llvm::Value* fabs(llvm::Value* a)
     {
-        fty = v->getType();
-        xassert(fty == _t->fp32 || fty == _t->fp64);
-        ity = fty == _t->fp32? _t->i32 : _t->i64;
-
-        if (ity == _t->i32) {
-            sgn = _c->i32(1U<<31);
-            nsgn = _c->i32((1U<<31) -1);
-        } else {
-            sgn = _c->i64(1ULL<<63);
-            nsgn = _c->i64((1ULL<<63) -1);
-        }
-    }
-
-    llvm::Function* getIntrinsic(
-        llvm::Intrinsic::ID id,
-        llvm::ArrayRef<llvm::Type*> tys)
-    {
-        return llvm::Intrinsic::getDeclaration(_ctx->module, id, tys);
-    }
-
-    llvm::Value* callIntrinsic(
-        llvm::Intrinsic::ID id,
-        llvm::ArrayRef<llvm::Value*> args)
-    {
-        xassert(!args.empty());
-        llvm::Value* a = args[0];
-        llvm::Function* f = getIntrinsic(id, {a->getType()});
-        llvm::Value* v = call(f, args);
-        xassert(_first);
-        return v;
-    }
-
-public:
-    llvm::Value* fsgnj(llvm::Value* a, llvm::Value* b)
-    {
-        llvm::Type *fty, *ity;
-        llvm::Constant *sgn, *nsgn;
-        fsgnj_init(a, fty, ity, sgn, nsgn);
-
-        // to int
-        a = bitOrPointerCast(a, ity);
-        b = bitOrPointerCast(b, ity);
-        a = _and(a, nsgn);
-        b = _and(b, sgn);
-        llvm::Value* v = _or(a, b);
-        // to fp
-        v = bitOrPointerCast(v, fty);
-        return v;
-    }
-
-    llvm::Value* fsgnjn(llvm::Value* a, llvm::Value* b)
-    {
-        llvm::Type *fty, *ity;
-        llvm::Constant *sgn, *nsgn;
-        fsgnj_init(a, fty, ity, sgn, nsgn);
-
-        // to int
-        a = bitOrPointerCast(a, ity);
-        b = bitOrPointerCast(b, ity);
-        a = _and(a, nsgn);
-        // negate b's signal bit
-        b = _xor(b, llvm::ConstantInt::get(ity, ~0ULL));
-        b = _and(b, sgn);
-        llvm::Value* v = _or(a, b);
-        // to fp
-        v = bitOrPointerCast(v, fty);
-        return v;
-    }
-
-    llvm::Value* fsgnjx(llvm::Value* a, llvm::Value* b)
-    {
-        llvm::Type *fty, *ity;
-        llvm::Constant *sgn, *nsgn;
-        fsgnj_init(a, fty, ity, sgn, nsgn);
-
-        // to int
-        a = bitOrPointerCast(a, ity);
-        b = bitOrPointerCast(b, ity);
-        // xor a and b (to get the correct value of the result signal bit)
-        b = _xor(a, b);
-        b = _and(b, sgn);
-        a = _and(a, nsgn);
-        llvm::Value* v = _or(a, b);
-        // to fp
-        v = bitOrPointerCast(v, fty);
-        return v;
+        return callIntrinsic(llvm::Intrinsic::fabs, {a});
     }
 
     llvm::Value* feq(llvm::Value* a, llvm::Value* b)
@@ -859,6 +768,109 @@ public:
     }
 
 private:
+    void fsgnj_init(
+        llvm::Value* v,
+        llvm::Type*& fty,
+        llvm::Type*& ity,
+        llvm::Constant*& sgn,
+        llvm::Constant*& nsgn)
+    {
+        fty = v->getType();
+        xassert(fty == _t->fp32 || fty == _t->fp64);
+        ity = fty == _t->fp32? _t->i32 : _t->i64;
+
+        if (ity == _t->i32) {
+            sgn = _c->i32(1U<<31);
+            nsgn = _c->i32((1U<<31) -1);
+        } else {
+            sgn = _c->i64(1ULL<<63);
+            nsgn = _c->i64((1ULL<<63) -1);
+        }
+    }
+
+public:
+    llvm::Value* fsgnj(llvm::Value* a, llvm::Value* b)
+    {
+#if 0
+        llvm::Type *fty, *ity;
+        llvm::Constant *sgn, *nsgn;
+        fsgnj_init(a, fty, ity, sgn, nsgn);
+
+        // to int
+        a = bitOrPointerCast(a, ity);
+        b = bitOrPointerCast(b, ity);
+        a = _and(a, nsgn);
+        b = _and(b, sgn);
+        llvm::Value* v = _or(a, b);
+        // to fp
+        v = bitOrPointerCast(v, fty);
+        return v;
+#else
+        return callIntrinsic(llvm::Intrinsic::copysign, {a, b});
+#endif
+    }
+
+    llvm::Value* fsgnjn(llvm::Value* a, llvm::Value* b)
+    {
+#if 0
+        llvm::Type *fty, *ity;
+        llvm::Constant *sgn, *nsgn;
+        fsgnj_init(a, fty, ity, sgn, nsgn);
+
+        // to int
+        a = bitOrPointerCast(a, ity);
+        b = bitOrPointerCast(b, ity);
+        a = _and(a, nsgn);
+        // negate b's signal bit
+        b = _xor(b, llvm::ConstantInt::get(ity, ~0ULL));
+        b = _and(b, sgn);
+        llvm::Value* v = _or(a, b);
+        // to fp
+        v = bitOrPointerCast(v, fty);
+        return v;
+#else
+        return callIntrinsic(llvm::Intrinsic::copysign, {a, fneg(b)});
+#endif
+    }
+
+    llvm::Value* fsgnjx(llvm::Value* a, llvm::Value* b)
+    {
+        llvm::Type *fty, *ity;
+        llvm::Constant *sgn, *nsgn;
+        fsgnj_init(a, fty, ity, sgn, nsgn);
+
+        // to int
+        a = bitOrPointerCast(a, ity);
+        b = bitOrPointerCast(b, ity);
+        // xor a and b (to get the correct value of the result signal bit)
+        b = _xor(a, b);
+        b = _and(b, sgn);
+        a = _and(a, nsgn);
+        llvm::Value* v = _or(a, b);
+        // to fp
+        v = bitOrPointerCast(v, fty);
+        return v;
+    }
+
+private:
+    llvm::Function* getIntrinsic(
+        llvm::Intrinsic::ID id,
+        llvm::ArrayRef<llvm::Type*> tys)
+    {
+        return llvm::Intrinsic::getDeclaration(_ctx->module, id, tys);
+    }
+
+    llvm::Value* callIntrinsic(
+        llvm::Intrinsic::ID id,
+        llvm::ArrayRef<llvm::Value*> args)
+    {
+        xassert(!args.empty());
+        llvm::Value* a = args[0];
+        llvm::Function* f = getIntrinsic(id, {a->getType()});
+        llvm::Value* v = call(f, args);
+        xassert(_first);
+        return v;
+    }
 
     // update first instruction pointer
     void updateFirst(llvm::Value* v)

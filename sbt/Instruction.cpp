@@ -700,6 +700,7 @@ llvm::Value* Instruction::getCSRValue(uint64_t csr)
                 _c->ZERO;
 
         case CSR::FRM:
+            xunreachable("Try not to use FRM");
             return enFCSR?
                 _bld->_and(
                     _bld->srl(getFCSR(), _c->u32(5)),
@@ -707,6 +708,7 @@ llvm::Value* Instruction::getCSRValue(uint64_t csr)
                 _c->ZERO;
 
         case CSR::FCSR:
+            xunreachable("Try not to use FCSR");
             return enFCSR? getFCSR() : _c->ZERO;
 
         default:
@@ -731,6 +733,7 @@ void Instruction::setCSRValue(uint64_t csr, llvm::Value* srcval)
             break;
 
         case CSR::FRM:
+            xunreachable("Try not to use FRM");
             if (enFCSR)
                 setFCSR(_bld->sll(
                             _bld->_and(srcval, _c->i32(7)),
@@ -738,6 +741,7 @@ void Instruction::setCSRValue(uint64_t csr, llvm::Value* srcval)
             break;
 
         case CSR::FCSR:
+            xunreachable("Try not to use FCSR");
             if (enFCSR)
                 setFCSR(srcval);
             break;
@@ -1489,40 +1493,43 @@ llvm::StoreInst* Instruction::fstore(llvm::Value* v, unsigned reg, FType ty)
 }
 
 
-unsigned Instruction::getFRD()
+unsigned Instruction::getFRD(bool out)
 {
-    return getFRegNum(0);
+    return getFRegNum(0, out);
 }
 
 
-unsigned Instruction::getFRegNum(unsigned op)
+unsigned Instruction::getFRegNum(unsigned op, bool out)
 {
     const llvm::MCOperand& r = _inst.getOperand(op);
     unsigned nr = FRegister::num(r.getReg());
-    *_os << _ctx->f->getReg(nr).name() << ", ";
+    if (out)
+        *_os << _ctx->f->getReg(nr).name() << ", ";
     return nr;
 }
 
 
-llvm::Value* Instruction::getFReg(int op, FType ty)
+llvm::Value* Instruction::getFReg(int op, FType ty, bool out)
 {
     const llvm::MCOperand& mcop = _inst.getOperand(op);
     unsigned nr = FRegister::num(mcop.getReg());
     llvm::Value* v = fload(nr, ty);
 
-    *_os << _ctx->f->getReg(nr).name();
-    if (op < 2)
-        *_os << ", ";
+    if (out) {
+        *_os << _ctx->f->getReg(nr).name();
+        if (op < 2)
+            *_os << ", ";
+    }
     return v;
 }
 
 
 namespace {
 
-class RM
+class FRM
 {
 public:
-    enum Mode {
+    enum RM {
         RNE = 0,
         RTZ = 1,
         RDN = 2,
@@ -1533,9 +1540,9 @@ public:
         DYN = 7
     };
 
-    static const char* name(Mode mode)
+    static const char* name(RM rm)
     {
-        switch (mode) {
+        switch (rm) {
             case RNE:   return "RNE";
             case RTZ:   return "RTZ";
             case RDN:   return "RDN";
@@ -1547,11 +1554,34 @@ public:
         }
     }
 
-    static int getRM(uint32_t inst)
+    static int get(uint32_t inst)
     {
         int rm = inst >> 12 & 7;
         xassert(rm == RNE || rm == DYN && "Unsupported Rounding Mode!");
         return rm;
+    }
+};
+
+class FFlags
+{
+public:
+    enum Flags {
+        NX,
+        UF,
+        OF,
+        DZ,
+        NV
+    };
+
+    static const char* name(Flags flags)
+    {
+        switch (flags) {
+            case NX:    return "NX";
+            case UF:    return "UF";
+            case OF:    return "OF";
+            case DZ:    return "DZ";
+            case NV:    return "NV";
+        }
     }
 };
 
@@ -1708,22 +1738,78 @@ llvm::Error Instruction::translateFPUOp(FPUOp op, FType ft)
             break;
     }
 
+    unsigned o1n = getFRegNum(1, false);
     llvm::Value* o1 = getFReg(1, ft);
+    unsigned o2n;
     llvm::Value* o2;
 
+    bool isSgnj = false;
     switch (op) {
         case F_SQRT:
             break;
 
+        case F_SGNJ:
+        case F_SGNJN:
+        case F_SGNJX:
+            isSgnj = true;
+            o2n = getFRegNum(2, false);
+            if (o1n != o2n)
+                o2 = getFReg(2, ft);
+            else
+                getFRegNum(2);
+            break;
+
         default:
+            o2n = getFRegNum(2, false);
             o2 = getFReg(2, ft);
     }
 
     if (hasRM(op))
-        RM::getRM(_rawInst);
+        FRM::get(_rawInst);
+
+    // optimize fsgnj opts
+    FPUOpAlias opa = FA_NONE;
+    switch (op) {
+        case F_SGNJ:
+            if (o1n == o2n)
+                opa = FA_MV;
+            break;
+
+        case F_SGNJN:
+            if (o1n == o2n)
+                opa = FA_NEG;
+            break;
+
+        case F_SGNJX:
+            if (o1n == o2n)
+                opa = FA_ABS;
+            break;
+
+        default:
+            break;
+    }
+
+    if (isSgnj && opa == FA_NONE)
+        DBGF("NOTE: unoptimized signal injection operation");
 
     llvm::Value* v;
-    switch (op) {
+    if (opa != FA_NONE) switch (opa) {
+        case FA_NONE:
+            xunreachable("unexpected");
+
+        case FA_MV:
+            v = o1;
+            break;
+
+        case FA_NEG:
+            v = _bld->fneg(o1);
+            break;
+
+        case FA_ABS:
+            v = _bld->fabs(o1);
+            break;
+
+    } else switch (op) {
         case F_ADD:
             v = _bld->fadd(o1, o2);
             break;
@@ -1807,7 +1893,7 @@ llvm::Error Instruction::translateFFPUOp(FFPUOp op, FType ft)
     llvm::Value* o1 = getFReg(1, ft);
     llvm::Value* o2 = getFReg(2, ft);
     llvm::Value* o3 = getFReg(3, ft);
-    RM::getRM(_rawInst);
+    FRM::get(_rawInst);
     llvm::Value* v;
 
     switch (op) {
@@ -1851,7 +1937,7 @@ llvm::Error Instruction::translateCVT(IType it, FType ft)
     llvm::Type* ty =_t->i32;
     unsigned rd = getRD();
     llvm::Value* fr = getFReg(1, ft);
-    RM::getRM(_rawInst);
+    FRM::get(_rawInst);
     llvm::Value* v;
 
     switch (it) {
@@ -1887,7 +1973,7 @@ llvm::Error Instruction::translateCVT(FType ft, IType it)
     llvm::Type* ty = ft == F_SINGLE? _t->fp32 : _t->fp64;
     unsigned rd = getFRD();
     llvm::Value* ir = getReg(1);
-    RM::getRM(_rawInst);
+    FRM::get(_rawInst);
     llvm::Value* v;
 
     switch (it) {
@@ -1922,7 +2008,7 @@ llvm::Error Instruction::translateCVT(FType ft1, FType ft2)
 
     unsigned rd = getFRD();
     llvm::Value* v = getFReg(1, ft2);
-    RM::getRM(_rawInst);
+    FRM::get(_rawInst);
 
     if (ft2 == F_SINGLE)
         v = _bld->fp32ToFP64(v);
