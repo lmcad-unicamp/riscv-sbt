@@ -18,6 +18,7 @@ class Disassembler;
 class FRegister;
 class FRegisters;
 class Function;
+class Register;
 class SBTRelocation;
 class SBTSection;
 class ShadowImage;
@@ -82,6 +83,7 @@ public:
   // registers
   XRegisters* x = nullptr;
   FRegisters* f = nullptr;
+  Register* fcsr = nullptr;
   // stack
   Stack* stack = nullptr;
   // flags

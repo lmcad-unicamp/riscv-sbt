@@ -676,6 +676,12 @@ llvm::Error Instruction::translateFence(bool fi)
 
 llvm::Value* Instruction::getCSRValue(uint64_t csr)
 {
+    bool enFCSR = _ctx->opts->enableFCSR();
+
+    auto getFCSR = [this]() -> llvm::Value* {
+        return _bld->load(_ctx->fcsr->getForRead());
+    };
+
     switch (csr) {
         case CSR::RDCYCLE:
             return _bld->call(_ctx->translator->getCycles().func());
@@ -686,8 +692,23 @@ llvm::Value* Instruction::getCSRValue(uint64_t csr)
         case CSR::RDCYCLEH:
         case CSR::RDTIMEH:
         case CSR::RDINSTRETH:
-        case CSR::FFLAGS: // ignoring it for now
             return _c->ZERO;
+
+        case CSR::FFLAGS:
+            return enFCSR?
+                _bld->_and(getFCSR(), _c->i32(0x1F)) :
+                _c->ZERO;
+
+        case CSR::FRM:
+            return enFCSR?
+                _bld->_and(
+                    _bld->srl(getFCSR(), _c->u32(5)),
+                    _c->i32(7)) :
+                _c->ZERO;
+
+        case CSR::FCSR:
+            return enFCSR? getFCSR() : _c->ZERO;
+
         default:
             DBGF("CSR=0x{0:X-8}", csr);
             xunreachable("Unsupported CSR read!");
@@ -697,8 +718,28 @@ llvm::Value* Instruction::getCSRValue(uint64_t csr)
 
 void Instruction::setCSRValue(uint64_t csr, llvm::Value* srcval)
 {
+    bool enFCSR = _ctx->opts->enableFCSR();
+
+    auto setFCSR = [this](llvm::Value* v) {
+        _bld->store(v, _ctx->fcsr->getForWrite());
+    };
+
     switch (csr) {
-        case CSR::FFLAGS: // ignoring it for now
+        case CSR::FFLAGS:
+            if (enFCSR)
+                setFCSR(_bld->_and(srcval, _c->i32(0x1F)));
+            break;
+
+        case CSR::FRM:
+            if (enFCSR)
+                setFCSR(_bld->sll(
+                            _bld->_and(srcval, _c->i32(7)),
+                            _c->i32(5)));
+            break;
+
+        case CSR::FCSR:
+            if (enFCSR)
+                setFCSR(srcval);
             break;
 
         case CSR::RDCYCLE:
@@ -750,13 +791,8 @@ llvm::Error Instruction::translateCSR(CSROp op, bool imm)
     }
     *_os << CSR::name(static_cast<CSR::Num>(csr));
 
-    // validate CSR and access
-    bool noSrc = (imm && src == 0) || (!imm && src == XRegister::ZERO);
+    // init counters
     switch (csr) {
-        case CSR::FFLAGS:
-            break;
-
-        // counters
         case CSR::RDCYCLE:
         case CSR::RDCYCLEH:
         case CSR::RDTIME:
@@ -764,12 +800,13 @@ llvm::Error Instruction::translateCSR(CSROp op, bool imm)
         case CSR::RDINSTRET:
         case CSR::RDINSTRETH:
             _ctx->translator->initCounters();
-        // fall through
-        // validate write
+            break;
+
         default:
-            xassert(noSrc && "CSR write not allowed!");
+            break;
     }
 
+    bool noSrc = (imm && src == 0) || (!imm && src == XRegister::ZERO);
     llvm::Value* csrval = getCSRValue(csr);
     switch (op) {
         case RW:
@@ -1442,6 +1479,7 @@ llvm::LoadInst* Instruction::fload(unsigned reg, FType ty)
         return _bld->fload64(reg);
 }
 
+
 llvm::StoreInst* Instruction::fstore(llvm::Value* v, unsigned reg, FType ty)
 {
     if (ty == F_SINGLE)
@@ -1449,6 +1487,7 @@ llvm::StoreInst* Instruction::fstore(llvm::Value* v, unsigned reg, FType ty)
     else
         return _bld->fstore64(v, reg);
 }
+
 
 unsigned Instruction::getFRD()
 {
@@ -1476,6 +1515,7 @@ llvm::Value* Instruction::getFReg(int op, FType ty)
         *_os << ", ";
     return v;
 }
+
 
 namespace {
 

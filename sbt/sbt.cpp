@@ -211,6 +211,9 @@ int main(int argc, char* argv[])
         cl::desc("Don't check if non-external symbols are within their "
             "section bounds"));
 
+    cl::opt<bool> enableFCSROpt("enable-fcsr",
+        cl::desc("Enable FCSR register emulation"));
+
     // enable debug code
     cl::opt<bool> debugOpt("debug", cl::desc("Enable debug code"));
 
@@ -272,7 +275,8 @@ int main(int argc, char* argv[])
         .setA2S(a2sOpt)
         .setSyncOnExternalCalls(syncOnExternalCallsOpt)
         .setCommentedAsm(commentedAsmOpt)
-        .setSymBoundsCheck(!noSymBoundsCheckOpt);
+        .setSymBoundsCheck(!noSymBoundsCheckOpt)
+        .setEnableFCSR(enableFCSROpt);
     auto exp = sbt::create<sbt::SBT>(inputFiles, outputFile, opts);
     if (!exp)
         sbt::handleError(exp.takeError());

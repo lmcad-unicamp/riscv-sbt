@@ -11,6 +11,7 @@ namespace sbt {
 Context::~Context()
 {
     // delete owned objects
+    delete fcsr;
     delete f;
     delete x;
     delete stack;

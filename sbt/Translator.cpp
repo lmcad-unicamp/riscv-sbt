@@ -72,6 +72,10 @@ llvm::Error Translator::start()
     // global register file
     _ctx->x = new XRegisters(_ctx, XRegisters::NONE);
     _ctx->f = new FRegisters(_ctx, FRegisters::NONE);
+    _ctx->fcsr = new Register(_ctx,
+        CSR::FCSR, "fcsr", "rv_fcsr",
+        Register::T_INT, Register::NONE);
+
     // stack
     _ctx->stack = new Stack(_ctx, _opts.stackSize());
     // disassembler

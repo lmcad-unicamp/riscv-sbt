@@ -16,7 +16,7 @@ static std::string regs2str(Options::Regs regs)
         case Options::Regs::LOCALS:
             return "locals";
     }
-    return "???";
+    xunreachable("invalid regs");
 }
 
 void Options::dump() const
@@ -30,6 +30,7 @@ void Options::dump() const
     DBGS << "syncOnExternalCalls=" << syncOnExternalCalls() << nl;
     DBGS << "commentedAsm=" << commentedAsm() << nl;
     DBGS << "symBoundsCheck=" << symBoundsCheck() << nl;
+    DBGS << "enableFCSR=" << enableFCSR() << nl;
 }
 
 }

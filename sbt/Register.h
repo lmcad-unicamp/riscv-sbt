@@ -137,6 +137,8 @@ class CSR
 public:
     enum Num : unsigned {
         FFLAGS      = 0x001,
+        FRM         = 0x002,
+        FCSR        = 0x003,
         RDCYCLE     = 0xC00,
         RDTIME      = 0xC01,
         RDINSTRET   = 0xC02,
@@ -150,6 +152,8 @@ public:
 #define CASE(csr) case csr: return #csr
         switch (csr) {
             CASE(FFLAGS);
+            CASE(FRM);
+            CASE(FCSR);
             CASE(RDCYCLE);
             CASE(RDTIME);
             CASE(RDINSTRET);

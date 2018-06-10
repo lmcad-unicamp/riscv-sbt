@@ -89,9 +89,21 @@ public:
         return _symBoundsCheck;
     }
 
-    void setSymBoundsCheck(bool b)
+    Options& setSymBoundsCheck(bool b)
     {
         _symBoundsCheck = b;
+        return *this;
+    }
+
+    bool enableFCSR() const
+    {
+        return _enableFCSR;
+    }
+
+    Options& setEnableFCSR(bool b)
+    {
+        _enableFCSR = b;
+        return *this;
     }
 
     void dump() const;
@@ -105,6 +117,7 @@ private:
     bool _syncOnExternalCalls = false;
     bool _commentedAsm = false;
     bool _symBoundsCheck = true;
+    bool _enableFCSR = false;
 };
 
 }
