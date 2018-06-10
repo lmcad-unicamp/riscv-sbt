@@ -724,6 +724,23 @@ public:
         return fsub(fadd(a, b), c);
     }
 
+    llvm::Value* fneg(llvm::Value* a)
+    {
+        llvm::Value* v = _builder->CreateFNeg(a);
+        updateFirst(v);
+        return v;
+    }
+
+    llvm::Value* fnmadd(llvm::Value* a, llvm::Value* b, llvm::Value* c)
+    {
+        return fneg(fmadd(a, b, c));
+    }
+
+    llvm::Value* fnmsub(llvm::Value* a, llvm::Value* b, llvm::Value* c)
+    {
+        return fneg(fmsub(a, b, c));
+    }
+
 private:
     void fsgnj_init(
         llvm::Value* v,

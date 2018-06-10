@@ -1330,6 +1330,18 @@ llvm::Error Instruction::translateF()
         case RISCV::FMSUB_D:
             err = translateFFPUOp(F_MSUB, F_DOUBLE);
             break;
+        case RISCV::FNMADD_S:
+            err = translateFFPUOp(F_NMADD, F_SINGLE);
+            break;
+        case RISCV::FNMADD_D:
+            err = translateFFPUOp(F_NMADD, F_DOUBLE);
+            break;
+        case RISCV::FNMSUB_S:
+            err = translateFFPUOp(F_NMSUB, F_SINGLE);
+            break;
+        case RISCV::FNMSUB_D:
+            err = translateFFPUOp(F_NMSUB, F_DOUBLE);
+            break;
 
         // sign injection
         case RISCV::FSGNJ_S:
@@ -1464,6 +1476,70 @@ llvm::Value* Instruction::getFReg(int op, FType ty)
         *_os << ", ";
     return v;
 }
+
+namespace {
+
+class RM
+{
+public:
+    enum Mode {
+        RNE = 0,
+        RTZ = 1,
+        RDN = 2,
+        RUP = 3,
+        RMM = 4,
+        INV1 = 5,
+        INV2 = 6,
+        DYN = 7
+    };
+
+    static const char* name(Mode mode)
+    {
+        switch (mode) {
+            case RNE:   return "RNE";
+            case RTZ:   return "RTZ";
+            case RDN:   return "RDN";
+            case RUP:   return "RUP";
+            case RMM:   return "RMM";
+            case INV1:  return "INV1";
+            case INV2:  return "INV2";
+            case DYN:   return "DYN";
+        }
+    }
+
+    static int getRM(uint32_t inst)
+    {
+        int rm = inst >> 12 & 7;
+        xassert(rm == RNE || rm == DYN && "Unsupported Rounding Mode!");
+        return rm;
+    }
+};
+
+}
+
+
+bool Instruction::hasRM(FPUOp op) const
+{
+    switch (op) {
+        case F_ADD:
+        case F_SUB:
+        case F_MUL:
+        case F_DIV:
+        case F_SQRT:
+            return true;
+
+        case F_MIN:
+        case F_MAX:
+        case F_SGNJ:
+        case F_SGNJN:
+        case F_SGNJX:
+        case F_EQ:
+        case F_LE:
+        case F_LT:
+            return false;
+    }
+}
+
 
 //
 
@@ -1603,8 +1679,10 @@ llvm::Error Instruction::translateFPUOp(FPUOp op, FType ft)
             o2 = getFReg(2, ft);
     }
 
-    llvm::Value* v;
+    if (hasRM(op))
+        RM::getRM(_rawInst);
 
+    llvm::Value* v;
     switch (op) {
         case F_ADD:
             v = _bld->fadd(o1, o2);
@@ -1673,8 +1751,10 @@ llvm::Error Instruction::translateFPUOp(FPUOp op, FType ft)
 llvm::Error Instruction::translateFFPUOp(FFPUOp op, FType ft)
 {
     switch (op) {
-        case F_MADD:    *_os << "fmadd";     break;
-        case F_MSUB:    *_os << "fmsub";     break;
+        case F_MADD:    *_os << "fmadd";    break;
+        case F_MSUB:    *_os << "fmsub";    break;
+        case F_NMADD:   *_os << "fnmadd";   break;
+        case F_NMSUB:   *_os << "fnmsub";   break;
     }
     switch (ft) {
         case F_SINGLE:  *_os << ".s";   break;
@@ -1687,6 +1767,7 @@ llvm::Error Instruction::translateFFPUOp(FFPUOp op, FType ft)
     llvm::Value* o1 = getFReg(1, ft);
     llvm::Value* o2 = getFReg(2, ft);
     llvm::Value* o3 = getFReg(3, ft);
+    RM::getRM(_rawInst);
     llvm::Value* v;
 
     switch (op) {
@@ -1697,12 +1778,19 @@ llvm::Error Instruction::translateFFPUOp(FFPUOp op, FType ft)
         case F_MSUB:
             v = _bld->fmsub(o1, o2, o3);
             break;
+
+        case F_NMADD:
+            v = _bld->fnmadd(o1, o2, o3);
+            break;
+
+        case F_NMSUB:
+            v = _bld->fnmsub(o1, o2, o3);
+            break;
     }
 
     fstore(v, o, ft);
     return llvm::Error::success();
 }
-
 
 
 llvm::Error Instruction::translateCVT(IType it, FType ft)
@@ -1723,6 +1811,7 @@ llvm::Error Instruction::translateCVT(IType it, FType ft)
     llvm::Type* ty =_t->i32;
     unsigned rd = getRD();
     llvm::Value* fr = getFReg(1, ft);
+    RM::getRM(_rawInst);
     llvm::Value* v;
 
     switch (it) {
@@ -1758,6 +1847,7 @@ llvm::Error Instruction::translateCVT(FType ft, IType it)
     llvm::Type* ty = ft == F_SINGLE? _t->fp32 : _t->fp64;
     unsigned rd = getFRD();
     llvm::Value* ir = getReg(1);
+    RM::getRM(_rawInst);
     llvm::Value* v;
 
     switch (it) {
@@ -1792,6 +1882,8 @@ llvm::Error Instruction::translateCVT(FType ft1, FType ft2)
 
     unsigned rd = getFRD();
     llvm::Value* v = getFReg(1, ft2);
+    RM::getRM(_rawInst);
+
     if (ft2 == F_SINGLE)
         v = _bld->fp32ToFP64(v);
     else
@@ -1809,6 +1901,7 @@ llvm::Error Instruction::translateFMV(IType it, FType ft)
 
     unsigned rd = getRD();
     llvm::Value* v = getFReg(1, ft);
+    // no RM
     v = _bld->bitOrPointerCast(v, _t->i32);
     _bld->store(v, rd);
 
@@ -1823,6 +1916,7 @@ llvm::Error Instruction::translateFMV(FType ft, IType it)
 
     unsigned rd = getFRD();
     llvm::Value* v = getReg(1);
+    // no RM
     v = _bld->bitOrPointerCast(v, _t->fp32);
     fstore(v, rd, ft);
 

@@ -144,7 +144,9 @@ private:
 
     enum FFPUOp {
         F_MADD,
-        F_MSUB
+        F_NMADD,
+        F_MSUB,
+        F_NMSUB
     };
 
     enum IType {
@@ -250,6 +252,7 @@ private:
     unsigned getFRD();
     unsigned getFRegNum(unsigned op);
     llvm::Value* getFReg(int op, FType ty);
+    bool hasRM(FPUOp op) const;
 };
 
 }
