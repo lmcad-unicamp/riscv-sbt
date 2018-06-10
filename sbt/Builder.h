@@ -864,9 +864,11 @@ private:
         llvm::Intrinsic::ID id,
         llvm::ArrayRef<llvm::Value*> args)
     {
-        xassert(!args.empty());
-        llvm::Value* a = args[0];
-        llvm::Function* f = getIntrinsic(id, {a->getType()});
+        llvm::Function* f;
+        if (args.empty())
+            f = getIntrinsic(id, {});
+        else
+            f = getIntrinsic(id, {args[0]->getType()});
         llvm::Value* v = call(f, args);
         xassert(_first);
         return v;
