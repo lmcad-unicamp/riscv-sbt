@@ -113,13 +113,13 @@ int main(void)
 /*   for (X = 0.0; X <= 360.0; X += 1.0) */
   for (X = 0.0; X <= 360.0; X += .001) {
     printf("%d %3.0lf degrees = ", 0, X);
-    printf("%d %.12lf radians\n", 0, deg2rad(X));
+    printf("%d %.10lf radians\n", 0, deg2rad(X));
   }
 
   puts("");
 /*   for (X = 0.0; X <= (2 * PI + 1e-6); X += (PI / 180)) */
   for (X = 0.0; X <= (2 * PI + 1e-6); X += (PI / 5760)) {
-    printf("%d %.12lf radians = ", 0, X);
+    printf("%d %.10lf radians = ", 0, X);
     printf("%d %3.0lf degrees\n", 0, rad2deg(X));
   }
   

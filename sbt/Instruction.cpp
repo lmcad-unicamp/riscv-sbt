@@ -1892,6 +1892,7 @@ llvm::Error Instruction::translateFFPUOp(FFPUOp op, FType ft)
     unsigned o = getFRD();
     llvm::Value* o1 = getFReg(1, ft);
     llvm::Value* o2 = getFReg(2, ft);
+    *_os << ", ";
     llvm::Value* o3 = getFReg(3, ft);
     FRM::get(_rawInst);
     llvm::Value* v;

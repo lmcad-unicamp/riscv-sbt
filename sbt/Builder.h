@@ -721,7 +721,7 @@ public:
 
     llvm::Value* fmsub(llvm::Value* a, llvm::Value* b, llvm::Value* c)
     {
-        return fsub(fadd(a, b), c);
+        return fsub(fmul(a, b), c);
     }
 
     llvm::Value* fneg(llvm::Value* a)
@@ -791,7 +791,8 @@ private:
 public:
     llvm::Value* fsgnj(llvm::Value* a, llvm::Value* b)
     {
-#if 0
+// #define OLD_SGNJ
+#ifdef OLD_SGNJ
         llvm::Type *fty, *ity;
         llvm::Constant *sgn, *nsgn;
         fsgnj_init(a, fty, ity, sgn, nsgn);
@@ -812,7 +813,7 @@ public:
 
     llvm::Value* fsgnjn(llvm::Value* a, llvm::Value* b)
     {
-#if 0
+#ifdef OLD_SGNJ
         llvm::Type *fty, *ity;
         llvm::Constant *sgn, *nsgn;
         fsgnj_init(a, fty, ity, sgn, nsgn);
