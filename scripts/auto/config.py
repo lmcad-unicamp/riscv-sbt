@@ -43,6 +43,9 @@ DIR = Dir()
 class Sbt:
     def __init__(self):
         self.flags = "-debug"
+        #self.flags = cat(self.flags,
+        #        "-enable-fcsr",
+        #        "-enable-fcvt-validation")
         self.share_dir = DIR.toolchain + "/share/riscv-sbt"
         self.modes = ["globals", "locals"]
 

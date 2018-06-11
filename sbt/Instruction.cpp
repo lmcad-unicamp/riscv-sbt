@@ -781,6 +781,7 @@ llvm::Error Instruction::translateCSR(CSROp op, bool imm)
 
     unsigned rd = getRegNum(0);
     uint64_t csr = _inst.getOperand(1).getImm();
+    *_os << CSR::name(static_cast<CSR::Num>(csr)) << ", ";
     uint64_t src;
     llvm::Value* srcval;
     if (imm) {
@@ -794,7 +795,6 @@ llvm::Error Instruction::translateCSR(CSROp op, bool imm)
         src = getRegNum(2, false);
         srcval = getReg(2);
     }
-    *_os << CSR::name(static_cast<CSR::Num>(csr));
 
     // init counters
     switch (csr) {

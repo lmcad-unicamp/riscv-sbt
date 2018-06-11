@@ -12,7 +12,7 @@
 **  Bits table
 */
 
-static char bits[256] =
+static char bits3[256] =
 {
       0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,  /* 0   - 15  */
       1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,  /* 16  - 31  */
@@ -42,14 +42,14 @@ static char bits[256] =
 int CDECL ntbl_bitcount(long int x)
 {
       return
-            bits[ (int) (x & 0x0000000FUL)       ] +
-            bits[ (int)((x & 0x000000F0UL) >> 4) ] +
-            bits[ (int)((x & 0x00000F00UL) >> 8) ] +
-            bits[ (int)((x & 0x0000F000UL) >> 12)] +
-            bits[ (int)((x & 0x000F0000UL) >> 16)] +
-            bits[ (int)((x & 0x00F00000UL) >> 20)] +
-            bits[ (int)((x & 0x0F000000UL) >> 24)] +
-            bits[ (int)((x & 0xF0000000UL) >> 28)];
+            bits3[ (int) (x & 0x0000000FUL)       ] +
+            bits3[ (int)((x & 0x000000F0UL) >> 4) ] +
+            bits3[ (int)((x & 0x00000F00UL) >> 8) ] +
+            bits3[ (int)((x & 0x0000F000UL) >> 12)] +
+            bits3[ (int)((x & 0x000F0000UL) >> 16)] +
+            bits3[ (int)((x & 0x00F00000UL) >> 20)] +
+            bits3[ (int)((x & 0x0F000000UL) >> 24)] +
+            bits3[ (int)((x & 0xF0000000UL) >> 28)];
 }
 
 /*
@@ -68,8 +68,8 @@ int CDECL BW_btbl_bitcount(long int x)
  
       U.y = x; 
  
-      return bits[ U.ch[0] ] + bits[ U.ch[1] ] + 
-             bits[ U.ch[3] ] + bits[ U.ch[2] ]; 
+      return bits3[ U.ch[0] ] + bits3[ U.ch[1] ] + 
+             bits3[ U.ch[3] ] + bits3[ U.ch[2] ]; 
 }
 
 /*
@@ -83,10 +83,10 @@ int CDECL AR_btbl_bitcount(long int x)
       unsigned char * Ptr = (unsigned char *) &x ;
       int Accu ;
 
-      Accu  = bits[ *Ptr++ ];
-      Accu += bits[ *Ptr++ ];
-      Accu += bits[ *Ptr++ ];
-      Accu += bits[ *Ptr ];
+      Accu  = bits3[ *Ptr++ ];
+      Accu += bits3[ *Ptr++ ];
+      Accu += bits3[ *Ptr++ ];
+      Accu += bits3[ *Ptr ];
       return Accu;
 }
 

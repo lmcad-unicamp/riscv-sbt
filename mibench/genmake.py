@@ -305,7 +305,8 @@ clean:
                 ["bitcnt_1.c", "bitcnt_2.c", "bitcnt_3.c", "bitcnt_4.c",
                     "bitcnts.c", "bitfiles.c", "bitstrng.c", "bstr_i.c"],
                 self._single_run(["1125000"]),
-                sbtflags=self.stack_large)
+                sbtflags=self.stack_large,
+                dbg="opt")
                 .out_filter("sed 's/Time:[^;]*; //;/^Best/d;/^Worst/d'"),
             self._bench("fft", "telecomm/FFT",
                 ["main.c", "fftmisc.c", "fourierf.c"],
