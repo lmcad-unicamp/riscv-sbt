@@ -11,6 +11,15 @@ namespace sbt {
 
 size_t Caller::MAX_ARGS;
 
+
+llvm::Value* Caller::getFunctionSymbol(
+    Context* ctx,
+    const std::string& name)
+{
+    return ctx->module->getValueSymbolTable().lookup(name);
+}
+
+
 Caller::Caller(
     Context* ctx,
     Builder* bld,
@@ -32,8 +41,7 @@ Caller::Caller(
     llvm::Function* llf = _tgtF->func();
     _llft = llf->getFunctionType();
     // lookup function by symbol
-    llvm::Value* sym =
-        _ctx->module->getValueSymbolTable().lookup(_tgtF->name());
+    llvm::Value* sym = getFunctionSymbol(_ctx, _tgtF->name());
     xassert(sym);
     // get pointer to function
     llvm::PointerType* fty = _llft->getPointerTo();

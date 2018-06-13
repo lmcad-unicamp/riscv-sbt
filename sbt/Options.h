@@ -117,6 +117,12 @@ public:
         return *this;
     }
 
+    // use ICaller for Indirect Internal Functions
+    bool useICallerForIIntFuncs() const
+    {
+        return false;
+    }
+
     void dump() const;
 
 private:

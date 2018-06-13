@@ -29,6 +29,10 @@ public:
         _retInGlobal = b;
     }
 
+    static llvm::Value* getFunctionSymbol(
+        Context* ctx,
+        const std::string& name);
+
     static size_t MAX_ARGS;
 
 private:

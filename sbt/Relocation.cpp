@@ -1,6 +1,7 @@
 #include "Relocation.h"
 
 #include "Builder.h"
+#include "Caller.h"
 #include "Instruction.h"
 #include "Object.h"
 #include "SBTError.h"
@@ -123,6 +124,7 @@ void SBTRelocation::addProxyReloc(ConstRelocationPtr reloc,
         case Relocation::PROXY_CALL:
             hi->setType(Relocation::PROXY_CALL_HI);
             lo->setType(Relocation::PROXY_CALL_LO);
+            lo->setHiPC(hi->offset());
             break;
         default:
             xunreachable("Unknown proxy relocation type");
@@ -234,6 +236,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
     reloc->validate();
 
     llvm::Constant* c = nullptr;
+    llvm::Constant* lastSymC = nullptr;
 
     // external symbol case: handle data or function
     if (isExt) {
@@ -286,16 +289,27 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
                 f->name(), saddr);
             if (os)
                 *os << f->name();
+
+            // If internal functions are always called via icaller,
+            // then return just their original guest address
+            if (_ctx->opts->useICallerForIIntFuncs())
+                c = _ctx->c.i32(saddr);
+            // else return its symbol, that will be properly translated to
+            // the to host symbol later
+            else {
+                llvm::Value* sym = Caller::getFunctionSymbol(_ctx, f->name());
+                xassert(sym && "Internal function symbol not found!");
+                c = llvm::ConstantExpr::getPointerCast(
+                    llvm::cast<llvm::Constant>(sym), _ctx->t.i32);
+                lastSymC = _ctx->c.i32(saddr);
+            }
+
         } else {
             DBGF("internal label: saddr={0:X+8}", saddr);
             if (os)
                 *os << llvm::formatv("{0:X+8}", saddr);
+            c = _ctx->c.i32(saddr);
         }
-
-        // XXX for now, internal functions are always called
-        //     indirectly, via icaller, so return just their
-        //     original guest address
-        c = _ctx->c.i32(saddr);
 
     // other relocations
     // add the relocation offset to ShadowImage to get the final address
@@ -305,6 +319,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
 
         if (reloc->hasSym()) {
             DBGF("symbol reloc: symbol=\"{0}\", addend={1:X+8}, section=\"{2}\"",
+
                 reloc->symName(), reloc->addend(), reloc->secName());
 
             saddr = reloc->symAddr() + reloc->addend();
@@ -329,7 +344,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             _ctx->c.i32(saddr));
     }
 
-    _lastSymVal = c;
+    _lastSymVal = lastSymC? lastSymC : c;
     c = relfn(c);
     DBG(c->dump());
     _last = reloc;

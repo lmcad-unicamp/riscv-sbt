@@ -929,6 +929,9 @@ llvm::Error Instruction::translateBranch(BranchType bt)
 
         Function* func = _ctx->reloc->isCall(_ctx->addr)?
             findFunction(_ctx->reloc->lastSymVal()) : nullptr;
+        DBGF("reloc->isCall()={0}, func={1}",
+            _ctx->reloc->isCall(_ctx->addr), !!func);
+        DBG(_ctx->reloc->lastSymVal()->dump());
 
         // target is known
         // NOTE querying the relocator is needed to disambiguate between
@@ -1119,39 +1122,31 @@ void Instruction::enterFunction(llvm::Value* ext)
         // ext? restore_ret_regs : restore_regs
         BasicBlock *bbRestoreRegs = f->newUBB(_addr, "restore_regs");
         BasicBlock *bbRestoreRetRegs = f->newUBB(_addr, "restore_ret_regs");
-        BasicBlock *bbICallEnd = f->newUBB(_addr, "icall_end");
+        BasicBlock *bbRestoreEnd = f->newUBB(_addr, "restore_end");
         _bld->condBr(ext, bbRestoreRetRegs, bbRestoreRegs);
 
         _bld->setInsertBlock(bbRestoreRegs);
         f->loadRegisters();
-        _bld->br(bbICallEnd);
+        _bld->br(bbRestoreEnd);
 
         _bld->setInsertBlock(bbRestoreRetRegs);
         f->loadRegisters(RET_REGS_ONLY);
-        _bld->br(bbICallEnd);
+        _bld->br(bbRestoreEnd);
 
-        _bld->setInsertBlock(bbICallEnd);
+        _bld->setInsertBlock(bbRestoreEnd);
     }
 }
 
 
-llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
+void Instruction::callICaller(llvm::Value* target)
 {
-    DBGF("NOTE: icall: linkReg={1}", linkReg);
-
     // prepare
     Translator* translator = _ctx->translator;
-    Function* f = _ctx->func;
-    xassert(f);
-    llvm::Function* llf = f->func();
-    xassert(llf);
     const Function& ic = translator->icaller();
     llvm::Function* llic = ic.func();
     xassert(llic);
-
-    // link
-    link(linkReg);
-    llvm::Value* ext = leaveFunction(target);
+    Function* f = _ctx->func;
+    xassert(f);
 
     // set args
     size_t n = llic->arg_size();
@@ -1169,14 +1164,49 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
     for (; i < n; i++)
         args.push_back(_ctx->c.ZERO);
 
-    // dump args
-    // for (auto arg : args)
-    //    arg->dump();
-
     // call
     _bld->call(llic, args);
-    enterFunction(ext);
+}
 
+
+llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
+{
+    DBGF("NOTE: icall: linkReg={1}", linkReg);
+
+    // link
+    link(linkReg);
+    llvm::Value* ext = leaveFunction(target);
+
+    if (_ctx->opts->useICallerForIIntFuncs())
+        callICaller(target);
+    else {
+        if (!ext) {
+            const Function& ie = _ctx->translator->isExternal();
+            llvm::Function* llie = ie.func();
+            xassert(llie);
+            ext = _bld->call(llie, target);
+            ext = _bld->eq(ext, _c->i32(1));
+        }
+        Function* f = _ctx->func;
+        xassert(f);
+        BasicBlock* bbICallExt = f->newUBB(_addr, "icall_ext");
+        BasicBlock* bbICallInt = f->newUBB(_addr, "icall_int");
+        BasicBlock* bbICallEnd = f->newUBB(_addr, "icall_end");
+        _bld->condBr(ext, bbICallExt, bbICallInt);
+
+        _bld->setInsertBlock(bbICallExt);
+        callICaller(target);
+        _bld->br(bbICallEnd);
+
+        _bld->setInsertBlock(bbICallInt);
+        target = _bld->bitOrPointerCast(target, _t->voidFunc->getPointerTo());
+        _bld->call(target);
+        _bld->br(bbICallEnd);
+
+        _bld->setInsertBlock(bbICallEnd);
+    }
+
+    enterFunction(ext);
     return llvm::Error::success();
 }
 

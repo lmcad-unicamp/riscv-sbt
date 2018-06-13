@@ -181,6 +181,7 @@ private:
     // call
     llvm::Error handleCall(uint64_t target, unsigned linkReg);
     // indirect call
+    void callICaller(llvm::Value* target);
     llvm::Error handleICall(llvm::Value* target, unsigned linkReg);
     // jump to offset
     llvm::Error handleJump(uint64_t target,
