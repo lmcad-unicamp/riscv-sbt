@@ -77,6 +77,10 @@ F(_IO_putc)
 F(__ctype_tolower_loc)
 F(__ctype_toupper_loc)
 
+// GNU extensions (used by gcc -O3)
+void sincos(double x, double* sin, double* cos);
+F(sincos)
+
 // soft float
 
 F(sbt__extenddftf2)
