@@ -32,8 +32,15 @@ Module::~Module()
 
 void Module::start()
 {
+    _ctx->sbtmodule = this;
     _shadowImage.reset(new ShadowImage(_ctx, _obj));
     _ctx->shadowImage = _shadowImage.get();
+}
+
+
+void Module::finish()
+{
+    _ctx->sbtmodule = nullptr;
 }
 
 
@@ -47,18 +54,20 @@ llvm::Error Module::translate(const std::string& file)
         return err;
     _obj = &expObj.get();
 
+    for (ConstSectionPtr sec : _obj->sections())
+       _sectionMap[sec->name()] =
+           std::unique_ptr<SBTSection>(new SBTSection(_ctx, sec));
+
     start();
 
     // translate each section
-    for (ConstSectionPtr sec : _obj->sections()) {
-        SBTSection ssec(_ctx, sec);
-        if (auto err = ssec.translate())
+    for (auto& p : _sectionMap) {
+        SBTSection* ssec = p.second.get();
+        if (auto err = ssec->translate())
             return err;
     }
 
-    // finish module
     finish();
-
     return llvm::Error::success();
 }
 

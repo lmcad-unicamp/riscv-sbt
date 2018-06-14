@@ -3,6 +3,7 @@
 #include "Builder.h"
 #include "Constants.h"
 #include "Instruction.h"
+#include "Module.h"
 #include "SBTError.h"
 #include "Section.h"
 #include "Stack.h"
@@ -322,24 +323,38 @@ static int isFunction(ConstSymbolPtrVec symv)
 }
 
 
-bool Function::isFunction(Context* ctx, uint64_t addr)
+bool Function::isFunction(Context* ctx, uint64_t addr, ConstSectionPtr sec)
 {
     if (auto fp = ctx->funcByAddr(addr, !ASSERT_NOT_NULL))
         return true;
 
     // get symbol by offset
-    ConstSymbolPtrVec symv = ctx->sec->section()->lookup(addr);
+    if (!sec)
+        sec = ctx->sec->section();
+    ConstSymbolPtrVec symv = sec->lookup(addr);
     return sbt::isFunction(symv);
 }
 
 
-Function* Function::getByAddr(Context* ctx, uint64_t addr)
+Function* Function::getByAddr(Context* ctx, uint64_t addr, ConstSectionPtr sec)
 {
     if (auto fp = ctx->funcByAddr(addr, !ASSERT_NOT_NULL))
         return fp;
 
+    SBTSection* ssec = ctx->sec;
+    if (!sec) {
+        xassert(ssec);
+        sec = ssec->section();
+        xassert(sec);
+    }
+
+    if (!ssec) {
+        ssec = ctx->sbtmodule->lookupSection(sec->name());
+        xassert(ssec);
+    }
+
     // get symbol by offset
-    ConstSymbolPtrVec symv = ctx->sec->section()->lookup(addr);
+    ConstSymbolPtrVec symv = sec->lookup(addr);
     // XXX lookup by symbol name
     if (symv.empty())
         DBGF("WARNING: symbol not found at {0:X+8}", addr);
@@ -351,12 +366,12 @@ Function* Function::getByAddr(Context* ctx, uint64_t addr)
         name = "f" + llvm::Twine::utohexstr(addr).str();
     else
         name = symv.at(--n)->name();
-    FunctionPtr f(new Function(ctx, name, ctx->sec, addr));
+    FunctionPtr f(new Function(ctx, name, ssec, addr));
     f->create();
     // insert in maps
     ctx->addFunc(std::move(f));
 
-    ctx->sec->updateNextFuncAddr(addr);
+    ssec->updateNextFuncAddr(addr);
 
     return ctx->funcByName(name);
 }

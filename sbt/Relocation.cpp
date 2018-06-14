@@ -384,18 +384,28 @@ llvm::GlobalVariable* SBTRelocation::relocateSection(
             switch (reloc->type()) {
                 case llvm::ELF::R_RISCV_32: {
                     uint64_t addr = reloc->addend();
+                    bool isFunction = false;
                     xassert(reloc->hasSec());
+
+                    auto* llrel =
+                        static_cast<const LLVMRelocation*>(reloc.get());
+
                     if (reloc->hasSym()) {
                         addr += reloc->symAddr();
+
+                        if (llrel->section()->isText() &&
+                            Function::isFunction(_ctx, addr, llrel->section()))
+                                isFunction = true;
+
                         DBGF(
                             "relocating {0:X-8}: "
                             "symbol=\"{1}\", symaddr={2:X+8}, "
                             "section=\"{3}\", addend={4:X+8}, "
-                            "addr={5:X-8}",
+                            "addr={5:X-8}{6}",
                             reloc->offset(),
                             reloc->symName(), reloc->symAddr(),
                             reloc->secName(), reloc->addend(),
-                            addr);
+                            addr, isFunction? " (function)" : "");
                     } else {
                         DBGF(
                             "relocating {0:X-8}: "
@@ -404,11 +414,19 @@ llvm::GlobalVariable* SBTRelocation::relocateSection(
                             reloc->secName(), reloc->addend());
                     }
 
-                    llvm::Constant* cexpr =
-                        llvm::ConstantExpr::getAdd(
+                    llvm::Constant* c;
+                    if (isFunction) {
+                        Function::getByAddr(_ctx, addr, llrel->section());
+                        llvm::Value* sym =
+                            Caller::getFunctionSymbol(_ctx, reloc->symName());
+                        xassert(sym && "Function symbol not found!");
+                        c = llvm::cast<llvm::Constant>(sym);
+                        c = llvm::ConstantExpr::getPointerCast(c, _ctx->t.i32);
+                    } else
+                        c = llvm::ConstantExpr::getAdd(
                             shadowImage->getSection(reloc->secName()),
-                            _ctx->c.u32(addr));
-                    cvec.push_back(cexpr);
+                                _ctx->c.u32(addr));
+                    cvec.push_back(c);
                     break;
                 }
 

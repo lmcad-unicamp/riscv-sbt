@@ -7,6 +7,10 @@
 
 #include <llvm/IR/ValueSymbolTable.h>
 
+#undef ENABLE_DBGS
+#define ENABLE_DBGS 1
+#include "Debug.h"
+
 namespace sbt {
 
 size_t Caller::MAX_ARGS;

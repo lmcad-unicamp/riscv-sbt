@@ -265,9 +265,15 @@ public:
     void copyArgv();
 
     // look up function by address
-    static Function* getByAddr(Context* ctx, uint64_t addr);
+    static Function* getByAddr(
+        Context* ctx,
+        uint64_t addr,
+        ConstSectionPtr sec = nullptr);
 
-    static bool isFunction(Context* ctx, uint64_t addr);
+    static bool isFunction(
+        Context* ctx,
+        uint64_t addr,
+        ConstSectionPtr sec = nullptr);
 
 private:
     Context* _ctx;

@@ -18,6 +18,7 @@ class Disassembler;
 class FRegister;
 class FRegisters;
 class Function;
+class Module;
 class Register;
 class SBTRelocation;
 class SBTSection;
@@ -36,114 +37,115 @@ class XRegisters;
 class Context
 {
 public:
-  using FunctionPtr = Pointer<Function>;
+    using FunctionPtr = Pointer<Function>;
 
-  /**
-   * Build context.
-   *
-   * @param ctx LLVM context
-   * @param mod LLVM module
-   * @param bld LLVM IR builder
-   */
-  Context(
-    llvm::LLVMContext* ctx,
-    llvm::Module* mod,
-    llvm::IRBuilder<>* bld)
-    :
-    ctx(ctx),
-    module(mod),
-    builder(bld),
-    t(*ctx)
-  {
-    c.init(ctx);
-  }
+    /**
+     * Build context.
+     *
+     * @param ctx LLVM context
+     * @param mod LLVM module
+     * @param bld LLVM IR builder
+     */
+    Context(
+        llvm::LLVMContext* ctx,
+        llvm::Module* mod,
+        llvm::IRBuilder<>* bld)
+        :
+        ctx(ctx),
+        module(mod),
+        builder(bld),
+        t(*ctx)
+    {
+        c.init(ctx);
+    }
 
-  /**
-   * Destructor.
-   *
-   * (out of line to allow forward declaration of most members)
-   */
-  ~Context();
+    /**
+     * Destructor.
+     *
+     * (out of line to allow forward declaration of most members)
+     */
+    ~Context();
 
-  // program scope stuff
+    // program scope stuff
 
-  // llvm
-  llvm::LLVMContext* ctx;
-  llvm::Module* module;
-  llvm::IRBuilder<>* builder;
-  // translator
-  Translator* translator = nullptr;
-  const Options* opts = nullptr;
-  // disassembler
-  Disassembler* disasm = nullptr;
-  // constants
-  Constants c;
-  // types
-  Types t;
-  // registers
-  XRegisters* x = nullptr;
-  FRegisters* f = nullptr;
-  Register* fcsr = nullptr;
-  // stack
-  Stack* stack = nullptr;
-  // flags
-  // inside C main function?
-  bool inMain = false;
-  // function maps
-  Map<std::string, FunctionPtr>* _func = nullptr;
-  Map<uint64_t, Function*>* _funcByAddr = nullptr;
-  //
-  const AddressToSource* a2s = nullptr;
+    // llvm
+    llvm::LLVMContext* ctx;
+    llvm::Module* module;
+    llvm::IRBuilder<>* builder;
+    // translator
+    Translator* translator = nullptr;
+    const Options* opts = nullptr;
+    // disassembler
+    Disassembler* disasm = nullptr;
+    // constants
+    Constants c;
+    // types
+    Types t;
+    // registers
+    XRegisters* x = nullptr;
+    FRegisters* f = nullptr;
+    Register* fcsr = nullptr;
+    // stack
+    Stack* stack = nullptr;
+    // flags
+    // inside C main function?
+    bool inMain = false;
+    // function maps
+    Map<std::string, FunctionPtr>* _func = nullptr;
+    Map<uint64_t, Function*>* _funcByAddr = nullptr;
+    //
+    const AddressToSource* a2s = nullptr;
 
-  // get function by name
-  Function* funcByName(const std::string& name, bool assertNotNull = true) const
-  {
-    FunctionPtr* f = (*_func)[name];
-    if (assertNotNull)
-      xassert(f);
-    else if (!f)
-      return nullptr;
-    return &**f;
-  }
+    // get function by name
+    Function* funcByName(const std::string& name, bool assertNotNull = true) const
+    {
+        FunctionPtr* f = (*_func)[name];
+        if (assertNotNull)
+            xassert(f);
+        else if (!f)
+            return nullptr;
+        return &**f;
+    }
 
-  // get function by guest address
-  Function* funcByAddr(uint64_t addr, bool assertNotNull = true) const
-  {
-    Function** f = (*_funcByAddr)[addr];
-    if (assertNotNull)
-      xassert(f);
-    else if (!f)
-      return nullptr;
-    return *f;
-  }
+    // get function by guest address
+    Function* funcByAddr(uint64_t addr, bool assertNotNull = true) const
+    {
+        Function** f = (*_funcByAddr)[addr];
+        if (assertNotNull)
+            xassert(f);
+        else if (!f)
+            return nullptr;
+        return *f;
+    }
 
-  // add function to maps
-  void addFunc(FunctionPtr&& f);
+    // add function to maps
+    void addFunc(FunctionPtr&& f);
 
-  // module scope
-  // (module == object file)
+    // module scope
+    // (module == object file)
+    const Module* sbtmodule = nullptr;
 
-  // object
-  // ConstObjectPtr obj = nullptr;
-  // shadow image
-  ShadowImage* shadowImage = nullptr;
+    // object
+    // ConstObjectPtr obj = nullptr;
+    // shadow image
+    ShadowImage* shadowImage = nullptr;
 
-  // section scope
-  // (e.g.: .text)
+    // section scope
+    // (e.g.: .text)
 
-  // section
-  SBTSection* sec = nullptr;
-  // relocator
-  SBTRelocation* reloc = nullptr;
-  // builder
-  Builder* bld = nullptr;
-  // function
-  Function* func = nullptr;
+    // section
+    SBTSection* sec = nullptr;
+    // relocator
+    SBTRelocation* reloc = nullptr;
+    // builder
+    Builder* bld = nullptr;
+    // function
+    Function* func = nullptr;
 
-  // function scope
+    // function scope
 
-  // current address
-  uint64_t addr = 0;
+    // current address
+    uint64_t addr = 0;
 };
 
 }

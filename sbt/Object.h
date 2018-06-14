@@ -442,12 +442,12 @@ public:
     void validate() const override;
 
     ConstSymbolPtr symbol() const override;
+    ConstSectionPtr section() const;
 
 private:
     ConstObjectPtr _obj;
     llvm::object::RelocationRef _reloc;
 
-    ConstSectionPtr section() const;
 };
 
 
