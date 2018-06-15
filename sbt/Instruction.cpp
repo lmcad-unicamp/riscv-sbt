@@ -1587,9 +1587,28 @@ public:
 
     static int get(uint32_t inst)
     {
-        int rm = inst >> 12 & 7;
+        return inst >> 12 & 7;
+    }
+
+    static void checkRM(uint32_t inst)
+    {
+        int rm = get(inst);
         xassert(rm == RNE || rm == DYN && "Unsupported Rounding Mode!");
-        return rm;
+    }
+
+    static bool isValid(int rm)
+    {
+        switch (rm) {
+            case RNE:
+            case RTZ:
+            case RDN:
+            case RUP:
+            case RMM:
+            case DYN:
+                return true;
+            default:
+                return false;
+        }
     }
 };
 
@@ -1796,7 +1815,7 @@ llvm::Error Instruction::translateFPUOp(FPUOp op, FType ft)
     }
 
     if (hasRM(op))
-        FRM::get(_rawInst);
+        FRM::checkRM(_rawInst);
 
     // optimize fsgnj opts
     FPUOpAlias opa = FA_NONE;
@@ -1924,7 +1943,7 @@ llvm::Error Instruction::translateFFPUOp(FFPUOp op, FType ft)
     llvm::Value* o2 = getFReg(2, ft);
     *_os << ", ";
     llvm::Value* o3 = getFReg(3, ft);
-    FRM::get(_rawInst);
+    FRM::checkRM(_rawInst);
     llvm::Value* v;
 
     switch (op) {
@@ -2053,7 +2072,8 @@ llvm::Error Instruction::translateCVT(IType it, FType ft)
     llvm::Type* ty =_t->i32;
     unsigned rd = getRD();
     llvm::Value* fr = getFReg(1, ft);
-    FRM::get(_rawInst);
+    int rm = FRM::get(_rawInst);
+    xassert(rm == FRM::RTZ || rm == FRM::DYN && "Unsupported Rounding Mode!");
     llvm::Value* v;
 
     BasicBlock* bbEnd = validateRangeBegin(fr, rd, ft, it);
@@ -2089,7 +2109,8 @@ llvm::Error Instruction::translateCVT(FType ft, IType it)
     llvm::Type* ty = ft == F_SINGLE? _t->fp32 : _t->fp64;
     unsigned rd = getFRD();
     llvm::Value* ir = getReg(1);
-    FRM::get(_rawInst);
+    int rm = FRM::get(_rawInst);
+    xassert(FRM::isValid(rm));
     llvm::Value* v;
 
     switch (it) {
@@ -2124,7 +2145,7 @@ llvm::Error Instruction::translateCVT(FType ft1, FType ft2)
 
     unsigned rd = getFRD();
     llvm::Value* v = getFReg(1, ft2);
-    FRM::get(_rawInst);
+    FRM::checkRM(_rawInst);
 
     if (ft2 == F_SINGLE)
         v = _bld->fp32ToFP64(v);
