@@ -81,7 +81,7 @@ TOOLS = Tools()
 class Arch:
     def __init__(self, name, prefix, triple, run, march, gcc_flags,
             clang_flags, sysroot, isysroot, llc_flags, as_flags,
-            ld_flags, mattr):
+            ld_flags, mattr, gcc_oflags=None):
 
         self.name = name
         self.prefix = prefix
@@ -93,7 +93,7 @@ class Arch:
         self.gcc_flags = lambda dbg, opt: \
             "{}{} {} {}".format(
                 ("-g " if dbg else ""),
-                (_O if opt else "-O0"),
+                (cat(_O, gcc_oflags) if opt else "-O0"),
                 CFLAGS,
                 gcc_flags)
         # clang
@@ -199,6 +199,7 @@ X86 = Arch(
         run="",
         march=X86_MARCH,
         gcc_flags="-m32",
+        gcc_oflags="-mfpmath=sse -m" + X86_MATTR,
         clang_flags=cat(CLANG_CFLAGS,
             "--target=x86_64-unknown-linux-gnu -m32"),
         sysroot=X86_SYSROOT,

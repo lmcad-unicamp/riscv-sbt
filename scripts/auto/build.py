@@ -37,6 +37,8 @@ class BuildOpts:
         else:
             opts._as = "mc"
         opts.cflags = args.cflags
+        opts.gccflags = args.gccflags
+        opts.oflags = args.oflags
         opts.sflags = args.sflags
         opts.ldflags = cat(*[SBT.nat_obj(opts.arch, o, opts.clink)
             for o in args.sbtobjs])
@@ -67,6 +69,8 @@ class BuildOpts:
         parser.add_argument("--as", dest="_as",
             choices=["as", "mc"], help="assembler to use")
         parser.add_argument("--cflags", help="compiler flags")
+        parser.add_argument("--gccflags", help="gcc compiler flags")
+        parser.add_argument("--oflags", help="opt flags")
         parser.add_argument("--sflags", help="assembler flags")
         parser.add_argument("--ldflags", help="linker flags")
         parser.add_argument("--sbtflags", nargs="+", metavar="flag",
@@ -119,10 +123,11 @@ class LLVMBuilder:
 
     def opt(self, dir, _in, out, printf_break):
         """ opt """
+        opts = self.opts
         ipath = path(dir, _in)
         opath = path(dir, out)
 
-        flags = TOOLS.opt_flags(self.opts.opt)
+        flags = cat(TOOLS.opt_flags(opts.opt), opts.oflags)
         if printf_break:
             flags = cat(flags,
                 "-load", "libPrintfBreak.so", "-printf-break")
@@ -206,7 +211,8 @@ class GCCBuilder:
         u = chsuf(out, ".c")
         self._c2u(srcdir, dstdir, ins, u)
 
-        cmd = cat(arch.gcc, arch.gcc_flags(opts.dbg, opts.opt), opts.cflags,
+        cmd = cat(arch.gcc, arch.gcc_flags(opts.dbg, opts.opt),
+                opts.cflags, opts.gccflags,
                 path(dstdir, u), "-S", "-o", path(dstdir, out))
         shell(cmd)
 

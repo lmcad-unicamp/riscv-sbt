@@ -312,7 +312,8 @@ clean:
                 Runs([
                     Run(["8", "32768"], "std"),
                     Run(["8", "32768", "-i"], "inv") ]),
-                sbtflags=self.stack_large),
+                sbtflags=self.stack_large,
+                bflags="--gccflags=-ffp-contract=off --oflags=-fp-contract=off"),
             self._bench("patricia", "network/patricia",
                 ["patricia.c", "patricia_test.c"],
                 self._single_run(
