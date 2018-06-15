@@ -2215,8 +2215,10 @@ void Instruction::dbgprint()
     llvm::MDNode* n = llvm::MDNode::get(*_ctx->ctx,
         llvm::MDString::get(*_ctx->ctx, "RISC-V Instruction"));
     std::string mdname = getMDName(dbgstr);
-    // DBGF("mdname={0}, n={1:X+8}, first={2:X+8}", mdname, n, _bld->first());
+    //DBGF("dbgstr={0}, mdname={1}, n={2:X+8}, first={3:X+8}",
+    //        dbgstr, mdname, n, _bld->first());
     xassert(_bld->first());
+    // DBG(_bld->first()->dump());
     _bld->first()->setMetadata(mdname, n);
 
     // don't add inline asm comments on terminated functions/BBs

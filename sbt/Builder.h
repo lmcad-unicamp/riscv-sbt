@@ -22,6 +22,7 @@ class Builder
     llvm::Instruction* _first = nullptr;
     BasicBlock* _bb = nullptr;
     BasicBlock* _savedBB = nullptr;
+    bool _updateFirst = true;
 
 public:
     /**
@@ -54,6 +55,11 @@ public:
     void reset()
     {
         _first = nullptr;
+    }
+
+    void setUpdateFirst(bool b)
+    {
+        _updateFirst = b;
     }
 
     // load
@@ -878,7 +884,7 @@ private:
     // update first instruction pointer
     void updateFirst(llvm::Value* v)
     {
-        if (!_first)
+        if (!_first && _updateFirst)
             _first = llvm::dyn_cast<llvm::Instruction>(v);
     }
 };

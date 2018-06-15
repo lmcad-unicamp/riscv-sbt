@@ -95,9 +95,11 @@ BasicBlockPtr BasicBlock::split(uint64_t addr)
             empty.push_back(it);
 
             bld->saveInsertBlock();
+            bld->setUpdateFirst(false);
             BasicBlock tmpBB(_ctx, *it, 0, {});
             bld->setInsertBlock(&tmpBB);
             bld->retVoid();
+            bld->setUpdateFirst(true);
             bld->restoreInsertBlock();
         }
     }
