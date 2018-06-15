@@ -30,6 +30,12 @@ RUN dpkg --add-architecture i386 \
     python3-numpy \
     && rm -rf /var/lib/apt/lists/*
 
+RUN sed -i "1s/main/& contrib non-free/" /etc/apt/sources.list \
+    && apt-get update \
+    && apt-get install -y \
+    gcc-doc \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN echo "alias ls='ls --color'" >> /root/.bashrc \
     && echo "echo 0 > /proc/sys/kernel/kptr_restrict" >> /root/.bashrc \
     && echo "source scripts/env.sh" >> /root/.bashrc
