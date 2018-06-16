@@ -287,12 +287,6 @@ class Builder:
         # generated object file, that would otherwise be fixed only later,
         # at link stage, after it's done with relaxing.
         else:
-            # XXX temporary workaround for x86 debugging
-            #     (upstream llvm-mc is not generating debug info)
-            #if opts.dbg and out.find('x86-') >= 0:
-            #    mc = "/usr/bin/llvm-mc-3.9"
-            #else:
-            #    mc = TOOLS.mc
             mc = TOOLS.mc
 
             # preserve rv32/x86 source code for debug, by not mixing in
@@ -311,14 +305,19 @@ class Builder:
                 "-assemble", "-filetype=obj",
                 ipath, "-o", opath)
             shell(cmd)
-            # temporary workaround: set double-float ABI flag in ELF object file
-            #shell(R"printf '\x04\x00\x00\x00' | " +
-            #    "dd of=" + opath + " bs=1 seek=$((0x24)) count=4 conv=notrunc" +
-            #    " >/dev/null 2>&1")
-
+            self.set_abi_hf(opath, opath)
 
         if opts.cc == "gcc" and arch == RV32_LINUX:
             self.bldr.merge_text(dstdir, out)
+
+
+    def set_abi_hf(self, ipath, opath):
+        # temporary workaround: set double-float ABI flag in ELF object file
+        if ipath != opath:
+            shell("cp {} {}".format(ipath, opath))
+        shell(R"printf '\x04\x00\x00\x00' | " +
+            "dd of=" + opath + " bs=1 seek=$((0x24)) count=4 conv=notrunc" +
+            " >/dev/null 2>&1")
 
 
     def _link(self, srcdir, dstdir, ins, out):
@@ -443,14 +442,18 @@ if __name__ == "__main__":
     # get args
     parser = argparse.ArgumentParser(description="build program")
     parser.add_argument("--addr2src", action='store_true')
+    parser.add_argument("--set-abi-hf", action='store_true')
     BuildOpts.add_to_parser(parser)
     args = parser.parse_args()
 
-    bld = Builder(BuildOpts.parse(args))
+    opts = BuildOpts.parse(args)
+    bld = Builder(opts)
 
     # addr2src
     if args.addr2src:
         bld.addr2src(args.ins[0], args.o)
+    elif args.set_abi_hf:
+        bld.set_abi_hf(opts.first, args.o)
     # build
     else:
         bld.build()

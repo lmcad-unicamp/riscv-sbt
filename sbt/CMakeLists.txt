@@ -3,7 +3,10 @@ project(riscv-sbt)
 
 # get build options from llvm-config
 
-set(LLVM_CONFIG "$ENV{TOPDIR}/scripts/llvm-config.sh")
+set(SCRIPTS_DIR "$ENV{TOPDIR}/scripts")
+set(LLVM_CONFIG "${SCRIPTS_DIR}/llvm-config.sh")
+set(AUTO_DIR "${SCRIPTS_DIR}/auto")
+set(BUILD_PY "${AUTO_DIR}/build.py")
 
 # include dirs
 execute_process(
@@ -130,12 +133,19 @@ add_custom_command(OUTPUT libc.bc COMMAND
 add_custom_target(libc DEPENDS libc.bc)
 
 # rv32-runtime
+
+# ilp32
 add_custom_command(OUTPUT rv32-runtime.o COMMAND
     clang --target=riscv32 -c -O0
         -isysroot / -isystem /usr/include
         ${RUNTIME_C} -o rv32-runtime.o
         MAIN_DEPENDENCY ${RUNTIME_C})
-add_custom_target(rv32-runtime DEPENDS rv32-runtime.o)
+
+# ilp32d
+add_custom_command(OUTPUT rv32-runtime-hf.o COMMAND
+    ${BUILD_PY} --set-abi-hf rv32-runtime.o -o rv32-runtime-hf.o
+        MAIN_DEPENDENCY rv32-runtime.o)
+add_custom_target(rv32-runtime DEPENDS rv32-runtime.o rv32-runtime-hf.o)
 
 # x86-runtime
 add_custom_command(OUTPUT x86-runtime.o COMMAND
@@ -160,6 +170,7 @@ install(FILES ${CMAKE_BINARY_DIR}/CMakeFiles/x86-counters.dir/x86-counters.s.o
     RENAME x86-counters.o DESTINATION share/riscv-sbt)
 # runtime
 install(FILES ${CMAKE_BINARY_DIR}/rv32-runtime.o DESTINATION share/riscv-sbt)
+install(FILES ${CMAKE_BINARY_DIR}/rv32-runtime-hf.o DESTINATION share/riscv-sbt)
 install(FILES ${CMAKE_BINARY_DIR}/x86-runtime.o  DESTINATION share/riscv-sbt)
 # PrintfBreak
 install(TARGETS PrintfBreak DESTINATION lib

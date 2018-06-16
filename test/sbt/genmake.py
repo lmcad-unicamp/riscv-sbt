@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from auto.config import DIR, RV32_LINUX, SBT, TOOLS, X86
+from auto.config import DIR, GOPTS, RV32_LINUX, SBT, TOOLS, X86
 from auto.genmake import ArchAndMode, GenMake, Run, Runs
 from auto.utils import cat, path
 
@@ -81,7 +81,7 @@ class Tests():
         self.srcdir = path(DIR.top, "test/sbt")
         self.dstdir = path(DIR.build, "test/sbt")
         self.sbtdir = path(DIR.top, "sbt")
-        self.bflags = "--cc=gcc"
+        self.bflags = "--cc=" + GOPTS.cc
         self.txt = ''
 
 

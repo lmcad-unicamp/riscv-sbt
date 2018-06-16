@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from auto.config import DIR, RV32_LINUX, SBT, TOOLS, X86
+from auto.config import DIR, GOPTS, RV32_LINUX, SBT, TOOLS, X86
 from auto.genmake import ArchAndMode, GenMake, Run, Runs
 from auto.utils import cat, mpath, path, xassert
 
@@ -166,7 +166,7 @@ class MiBench:
         self.dstdir = path(DIR.build, "mibench")
         self.stack_large = ["-stack-size=131072"]    # 128K
         self.stack_huge = ["-stack-size=1048576"]    # 1M
-        self.bflags = "--cc=gcc"
+        self.bflags = "--cc=" + GOPTS.cc
         self.txt = ''
         self.benchs = None
 

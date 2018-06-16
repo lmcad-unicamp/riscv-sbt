@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
 
-from auto.utils import *
+from auto.utils import cat, chsuf, path
 
 import os
 
 ### config ###
+
+class GlobalOpts:
+    def __init__(self):
+        self.abi = "ilp32d"
+        self.cc = "gcc"
+
+
+GOPTS = GlobalOpts()
 
 # flags
 CFLAGS          = "-fno-exceptions"
@@ -50,11 +58,18 @@ class Sbt:
         self.modes = ["globals", "locals"]
 
     def nat_obj(self, arch, name, clink):
-        if arch == RV32 or arch == RV32_LINUX and name != "runtime":
+        is_rv32 = arch == RV32 or arch == RV32_LINUX
+        is_runtime = name == "runtime"
+
+        if is_rv32 and not is_runtime:
             return ""
-        if name == "runtime" and not clink:
+        if is_runtime and not clink:
             return ""
-        return "{}/{}-{}.o".format(self.share_dir, arch.prefix, name)
+        if is_rv32 and is_runtime and GOPTS.abi == "ilp32d":
+            suffix = "-hf"
+        else:
+            suffix = ""
+        return "{}/{}-{}{}.o".format(self.share_dir, arch.prefix, name, suffix)
 
 
 SBT = Sbt()
@@ -162,7 +177,7 @@ RV32 = Arch(
 
 
 RV32_LINUX_SYSROOT  = DIR.toolchain_release + "/opt/riscv/sysroot"
-RV32_LINUX_ABI      = "ilp32"
+RV32_LINUX_ABI          = GOPTS.abi
 RV32_LINUX_GCC_FLAGS    = "-march=rv32g -mabi=" + RV32_LINUX_ABI
 RV32_LINUX_AS_FLAGS     = "-march=rv32g -mabi=" + RV32_LINUX_ABI
 RV32_LINUX_LD_FLAGS     = "-m elf32lriscv"
