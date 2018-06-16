@@ -260,6 +260,7 @@ public:
     // sync local register file
     void loadRegisters(bool retRegsOnly = false);
     void storeRegisters();
+    void freturn();
 
     // setup argc/argv
     void copyArgv();

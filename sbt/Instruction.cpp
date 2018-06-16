@@ -900,10 +900,8 @@ llvm::Error Instruction::translateBranch(BranchType bt)
     {
         if (_ctx->inMain)
             v = _bld->ret(_bld->load(XRegister::A0));
-        else {
-            _ctx->func->storeRegisters();
-            v = _bld->retVoid();
-        }
+        else
+            _ctx->func->freturn();
         return llvm::Error::success();
     }
 
@@ -1072,7 +1070,7 @@ llvm::Error Instruction::handleCall(uint64_t target, unsigned linkReg)
         _ctx->func->loadRegisters();
     if (isTailCall) {
         xassert(!_ctx->inMain);
-        _bld->retVoid();
+        _ctx->func->freturn();
     }
 
     return llvm::Error::success();

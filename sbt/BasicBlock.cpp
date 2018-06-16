@@ -109,7 +109,9 @@ BasicBlockPtr BasicBlock::split(uint64_t addr)
     if (!term) {
         bld->saveInsertBlock();
         bld->setInsertBlock(this);
+        bld->setUpdateFirst(false);
         instr = bld->retVoid();
+        bld->setUpdateFirst(true);
         bld->restoreInsertBlock();
     }
 

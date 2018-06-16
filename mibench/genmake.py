@@ -255,7 +255,8 @@ clean:
 
         return self._bench("susan", dir,
                 ["susan.c"], runs,
-                sbtflags=self.stack_huge)
+                sbtflags=self.stack_huge,
+                dbg="opt")
 
 
     def _single_run(self, args, stdin=None, rflags=None):

@@ -146,10 +146,8 @@ llvm::Error Function::finish()
         // In this case, the next instruction will be unreachable.
         if (_ctx->inMain)
             bld->unreachable();
-        else {
-            storeRegisters();
-            bld->retVoid();
-        }
+        else
+            freturn();
     }
     _ctx->inMain = false;
     cleanRegs();
@@ -489,6 +487,13 @@ void Function::storeRegisters()
         llvm::Value* v = bld->load(local.get());
         bld->store(v, global.getForWrite());
     }
+}
+
+
+void Function::freturn()
+{
+    storeRegisters();
+    _ctx->bld->retVoid();
 }
 
 
