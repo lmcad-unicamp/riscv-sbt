@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from auto.config import ARCH, RV32, RV32_LINUX, SBT, TOOLS, emit_llvm
+from auto.config import ARCH, RV32, RV32_LINUX, SBT, TOOLS, X86, emit_llvm
 from auto.utils import cat, cd, chsuf, path, shell
 
 import argparse
@@ -38,7 +38,13 @@ class BuildOpts:
             opts._as = "mc"
         opts.cflags = args.cflags
         opts.gccflags = args.gccflags
+        opts.arch_gccflags = {}
+        if args.gccflags_x86:
+            opts.arch_gccflags[X86.prefix] = args.gccflags_x86
         opts.oflags = args.oflags
+        opts.llcflags = {}
+        if args.llcflags_x86:
+            opts.llcflags[X86.prefix] = args.llcflags_x86
         opts.sflags = args.sflags
         opts.ldflags = cat(*[SBT.nat_obj(opts.arch, o, opts.clink)
             for o in args.sbtobjs])
@@ -70,7 +76,9 @@ class BuildOpts:
             choices=["as", "mc"], help="assembler to use")
         parser.add_argument("--cflags", help="compiler flags")
         parser.add_argument("--gccflags", help="gcc compiler flags")
+        parser.add_argument("--gccflags-x86", help="gcc compiler flags for x86")
         parser.add_argument("--oflags", help="opt flags")
+        parser.add_argument("--llcflags-x86", help="llc flags for x86")
         parser.add_argument("--sflags", help="assembler flags")
         parser.add_argument("--ldflags", help="linker flags")
         parser.add_argument("--sbtflags", nargs="+", metavar="flag",
@@ -159,7 +167,12 @@ class LLVMBuilder:
         arch = opts.arch
         ipath = path(dir, _in)
         opath = path(dir, out)
-        flags = arch.llc_flags(opts.opt)
+        flags = arch.llcflags_prefix
+        flags = cat(flags, "-O3" if opts.opt else "-O0")
+        if arch.prefix in opts.llcflags.keys():
+            flags = cat(flags, opts.llcflags[arch.prefix])
+        else:
+            flags = cat(flags, arch.llcflags)
 
         cmd = cat(arch.llc, flags, ipath, "-o", opath)
         shell(cmd)
@@ -211,8 +224,20 @@ class GCCBuilder:
         u = chsuf(out, ".c")
         self._c2u(srcdir, dstdir, ins, u)
 
-        cmd = cat(arch.gcc, arch.gcc_flags(opts.dbg, opts.opt),
-                opts.cflags, opts.gccflags,
+        flags = arch.gccflags
+        if opts.dbg:
+            flags = cat(flags, "-g")
+        if opts.opt:
+            flags = cat(flags, "-O3")
+        else:
+            flags = cat(flags, "-O0")
+        flags = cat(flags, opts.cflags, opts.gccflags)
+        if arch.prefix in opts.arch_gccflags.keys():
+            flags = cat(flags, opts.arch_gccflags[arch.prefix])
+        else:
+            flags = cat(flags, arch.gccoflags)
+
+        cmd = cat(arch.gcc, flags,
                 path(dstdir, u), "-S", "-o", path(dstdir, out))
         shell(cmd)
 
@@ -303,7 +328,13 @@ class Builder:
         arch = opts.arch
         if opts.clink:
             tool = arch.gcc
-            flags = arch.gcc_flags(opts.dbg, opts.opt)
+            flags = arch.gccflags
+            if opts.dbg:
+                flags = cat(flags, "-g")
+            if opts.opt:
+                flags = cat(flags, "-O3")
+            else:
+                flags = cat(flags, "-O0")
         else:
             tool = arch.ld
             flags = arch.ld_flags

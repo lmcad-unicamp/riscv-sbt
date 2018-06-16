@@ -79,9 +79,9 @@ TOOLS = Tools()
 
 
 class Arch:
-    def __init__(self, name, prefix, triple, run, march, gcc_flags,
-            clang_flags, sysroot, isysroot, llc_flags, as_flags,
-            ld_flags, mattr, gcc_oflags=None):
+    def __init__(self, name, prefix, triple, run, march, gccflags,
+            clang_flags, sysroot, isysroot, llcflags, as_flags,
+            ld_flags, mattr, gccoflags=None):
 
         self.name = name
         self.prefix = prefix
@@ -90,12 +90,9 @@ class Arch:
         self.march = march
         # gcc
         self.gcc = triple + "-gcc"
-        self.gcc_flags = lambda dbg, opt: \
-            "{}{} {} {}".format(
-                ("-g " if dbg else ""),
-                (cat(_O, gcc_oflags) if opt else "-O0"),
-                CFLAGS,
-                gcc_flags)
+        self.gccflags = cat(CFLAGS, gccflags)
+        self.gccoflags = gccoflags
+
         # clang
         self.clang = "clang"
         self.clang_flags = "{} {}".format(CFLAGS, clang_flags)
@@ -105,10 +102,9 @@ class Arch:
             sysroot, isysroot)
         # llc
         self.llc = "llc"
-        self.llc_flags = lambda opt: \
-            cat("-relocation-model=static",
-                (_O if opt else "-O0"),
-                llc_flags)
+        self.llcflags_prefix = "-relocation-model=static"
+        self.llcflags = llcflags
+
         # as
         self._as = triple + "-as"
         self.as_flags = as_flags
@@ -155,11 +151,11 @@ RV32 = Arch(
         run="LD_LIBRARY_PATH={}/lib spike {}".format(
             DIR.toolchain_release, PK32),
         march=RV32_MARCH,
-        gcc_flags="",
+        gccflags="",
         clang_flags=cat(CLANG_CFLAGS, "--target=riscv32"),
         sysroot=RV32_SYSROOT,
         isysroot=RV32_SYSROOT + "/include",
-        llc_flags=RV32_LLC_FLAGS,
+        llcflags=RV32_LLC_FLAGS,
         as_flags="",
         ld_flags="",
         mattr=RV32_MATTR)
@@ -177,11 +173,11 @@ RV32_LINUX = Arch(
         triple="riscv64-unknown-linux-gnu",
         run="qemu-riscv32 -L " + RV32_LINUX_SYSROOT,
         march=RV32_MARCH,
-        gcc_flags=RV32_LINUX_GCC_FLAGS,
+        gccflags=RV32_LINUX_GCC_FLAGS,
         clang_flags=cat(CLANG_CFLAGS, "--target=riscv32 -D__riscv_xlen=32"),
         sysroot=RV32_LINUX_SYSROOT,
         isysroot=RV32_LINUX_SYSROOT + "/usr/include",
-        llc_flags=RV32_LLC_FLAGS,
+        llcflags=RV32_LLC_FLAGS,
         as_flags=RV32_LINUX_AS_FLAGS,
         ld_flags=RV32_LINUX_LD_FLAGS,
         mattr=RV32_MATTR)
@@ -198,13 +194,13 @@ X86 = Arch(
         triple="x86_64-linux-gnu",
         run="",
         march=X86_MARCH,
-        gcc_flags="-m32",
-        gcc_oflags="-mfpmath=sse -m" + X86_MATTR,
+        gccflags="-m32",
+        gccoflags="-mfpmath=sse -m" + X86_MATTR,
         clang_flags=cat(CLANG_CFLAGS,
             "--target=x86_64-unknown-linux-gnu -m32"),
         sysroot=X86_SYSROOT,
         isysroot=X86_ISYSROOT,
-        llc_flags=cat("-march=" + X86_MARCH, "-mattr=" + X86_MATTR),
+        llcflags=cat("-march=" + X86_MARCH, "-mattr=" + X86_MATTR),
         as_flags="--32",
         ld_flags="-m elf_i386",
         mattr=X86_MATTR)
@@ -216,11 +212,11 @@ RV32_FOR_X86 = Arch(
         triple=RV32_LINUX.triple,
         run="",
         march=RV32_MARCH,
-        gcc_flags=RV32_LINUX_GCC_FLAGS,
+        gccflags=RV32_LINUX_GCC_FLAGS,
         clang_flags=cat(CLANG_CFLAGS, "--target=riscv32"),
         sysroot=X86_SYSROOT,
         isysroot=X86_ISYSROOT,
-        llc_flags=RV32_LLC_FLAGS,
+        llcflags=RV32_LLC_FLAGS,
         as_flags=RV32_LINUX_AS_FLAGS,
         ld_flags=RV32_LINUX_LD_FLAGS,
         mattr=RV32_MATTR)

@@ -255,8 +255,7 @@ clean:
 
         return self._bench("susan", dir,
                 ["susan.c"], runs,
-                sbtflags=self.stack_huge,
-                dbg="opt")
+                sbtflags=self.stack_huge)
 
 
     def _single_run(self, args, stdin=None, rflags=None):
@@ -296,6 +295,8 @@ clean:
             self._bench("stringsearch", "office/stringsearch",
                 ["bmhasrch.c", "bmhisrch.c", "bmhsrch.c", "pbmsrch_large.c"],
                 self._single_run([]),
+                bflags='--llcflags-x86="-march=x86 -mcpu=pentium-mmx' +
+                    ' -mattr=mmx" --gccflags-x86="-march=pentium-mmx"',
                 sbtflags=self.stack_large),
             self._bf(),
             self._bench("basicmath", "automotive/basicmath",
