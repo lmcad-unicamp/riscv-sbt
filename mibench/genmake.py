@@ -189,16 +189,18 @@ clean:
 
     def _bench(self, name, dir, ins, runs,
             dstdir=None, ctor=Bench,
-            bflags=None, xflags=None,
+            bflags=None, xflags=None, sbtflags=[],
             **kwargs):
         dstdir = dstdir if dstdir else path(self.dstdir, dir)
         bflags = cat(self.bflags, bflags)
+        if GOPTS.soft_float():
+            sbtflags = sbtflags + ["-soft-float-abi"]
 
         return ctor(
             name=name, dir=dir, ins=ins, runs=runs,
             srcdir=path(self.srcdir, dir),
             dstdir=dstdir,
-            bflags=bflags, xflags=xflags,
+            bflags=bflags, xflags=xflags, sbtflags=sbtflags,
             narchs=self.narchs,
             xarchs=self.xarchs,
             **kwargs)
