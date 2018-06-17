@@ -18,14 +18,14 @@ START
 
   # Test with a negative base
 
-    la  x1, tdat
+    lsym  x1, tdat
     addi x1, x1, -32
     lbu x3, 32(x1)
   TEST_CASE 10, x3, 0x000000ff
 
   # Test with unaligned base
 
-    la  x1, tdat
+    lsym  x1, tdat
     addi x1, x1, -6
     lbu x3, 7(x1)
   TEST_CASE 11, x3, 0x00000000
@@ -42,12 +42,12 @@ START
 
   # Test write-after-write hazard
 
-    la  x3, tdat
+    lsym  x3, tdat
     lbu  x2, 0(x3)
     li  x2, 2
   TEST_CASE 18, x2, 2
 
-    la  x3, tdat
+    lsym  x3, tdat
     lbu  x2, 0(x3)
     nop
     li  x2, 2

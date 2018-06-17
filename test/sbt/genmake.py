@@ -175,10 +175,13 @@ x86-fp128-run:
                 xarchs=[], narchs=[RV32_LINUX], rflags=rflags),
         ]
 
+        names = []
         for mod in mods:
+            if GOPTS.cc == "gcc" and mod.name == "printf":
+                continue
             self.append(mod.gen())
+            names.append(mod.name)
 
-        names = [mod.name for mod in mods]
         tests = [name + GenMake.test_suffix() for name in names]
 
         self.append("""\
@@ -301,6 +304,8 @@ rv32tests_status:
         def sbtflags(test):
             if test == "aiupc":
                 return ["-no-sym-bounds-check"]
+            if test == "jalr":
+                return ["-soft-float-abi"]
             return []
 
         for test in tests:

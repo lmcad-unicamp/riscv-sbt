@@ -1,5 +1,5 @@
 .macro TEST_ST_OP T iL iS res off base
-	la	t0, \base
+	lsym	t0, \base
 	li	t1, \res
 	\iS	t1, \off(t0)
 	\iL	s0, \off(t0)

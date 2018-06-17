@@ -41,7 +41,7 @@ main:
     add s1, zero, ra
 
     # print test
-    la a0, str
+    lsym a0, str
     call printf
 
     # rdcycle
@@ -62,12 +62,12 @@ loop:
     bge a1, t5, time_l
 
     # error
-    la a0, error_str
+    lsym a0, error_str
     call printf
     j time_l2
 
 time_l:
-    la a0, time
+    lsym a0, time
     call printf
 time_l2:
 
@@ -77,22 +77,22 @@ time_l2:
 
     # error
     mv s5, t1
-    la a0, error_str
+    lsym a0, error_str
     call printf
 
-    la a0, fmtX
+    lsym a0, fmtX
     mv a1, s3
     call printf
-    la a0, fmtX
+    lsym a0, fmtX
     mv a1, s4
     call printf
-    la a0, fmtX
+    lsym a0, fmtX
     mv a1, s5
     call printf
     j cycles_l2
 
 cycles_l:
-    la a0, cycles
+    lsym a0, cycles
     call printf
 cycles_l2:
 
@@ -107,12 +107,12 @@ cycles_l2:
     sub a1, t2, t1
     li t1, 5
     bge a1, t1, instret_l
-    la a0, error_str
+    lsym a0, error_str
     call printf
     j instret_l2
 
 instret_l:
-    la a0, insts
+    lsym a0, insts
     call printf
 instret_l2:
 
@@ -121,13 +121,13 @@ instret_l2:
     call fflush
 
     li a0, 1
-    la a1, ecall
+    lsym a1, ecall
     li a2, %lo(len)
     li a7, %lo(SYS_WRITE)
     ecall
 
     # ebreak
-    la a0, ebreak
+    lsym a0, ebreak
     call printf
     #ebreak
 

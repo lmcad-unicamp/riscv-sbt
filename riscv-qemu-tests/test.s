@@ -1,17 +1,17 @@
-.macro la reg, sym
+.macro lsym reg, sym
     lui \reg, %hi(\sym)
     addi \reg, \reg, %lo(\sym)
 .endm
 
-.macro li reg, imm
-    lui  \reg, %hi(\imm)
-    addi \reg, \reg, %lo(\imm)
-.endm
+# .macro li reg, imm
+#    lui  \reg, %hi(\imm)
+#    addi \reg, \reg, %lo(\imm)
+# .endm
 
-.macro call func
-    lui  ra, %hi(\func)
-    jalr ra, ra, %lo(\func)
-.endm
+# .macro call func
+#    lui  ra, %hi(\func)
+#    jalr ra, ra, %lo(\func)
+# .endm
 
 .data
 
@@ -30,7 +30,7 @@ FAIL:	.ascii	"FAIL\n"
 .global failfunc
 failfunc:
 	li	a0, 2
-	la	a1, FAIL
+	lsym a1, FAIL
 	li	a2, FLEN
 	li	a7, 64 # write
 	ecall

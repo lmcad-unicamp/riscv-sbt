@@ -18,7 +18,7 @@ START
 
   # Test with a negative base
 
-    la  x1, tdat9
+    lsym  x1, tdat9
     li  x2, 0x12345678
     addi x4, x1, -32
     sw x2, 32(x4)
@@ -27,11 +27,11 @@ START
 
   # Test with unaligned base
 
-    la  x1, tdat9
+    lsym  x1, tdat9
     li  x2, 0x58213098
     addi x1, x1, -3
     sw x2, 7(x1)
-    la  x4, tdat10
+    lsym  x4, tdat10
     lw x3, 0(x4)
   TEST_CASE 11, x3, 0x58213098
 

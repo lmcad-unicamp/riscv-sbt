@@ -16,7 +16,7 @@ linkaddr_2:
     call failfunc
 
 target_2:
-    la x2, linkaddr_2
+    lsym x2, linkaddr_2
     FAILIF bne x2, x3
 
   # Test delay slot instructions not executed nor bypassed
