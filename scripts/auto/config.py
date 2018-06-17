@@ -8,8 +8,20 @@ import os
 
 class GlobalOpts:
     def __init__(self):
-        self.abi = "ilp32d"
-        self.cc = "gcc"
+        #self.cc = "gcc"
+        self.cc = "clang"
+        if self.cc == "gcc":
+            self.abi = "ilp32d"
+        else:
+            self.abi = "ilp32"
+
+
+    def soft_float(self):
+        return self.abi == "ilp32"
+
+
+    def hard_float(self):
+        return self.abi == "ilp32d"
 
 
 GOPTS = GlobalOpts()
@@ -65,7 +77,7 @@ class Sbt:
             return ""
         if is_runtime and not clink:
             return ""
-        if is_rv32 and is_runtime and GOPTS.abi == "ilp32d":
+        if is_rv32 and is_runtime and GOPTS.hard_float():
             suffix = "-hf"
         else:
             suffix = ""

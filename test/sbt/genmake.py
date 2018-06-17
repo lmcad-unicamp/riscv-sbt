@@ -165,12 +165,14 @@ x86-fp128-run:
     def gen_basic(self):
         # tests
         rflags = "--tee"
+        sbtflags = ["-soft-float-abi"] if GOPTS.soft_float() else []
         mods = [
             self._module("hello", "{}-hello.s", bflags="-C", rflags=rflags),
             self._module("argv", "argv.c", rflags="--args one two three " + rflags),
             self._module("mm", "mm.c", bflags='--cflags="-DROWS=4"', rflags=rflags),
-            self._module("fp", "fp.c", rflags=rflags),
-            self._module("printf", "printf.c", rflags=rflags),
+            self._module("fp", "fp.c", rflags=rflags, sbtflags=sbtflags),
+            self._module("printf", "printf.c", rflags=rflags,
+                sbtflags=sbtflags),
             self._module("test", "rv32-test.s",
                 xarchs=[], narchs=[RV32_LINUX], rflags=rflags),
         ]
@@ -222,18 +224,22 @@ tests-run: tests x86-syscall-test-run {tests}
         xflags = "--sbtobjs syscall runtime counters"
         rflags = "--tee"
 
+        names = []
         for utest in utests:
+            if utest == "f" and GOPTS.soft_float():
+                continue
             name = utest
             src = "rv32-" + name + ".s"
             mod = self._module(name, src, xarchs=xarchs, narchs=narchs,
                     xflags=xflags, rflags=rflags, sbtflags=sbtflags(name))
             self.append(mod.gen())
+            names.append(utest)
 
-        utests_run = [utest + GenMake.test_suffix()
-                    for utest in utests if utest != "system"]
+        utests_run = [name + GenMake.test_suffix()
+                    for name in names if name != "system"]
 
         fmtdata = {
-            "utests":       " ".join(utests),
+            "utests":       " ".join(names),
             "utests_run":   " ".join(utests_run),
         }
 

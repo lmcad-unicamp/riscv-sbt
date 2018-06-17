@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-from auto.config import ARCH, RV32, RV32_LINUX, SBT, TOOLS, X86, emit_llvm
+from auto.config import ARCH, GOPTS, RV32, RV32_LINUX, \
+                        SBT, TOOLS, X86, emit_llvm
 from auto.utils import cat, cd, chsuf, path, shell
 
 import argparse
@@ -305,7 +306,8 @@ class Builder:
                 "-assemble", "-filetype=obj",
                 ipath, "-o", opath)
             shell(cmd)
-            self.set_abi_hf(opath, opath)
+            if GOPTS.hard_float():
+                self.set_abi_hf(opath, opath)
 
         if opts.cc == "gcc" and arch == RV32_LINUX:
             self.bldr.merge_text(dstdir, out)

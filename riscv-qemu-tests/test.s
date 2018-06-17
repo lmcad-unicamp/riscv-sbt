@@ -3,10 +3,11 @@
     addi \reg, \reg, %lo(\sym)
 .endm
 
-# .macro li reg, imm
-#    lui  \reg, %hi(\imm)
-#    addi \reg, \reg, %lo(\imm)
-# .endm
+# needed by LLVM, for now
+.macro li reg, imm
+   lui  \reg, %hi(\imm)
+   addi \reg, \reg, %lo(\imm)
+.endm
 
 # .macro call func
 #    lui  ra, %hi(\func)

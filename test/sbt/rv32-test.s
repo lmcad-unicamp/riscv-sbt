@@ -3,7 +3,7 @@
 .text
 .global main
 main:
-    la a0, str
+    lsym a0, str
     mv s0, ra
     call puts
     mv ra, s0
