@@ -63,30 +63,15 @@ public:
         return _r;
     }
 
-    bool hasRead() const
-    {
-        return _read;
-    }
-
     llvm::Value* getForWrite()
     {
         _write = true;
         return _r;
     }
 
-    bool hasWrite() const
-    {
-        return _write;
-    }
-
     bool hasAccess() const
     {
         return _read || _write;
-    }
-
-    bool touched() const
-    {
-        return _touched || hasAccess();
     }
 
 private:
@@ -103,6 +88,23 @@ private:
     // because we don't load from global registers when
     // we enter it
     bool _touched = false;
+
+    // deprecated //
+
+    bool touched() const
+    {
+        return _touched || hasAccess();
+    }
+
+    bool hasRead() const
+    {
+        return _read;
+    }
+
+    bool hasWrite() const
+    {
+        return _write;
+    }
 };
 
 

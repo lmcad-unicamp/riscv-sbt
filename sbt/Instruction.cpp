@@ -1153,14 +1153,8 @@ void Instruction::callICaller(llvm::Value* target)
     args.push_back(target);
     size_t i = 1;
     unsigned reg = XRegister::A0;
-    for (; i < n; i++, reg++) {
-        Register& x = f->getReg(reg);
-        if (!x.touched())
-            break;
+    for (; i < n; i++, reg++)
         args.push_back(_bld->load(reg));
-    }
-    for (; i < n; i++)
-        args.push_back(_ctx->c.ZERO);
 
     // call
     _bld->call(llic, args);

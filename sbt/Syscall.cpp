@@ -149,13 +149,8 @@ void Syscall::call()
     std::vector<llvm::Value*> args = { sc };
     size_t i = 1;
     size_t reg = XRegister::A0;
-    for (; i < MAX_ARGS; i++, reg++) {
-        if (!f->getReg(reg).touched())
-            break;
+    for (; i < MAX_ARGS; i++, reg++)
         args.push_back(bld->load(reg));
-    }
-    for (; i < MAX_ARGS; i++)
-        args.push_back(_ctx->c.ZERO);
 
     llvm::Value* v = bld->call(_fRVSC, args);
     bld->store(v, XRegister::A0);
