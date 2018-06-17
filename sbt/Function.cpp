@@ -439,25 +439,30 @@ void Function::loadRegisters(bool retRegsOnly)
         bld->store(v, local.get());
     };
 
-    if (retRegsOnly) {
-        for (size_t i = XRegister::A0; i <= XRegister::A1; i++)
-            loadXReg(i);
-        return;
-    }
-
-    for (size_t i = 1; i < XRegisters::NUM; i++)
-        loadXReg(i);
-
-    if (!_ctx->opts->syncFRegs())
-        return;
-
-    for (size_t i = 0; i < FRegisters::NUM; i++) {
+    auto loadFReg = [&](size_t i) {
         Register& local = getFReg(i);
         Register& global = _ctx->f->getReg(i);
         // NOTE don't count this write
         llvm::Value* v = bld->load(global.getForRead());
         bld->store(v, local.get());
-    }
+    };
+
+    if (retRegsOnly)
+        for (size_t i = XRegister::A0; i <= XRegister::A1; i++)
+            loadXReg(i);
+    else
+        for (size_t i = 1; i < XRegisters::NUM; i++)
+            loadXReg(i);
+
+    if (!_ctx->opts->syncFRegs())
+        return;
+
+    if (retRegsOnly)
+        for (size_t i = FRegister::FA0; i <= FRegister::FA1; i++)
+            loadFReg(i);
+    else
+        for (size_t i = 0; i < FRegisters::NUM; i++)
+            loadFReg(i);
 }
 
 

@@ -9,6 +9,9 @@
 
 ============================================================================*/
 
+#ifndef _FOURIER_H_
+#define _FOURIER_H_
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -61,5 +64,5 @@ double Index_to_frequency ( unsigned NumSamples, unsigned Index );
 }
 #endif
 
-
+#endif
 /*--- end of file fourier.h ---*/

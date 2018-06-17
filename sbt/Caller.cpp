@@ -96,20 +96,15 @@ llvm::Value* Caller::nextArg()
         ty = _llft->getParamType(_argIdx++);
     else
         ty = _ctx->t.i32;
-    bool isFP = ty->isFloatTy() || ty->isDoubleTy();
-    Register& x = isFP? _curF->getFReg(_freg) : _curF->getReg(_reg);
-    if (!x.touched()) {
-        _passZero = true;
-        v = isFP? llvm::ConstantFP::get(ty, 0) : _ctx->c.ZERO;
-    } else {
-        if (ty->isFloatTy())
-            v = _bld->fload32(_freg);
-        else if (ty->isDoubleTy())
-            v = _bld->fload64(_freg);
-        else
-            v = _bld->load(_reg);
-    }
-    if (isFP)
+
+    if (ty->isFloatTy())
+        v = _bld->fload32(_freg);
+    else if (ty->isDoubleTy())
+        v = _bld->fload64(_freg);
+    else
+        v = _bld->load(_reg);
+
+    if (ty->isFloatTy() || ty->isDoubleTy())
         _freg++;
     else
         _reg++;
@@ -120,10 +115,19 @@ llvm::Value* Caller::nextArg()
 
 llvm::Value* Caller::castArg(llvm::Value* v, llvm::Type* ty)
 {
-    if ((!_hf || _isVarArg) && ty == _ctx->t.i32)
-        return v;
-    if (_hf && (ty->isFloatTy() || ty->isDoubleTy()))
-        return v;
+    // check if conversion can be skipped
+    if (_hf) {
+        if (_isVarArg) {
+            if (ty == _ctx->t.i32)
+                return v;
+        } else {
+            if (ty == _ctx->t.i32 || ty->isFloatTy() || ty->isDoubleTy())
+                return v;
+        }
+    } else {
+        if (ty == _ctx->t.i32)
+            return v;
+    }
 
     DBGF("cast from:");
     DBG(v->getType()->dump());
@@ -131,7 +135,7 @@ llvm::Value* Caller::castArg(llvm::Value* v, llvm::Type* ty)
     DBG(ty->dump());
     DBGS.flush();
 
-    if (!_hf && ty->isDoubleTy())
+    if (ty->isDoubleTy())
         return i32x2ToFP64(v, nextArg());
     // long double: by ref
     if (ty->isFP128Ty())

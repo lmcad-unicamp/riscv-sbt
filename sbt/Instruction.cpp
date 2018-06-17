@@ -1193,7 +1193,10 @@ llvm::Error Instruction::handleICall(llvm::Value* target, unsigned linkReg)
         _bld->condBr(ext, bbICallExt, bbICallInt);
 
         _bld->setInsertBlock(bbICallExt);
-        callICaller(target);
+        if (_ctx->opts->hardFloatABI())
+            _bld->call(_ctx->translator->sbtabort()->func());
+        else
+            callICaller(target);
         _bld->br(bbICallEnd);
 
         _bld->setInsertBlock(bbICallInt);

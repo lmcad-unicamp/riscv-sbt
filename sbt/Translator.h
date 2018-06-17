@@ -101,6 +101,11 @@ public:
         return addr >= FIRST_EXT_FUNC_ADDR;
     }
 
+    const Function* sbtabort() const
+    {
+        return &*_sbtabort;
+    }
+
 private:
     // data
 
