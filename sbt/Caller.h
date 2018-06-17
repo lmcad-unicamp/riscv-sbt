@@ -40,11 +40,14 @@ private:
     Builder* _bld;
     Function* _tgtF;
     Function* _curF;
+    bool _hf;
     std::vector<llvm::Value*>* _args = nullptr;
 
     llvm::FunctionType* _llft;
     llvm::Value* _fptr;
     unsigned _reg;
+    unsigned _freg;
+    unsigned _argIdx = 0;
     bool _passZero = false;
     std::vector<llvm::Value*>::const_iterator _argit;
     size_t _fixedArgs;
@@ -52,12 +55,14 @@ private:
     size_t _wordArgs;
     llvm::Value* _retref = nullptr;
     bool _retInGlobal = false;
+    bool _isVarArg;
 
 
     llvm::Value* nextArg();
     llvm::Value* castArg(llvm::Value* v, llvm::Type* ty);
     void handleReturn(llvm::Value* ret);
     Register& getRetReg(unsigned reg);
+    Register& getFRetReg(unsigned reg);
 
     llvm::Value* i32x2ToFP64(llvm::Value* lo, llvm::Value* hi);
     std::pair<llvm::Value*, llvm::Value*> fp64ToI32x2(llvm::Value* f);

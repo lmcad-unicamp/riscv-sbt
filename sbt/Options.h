@@ -123,6 +123,17 @@ public:
         return false;
     }
 
+    bool hardFloatABI() const
+    {
+        return _hf;
+    }
+
+    Options& setHardFloatABI(bool b)
+    {
+        _hf = b;
+        return *this;
+    }
+
     void dump() const;
 
 private:
@@ -136,6 +147,7 @@ private:
     bool _symBoundsCheck = true;
     bool _enableFCSR = false;
     bool _enableFCVTValidation = false;
+    bool _hf = true;
 };
 
 }

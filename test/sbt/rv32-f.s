@@ -7,14 +7,13 @@ main:
     mv s1, ra
 
     # print test
-    la a0, str
+    lsym a0, str
     call printf
 
     # print f
-    la a0, f_fmt
-    la t0, f
-    lw a1, 0(t0)
-    lw a2, 4(t0)
+    lsym a0, f_fmt
+    lsym t0, f
+    fld fa0, 0(t0)
     call sbt_printf_d
 
     # restore ra

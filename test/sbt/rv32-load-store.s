@@ -15,21 +15,17 @@ main:
     # save ra
     add s1, zero, ra
 
-    # s2: printf
-    lui s2, %hi(printf)
-    addi s2, s2, %lo(printf)
-
     # print test
     lui a0, %hi(str)
     addi a0, a0, %lo(str)
-    jalr ra, s2, 0
+    call printf
 
     ### load ###
 
     # lb
     lui a0, %hi(lb_str)
     addi a0, a0, %lo(lb_str)
-    jalr ra, s2, 0
+    call printf
     # b0
     lui a0, %hi(b0_fmt)
     addi a0, a0, %lo(b0_fmt)
@@ -37,7 +33,7 @@ main:
     addi t1, t1, %lo(b0)
     lb a1, 0(t1)
     add a2, a1, zero
-    jalr ra, s2, 0
+    call printf
     # b1
     lui a0, %hi(b1_fmt)
     addi a0, a0, %lo(b1_fmt)
@@ -45,7 +41,7 @@ main:
     addi t1, t1, %lo(b1)
     lb a1, 0(t1)
     add a2, a1, zero
-    jalr ra, s2, 0
+    call printf
 
     # lbu
     # bu0
@@ -55,7 +51,7 @@ main:
     addi t1, t1, %lo(b0)
     lbu a1, 0(t1)
     add a2, a1, zero
-    jalr ra, s2, 0
+    call printf
     # bu1
     lui a0, %hi(bu1_fmt)
     addi a0, a0, %lo(bu1_fmt)
@@ -63,12 +59,12 @@ main:
     addi t1, t1, %lo(bu1)
     lbu a1, 0(t1)
     add a2, a1, zero
-    jalr ra, s2, 0
+    call printf
 
     # lh
     lui a0, %hi(lh_str)
     addi a0, a0, %lo(lh_str)
-    jalr ra, s2, 0
+    call printf
     # h0
     lui a0, %hi(h0_fmt)
     addi a0, a0, %lo(h0_fmt)
@@ -76,7 +72,7 @@ main:
     addi t1, t1, %lo(h0)
     lh a1, 0(t1)
     add a2, a1, zero
-    jalr ra, s2, 0
+    call printf
     # b1
     lui a0, %hi(h1_fmt)
     addi a0, a0, %lo(h1_fmt)
@@ -84,7 +80,7 @@ main:
     addi t1, t1, %lo(h1)
     lh a1, 0(t1)
     add a2, a1, zero
-    jalr ra, s2, 0
+    call printf
 
     # lhu
     # hu0
@@ -94,7 +90,7 @@ main:
     addi t1, t1, %lo(h0)
     lhu a1, 0(t1)
     add a2, a1, zero
-    jalr ra, s2, 0
+    call printf
     # hu1
     lui a0, %hi(hu1_fmt)
     addi a0, a0, %lo(hu1_fmt)
@@ -102,12 +98,12 @@ main:
     addi t1, t1, %lo(hu1)
     lhu a1, 0(t1)
     add a2, a1, zero
-    jalr ra, s2, 0
+    call printf
 
     # lw
     lui a0, %hi(lw_str)
     addi a0, a0, %lo(lw_str)
-    jalr ra, s2, 0
+    call printf
     # signed
     lui a0, %hi(w0_fmt)
     addi a0, a0, %lo(w0_fmt)
@@ -115,7 +111,7 @@ main:
     addi t1, t1, %lo(w)
     lw a1, 0(t1)
     add a2, a1, zero
-    jalr ra, s2, 0
+    call printf
     # unsigned
     lui a0, %hi(w1_fmt)
     addi a0, a0, %lo(w1_fmt)
@@ -123,7 +119,7 @@ main:
     addi t1, t1, %lo(w)
     lw a1, 0(t1)
     add a2, a1, zero
-    jalr ra, s2, 0
+    call printf
 
     ### store ###
 
@@ -153,40 +149,40 @@ main:
     # sh
     lui a0, %hi(sh_str)
     addi a0, a0, %lo(sh_str)
-    jalr ra, s2, 0
+    call printf
     # signed
     lui t0, 0x10
     addi t0, t0, -1
     sh t0, 0(s3)
     add a0, zero, s4
     lw a1, 0(s3)
-    jalr ra, s2, 0
+    call printf
     # unsigned
     lui t0, 0x8
     addi t0, t0, -1
     sh t0, 0(s3)
     add a0, zero, s4
     lw a1, 0(s3)
-    jalr ra, s2, 0
+    call printf
 
     # sw
     lui a0, %hi(sw_str)
     addi a0, a0, %lo(sw_str)
-    jalr ra, s2, 0
+    call printf
     # signed
     lui t0, 0x80012
     addi t0, t0, 0x345
     sw t0, 0(s3)
     add a0, zero, s4
     lw a1, 0(s3)
-    jalr ra, s2, 0
+    call printf
     # unsigned
     lui t0, 0x80000
     addi t0, t0, -1
     sw t0, 0(s3)
     add a0, zero, s4
     lw a1, 0(s3)
-    jalr ra, s2, 0
+    call printf
 
     # test array
 
@@ -198,43 +194,43 @@ main:
 
     lui a0, %hi(a_str)
     addi a0, a0, %lo(a_str)
-    jalr ra, s2, 0
+    call printf
 
     # 0
     add a0, zero, s4
     lw a1, 0(s3)
-    jalr ra, s2, 0
+    call printf
     # 1
     add a0, zero, s4
     lw a1, 4(s3)
-    jalr ra, s2, 0
+    call printf
     # 2
     add a0, zero, s4
     lw a1, 8(s3)
-    jalr ra, s2, 0
+    call printf
     # 3
     add a0, zero, s4
     lw a1, 12(s3)
-    jalr ra, s2, 0
+    call printf
     # 0/1: 0x01234567 = 0x67 0x45 0x23 0x01 + 0xAB = 0xAB012345
     add a0, zero, s4
     lw a1, 1(s3)
-    jalr ra, s2, 0
+    call printf
     # 0/2
     add a0, zero, s4
     lw a1, 2(s3)
-    jalr ra, s2, 0
+    call printf
     # 0/3
     add a0, zero, s4
     lw a1, 3(s3)
-    jalr ra, s2, 0
+    call printf
     # store @ a[2]
     lui t0, 0x12345
     addi t0, t0, 0x678
     sw t0, 8(s3)
     lw a1, 8(s3)
     add a0, zero, s4
-    jalr ra, s2, 0
+    call printf
 
     # restore ra
     add ra, zero, s1

@@ -32,6 +32,7 @@ void Options::dump() const
     DBGS << "symBoundsCheck=" << symBoundsCheck() << nl;
     DBGS << "enableFCSR=" << enableFCSR() << nl;
     DBGS << "enableFCVTValidation=" << enableFCVTValidation() << nl;
+    DBGS << "hardFloatABI=" << hardFloatABI() << nl;
 }
 
 }

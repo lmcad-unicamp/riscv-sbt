@@ -162,7 +162,8 @@ llvm::Error Translator::startTarget()
 llvm::Error Translator::finish()
 {
     genIsExternal();
-    genICaller();
+    if (!_opts.hardFloatABI())
+        genICaller();
     return llvm::Error::success();
 }
 

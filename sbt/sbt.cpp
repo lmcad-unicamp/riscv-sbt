@@ -217,6 +217,9 @@ int main(int argc, char* argv[])
     cl::opt<bool> enableFCVTValidationOpt("enable-fcvt-validation",
         cl::desc("Enable input validation on fcvt instructions"));
 
+    cl::opt<bool> softFloatABIOpt("soft-float-abi",
+        cl::desc("Use soft-float ABI"));
+
     // enable debug code
     cl::opt<bool> debugOpt("debug", cl::desc("Enable debug code"));
 
@@ -280,7 +283,8 @@ int main(int argc, char* argv[])
         .setCommentedAsm(commentedAsmOpt)
         .setSymBoundsCheck(!noSymBoundsCheckOpt)
         .setEnableFCSR(enableFCSROpt)
-        .setEnableFCVTValidation(enableFCVTValidationOpt);
+        .setEnableFCVTValidation(enableFCVTValidationOpt)
+        .setHardFloatABI(!softFloatABIOpt);
     auto exp = sbt::create<sbt::SBT>(inputFiles, outputFile, opts);
     if (!exp)
         sbt::handleError(exp.takeError());

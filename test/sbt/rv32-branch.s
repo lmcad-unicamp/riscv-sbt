@@ -15,13 +15,13 @@
 jalr_test:
     mv s5, ra
 
-    la a0, jalr_test_str
+    lsym a0, jalr_test_str
     call printf
 
     # jalr with offset
-    la t1, printf
+    lsym t1, printf
     addi t1, t1, -0x10
-    la a0, jalr_test_str
+    lsym a0, jalr_test_str
     jalr ra, t1, 0x10
 
     mv ra, s5
@@ -34,20 +34,20 @@ main:
     mv s2, ra
 
     # print test
-    la a0, str
+    lsym a0, str
     call printf
 
     # jal
-    la a0, jal_str
+    lsym a0, jal_str
     call printf
     jal jal_test
 
     # jalr
-    la t1, jalr_test
+    lsym t1, jalr_test
     jalr t1
 
     # beq
-    la a0, beq_str
+    lsym a0, beq_str
     call printf
     li t1, 5
     li t2, 5
@@ -56,7 +56,7 @@ main:
 beq_l:
 
     # bne
-    la a0, bne_str
+    lsym a0, bne_str
     call printf
     li t1, 5
     li t2, 5
@@ -68,7 +68,7 @@ bne_err:
 bne_l:
 
     # blt
-    la a0, blt_str
+    lsym a0, blt_str
     call printf
     li t1, -5
     li t2, -10
@@ -77,7 +77,7 @@ bne_l:
 blt_l:
 
     # bltu
-    la a0, bltu_str
+    lsym a0, bltu_str
     call printf
     li t1, -5
     li t2, -10
@@ -88,13 +88,13 @@ bltu_l:
     # bge
     li s5, 2
 bge_l:
-    la a0, bge_str
+    lsym a0, bge_str
     call printf
     addi s5, s5, -1
     bge s5, zero, bge_l
 
     # bgeu
-    la a0, bgeu_str
+    lsym a0, bgeu_str
     call printf
     li t1, -1
     bgeu t1, zero, bgeu_l
@@ -112,17 +112,17 @@ bgeu_l:
 jal_test:
     mv s4, ra
 
-    la a0, jal_test_str
+    lsym a0, jal_test_str
     call printf
 
     j jal_test_1
 jal_test_2:
-    la a0, jal_test2_str
+    lsym a0, jal_test2_str
     call printf
     j jal_test_3
 
 jal_test_1:
-    la a0, jal_test1_str
+    lsym a0, jal_test1_str
     call printf
     j jal_test_2
 
@@ -133,7 +133,7 @@ jal_test_3:
 
 .type test_error,@function
 test_error:
-    la a0, error_str
+    lsym a0, error_str
     call printf
     call abort
 

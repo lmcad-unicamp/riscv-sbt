@@ -7,14 +7,10 @@ main:
     # save ra
     add s1, zero, ra
 
-    # s2: printf
-    lui s2, %hi(printf)
-    addi s2, s2, %lo(printf)
-
     # print test
     lui a0, %hi(str)
     addi a0, a0, %lo(str)
-    jalr ra, s2, 0
+    call printf
 
     # XXX this actually tests nothing for now...
 
@@ -33,7 +29,7 @@ main:
     lui a0, %hi(fmt)
     addi a0, a0, %lo(fmt)
     lw a1, 0(t2)
-    jalr ra, s2, 0
+    call printf
 
     # restore ra
     add ra, zero, s1

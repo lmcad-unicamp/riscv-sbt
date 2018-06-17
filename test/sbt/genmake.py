@@ -209,6 +209,13 @@ tests-run: tests x86-syscall-test-run {tests}
 
         narchs = [RV32_LINUX]
         xarchs = self.xarchs
+
+        def sbtflags(test):
+            if test == "branch":
+                return ["-soft-float-abi"]
+            else:
+                return []
+
         xflags = "--sbtobjs syscall runtime counters"
         rflags = "--tee"
 
@@ -216,7 +223,7 @@ tests-run: tests x86-syscall-test-run {tests}
             name = utest
             src = "rv32-" + name + ".s"
             mod = self._module(name, src, xarchs=xarchs, narchs=narchs,
-                    xflags=xflags, rflags=rflags)
+                    xflags=xflags, rflags=rflags, sbtflags=sbtflags(name))
             self.append(mod.gen())
 
         utests_run = [utest + GenMake.test_suffix()

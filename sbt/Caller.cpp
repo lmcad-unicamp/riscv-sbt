@@ -2,7 +2,9 @@
 
 #include "Builder.h"
 #include "Debug.h"
+#include "FRegister.h"
 #include "Function.h"
+#include "Options.h"
 #include "XRegister.h"
 
 #include <llvm/IR/ValueSymbolTable.h>
@@ -34,7 +36,9 @@ Caller::Caller(
     _bld(bld),
     _tgtF(tgtF),
     _curF(curF),
-    _reg(XRegister::A0)
+    _hf(_ctx->opts->hardFloatABI()),
+    _reg(XRegister::A0),
+    _freg(FRegister::FA0)
 {
     xassert(_ctx);
     xassert(_bld);
@@ -54,14 +58,15 @@ Caller::Caller(
     // prepare args
     _fixedArgs = _llft->getNumParams();
     _wordArgs = 0;
+    _isVarArg = _llft->isVarArg();
     for (const auto& ty : _llft->params())
-        if (ty->isDoubleTy())
+        if ((!_hf || _isVarArg) && ty->isDoubleTy())
             _wordArgs += 2;
         else
             _wordArgs += 1;
 
     // varArgs: passing 4 extra args for now
-    if (_llft->isVarArg()) {
+    if (_isVarArg) {
         _totalArgs = MIN(_fixedArgs + 4, MAX_ARGS);
         _wordArgs = MIN(_wordArgs + 4, MAX_ARGS);
     } else
@@ -86,13 +91,28 @@ llvm::Value* Caller::nextArg()
         return v;
     }
 
-    Register& x = _curF->getReg(_reg);
+    llvm::Type* ty;
+    if (_hf && _argIdx < _fixedArgs)
+        ty = _llft->getParamType(_argIdx++);
+    else
+        ty = _ctx->t.i32;
+    bool isFP = ty->isFloatTy() || ty->isDoubleTy();
+    Register& x = isFP? _curF->getFReg(_freg) : _curF->getReg(_reg);
     if (!x.touched()) {
         _passZero = true;
-        v = _ctx->c.ZERO;
-    } else
-        v = _bld->load(_reg);
-    _reg++;
+        v = isFP? llvm::ConstantFP::get(ty, 0) : _ctx->c.ZERO;
+    } else {
+        if (ty->isFloatTy())
+            v = _bld->fload32(_freg);
+        else if (ty->isDoubleTy())
+            v = _bld->fload64(_freg);
+        else
+            v = _bld->load(_reg);
+    }
+    if (isFP)
+        _freg++;
+    else
+        _reg++;
 
     return v;
 }
@@ -100,7 +120,9 @@ llvm::Value* Caller::nextArg()
 
 llvm::Value* Caller::castArg(llvm::Value* v, llvm::Type* ty)
 {
-    if (ty == _ctx->t.i32)
+    if ((!_hf || _isVarArg) && ty == _ctx->t.i32)
+        return v;
+    if (_hf && (ty->isFloatTy() || ty->isDoubleTy()))
         return v;
 
     DBGF("cast from:");
@@ -109,7 +131,7 @@ llvm::Value* Caller::castArg(llvm::Value* v, llvm::Type* ty)
     DBG(ty->dump());
     DBGS.flush();
 
-    if (ty->isDoubleTy())
+    if (!_hf && ty->isDoubleTy())
         return i32x2ToFP64(v, nextArg());
     // long double: by ref
     if (ty->isFP128Ty())
@@ -162,6 +184,15 @@ Register& Caller::getRetReg(unsigned reg)
 }
 
 
+Register& Caller::getFRetReg(unsigned reg)
+{
+    if (_retInGlobal)
+        return _ctx->f->getReg(reg);
+    else
+        return _curF->getFReg(reg);
+}
+
+
 void Caller::handleReturn(llvm::Value* ret)
 {
     llvm::Type* retty = ret->getType();
@@ -169,14 +200,20 @@ void Caller::handleReturn(llvm::Value* ret)
     if (retty->isVoidTy())
         return;
 
-    // write return value into x10/x11 for libc functions
-    // ret: ret will be set if value is returned by ref
-    if (retty->isDoubleTy()) {
-        auto p = fp64ToI32x2(ret);
-        auto& reglo = getRetReg(XRegister::A0);
-        auto& reghi = getRetReg(XRegister::A1);
-        _bld->store(p.first, reglo.getForWrite());
-        _bld->store(p.second, reghi.getForWrite());
+    if (_hf && retty->isFloatTy()) {
+        auto& reg = getFRetReg(FRegister::FA0);
+        _bld->store(ret, _bld->fp64PtrToFP32Ptr(reg.getForWrite()));
+    } else if (retty->isDoubleTy()) {
+        if (_hf) {
+            auto& reg = getFRetReg(FRegister::FA0);
+            _bld->store(ret, reg.getForWrite());
+        } else {
+            auto p = fp64ToI32x2(ret);
+            auto& reglo = getRetReg(XRegister::A0);
+            auto& reghi = getRetReg(XRegister::A1);
+            _bld->store(p.first, reglo.getForWrite());
+            _bld->store(p.second, reghi.getForWrite());
+        }
     } else if (retty->isFP128Ty()) {
         xassert(_retref);
         fp128ToRef(ret, _retref);

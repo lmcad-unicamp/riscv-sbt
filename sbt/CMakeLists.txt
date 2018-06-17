@@ -143,8 +143,9 @@ add_custom_command(OUTPUT rv32-runtime.o COMMAND
 
 # ilp32d
 add_custom_command(OUTPUT rv32-runtime-hf.o COMMAND
-    ${BUILD_PY} --set-abi-hf rv32-runtime.o -o rv32-runtime-hf.o
-        MAIN_DEPENDENCY rv32-runtime.o)
+    riscv64-unknown-linux-gnu-gcc -march=rv32g -mabi=ilp32d -c -O0
+        ${RUNTIME_C} -o rv32-runtime-hf.o
+        MAIN_DEPENDENCY ${RUNTIME_C})
 add_custom_target(rv32-runtime DEPENDS rv32-runtime.o rv32-runtime-hf.o)
 
 # x86-runtime
