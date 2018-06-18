@@ -8,8 +8,8 @@ import os
 
 class GlobalOpts:
     def __init__(self):
-        #self.cc = "gcc"
-        self.cc = "clang"
+        self.cc = "gcc"
+        #self.cc = "clang"
         if self.cc == "gcc":
             self.abi = "ilp32d"
         else:
