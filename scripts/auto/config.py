@@ -108,7 +108,7 @@ TOOLS = Tools()
 class Arch:
     def __init__(self, name, prefix, triple, run, march, gccflags,
             clang_flags, sysroot, isysroot, llcflags, as_flags,
-            ld_flags, mattr, gccoflags=None):
+            ld_flags, mattr, gccoflags=None, gcc=None):
 
         self.name = name
         self.prefix = prefix
@@ -116,7 +116,7 @@ class Arch:
         self.run = run
         self.march = march
         # gcc
-        self.gcc = triple + "-gcc"
+        self.gcc = gcc if gcc else triple + "-gcc"
         self.gccflags = cat(CFLAGS, gccflags)
         self.gccoflags = gccoflags
 
@@ -249,8 +249,31 @@ RV32_FOR_X86 = Arch(
         mattr=RV32_MATTR)
 
 
+ARM_TRIPLE  = "arm-linux-gnueabihf"
+ARM_PREFIX  = "arm"
+ARM_SYSROOT = "/usr/arm-linux-gnueabihf"
+
+ARM = Arch(
+        name=ARM_PREFIX,
+        prefix=ARM_PREFIX,
+        triple=ARM_TRIPLE,
+        run="echo Skipped:",
+        march="arm",
+        gcc="{}-gcc-6".format(ARM_TRIPLE),
+        gccflags="",
+        clang_flags=cat(CLANG_CFLAGS,
+            "--target=" + ARM_TRIPLE),
+        sysroot=ARM_SYSROOT,
+        isysroot=ARM_SYSROOT + "/include",
+        llcflags="",
+        as_flags="",
+        ld_flags="",
+        mattr="armv7-a")
+
+
 # arch map
 ARCH = {
+    "arm"           : ARM,
     "rv32"          : RV32,
     "rv32-linux"    : RV32_LINUX,
     "x86"           : X86,

@@ -7,7 +7,7 @@ RUN_PY    := $(TOPDIR)/scripts/auto/run.py
 SRCDIR    := $(shell pwd)
 DSTDIR    := $(TOPDIR)/build/test
 
-ARCHS     := rv32-linux x86
+ARCHS     := rv32-linux x86 arm
 COMPILERS := clang gcc
 
 BINS      := \
@@ -42,6 +42,7 @@ $(eval A_BIN = $(A_ARCH)-$(A_CC)-$(A_MOD))
 
 $(DSTDIR)/$(A_BIN): $(SRCDIR)/$(A_MOD).c
 	$(BUILD_PY) --arch $(A_ARCH) --srcdir $(SRCDIR) --dstdir $(DSTDIR) \
+		--sbtobjs=runtime \
 		--cc $(A_CC) $(A_MOD).c -o $(A_BIN)
 
 .PHONY: $(A_BIN)

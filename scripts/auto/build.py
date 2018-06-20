@@ -306,7 +306,7 @@ class Builder:
                 "-assemble", "-filetype=obj",
                 ipath, "-o", opath)
             shell(cmd)
-            if GOPTS.hard_float():
+            if GOPTS.hard_float() and arch == RV32_LINUX:
                 self.set_abi_hf(opath, opath)
 
         if opts.cc == "gcc" and arch == RV32_LINUX:

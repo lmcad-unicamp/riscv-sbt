@@ -156,7 +156,16 @@ add_custom_command(OUTPUT x86-runtime.o COMMAND
         MAIN_DEPENDENCY ${RUNTIME_C})
 add_custom_target(x86-runtime DEPENDS x86-runtime.o)
 
-add_dependencies(riscv-sbt libc rv32-runtime x86-runtime)
+# arm-runtime
+add_custom_command(OUTPUT arm-runtime.o COMMAND
+    clang --target=arm-linux-gnueabihf -c -O3
+        -isysroot /usr/arm-linux-gnueabihf
+        -isystem /usr/arm-linux-gnueabihf/include
+        ${RUNTIME_C} -o arm-runtime.o
+        MAIN_DEPENDENCY ${RUNTIME_C})
+add_custom_target(arm-runtime DEPENDS arm-runtime.o)
+
+add_dependencies(riscv-sbt libc rv32-runtime x86-runtime arm-runtime)
 
 # install
 
@@ -173,6 +182,7 @@ install(FILES ${CMAKE_BINARY_DIR}/CMakeFiles/x86-counters.dir/x86-counters.s.o
 install(FILES ${CMAKE_BINARY_DIR}/rv32-runtime.o DESTINATION share/riscv-sbt)
 install(FILES ${CMAKE_BINARY_DIR}/rv32-runtime-hf.o DESTINATION share/riscv-sbt)
 install(FILES ${CMAKE_BINARY_DIR}/x86-runtime.o  DESTINATION share/riscv-sbt)
+install(FILES ${CMAKE_BINARY_DIR}/arm-runtime.o  DESTINATION share/riscv-sbt)
 # PrintfBreak
 install(TARGETS PrintfBreak DESTINATION lib
     PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE

@@ -34,6 +34,7 @@ RUN sed -i "1s/main/& contrib non-free/" /etc/apt/sources.list \
     && apt-get update \
     && apt-get install -y \
     gcc-doc \
+    gcc-6-arm-linux-gnueabihf \
     && rm -rf /var/lib/apt/lists/*
 
 RUN echo "alias ls='ls --color'" >> /root/.bashrc \
