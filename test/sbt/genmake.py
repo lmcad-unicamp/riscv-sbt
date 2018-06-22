@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from auto.config import DIR, GOPTS, RV32_LINUX, SBT, TOOLS, X86
+from auto.config import ARM, DIR, GOPTS, RV32_LINUX, SBT, TOOLS, X86
 from auto.genmake import ArchAndMode, GenMake, Run, Runs
 from auto.utils import cat, path
 
@@ -76,8 +76,8 @@ class Module:
 
 class Tests():
     def __init__(self):
-        self.narchs = [RV32_LINUX, X86]
-        self.xarchs = [(RV32_LINUX, X86)]
+        self.narchs = [RV32_LINUX, X86, ARM]
+        self.xarchs = [(RV32_LINUX, X86), (RV32_LINUX, ARM)]
         self.srcdir = path(DIR.top, "test/sbt")
         self.dstdir = path(DIR.build, "test/sbt")
         self.sbtdir = path(DIR.top, "sbt")
@@ -149,7 +149,7 @@ x86-fp128-run:
             xarchs=None, narchs=None,
             srcdir=None, dstdir=None,
             xflags=None, bflags=None, rflags=None, sbtflags=[],
-            dbg=True):
+            dbg=True, skip_arm=False):
         if not xarchs and not narchs:
             xarchs = self.xarchs
             narchs = self.narchs
@@ -157,6 +157,10 @@ x86-fp128-run:
             srcdir = self.srcdir
             dstdir = self.dstdir
         bflags = cat(self.bflags, bflags)
+        if skip_arm:
+            narchs = [arch for arch in narchs if arch != ARM]
+            xarchs = [(farch, narch) for (farch, narch) in xarchs
+                    if narch != ARM]
         return Module(name, src,
                 xarchs, narchs, srcdir, dstdir,
                 xflags, bflags, rflags, sbtflags, dbg)
@@ -166,13 +170,18 @@ x86-fp128-run:
         # tests
         rflags = "--tee"
         sbtflags = ["-soft-float-abi"] if GOPTS.soft_float() else []
+        bflags = "--sbtobjs=runtime"
         mods = [
-            self._module("hello", "{}-hello.s", bflags="-C", rflags=rflags),
-            self._module("argv", "argv.c", rflags="--args one two three " + rflags),
-            self._module("mm", "mm.c", bflags='--cflags="-DROWS=4"', rflags=rflags),
-            self._module("fp", "fp.c", rflags=rflags, sbtflags=sbtflags),
+            self._module("hello", "{}-hello.s", bflags="-C", rflags=rflags,
+                skip_arm=True),
+            self._module("argv", "argv.c", bflags=bflags,
+                rflags="--args one two three " + rflags),
+            self._module("mm", "mm.c",
+                bflags='--cflags="-DROWS=4" ' + bflags, rflags=rflags),
+            self._module("fp", "fp.c", rflags=rflags,
+                bflags=bflags, sbtflags=sbtflags),
             self._module("printf", "printf.c", rflags=rflags,
-                sbtflags=sbtflags),
+                bflags=bflags, sbtflags=sbtflags),
             self._module("test", "rv32-test.s",
                 xarchs=[], narchs=[RV32_LINUX], rflags=rflags),
         ]
@@ -194,6 +203,9 @@ tests: x86-syscall-test x86-fp128 {names}
 
 .PHONY: tests-run
 tests-run: tests x86-syscall-test-run {tests}
+
+.PHONY: tests-arm-run
+tests-arm-run: {tests}
 
 """.format(**{"names": " ".join(names), "tests": " ".join(tests)}))
 

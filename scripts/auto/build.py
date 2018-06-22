@@ -168,8 +168,7 @@ class LLVMBuilder:
         arch = opts.arch
         ipath = path(dir, _in)
         opath = path(dir, out)
-        flags = arch.llcflags_prefix
-        flags = cat(flags, "-O3" if opts.opt else "-O0")
+        flags = "-O3" if opts.opt else "-O0"
         if arch.prefix in opts.llcflags.keys():
             flags = cat(flags, opts.llcflags[arch.prefix])
         else:

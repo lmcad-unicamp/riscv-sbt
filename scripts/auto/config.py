@@ -130,7 +130,6 @@ class Arch:
             sysroot, isysroot)
         # llc
         self.llc = "llc"
-        self.llcflags_prefix = "-relocation-model=static"
         self.llcflags = llcflags
 
         # as
@@ -173,6 +172,10 @@ class Arch:
         return self.prefix == "rv32"
 
 
+    def is_arm(self):
+        return self.prefix == "arm"
+
+
     def is_rv32_x86(self):
         return self.is_rv32() and UNAME_M.find("x86") != -1
 
@@ -181,11 +184,15 @@ class Arch:
         return self.is_rv32_x86() or self.is_native()
 
 
+LLC_STATIC      = "-relocation-model=static"
+LLC_PIC         = "-relocation-model=pic"
+
 PK32 = DIR.toolchain_release + "/" + RV32_TRIPLE + "/bin/pk"
 RV32_SYSROOT    = DIR.toolchain_release + "/opt/riscv/" + RV32_TRIPLE
 RV32_MARCH      = "riscv32"
 RV32_MATTR      = "-a,-c,+m,+f,+d"
-RV32_LLC_FLAGS  = cat("-march=" + RV32_MARCH, "-mattr=" + RV32_MATTR)
+RV32_LLC_FLAGS  = cat(LLC_STATIC,
+        "-march=" + RV32_MARCH, "-mattr=" + RV32_MATTR)
 
 RV32 = Arch(
         name="rv32",
@@ -243,10 +250,36 @@ X86 = Arch(
             "--target=x86_64-unknown-linux-gnu -m32"),
         sysroot=X86_SYSROOT,
         isysroot=X86_ISYSROOT,
-        llcflags=cat("-march=" + X86_MARCH, "-mattr=" + X86_MATTR),
+        llcflags=cat(LLC_STATIC, "-march=" + X86_MARCH, "-mattr=" + X86_MATTR),
         as_flags="--32",
         ld_flags="-m elf_i386",
         mattr=X86_MATTR)
+
+
+ARM_TRIPLE  = "arm-linux-gnueabihf"
+ARM_PREFIX  = "arm"
+ARM_SYSROOT = "/usr/arm-linux-gnueabihf"
+ARM_MARCH   = "arm"
+ARM_MATTR   = "armv7-a"
+
+ARM = Arch(
+        name=ARM_PREFIX,
+        prefix=ARM_PREFIX,
+        triple=ARM_TRIPLE,
+        run="",
+        march=ARM_MARCH,
+        gcc="{}-gcc-6".format(ARM_TRIPLE),
+        gccflags=cat("-march=" + ARM_MATTR, "-mfpu=vfpv3-d16"),
+        clang_flags=cat(CLANG_CFLAGS,
+            "--target=" + ARM_TRIPLE),
+        sysroot=ARM_SYSROOT,
+        isysroot=ARM_SYSROOT + "/include",
+        llcflags=cat(LLC_PIC,
+            "-march=" + ARM_MARCH, "-mattr=" + ARM_MATTR,
+            "-float-abi=hard"),
+        as_flags="",
+        ld_flags="",
+        mattr=ARM_MATTR)
 
 
 RV32_FOR_X86 = Arch(
@@ -263,28 +296,6 @@ RV32_FOR_X86 = Arch(
         as_flags=RV32_LINUX_AS_FLAGS,
         ld_flags=RV32_LINUX_LD_FLAGS,
         mattr=RV32_MATTR)
-
-
-ARM_TRIPLE  = "arm-linux-gnueabihf"
-ARM_PREFIX  = "arm"
-ARM_SYSROOT = "/usr/arm-linux-gnueabihf"
-
-ARM = Arch(
-        name=ARM_PREFIX,
-        prefix=ARM_PREFIX,
-        triple=ARM_TRIPLE,
-        run="",
-        march="arm",
-        gcc="{}-gcc-6".format(ARM_TRIPLE),
-        gccflags="",
-        clang_flags=cat(CLANG_CFLAGS,
-            "--target=" + ARM_TRIPLE),
-        sysroot=ARM_SYSROOT,
-        isysroot=ARM_SYSROOT + "/include",
-        llcflags="",
-        as_flags="",
-        ld_flags="",
-        mattr="armv7-a")
 
 
 # arch map
