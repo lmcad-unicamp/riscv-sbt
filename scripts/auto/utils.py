@@ -17,9 +17,10 @@ class cd:
         os.chdir(self.prev_dir)
 
 
-def shell(cmd, save_out=False, bin=False, exp_rc=0):
+def shell(cmd, save_out=False, bin=False, exp_rc=0, quiet=False):
     """ run shell command """
-    print(cmd)
+    if not quiet:
+        print(cmd)
 
     check = exp_rc == 0
     def check_rc(cp):

@@ -6,27 +6,41 @@ from auto.utils import *
 import argparse
 import shlex
 
-# run
-def run(arch, dir, prog, args, out, tee, bin, exp_rc):
-    ppath = path(dir, prog)
-    opath = path(dir, out)
-    save_out = len(out) > 0
+class Runner:
+    def __init__(self, arch):
+        self.arch = arch
 
-    cmd = cat(arch.run, ppath, " ".join(args))
-    if tee:
-        cmd = "/bin/bash -c " + shlex.quote(cmd + " | tee " + opath +
-              "; exit ${PIPESTATUS[0]}")
-        shell(cmd, exp_rc=exp_rc)
-    else:
-        if save_out and bin:
-            sout = shell(cmd, save_out, bin, exp_rc=exp_rc)
-            with open(opath, "wb") as f:
-                f.write(sout)
+
+    def _run_native(self, cmd, save_out, bin, exp_rc):
+        if not self.arch.can_run():
+            out = "Skipped (non-native): {}\n".format(cmd)
+            print(out, end='')
+            return out
+        return shell(cmd, save_out, bin, exp_rc=exp_rc)
+
+
+    # run
+    def run(self, dir, prog, args, out, tee, bin, exp_rc):
+        arch = self.arch
+        ppath = path(dir, prog)
+        opath = path(dir, out)
+        save_out = len(out) > 0
+
+        cmd = cat(arch.run, ppath, " ".join(args))
+        if tee:
+            cmd = "/bin/bash -c " + shlex.quote(cmd + " | tee " + opath +
+                  "; exit ${PIPESTATUS[0]}")
+            self._run_native(cmd, save_out, bin, exp_rc)
         else:
-            sout = shell(cmd, save_out, exp_rc=exp_rc)
-            if save_out:
-                with open(opath, "w") as f:
+            if save_out and bin:
+                sout = self._run_native(cmd, save_out, bin, exp_rc)
+                with open(opath, "wb") as f:
                     f.write(sout)
+            else:
+                sout = self._run_native(cmd, save_out, bin, exp_rc)
+                if save_out:
+                    with open(opath, "w") as f:
+                        f.write(sout)
 
 
 if __name__ == "__main__":
@@ -46,5 +60,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     sargs = [arg.strip() for arg in args.args]
-    run(ARCH[args.arch], args.dir, args.prog, sargs, args.o, args.tee,
+    runner = Runner(ARCH[args.arch])
+    runner.run(args.dir, args.prog, sargs, args.o, args.tee,
             args.bin, args.exp_rc)

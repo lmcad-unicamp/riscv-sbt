@@ -2,6 +2,8 @@
 
 # TOPDIR
 export TOPDIR=$PWD
+export ARM="luporl@192.168.0.15"
+export ARM_TOPDIR="~/riscv-sbt"
 
 # build type
 if [ $# -eq 1 -a "$1" == "release" ]; then

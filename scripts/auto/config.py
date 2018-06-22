@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from auto.utils import cat, chsuf, path
+from auto.utils import cat, chsuf, path, shell
 
 import os
 
@@ -104,6 +104,7 @@ class Tools:
 
 TOOLS = Tools()
 
+UNAME_M = shell("uname -m", save_out=True, quiet=True)
 
 class Arch:
     def __init__(self, name, prefix, triple, run, march, gccflags,
@@ -163,6 +164,21 @@ class Arch:
             name = self.add_prefix(out)
         return name + ".o"
 
+
+    def is_native(self):
+        return UNAME_M.find(self.prefix) != -1
+
+
+    def is_rv32(self):
+        return self.prefix == "rv32"
+
+
+    def is_rv32_x86(self):
+        return self.is_rv32() and UNAME_M.find("x86") != -1
+
+
+    def can_run(self):
+        return self.is_rv32_x86() or self.is_native()
 
 
 PK32 = DIR.toolchain_release + "/" + RV32_TRIPLE + "/bin/pk"
@@ -257,7 +273,7 @@ ARM = Arch(
         name=ARM_PREFIX,
         prefix=ARM_PREFIX,
         triple=ARM_TRIPLE,
-        run="echo Skipped:",
+        run="",
         march="arm",
         gcc="{}-gcc-6".format(ARM_TRIPLE),
         gccflags="",

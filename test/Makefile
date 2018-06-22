@@ -6,6 +6,7 @@ BUILD_PY  := $(TOPDIR)/scripts/auto/build.py
 RUN_PY    := $(TOPDIR)/scripts/auto/run.py
 SRCDIR    := $(shell pwd)
 DSTDIR    := $(TOPDIR)/build/test
+ARM_DSTDIR := $(ARM_TOPDIR)/build/test
 
 ARCHS     := rv32-linux x86 arm
 COMPILERS := clang gcc
@@ -55,3 +56,8 @@ endef
 
 $(eval $(foreach arch,$(ARCHS),$(foreach cc,$(COMPILERS),\
 $(call BLDNRUN,$(arch),$(cc),hello))))
+
+.PHONY: arm-copy
+arm-copy:
+	ssh $(ARM) mkdir -p $(ARM_DSTDIR)
+	scp $(foreach cc,$(COMPILERS),$(DSTDIR)/arm-$(cc)-hello) $(ARM):$(ARM_DSTDIR)
