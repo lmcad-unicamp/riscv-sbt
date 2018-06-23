@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from auto.config import SBT, TOOLS
+from auto.config import SBT, TOOLS, X86
 from auto.utils import cat, path, unique
 
 class ArchAndMode:
@@ -207,7 +207,38 @@ class GenMake:
 """.format(**fmtdata))
 
 
-    def run(self, name, robj, am):
+    def copy(self, am, name):
+        # don't copy if we're not on an x86 host OR
+        # if 'out' is a native binary OR
+        # if 'out' is a RISC-V binary (we can emulate it)
+        if not X86.is_native() or am.narch.is_native() or am.narch.is_rv32():
+            return
+
+        out = am.bin(name)
+        tgt = out + self.copy_suffix()
+
+        srcdir = self.dstdir
+        src = path(srcdir, out)
+        dstdir = am.narch.get_remote_path(srcdir)
+        dst = path(dstdir, out)
+
+        fmtdata = {
+            "out":      out,
+            "tgt":      tgt,
+            "src":      src,
+            "rem":      am.narch.rem_host,
+            "dst":      dst,
+        }
+
+        self.append("""\
+.PHONY: {tgt}
+{tgt}: {out}
+\tscp {src} {rem}:{dst}
+
+""".format(**fmtdata))
+
+
+    def run(self, name, robj, am, dep_bin=True):
         dir = self.dstdir
         bin = robj.bin(am, name)
 
@@ -222,11 +253,12 @@ class GenMake:
             "suffix":   suffix,
             "rflags":   " " + rflags if rflags else "",
             "run":      TOOLS.run,
+            "dep":      " " + bin if dep_bin else "",
         }
 
         self.append("""\
 .PHONY: {bin}{suffix}-run
-{bin}{suffix}-run: {bin}
+{bin}{suffix}-run:{dep}
 \t{run} --arch {arch} --dir {dir} {bin}{rflags}
 
 """.format(**fmtdata))
@@ -435,6 +467,10 @@ class GenMake:
     @staticmethod
     def test_suffix():
         return "-test"
+
+    @staticmethod
+    def copy_suffix():
+        return "-copy"
 
     @staticmethod
     def run_suffixes(runs):

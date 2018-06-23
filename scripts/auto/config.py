@@ -109,7 +109,8 @@ UNAME_M = shell("uname -m", save_out=True, quiet=True)
 class Arch:
     def __init__(self, name, prefix, triple, run, march, gccflags,
             clang_flags, sysroot, isysroot, llcflags, as_flags,
-            ld_flags, mattr, gccoflags=None, gcc=None):
+            ld_flags, mattr, gccoflags=None, gcc=None,
+            rem_host=None, rem_topdir=None):
 
         self.name = name
         self.prefix = prefix
@@ -140,6 +141,9 @@ class Arch:
         self.ld_flags = ld_flags
         #
         self.mattr = mattr
+        # remote
+        self.rem_host = rem_host
+        self.rem_topdir = rem_topdir
 
 
     def add_prefix(self, s):
@@ -182,6 +186,16 @@ class Arch:
 
     def can_run(self):
         return self.is_rv32_x86() or self.is_native()
+
+
+    def get_remote_path(self, lpath):
+        ltop = DIR.top
+        p = lpath.find(ltop)
+        if p != 0:
+            raise Exception(
+                "Expected to find local topdir at beginning of lpath")
+        rpath = self.rem_topdir + lpath[len(ltop):]
+        return rpath
 
 
 LLC_STATIC      = "-relocation-model=static"
@@ -279,7 +293,9 @@ ARM = Arch(
             "-float-abi=hard"),
         as_flags="",
         ld_flags="",
-        mattr=ARM_MATTR)
+        mattr=ARM_MATTR,
+        rem_host=os.environ["ARM"],
+        rem_topdir=os.environ["ARM_TOPDIR"])
 
 
 RV32_FOR_X86 = Arch(

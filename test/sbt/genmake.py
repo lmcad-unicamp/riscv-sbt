@@ -35,7 +35,7 @@ class Module:
 
     def _bldnrun(self, am, ins, out):
         self.gm.bld(am.narch, ins, out)
-        self.gm.run(self.name, self.robj, am)
+        self.gm.run(self.name, self.robj, am, dep_bin=False)
 
 
     def _xlatenrun(self, am):
@@ -44,7 +44,7 @@ class Module:
         nmod = am.bin(name)
 
         self.gm.xlate(am, fmod, nmod)
-        self.gm.run(name, self.robj, am)
+        self.gm.run(name, self.robj, am, dep_bin=False)
 
 
     def gen(self):
@@ -57,12 +57,14 @@ class Module:
             out = arch.add_prefix(name)
             am = ArchAndMode(None, arch)
             self._bldnrun(am, [_in], out)
+            self.gm.copy(am, name)
 
         # translations
         for (farch, narch) in self.xarchs:
             for mode in SBT.modes:
                 am = ArchAndMode(farch, narch, mode)
                 self._xlatenrun(am)
+                self.gm.copy(am, name)
 
         # tests
         self.gm.test(self.runs)
@@ -93,14 +95,18 @@ class Tests():
         self.append("""\
 all: elf tests utests
 
+{dstdir}:
+\tmkdir -p $@
+
+.PHONY: arm-dstdir
+arm-dstdir:
+\tssh {arm} mkdir -p {arm-dstdir}
+
 ### elf ###
 
 CXX      = g++
 CXXFLAGS = -m32 -Wall -Werror -g -std=c++11 -pedantic
 LDFLAGS  = -m32
-
-{dstdir}:
-\tmkdir -p $@
 
 {dstdir}/elf.o: elf.cpp elf.hpp
 \t$(CXX) $(CXXFLAGS) -o $@ -c $<
@@ -142,6 +148,8 @@ x86-fp128-run:
         "srcdir":   self.srcdir,
         "dstdir":   self.dstdir,
         "sbtdir":   self.sbtdir,
+        "arm":      ARM.rem_host,
+        "arm-dstdir":   ARM.get_remote_path(self.dstdir),
         }))
 
 
@@ -164,6 +172,20 @@ x86-fp128-run:
         return Module(name, src,
                 xarchs, narchs, srcdir, dstdir,
                 xflags, bflags, rflags, sbtflags, dbg)
+
+
+    def _arm_bins(self, names):
+        bins = []
+
+        for name in names:
+            bins.append(ARM.add_prefix(name))
+
+            farch, narch = RV32_LINUX, ARM
+            for mode in SBT.modes:
+                am = ArchAndMode(farch, narch, mode)
+                bins.append(am.bin(name))
+
+        return bins
 
 
     def gen_basic(self):
@@ -194,6 +216,17 @@ x86-fp128-run:
             names.append(mod.name)
 
         tests = [name + GenMake.test_suffix() for name in names]
+        arm_bins = self._arm_bins([name for name in names
+            if name != "hello" and name != "test"])
+        tests_arm_copy = [bin + GenMake.copy_suffix() for bin in arm_bins]
+        tests_arm_run = [bin + GenMake.run_suffix() for bin in arm_bins]
+
+        fmtdata = {
+            "names":    " ".join(names),
+            "tests":    " ".join(tests),
+            "tests-arm-copy":   " ".join(tests_arm_copy),
+            "tests-arm-run":    " ".join(tests_arm_run),
+        }
 
         self.append("""\
 ### tests targets ###
@@ -204,10 +237,13 @@ tests: x86-syscall-test x86-fp128 {names}
 .PHONY: tests-run
 tests-run: tests x86-syscall-test-run {tests}
 
-.PHONY: tests-arm-run
-tests-arm-run: {tests}
+.PHONY: tests-arm-copy
+tests-arm-copy: arm-dstdir {tests-arm-copy}
 
-""".format(**{"names": " ".join(names), "tests": " ".join(tests)}))
+.PHONY: tests-arm-run
+tests-arm-run: {tests-arm-run}
+
+""".format(**fmtdata))
 
 
     def gen_utests(self):

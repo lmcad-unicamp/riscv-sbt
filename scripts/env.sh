@@ -78,3 +78,26 @@ rv32-gdb()
         -ex "set listsize 30" \
         $1
 }
+
+arm-cp()
+{
+    if [ $# -eq 0 ]; then
+        echo "Missing arg(s)"
+        return 1
+    fi
+
+    local src
+    local dst
+    while [ "$1" ]; do
+        src=$1
+        dst=$1
+        shift
+        echo "scp $src $ARM:$ARM_TOPDIR/$dst"
+        scp $src $ARM:$ARM_TOPDIR/$dst
+    done
+}
+
+arm-modcp()
+{
+    arm-cp $(git status | grep modified: | awk '{print$2}' | sort | uniq)
+}
