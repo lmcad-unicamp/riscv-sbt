@@ -216,10 +216,11 @@ x86-fp128-run:
             names.append(mod.name)
 
         tests = [name + GenMake.test_suffix() for name in names]
-        arm_bins = self._arm_bins([name for name in names
-            if name != "hello" and name != "test"])
+        arm_names = [name for name in names
+                if name != "hello" and name != "test"]
+        arm_bins = self._arm_bins(arm_names)
         tests_arm_copy = [bin + GenMake.copy_suffix() for bin in arm_bins]
-        tests_arm_run = [bin + GenMake.run_suffix() for bin in arm_bins]
+        tests_arm_run = [name + GenMake.test_suffix() for name in arm_names]
 
         fmtdata = {
             "names":    " ".join(names),

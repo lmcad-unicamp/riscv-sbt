@@ -317,20 +317,22 @@ class GenMake:
             diffs.append(self._diff(f0, f1))
 
         xams = self._xams()
-        fams = self._ufams()
-        nams = self._unams()
-        farchs = self._farchs()
 
         for xam in xams:
+            if not xam.narch.is_native():
+                continue
+
             xout = name(xam)
-            for fam in fams:
+            # foreign
+            # skip rv32 if on arm
+            if not xam.narch.is_arm():
+                fam = ArchAndMode(None, xam.farch)
                 fout = name(fam)
                 diff(fout, xout)
-            for nam in nams:
-                if nam.narch in farchs:
-                    continue
-                nout = name(nam)
-                diff(nout, xout)
+            # native
+            nam = ArchAndMode(None, xam.narch)
+            nout = name(nam)
+            diff(nout, xout)
 
         tname = Run.build_name(None, self.name, id, None)
         fmtdata = {
