@@ -174,11 +174,12 @@ x86-fp128-run:
                 xflags, bflags, rflags, sbtflags, dbg)
 
 
-    def _arm_bins(self, names):
+    def _arm_bins(self, names, skip_native=False):
         bins = []
 
         for name in names:
-            bins.append(ARM.add_prefix(name))
+            if not skip_native:
+                bins.append(ARM.add_prefix(name))
 
             farch, narch = RV32_LINUX, ARM
             for mode in SBT.modes:
@@ -270,26 +271,38 @@ tests-arm-run: {tests-arm-run}
             else:
                 return []
 
-        xflags = "--sbtobjs syscall runtime counters"
+        def xflags(test):
+            if test == "system":
+                return "--sbtobjs syscall runtime counters"
+            return "--sbtobjs runtime"
+
         rflags = "--tee"
 
         names = []
         for utest in utests:
             if utest == "f" and GOPTS.soft_float():
                 continue
+            skip_arm = True if utest == "system" else False
             name = utest
             src = "rv32-" + name + ".s"
             mod = self._module(name, src, xarchs=xarchs, narchs=narchs,
-                    xflags=xflags, rflags=rflags, sbtflags=sbtflags(name))
+                    xflags=xflags(name), rflags=rflags,
+                    sbtflags=sbtflags(name), skip_arm=skip_arm)
             self.append(mod.gen())
             names.append(utest)
 
-        utests_run = [name + GenMake.test_suffix()
-                    for name in names if name != "system"]
+        run_names = [name for name in names if name != "system"]
+        utests_run = [name + GenMake.test_suffix() for name in run_names]
+
+        arm_bins = self._arm_bins(run_names, skip_native=True)
+        utests_arm_copy = [bin + GenMake.copy_suffix() for bin in arm_bins]
+        utests_arm_run = [name + GenMake.test_suffix() for name in run_names]
 
         fmtdata = {
             "utests":       " ".join(names),
-            "utests_run":   " ".join(utests_run),
+            "utests-run":   " ".join(utests_run),
+            "utests-arm-copy":  " ".join(utests_arm_copy),
+            "utests-arm-run":   " ".join(utests_arm_run),
         }
 
         self.append("""\
@@ -298,7 +311,14 @@ utests: {utests}
 
 # NOTE removed system from utests to run (need MSR access and performance
 # counters support (not always available in VMs))
-utests-run: utests {utests_run}
+utests-run: utests {utests-run}
+\t@echo "All unit tests passed!"
+
+.PHONY: utests-arm-copy
+utests-arm-copy: arm-dstdir {utests-arm-copy}
+
+.PHONY: utests-arm-run
+utests-arm-run: {utests-arm-run}
 \t@echo "All unit tests passed!"
 
 """.format(**fmtdata))

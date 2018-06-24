@@ -330,9 +330,10 @@ class GenMake:
                 fout = name(fam)
                 diff(fout, xout)
             # native
-            nam = ArchAndMode(None, xam.narch)
-            nout = name(nam)
-            diff(nout, xout)
+            if xam.narch in self.narchs:
+                nam = ArchAndMode(None, xam.narch)
+                nout = name(nam)
+                diff(nout, xout)
 
         tname = Run.build_name(None, self.name, id, None)
         fmtdata = {

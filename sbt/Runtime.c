@@ -1,14 +1,10 @@
 #include "Runtime.h"
 
-#include <math.h>
 #include <stdio.h>
 
-int sbt_printf_d(const char *fmt, double d)
-{
-    return printf(fmt, d);
-}
-
 #ifdef __i386__
+
+#include <math.h>
 
 double __trunctfdf2(__float128);
 __float128 __extenddftf2(double);
@@ -134,4 +130,35 @@ asm(
     leave
 );
 
+// sbtabort
+asm(
+    decl_fn(sbtabort)
+    // getpid
+    "movl $0x14, %eax\n\t"
+    "int $0x80\n\t"
+    // kill
+    "movl %eax, %ebx\n\t"   // pid
+    "movl $6, %ecx\n\t"     // SIGABORT
+    "movl $0x25, %eax\n\t"
+    "int $0x80\n"
+);
+
+// non-x86
+#else
+
+#include <sys/types.h>
+#include <signal.h>
+#include <unistd.h>
+
+void sbtabort()
+{
+    kill(getpid(), SIGABRT);
+}
+
 #endif
+
+
+int sbt_printf_d(const char *fmt, double d)
+{
+    return printf(fmt, d);
+}
