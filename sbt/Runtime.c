@@ -1,6 +1,10 @@
 #include "Runtime.h"
 
+#include <signal.h>
 #include <stdio.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 
 #ifdef __i386__
 
@@ -130,32 +134,13 @@ asm(
     leave
 );
 
-// sbtabort
-asm(
-    decl_fn(sbtabort)
-    // getpid
-    "movl $0x14, %eax\n\t"
-    "int $0x80\n\t"
-    // kill
-    "movl %eax, %ebx\n\t"   // pid
-    "movl $6, %ecx\n\t"     // SIGABORT
-    "movl $0x25, %eax\n\t"
-    "int $0x80\n"
-);
+#endif  // __i386__
 
-// non-x86
-#else
-
-#include <sys/types.h>
-#include <signal.h>
-#include <unistd.h>
 
 void sbtabort()
 {
     kill(getpid(), SIGABRT);
 }
-
-#endif
 
 
 int sbt_printf_d(const char *fmt, double d)

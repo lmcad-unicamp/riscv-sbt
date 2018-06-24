@@ -76,7 +76,9 @@ class Sbt:
         if is_rv32 and not is_runtime:
             return ""
         if is_runtime and not clink:
-            return ""
+            if is_rv32:
+                return ""
+            name = "asm-runtime"
         if is_rv32 and is_runtime and GOPTS.hard_float():
             suffix = "-hf"
         else:

@@ -79,6 +79,10 @@ target_compile_options(x86-syscall PRIVATE --32)
 add_library(x86-counters OBJECT x86-counters.s)
 target_compile_options(x86-counters PRIVATE --32)
 
+# x86 asm runtime
+add_library(x86-asm-runtime OBJECT x86-runtime.s)
+target_compile_options(x86-asm-runtime PRIVATE --32)
+
 # SBT
 
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
@@ -173,11 +177,15 @@ add_dependencies(riscv-sbt libc rv32-runtime x86-runtime arm-runtime)
 install(TARGETS riscv-sbt DESTINATION bin)
 # libc.bc
 install(FILES ${CMAKE_BINARY_DIR}/libc.bc DESTINATION share/riscv-sbt)
-# syscall + counters
+# syscall
 install(FILES ${CMAKE_BINARY_DIR}/CMakeFiles/x86-syscall.dir/x86-syscall.s.o
     RENAME x86-syscall.o DESTINATION share/riscv-sbt)
+# counters
 install(FILES ${CMAKE_BINARY_DIR}/CMakeFiles/x86-counters.dir/x86-counters.s.o
     RENAME x86-counters.o DESTINATION share/riscv-sbt)
+# asm runtime
+install(FILES ${CMAKE_BINARY_DIR}/CMakeFiles/x86-asm-runtime.dir/x86-runtime.s.o
+    RENAME x86-asm-runtime.o DESTINATION share/riscv-sbt)
 # runtime
 install(FILES ${CMAKE_BINARY_DIR}/rv32-runtime.o DESTINATION share/riscv-sbt)
 install(FILES ${CMAKE_BINARY_DIR}/rv32-runtime-hf.o DESTINATION share/riscv-sbt)

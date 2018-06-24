@@ -104,7 +104,7 @@ arm-dstdir:
 
 ### elf ###
 
-CXX      = g++
+CXX      = x86_64-linux-gnu-g++
 CXXFLAGS = -m32 -Wall -Werror -g -std=c++11 -pedantic
 LDFLAGS  = -m32
 
@@ -368,7 +368,7 @@ rv32tests_status:
 """.format(**{"status":status}))
 
         dbg = False
-        xarchs = self.xarchs
+        xarchs = [(RV32_LINUX, X86)]
         narchs = [RV32_LINUX]
         qtests = path(DIR.top, "riscv-qemu-tests")
         incdir = qtests
@@ -446,6 +446,25 @@ almost-alltests: basic-test tests-run utests-run mmm rv32tests-run
 
 .PHONY: alltests
 alltests: setmsr almost-alltests system-test
+
+.PHONY: basic-test-arm
+basic-test-arm:
+\t$(MAKE) -C {top}/test all
+
+.PHONY: basic-test-arm-copy
+basic-test-arm-copy: basic-test-arm
+\t$(MAKE) -C {top}/test arm-copy
+
+.PHONY: basic-test-arm-run
+basic-test-arm-run:
+\t$(MAKE) -C {top}/test run
+
+.PHONY: alltests-arm-copy
+alltests-arm-copy: basic-test-arm-copy tests-arm-copy utests-arm-copy
+
+.PHONY: alltests-arm-run
+alltests-arm-run: basic-test-arm-run tests-arm-run utests-arm-run
+
 """.format(**fmtdata))
 
 
