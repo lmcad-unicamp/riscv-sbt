@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from auto.config import DIR, GOPTS, RV32_LINUX, SBT, TOOLS, X86
+from auto.config import ARM, DIR, GOPTS, RV32_LINUX, SBT, TOOLS, X86
 from auto.genmake import ArchAndMode, GenMake, Run, Runs
 from auto.utils import cat, mpath, path, xassert
 
@@ -76,18 +76,28 @@ class Bench:
                 self.gm.xlate(am, fin, fout)
 
 
-    def gen_run(self):
-        # prepare archs and modes
+    def _ams(self):
         ams = [ArchAndMode(None, arch) for arch in self.narchs]
         ams.extend(
             [ArchAndMode(farch, narch, mode)
             for (farch, narch) in self.xarchs
             for mode in SBT.modes])
+        return ams
 
-        # runs
-        for am in ams:
+
+    def gen_run(self):
+        for am in self._ams():
             for run in self.runs:
                 self.gm.run(self.runs.name, run, am)
+
+
+    def arm_bins(self):
+        return [am.bin(self.name) for am in self._ams()]
+
+
+    def gen_copy(self):
+        for am in self._ams():
+            self.gm.copy(am, self.name)
 
 
     def gen_test(self):
@@ -118,6 +128,7 @@ class Bench:
     def gen(self):
         self.gen_build()
         self.gen_run()
+        self.gen_copy()
         self.gen_test()
         self.gen_measure()
         self.gm.clean()
@@ -160,13 +171,13 @@ class EncDecBench(Bench):
 
 class MiBench:
     def __init__(self):
-        self.narchs = [RV32_LINUX, X86]
-        self.xarchs = [(RV32_LINUX, X86)]
+        self.narchs = [RV32_LINUX, X86, ARM]
+        self.xarchs = [(RV32_LINUX, X86), (RV32_LINUX, ARM)]
         self.srcdir = path(DIR.top, "mibench")
         self.dstdir = path(DIR.build, "mibench")
         self.stack_large = ["-stack-size=131072"]    # 128K
         self.stack_huge = ["-stack-size=1048576"]    # 1M
-        self.bflags = "--cc=" + GOPTS.cc
+        self.bflags = cat("--cc=" + GOPTS.cc, "--sbtobjs=runtime")
         self.txt = ''
         self.benchs = None
 
@@ -375,12 +386,16 @@ csv-header:
 .PHONY: benchs-measure
 benchs-measure: benchs csv-header {}
 
+.PHONY: benchs-arm-copy
+benchs-arm-copy: benchs {}
+
 """.format(
             " ".join(names),
             " ".join([name + "-test" for name in names]),
             ",".join(csv_header[0]),
             ",".join(csv_header[1]),
             " ".join([name + "-measure" for name in names]),
+            " ".join([name + "-copy" for name in names]),
         ))
 
 
