@@ -88,7 +88,7 @@ class Bench:
     def gen_run(self):
         for am in self._ams():
             for run in self.runs:
-                self.gm.run(self.runs.name, run, am)
+                self.gm.run(self.runs.name, run, am, dep_bin=False)
 
 
     def arm_bins(self):
@@ -386,7 +386,7 @@ arm-dstdir:
 benchs: {}
 
 .PHONY: benchs-test
-benchs-test: benchs {}
+benchs-test: {}
 
 .PHONY: csv-header
 csv-header:
@@ -394,7 +394,7 @@ csv-header:
 \techo "{}" >> mibench.csv
 
 .PHONY: benchs-measure
-benchs-measure: benchs csv-header {}
+benchs-measure: csv-header {}
 
 .PHONY: benchs-arm-copy
 benchs-arm-copy: benchs arm-dstdir {}
