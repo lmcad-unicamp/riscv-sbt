@@ -4,6 +4,8 @@
 export TOPDIR=$PWD
 export ARM="luporl@192.168.0.15"
 export ARM_TOPDIR="~/riscv-sbt"
+export ADB=adb
+export ADB_TOPDIR=/data/local/tmp/riscv-sbt
 
 # build type
 if [ $# -eq 1 -a "$1" == "release" ]; then
@@ -100,4 +102,22 @@ arm-cp()
 arm-modcp()
 {
     arm-cp $(git status | grep modified: | awk '{print$2}' | sort | uniq)
+}
+
+adb-cp()
+{
+    if [ $# -eq 0 ]; then
+        echo "Missing arg(s)"
+        return 1
+    fi
+
+    local src
+    local dst
+    while [ "$1" ]; do
+        src=$1
+        dst=$1
+        shift
+        echo "adb push $src $ADB_TOPDIR/$dst"
+        adb push $src $ADB_TOPDIR/$dst
+    done
 }

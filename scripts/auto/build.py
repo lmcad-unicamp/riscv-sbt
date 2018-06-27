@@ -338,6 +338,8 @@ class Builder:
         else:
             tool = arch.ld
             flags = arch.ld_flags
+        if GOPTS.static:
+            flags = cat(flags, "-static")
         flags = cat(flags, opts.ldflags)
         if opts.clink:
             flags = cat(flags, "-lm")

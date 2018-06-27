@@ -14,15 +14,24 @@ class GlobalOpts:
             self.abi = "ilp32d"
         else:
             self.abi = "ilp32"
-
+        #self.arm_copy = "ssh"
+        self.arm_copy = "adb"
+        if self.arm_copy == "adb":
+            self.static = True
+        else:
+            self.static = False
 
     def soft_float(self):
         return self.abi == "ilp32"
 
-
     def hard_float(self):
         return self.abi == "ilp32d"
 
+    def adb_copy(self):
+        return self.arm_copy == "adb"
+
+    def ssh_copy(self):
+        return self.arm_copy == "ssh"
 
 GOPTS = GlobalOpts()
 
@@ -277,6 +286,9 @@ ARM_PREFIX  = "arm"
 ARM_SYSROOT = "/usr/arm-linux-gnueabihf"
 ARM_MARCH   = "arm"
 ARM_MATTR   = "armv7-a"
+ARM_HOST    = os.environ["ARM"] if GOPTS.ssh_copy() else os.environ["ADB"]
+ARM_TOPDIR  = (os.environ["ARM_TOPDIR"] if GOPTS.ssh_copy()
+                else os.environ["ADB_TOPDIR"])
 
 ARM = Arch(
         name=ARM_PREFIX,
@@ -296,8 +308,8 @@ ARM = Arch(
         as_flags="",
         ld_flags="",
         mattr=ARM_MATTR,
-        rem_host=os.environ["ARM"],
-        rem_topdir=os.environ["ARM_TOPDIR"])
+        rem_host=ARM_HOST,
+        rem_topdir=ARM_TOPDIR)
 
 
 RV32_FOR_X86 = Arch(

@@ -7,6 +7,7 @@ RUN_PY    := $(TOPDIR)/scripts/auto/run.py
 SRCDIR    := $(shell pwd)
 DSTDIR    := $(TOPDIR)/build/test
 ARM_DSTDIR := $(ARM_TOPDIR)/build/test
+ADB_DSTDIR := $(ADB_TOPDIR)/build/test
 
 ARCHS     := rv32-linux x86 arm
 COMPILERS := clang gcc
@@ -57,7 +58,12 @@ endef
 $(eval $(foreach arch,$(ARCHS),$(foreach cc,$(COMPILERS),\
 $(call BLDNRUN,$(arch),$(cc),hello))))
 
-.PHONY: arm-copy
-arm-copy:
+.PHONY: ssh-copy
+ssh-copy:
 	ssh $(ARM) mkdir -p $(ARM_DSTDIR)
 	scp $(foreach cc,$(COMPILERS),$(DSTDIR)/arm-$(cc)-hello) $(ARM):$(ARM_DSTDIR)
+
+.PHONY: adb-copy
+adb-copy:
+	$(ADB) shell mkdir -p $(ADB_DSTDIR)
+	$(ADB) push $(foreach cc,$(COMPILERS),$(DSTDIR)/arm-$(cc)-hello) $(ADB_DSTDIR)

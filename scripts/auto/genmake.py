@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from auto.config import SBT, TOOLS, X86
+from auto.config import GOPTS, SBT, TOOLS, X86
 from auto.utils import cat, path, unique
 
 class ArchAndMode:
@@ -207,6 +207,24 @@ class GenMake:
 """.format(**fmtdata))
 
 
+    def _ssh_copy(self, fmtdata):
+        self.append("""\
+.PHONY: {tgt}
+{tgt}: {out}
+\tscp {src} {rem}:{dst}
+
+""".format(**fmtdata))
+
+
+    def _adb_copy(self, fmtdata):
+        self.append("""\
+.PHONY: {tgt}
+{tgt}: {out}
+\t{rem} push {src} {dst}
+
+""".format(**fmtdata))
+
+
     def copy(self, am, name):
         # don't copy if we're not on an x86 host OR
         # if 'out' is a native binary OR
@@ -230,12 +248,10 @@ class GenMake:
             "dst":      dst,
         }
 
-        self.append("""\
-.PHONY: {tgt}
-{tgt}: {out}
-\tscp {src} {rem}:{dst}
-
-""".format(**fmtdata))
+        if GOPTS.ssh_copy():
+            self._ssh_copy(fmtdata)
+        else:
+            self._adb_copy(fmtdata)
 
 
     def run(self, name, robj, am, dep_bin=True):

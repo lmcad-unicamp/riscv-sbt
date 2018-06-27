@@ -100,7 +100,7 @@ all: elf tests utests
 
 .PHONY: arm-dstdir
 arm-dstdir:
-\tssh {arm} mkdir -p {arm-dstdir}
+\t{mk-arm-dstdir}
 
 ### elf ###
 
@@ -148,8 +148,10 @@ x86-fp128-run:
         "srcdir":   self.srcdir,
         "dstdir":   self.dstdir,
         "sbtdir":   self.sbtdir,
-        "arm":      ARM.rem_host,
-        "arm-dstdir":   ARM.get_remote_path(self.dstdir),
+        "mk-arm-dstdir":
+            ("ssh {} mkdir -p {}" if GOPTS.ssh_copy()
+             else "{} shell mkdir -p {}").format(
+                ARM.rem_host, ARM.get_remote_path(self.dstdir))
         }))
 
 
@@ -417,6 +419,7 @@ rv32tests-clean:
             "srcdir":   self.srcdir,
             "dstdir":   self.dstdir,
             "measure":  path(DIR.auto, "measure.py"),
+            "arm-copy": "ssh-copy" if GOPTS.ssh_copy() else "adb-copy"
         }
 
         self.append("""\
@@ -453,7 +456,7 @@ basic-test-arm:
 
 .PHONY: basic-test-arm-copy
 basic-test-arm-copy: basic-test-arm
-\t$(MAKE) -C {top}/test arm-copy
+\t$(MAKE) -C {top}/test {arm-copy}
 
 .PHONY: basic-test-arm-run
 basic-test-arm-run:
