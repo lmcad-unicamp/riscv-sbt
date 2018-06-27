@@ -9,11 +9,11 @@ export ADB_TOPDIR=/data/local/tmp/riscv-sbt
 
 # build type
 if [ $# -eq 1 -a "$1" == "release" ]; then
-  BUILD_TYPE=Release
-  BUILD_TYPE_DIR=release
+    BUILD_TYPE=Release
+    BUILD_TYPE_DIR=release
 else
-  BUILD_TYPE=Debug
-  BUILD_TYPE_DIR=debug
+    BUILD_TYPE=Debug
+    BUILD_TYPE_DIR=debug
 fi
 
 # toolchains: debug and release
@@ -104,6 +104,8 @@ arm-modcp()
     arm-cp $(git status | grep modified: | awk '{print$2}' | sort | uniq)
 }
 
+# ADB copy
+
 adb-cp()
 {
     if [ $# -eq 0 ]; then
@@ -117,7 +119,26 @@ adb-cp()
         src=$1
         dst=$1
         shift
-        echo "adb push $src $ADB_TOPDIR/$dst"
-        adb push $src $ADB_TOPDIR/$dst
+        echo "$ADB push $src $ADB_TOPDIR/$dst"
+        $ADB push $src $ADB_TOPDIR/$dst
     done
+}
+
+# ADB on Windows
+
+ADB36_WIN="/cygdrive/c/Users/leandro.lupori/Documents/programs/adb36/adb.exe"
+
+adb-win-server-start()
+{
+    $ADB36_WIN -a nodaemon server&
+}
+
+adb-win-server-stop()
+{
+    $ADB36_WIN -H 127.0.0.1 kill-server
+}
+
+adb-win()
+{
+    $ADB36_WIN -H 127.0.0.1 $@
 }
