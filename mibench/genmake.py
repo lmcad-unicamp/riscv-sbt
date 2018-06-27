@@ -96,8 +96,12 @@ class Bench:
 
 
     def gen_copy(self):
+        tgts = [self.gm.mk_arm_dstdir(self.name)]
         for am in self._ams():
-            self.gm.copy(am, self.name)
+            tgt = self.gm.copy(am, self.name)
+            if len(tgt) > 0:
+                tgts.append(tgt)
+        self.gm.alias(self.name + self.gm.copy_suffix(), tgts)
 
 
     def gen_test(self):
@@ -197,7 +201,11 @@ all: benchs
 clean:
 \trm -rf {}
 
-""".format(self.dstdir))
+.PHONY: arm-dstdir
+arm-dstdir:
+\t{}
+
+""".format(self.dstdir, GenMake.mk_arm_dstdir_static(self.dstdir)))
 
 
     def _bench(self, name, dir, ins, runs,
@@ -389,7 +397,7 @@ csv-header:
 benchs-measure: benchs csv-header {}
 
 .PHONY: benchs-arm-copy
-benchs-arm-copy: benchs {}
+benchs-arm-copy: benchs arm-dstdir {}
 
 """.format(
             " ".join(names),

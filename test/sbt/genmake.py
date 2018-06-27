@@ -148,10 +148,7 @@ x86-fp128-run:
         "srcdir":   self.srcdir,
         "dstdir":   self.dstdir,
         "sbtdir":   self.sbtdir,
-        "mk-arm-dstdir":
-            ("ssh {} mkdir -p {}" if GOPTS.ssh_copy()
-             else "{} shell mkdir -p {}").format(
-                ARM.rem_host, ARM.get_remote_path(self.dstdir))
+        "mk-arm-dstdir":    GenMake.mk_arm_dstdir_static(self.dstdir)
         }))
 
 

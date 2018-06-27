@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from auto.config import GOPTS, SBT, TOOLS, X86
+from auto.config import ARM, GOPTS, SBT, TOOLS, X86
 from auto.utils import cat, path, unique
 
 class ArchAndMode:
@@ -230,7 +230,7 @@ class GenMake:
         # if 'out' is a native binary OR
         # if 'out' is a RISC-V binary (we can emulate it)
         if not X86.is_native() or am.narch.is_native() or am.narch.is_rv32():
-            return
+            return ''
 
         out = am.bin(name)
         tgt = out + self.copy_suffix()
@@ -252,6 +252,27 @@ class GenMake:
             self._ssh_copy(fmtdata)
         else:
             self._adb_copy(fmtdata)
+        return tgt
+
+
+    @staticmethod
+    def mk_arm_dstdir_static(dstdir):
+        return ("ssh {} mkdir -p {}" if GOPTS.ssh_copy()
+             else "{} shell mkdir -p {}").format(
+                ARM.rem_host, ARM.get_remote_path(dstdir))
+
+
+    def mk_arm_dstdir(self, name):
+        tgt = name + "-arm-dstdir"
+
+        self.append("""\
+.PHONY: {0}
+{0}:
+\t{1}
+
+""".format( tgt,
+            self.mk_arm_dstdir_static(self.dstdir)))
+        return tgt
 
 
     def run(self, name, robj, am, dep_bin=True):
