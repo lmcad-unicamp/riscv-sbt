@@ -163,6 +163,8 @@ class EncDecBench(Bench):
 
         tests = []
         for am in self.gm.ams():
+            if not am.narch.can_run():
+                continue
             tgt = am.bin(self.name)
             runs = self.gm.get_runs(self.runs, am, self.name)
             tests.append(self.gen_single_test(tgt, runs, asc, am.fmt(dec)))

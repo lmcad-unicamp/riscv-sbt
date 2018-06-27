@@ -14,8 +14,8 @@ class GlobalOpts:
             self.abi = "ilp32d"
         else:
             self.abi = "ilp32"
-        #self.arm_copy = "ssh"
-        self.arm_copy = "adb"
+        self.arm_copy = "ssh"
+        #self.arm_copy = "adb"
         if self.arm_copy == "adb":
             self.static = True
         else:

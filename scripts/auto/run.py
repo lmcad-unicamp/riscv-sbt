@@ -24,7 +24,7 @@ class Runner:
         arch = self.arch
         ppath = path(dir, prog)
         opath = path(dir, out)
-        save_out = len(out) > 0
+        save_out = len(out) > 0 and self.arch.can_run()
 
         cmd = cat(arch.run, ppath, " ".join(args))
         if tee:
@@ -32,15 +32,16 @@ class Runner:
                   "; exit ${PIPESTATUS[0]}")
             self._run_native(cmd, save_out, bin, exp_rc)
         else:
-            if save_out and bin:
-                sout = self._run_native(cmd, save_out, bin, exp_rc)
-                with open(opath, "wb") as f:
-                    f.write(sout)
-            else:
+            try:
+                f = None
+                if save_out:
+                    f = open(opath, "wb" if bin else "w")
                 sout = self._run_native(cmd, save_out, bin, exp_rc)
                 if save_out:
-                    with open(opath, "w") as f:
-                        f.write(sout)
+                    f.write(sout)
+            finally:
+                if f:
+                    f.close()
 
 
 if __name__ == "__main__":
