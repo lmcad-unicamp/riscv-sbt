@@ -286,9 +286,9 @@ ARM_PREFIX  = "arm"
 ARM_SYSROOT = "/usr/arm-linux-gnueabihf"
 ARM_MARCH   = "arm"
 ARM_MATTR   = "armv7-a"
-ARM_HOST    = os.environ["ARM"] if GOPTS.ssh_copy() else os.environ["ADB"]
-ARM_TOPDIR  = (os.environ["ARM_TOPDIR"] if GOPTS.ssh_copy()
-                else os.environ["ADB_TOPDIR"])
+ARM_HOST    = os.getenv("ARM") if GOPTS.ssh_copy() else os.getenv("ADB")
+ARM_TOPDIR  = (os.getenv("ARM_TOPDIR") if GOPTS.ssh_copy()
+                else os.getenv("ADB_TOPDIR"))
 
 ARM = Arch(
         name=ARM_PREFIX,

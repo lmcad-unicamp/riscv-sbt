@@ -34,15 +34,15 @@ docker-img:
 		./build.py --get-srcs && \
 		./build.py --build all
 
-docker-dev:
+docker-rdev:
 	cd docker && \
 		export TOPDIR=$(TOPDIR) PYTHONPATH=$(TOPDIR)/scripts && \
-		./build.py --dev
+		./build.py --rdev
 
-docker-dev2:
+docker-xdev:
 	cd docker && \
 		export TOPDIR=$(TOPDIR) PYTHONPATH=$(TOPDIR)/scripts && \
-		./build.py --dev2
+		./build.py --xdev
 
 ###
 

@@ -11,6 +11,138 @@ TOPDIR          = os.environ["TOPDIR"]
 DOCKER_DIR      = path(TOPDIR, "docker")
 
 #
+# Helper
+#
+
+class Helper:
+    @staticmethod
+    def is_cygwin():
+        try:
+            shell("uname | grep -i cygwin")
+            return True
+        except:
+            return False
+
+    @staticmethod
+    def cygpath(path):
+        if Helper.is_cygwin():
+            return shell("cygpath -m " + path, save_out=True).strip()
+        else:
+            return path
+
+    @staticmethod
+    def clean_imgs():
+        # remove all container instances
+        containers = shell("docker ps -a | awk '{print$1}' | sed 1d",
+            save_out=True).split()
+        if len(containers) > 0:
+            shell("docker rm " + " ".join(containers))
+        # remove all '<none>' and 'sbt' images
+        images = shell(
+            "docker images | grep -e sbt -e '<none>' | awk '{print$3}'",
+            save_out=True).split()
+        if len(images) > 0:
+            shell("docker rmi " + " ".join(images))
+
+#
+# Volumes
+#
+
+class Volume:
+    def __init__(self, name, vol_name, mount_point):
+        self.name = name
+        self.vol_name = vol_name
+        self.mount_point = mount_point
+
+
+    def create(self):
+        # create volume if needed
+        try:
+            shell("docker volume ls | grep " + self.vol_name)
+        except:
+            shell("docker volume create " + self.vol_name)
+
+
+    def volstr(self):
+        return "--mount type=volume,source={},destination={}".format(
+                    self.vol_name, self.mount_point)
+
+
+class Volumes:
+    def __init__(self):
+        self.vols = {
+            "build":
+                Volume("build", "sbt-vol-build", "/riscv-sbt/build"),
+            "toolchain":
+                Volume("toolchain", "sbt-vol-toolchain", "/riscv-sbt/toolchain")
+        }
+
+
+    def __getitem__(self, key):
+        return self.vols[key]
+
+
+    def volstr(self):
+        vstr = ''
+        for k, v in self.vols.items():
+            vstr = cat(vstr, v.volstr())
+        return vstr
+
+
+VOLS = Volumes()
+
+#
+# Docker
+#
+
+class Docker:
+    def __init__(self, name, img):
+        self.name = name
+        self.img = img
+
+
+    def cmd(self, dcmd, cmd, interactive, vols=None):
+        if Helper.is_cygwin():
+            prefix = "winpty "
+        else:
+            prefix = ''
+
+        privileged = True
+        fmtdata = {
+            "prefix":       prefix if interactive else "",
+            "dcmd":         dcmd,
+            "privileged":   " --privileged" if privileged else "",
+            "interactive":  " -it" if interactive else  "",
+            "rm":           " --rm" if dcmd == "run" else "",
+            "hostname":     " -h dev" if dcmd == "run" else "",
+            "name":         " --name " + self.name if dcmd == "run" else "",
+            "vols":         " " + vols if vols else "",
+            "img":          " " + self.img,
+            "cmd":          " " + cmd if cmd else "",
+        }
+
+        shell(("{prefix}docker {dcmd}" +
+            "{privileged}{interactive}{rm}{hostname}{name}{vols}{img}{cmd}"
+            ).format(**fmtdata))
+
+
+    def run(self, cmd=None, interactive=False):
+        self.cmd("run", cmd, interactive, vols=Docker.volstr())
+
+
+    def exec(self, cmd, interactive=True):
+        self.cmd("exec", cmd, interactive)
+
+
+    @staticmethod
+    def volstr():
+        src = Helper.cygpath(TOPDIR)
+        dst = "/riscv-sbt"
+        vstr = "--mount type=bind,source={},destination={}".format(src, dst)
+        vstr = cat(vstr, VOLS.volstr())
+        return vstr
+
+#
 # Commits
 #
 
@@ -80,10 +212,14 @@ class Commits:
 
 # source package
 class Source:
-    def __init__(self, name, dir, url, clone_flags=None):
+    def __init__(self, name, url, dir=None, clone_flags=None):
         self.name = name
-        self.parent_dir = mpath(DOCKER_DIR, dir, "src")
-        self.dstdir = path(self.parent_dir, name)
+        if dir == "top":
+            self.dstdir = TOPDIR
+            self.parent_dir = None
+        else:
+            self.parent_dir = path(TOPDIR, "submodules")
+            self.dstdir = path(self.parent_dir, name)
         self.url = url
         self.clone_flags = clone_flags
         self.update = True
@@ -108,29 +244,30 @@ class Source:
 class Sources:
     def __init__(self):
         self.srcs = [
-            Source("riscv-sbt", "riscv-sbt",
-                "https://github.com/OpenISA/riscv-sbt.git"),
-            Source("riscv-gnu-toolchain", "riscv-gnu-toolchain",
+            Source("riscv-sbt",
+                "https://github.com/OpenISA/riscv-sbt.git",
+                dir="top"),
+            Source("riscv-gnu-toolchain",
                 "https://github.com/riscv/riscv-gnu-toolchain",
-                "--recursive"),
-            Source("llvm", "llvm",
+                clone_flags="--recursive"),
+            Source("llvm",
                 "https://github.com/OpenISA/llvm",
-                "--recursive -b lowrisc"),
-            Source("clang", "llvm",
+                clone_flags="--recursive -b lowrisc"),
+            Source("clang",
                 "https://github.com/OpenISA/clang",
-                "--recursive -b lowrisc"),
-            Source("riscv-fesvr", "emu",
+                clone_flags="--recursive -b lowrisc"),
+            Source("riscv-fesvr",
                 "https://github.com/riscv/riscv-fesvr",
-                "--recursive"),
-            Source("riscv-pk", "emu",
+                clone_flags="--recursive"),
+            Source("riscv-pk",
                 "https://github.com/riscv/riscv-pk",
-                "--recursive"),
-            Source("riscv-isa-sim", "emu",
+                clone_flags="--recursive"),
+            Source("riscv-isa-sim",
                 "https://github.com/riscv/riscv-isa-sim",
-                "--recursive"),
-            Source("riscv-qemu-tests", "emu",
+                clone_flags="--recursive"),
+            Source("riscv-qemu-tests",
                 "https://github.com/arsv/riscv-qemu-tests",
-                "--recursive")
+                clone_flags="--recursive")
         ]
 
         commits = Commits(TOPDIR, DOCKER_DIR)
@@ -153,12 +290,8 @@ class Sources:
 class Image:
     commits = Commits(TOPDIR, DOCKER_DIR).load()
 
-    def __init__(self, name, srcs=None, img=None):
+    def __init__(self, name, img=None):
         self.name = name
-        if srcs == None:
-            self.srcs = [name]
-        else:
-            self.srcs = srcs
         if not img:
             self.img = "sbt-" + name
         else:
@@ -166,175 +299,81 @@ class Image:
 
 
     # build if done file does not exist
-    def build(self):
-        # skip if done
+    def build(self, force):
         dir = path(DOCKER_DIR, self.name)
         done = path(dir, "done")
-        if os.path.exists(done):
+        # skip if done
+        if not force and os.path.exists(done):
             return
 
         # docker build
         with cd(DOCKER_DIR):
             shell("docker build -t {} {}".format(
                 self.img, self.name))
+            self._build()
             shell("touch " + done)
 
 
-class Images:
-    build_vol = "sbt-vol-build"
-    toolchain_vol = "sbt-vol-toolchain"
+    def _build(self):
+        name = self.name
+        docker = Docker(name, self.img)
+        if name == "riscv-sbt":
+            pass
+        elif name == "riscv-gnu-toolchain":
+            VOLS["build"].create()
+            VOLS["toolchain"].create()
+            docker.run("make riscv-gnu-toolchain-newlib")
+            docker.run("make riscv-gnu-toolchain-linux")
+        elif name == "emu":
+            docker.run("make spike")
+            docker.run("make qemu")
+        elif name == "llvm":
+            docker.run("make llvm")
+        elif name == "sbt":
+            docker.run("make sbt")
+            # run sbt tests (all but system)
+            docker.run('bash -c "mkdir -p junk && make almost-alltests"')
+        else:
+            raise Exception("TODO: build " + name)
 
+
+class Images:
     def __init__(self):
         self.imgs = [
             Image("riscv-sbt"),
             Image("riscv-gnu-toolchain"),
-            Image("emu",
-                srcs=["riscv-fesvr",
-                    "riscv-isa-sim",
-                    "riscv-pk",
-                    "riscv-gnu-toolchain/riscv-qemu",
-                    "riscv-qemu-tests"]),
-            Image("llvm", srcs=["llvm", "clang"]),
-            Image("sbt", srcs=[], img="sbt"),
-            Image("dev", srcs=[])
+            Image("emu"),
+            Image("llvm"),
+            Image("sbt", img="sbt"),
+            Image("dev")
         ]
         self._iter = None
 
 
-    def build(self, name):
+    def build(self, name, force):
         # build all?
         if name == "all":
             for img in self.imgs:
-                img.build()
+                img.build(force)
             return
 
         # find and build img by name
         for img in self.imgs:
             if img.name == name:
-                img.build()
+                img.build(force)
                 break
         else:
             sys.exit("ERROR: component not found: " + args.build)
-
-
-    def _find_img(self, name):
-        for img in self.imgs:
-            if img.name == name:
-                return img
-        raise Exception("Image " + name + " not found")
-
-
-    def _copy_build_objs(self, img):
-        if img.name in ["riscv-sbt", "dev"]:
-            return
-
-        shell("docker run --rm --mount source=" + self.build_vol +
-                ",destination=/build " + img.img +
-                " cp -a build /")
-
-
-    def copy_build_objs(self, img_names):
-        if len(img_names) == 0:
-            raise Exception("No images specified")
-
-        # create volume if needed
-        try:
-            shell("docker volume ls | grep " + self.build_vol)
-        except:
-            shell("docker volume create " + self.build_vol)
-
-        # find images
-        if len(img_names) == 1 and img_names[0] == "all":
-            imgs = self.imgs
-        else:
-            imgs = []
-            for img_name in img_names:
-                imgs.append(self._find_img(img_name))
-
-        for img in imgs:
-            self._copy_build_objs(img)
-
-
-    def copy_toolchain(self):
-        try:
-            shell("docker volume ls | grep " + self.toolchain_vol)
-        except:
-            shell("docker volume create " + self.toolchain_vol)
-
-        shell("docker run --rm --mount source=" + self.toolchain_vol +
-                ",destination=/toolchain sbt" +
-                " cp -a toolchain /")
 
 
     def __iter__(self):
         self._iter = iter(self.imgs)
         return self._iter
 
+
 #
 # main
 #
-
-def is_cygwin():
-    try:
-        shell("uname | grep -i cygwin")
-        return True
-    except:
-        return False
-
-def get_volstr():
-    workdir = mpath(DOCKER_DIR, "riscv-sbt", "src", "riscv-sbt")
-    emu = mpath(DOCKER_DIR, "emu", "src")
-    llvm = mpath(DOCKER_DIR, "llvm", "src")
-    vols = {
-        "/riscv-sbt"            : workdir,
-        "/riscv-sbt/build"      : Images.build_vol,
-        "/riscv-sbt/toolchain"  : Images.toolchain_vol,
-        "/riscv-sbt/submodules/riscv-gnu-toolchain" :
-            mpath(DOCKER_DIR, "riscv-gnu-toolchain", "src",
-                    "riscv-gnu-toolchain"),
-        "/riscv-sbt/submodules/riscv-fesvr"     : path(emu, "riscv-fesvr"),
-        "/riscv-sbt/submodules/riscv-isa-sim"   : path(emu, "riscv-isa-sim"),
-        "/riscv-sbt/submodules/riscv-pk"        : path(emu, "riscv-pk"),
-        "/riscv-sbt/submodules/riscv-qemu-tests": path(emu, "riscv-qemu-tests"),
-        "/riscv-sbt/submodules/llvm"    : path(llvm, "llvm"),
-        "/riscv-sbt/submodules/clang"   : path(llvm, "clang"),
-    }
-
-    def is_vol(key):
-        return key in ["/riscv-sbt/build", "/riscv-sbt/toolchain"]
-
-    if is_cygwin():
-        def cygpath(path):
-            return shell("cygpath -m " + path, save_out=True).strip()
-
-        for k, v in vols.items():
-            if is_vol(k):
-                continue
-            vols[k] = cygpath(v)
-
-    vols_str = ''
-    for k, v in vols.items():
-        if is_vol(k):
-            t="volume"
-        else:
-            t="bind"
-        vols_str = cat(vols_str,
-                "--mount type={},source={},destination={}".format(t, v, k))
-    return vols_str
-
-
-def run_dev(n):
-    if is_cygwin():
-        prefix = "winpty "
-    else:
-        prefix = ''
-
-    if n == 1:
-        shell(prefix + "docker run --privileged -it --rm -h dev --name dev " +
-                get_volstr() + " sbt-dev")
-    elif n == 2:
-        shell(prefix + "docker exec -it dev /bin/bash")
-
 
 if __name__ == "__main__":
     imgs = Images()
@@ -347,24 +386,31 @@ if __name__ == "__main__":
         help="clone and checkout all needed sources")
     parser.add_argument("--clean", action="store_true",
         help="remove done files from every docker build dir")
-    parser.add_argument("--clean-srcs", action="store_true",
-        help="remove downloaded sources dir")
     parser.add_argument("--clean-imgs", action="store_true",
         help="remove <none> and docker related images")
     parser.add_argument("--build", metavar="img", type=str,
         choices=names + ["all"],
         help="build img. imgs=[{}]".format(", ".join(names + ["all"])))
-    parser.add_argument("--run", action="store_true",
-        help="run the sbt container")
-    parser.add_argument("--copy-build-objs",
-        metavar="img", type=str, nargs='+',
-        help="copy build objects from intermediate containers" +
-            " (use \"all\" to copy objs from all images)")
-    parser.add_argument("--copy-toolchain", action="store_true",
-        help="copy toolchain files to volume")
-    parser.add_argument("--dev", action="store_true")
-    parser.add_argument("--dev2", action="store_true")
+    parser.add_argument("--run", type=str, help="run a docker image")
+    parser.add_argument("--exec", type=str,
+        help="exec bash on an existing container")
+    parser.add_argument("--rdev", action="store_true",
+        help="run dev container")
+    parser.add_argument("--xdev", action="store_true",
+        help="exec bash on an existing dev container")
+    parser.add_argument("-f", "--force", action="store_true")
     args = parser.parse_args()
+
+
+    def run(img):
+        name = img.replace("sbt-", "")
+        docker = Docker(name, img)
+        docker.run(interactive=True)
+
+    def exec(img):
+        name = img.replace("sbt-", "")
+        docker = Docker(name, img)
+        docker.exec("/bin/bash", interactive=True)
 
 
     # --save-current-commits
@@ -380,47 +426,24 @@ if __name__ == "__main__":
         with cd(DOCKER_DIR):
             shell("rm -f {}".format(
                 " ".join([name + "/done" for name in names])))
-    # --clean-srcs
-    elif args.clean_srcs:
-        with cd(DOCKER_DIR):
-            shell("rm -rf {}".format(
-                " ".join([name + "/src" for name in names])))
     # --clean-imgs
     elif args.clean_imgs:
-        # remove all container instances
-        containers = shell("docker ps -a | awk '{print$1}' | sed 1d",
-            save_out=True).split()
-        if len(containers) > 0:
-            shell("docker rm " + " ".join(containers))
-        # remove all '<none>' and 'sbt' images
-        images = shell(
-            "docker images | grep -e sbt -e '<none>' | awk '{print$3}'",
-            save_out=True).split()
-        if len(images) > 0:
-            shell("docker rmi " + " ".join(images))
+        Helper.clean_imgs()
     # --build
     elif args.build:
-        imgs.build(args.build)
+        imgs.build(args.build, args.force)
     # --run
     elif args.run:
-        if is_cygwin():
-            cmd = "winpty "
-        else:
-            cmd = ''
-        cmd = cmd + "docker run -it --rm -h sbt sbt"
-        shell(cmd)
-    # --copy-build-objs
-    elif args.copy_build_objs:
-        imgs.copy_build_objs(args.copy_build_objs)
-    # --copy-toolchain
-    elif args.copy_toolchain:
-        imgs.copy_toolchain()
-    # --dev
-    elif args.dev:
-        run_dev(1)
-    # --dev2
-    elif args.dev2:
-        run_dev(2)
+        run(args.run)
+    # --exec
+    elif args.exec:
+        exec(args.exec)
+    # --rdev
+    elif args.xdev:
+        run("sbt-dev")
+    # --xdev
+    elif args.xdev:
+        exec("sbt-dev")
     # error
     else:
         sys.exit("ERROR: no command specified")

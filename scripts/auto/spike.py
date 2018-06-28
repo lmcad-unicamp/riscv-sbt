@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-from auto.config import *
+from auto.config import DIR, RV32
 from auto.pkg import Package
+from auto.utils import cat, cd, path, shell
 
 import os
 
