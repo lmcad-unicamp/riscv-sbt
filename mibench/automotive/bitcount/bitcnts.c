@@ -21,7 +21,7 @@ static int CDECL bit_shifter(long int x);
 int main(int argc, char *argv[])
 {
   clock_t start, stop;
-  double ct, cmin = DBL_MAX, cmax = 0;
+  double ct, cmin = DBL_MAX, cmax = -1.0;
   int i, cminix, cmaxix;
   long j, n, seed;
   int iterations;

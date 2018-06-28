@@ -52,21 +52,25 @@ void ShadowImage::build()
 
         llvm::StringRef bytes;
         std::string z;
+        uint64_t align;
         // .bss/.common
         if (sec->isBSS() || sec->isCommon()) {
             z = std::string(sec->size(), 0);
             bytes = z;
+            align = 8;
         // others
         } else {
             // read contents
             if (sec->contents(bytes))
                 XABORTF("failed to get section [{0}] contents", sec->name());
+            align = sec->section().getAlignment();
         }
 
         // align
-        while (addr % 4 != 0)
+        while (addr % align != 0)
             addr++;
-        DBGF("{0}@{1:X+8}-{2:X+8}", sec->name(), addr, addr + bytes.size());
+        DBGF("{0}@{1:X+8}-{2:X+8}, align={3}",
+                sec->name(), addr, addr + bytes.size(), align);
         addr += bytes.size();
 
         const ConstRelocationPtrVec& relocs = sec->relocs();
@@ -87,6 +91,7 @@ void ShadowImage::build()
             *_ctx->module, cda->getType(), !CONSTANT,
             llvm::GlobalValue::ExternalLinkage, cda,
             gvname(sec->name()));
+        gv->setAlignment(align);
         _sections[sec->name()] = toI32(gv);
     }
 
