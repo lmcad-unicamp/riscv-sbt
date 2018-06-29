@@ -332,9 +332,19 @@ class Image:
         elif name == "sbt":
             docker.run("make sbt")
             # run sbt tests (all but system)
-            docker.run('bash -c "mkdir -p junk && make almost-alltests"')
+            docker.run('bash -c "' +
+                # sbt log dir
+                'mkdir -p junk && ' +
+                # restore symlinks (needed if in cygwin fs)
+                'git checkout HEAD test/sbt/rv32-hello.s && ' +
+                'git checkout HEAD riscv-qemu-tests && ' +
+                # build and run tests
+                '. scripts/env.sh && ' +
+                'make almost-alltests"')
+        elif name == "dev":
+            pass
         else:
-            raise Exception("TODO: build " + name)
+            raise Exception("Invalid: build " + name)
 
 
 class Images:
@@ -439,7 +449,7 @@ if __name__ == "__main__":
     elif args.exec:
         exec(args.exec)
     # --rdev
-    elif args.xdev:
+    elif args.rdev:
         run("sbt-dev")
     # --xdev
     elif args.xdev:

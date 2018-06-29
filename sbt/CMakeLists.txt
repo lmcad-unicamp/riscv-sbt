@@ -3,7 +3,8 @@ project(riscv-sbt)
 
 # get build options from llvm-config
 
-set(SCRIPTS_DIR "$ENV{TOPDIR}/scripts")
+set(TOPDIR "$ENV{TOPDIR}")
+set(SCRIPTS_DIR "${TOPDIR}/scripts")
 set(LLVM_CONFIG "${SCRIPTS_DIR}/llvm-config.sh")
 set(AUTO_DIR "${SCRIPTS_DIR}/auto")
 set(BUILD_PY "${AUTO_DIR}/build.py")
@@ -127,11 +128,14 @@ target_link_libraries(riscv-sbt ${SBT_LIBS} ${SBT_SYS_LIBS})
 
 set(LIBC_C ${PROJECT_SOURCE_DIR}/libc.c)
 set(RUNTIME_C ${PROJECT_SOURCE_DIR}/Runtime.c)
+set(TOOLCHAIN_RELEASE ${TOPDIR}/toolchain/release)
+set(RV32_SYSROOT ${TOOLCHAIN_RELEASE}/opt/riscv/sysroot)
+set(RV32_SYSROOT_FLAGS -isysroot ${RV32_SYSROOT}
+        -isystem ${RV32_SYSROOT}/usr/include)
 
 # libc.bc
 add_custom_command(OUTPUT libc.bc COMMAND
-    clang --target=riscv32
-        -isysroot / -isystem /usr/include
+    clang --target=riscv32 ${RV32_SYSROOT_FLAGS}
         -emit-llvm -c -O0 -mllvm -disable-llvm-optzns
         ${LIBC_C} MAIN_DEPENDENCY ${LIBC_C})
 add_custom_target(libc DEPENDS libc.bc)
@@ -140,14 +144,13 @@ add_custom_target(libc DEPENDS libc.bc)
 
 # ilp32
 add_custom_command(OUTPUT rv32-runtime.o COMMAND
-    clang --target=riscv32 -c -O0
-        -isysroot / -isystem /usr/include
+    clang --target=riscv32 -c -O3 ${RV32_SYSROOT_FLAGS}
         ${RUNTIME_C} -o rv32-runtime.o
         MAIN_DEPENDENCY ${RUNTIME_C})
 
 # ilp32d
 add_custom_command(OUTPUT rv32-runtime-hf.o COMMAND
-    riscv64-unknown-linux-gnu-gcc -march=rv32g -mabi=ilp32d -c -O0
+    riscv64-unknown-linux-gnu-gcc -march=rv32g -mabi=ilp32d -c -O3
         ${RUNTIME_C} -o rv32-runtime-hf.o
         MAIN_DEPENDENCY ${RUNTIME_C})
 add_custom_target(rv32-runtime DEPENDS rv32-runtime.o rv32-runtime-hf.o)

@@ -4,6 +4,7 @@ FROM sbt-riscv-sbt
 # clang-3.9: needed to build sbt
 # cmake: needed to build sbt
 # device-tree-compiler: needed to run spike
+# g++-6-multilib: gcc for x86 and x64
 # gcc-6-arm-linux-gnueabihf: cross gcc for ARM
 # libc6-dev:i386: headers/libraries needed by x86 binaries
 # libglib2.0-0: needed by qemu
@@ -18,6 +19,7 @@ RUN dpkg --add-architecture i386 \
     clang-3.9 \
     cmake \
     device-tree-compiler \
+    g++-6-multilib \
     gcc-6-arm-linux-gnueabihf \
     libc6-dev:i386 \
     libglib2.0-0 \
