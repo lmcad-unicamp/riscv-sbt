@@ -10,7 +10,7 @@ FROM sbt-riscv-sbt
 # libglib2.0-0: needed by qemu
 # libunwind8:i386: needed by perf
 # linux-headers-amd64: maybe needed by perf?
-# linux-perf-4.8:i386: perf for x86 binaries
+# linux-perf-4.9:i386: perf for x86 binaries
 # python3-numpy: needed by measure.py
 RUN dpkg --add-architecture i386 \
     && apt-get update \
@@ -29,13 +29,8 @@ RUN dpkg --add-architecture i386 \
     python3-numpy \
     && rm -rf /var/lib/apt/lists/*
 
-ENV TOPDIR=/riscv-sbt
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/riscv-sbt/scripts
 ENV PATH=$TOPDIR/toolchain/release/opt/riscv/bin:$PATH
 ENV PATH=$TOPDIR/toolchain/release/bin:$PATH
 ENV PATH=$TOPDIR/toolchain/debug/bin:$PATH
-ENV MAKE_OPTS=-j2
 
-WORKDIR /riscv-sbt
 CMD ["/bin/bash"]

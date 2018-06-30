@@ -108,6 +108,11 @@ class Docker:
             prefix = ''
 
         privileged = True
+        make_opts = os.getenv("MAKE_OPTS")
+        if make_opts:
+            env = "MAKE_OPTS=" + make_opts
+        else:
+            env = None
         fmtdata = {
             "prefix":       prefix if interactive else "",
             "dcmd":         dcmd,
@@ -119,10 +124,11 @@ class Docker:
             "vols":         " " + vols if vols else "",
             "img":          " " + self.img,
             "cmd":          " " + cmd if cmd else "",
+            "env":          " -e " + env if env and dcmd == "run" else "",
         }
 
         shell(("{prefix}docker {dcmd}" +
-            "{privileged}{interactive}{rm}{hostname}{name}{vols}{img}{cmd}"
+            "{privileged}{interactive}{rm}{hostname}{name}{vols}{env}{img}{cmd}"
             ).format(**fmtdata))
 
 
