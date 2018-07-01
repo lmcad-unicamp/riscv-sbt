@@ -281,6 +281,53 @@ arm-dstdir:
                 sbtflags=self.stack_huge)
 
 
+    def _lame(self):
+        srcs = [
+            "main.c",
+            "brhist.c",
+            "formatBitstream.c",
+            "fft.c",
+            "get_audio.c",
+            "l3bitstream.c",
+            "id3tag.c",
+            "ieeefloat.c",
+            "lame.c",
+            "newmdct.c",
+            "parse.c",
+            "portableio.c",
+            "psymodel.c",
+            "quantize.c",
+            "quantize-pvt.c",
+            "vbrquantize.c",
+            "reservoir.c",
+            "tables.c",
+            "takehiro.c",
+            "timestatus.c",
+            "util.c",
+            "VbrTag.c",
+            "version.c",
+            "gtkanal.c",
+            "gpkplotting.c",
+            "mpglib/common.c",
+            "mpglib/dct64_i386.c",
+            "mpglib/decode_i386.c",
+            "mpglib/layer3.c",
+            "mpglib/tabinit.c",
+            "mpglib/interface.c",
+            "mpglib/main.c"
+        ]
+        srcs = [path("lame3.70", src) for src in srcs]
+
+        dir = "consumer/lame"
+        _in = mpath(self.srcdir, dir, "large.wav")
+        out = mpath(self.dstdir, dir, "{prefix}output_large{mode}.mp3")
+        runs = Runs([Run([_in, out], outidx=1)])
+        bflags = '--cflags="-DLAMEPARSE -DLAMESNDFILE"'
+        sbtflags = self.stack_huge
+        return self._bench("lame", dir, srcs, runs,
+                bflags=bflags, sbtflags=sbtflags)
+
+
     def _single_run(self, args, stdin=None, rflags=None):
         return Runs([Run(args, stdin=stdin, rflags=rflags)])
 
@@ -346,6 +393,7 @@ arm-dstdir:
                     rflags="--exp-rc=1"),
                 mflags=["--exp-rc=1"]),
             self._susan(),
+            self._lame()
         ]
 
         for bench in self.benchs:
@@ -418,53 +466,3 @@ benchs-arm-copy: benchs arm-dstdir {}
 if __name__ == "__main__":
     mb = MiBench()
     mb.gen()
-
-
-"""
-## 14- LAME
-# rv32: OK (soft-float)
-
-LAME_NAME := lame
-LAME_DIR  := consumer/lame
-LAME_SRC_DIR_SUFFIX := /lame3.70
-
-LAME_MODS := \
-        main \
-        brhist \
-        formatBitstream \
-        fft \
-        get_audio \
-        l3bitstream \
-        id3tag \
-        ieeefloat \
-        lame \
-        newmdct \
-        parse \
-        portableio \
-        psymodel \
-        quantize \
-        quantize-pvt \
-        vbrquantize \
-        reservoir \
-        tables \
-        takehiro \
-        timestatus \
-        util \
-        VbrTag \
-        version \
-        gtkanal \
-        gpkplotting \
-        mpglib/common \
-        mpglib/dct64_i386 \
-        mpglib/decode_i386 \
-        mpglib/layer3 \
-        mpglib/tabinit \
-        mpglib/interface \
-        mpglib/main
-
-LAME_CFLAGS := -DLAMEPARSE -DLAMESNDFILE
-LAME_DEPS := $(BUILD_MIBENCH)/$(LAME_DIR)/mpglib
-
-LAME_ARGS := notests
-"""
-

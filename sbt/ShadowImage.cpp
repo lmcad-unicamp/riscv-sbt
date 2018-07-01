@@ -23,9 +23,11 @@ void ShadowImage::build()
         ConstSectionPtr sec;
         std::vector<uint8_t> vec;
         const ConstRelocationPtrVec& relocs;
+        llvm::GlobalVariable* gv = nullptr;
 
         Work(ConstSectionPtr sec, std::vector<uint8_t>&& vec,
-             const ConstRelocationPtrVec& relocs) :
+            const ConstRelocationPtrVec& relocs)
+            :
             sec(sec),
             vec(std::move(vec)),
             relocs(relocs)
@@ -74,24 +76,35 @@ void ShadowImage::build()
         addr += bytes.size();
 
         const ConstRelocationPtrVec& relocs = sec->relocs();
-        llvm::GlobalVariable* gv;
         std::vector<uint8_t> vec(bytes.size());
         std::copy(bytes.begin(), bytes.end(), vec.begin());
+        llvm::Constant* cda;
+        llvm::Type* aty;
+        llvm::GlobalVariable* gv;
+        Work* work = nullptr;
 
         // check if section needs to be relocated
         // Note: text sections are relocated during translation
         if (!relocs.empty() && !sec->isText()) {
+            xassert(vec.size() % sizeof(uint32_t) == 0);
+            uint64_t elems = vec.size() / sizeof(uint32_t);
+            cda = nullptr;
+            aty = llvm::ArrayType::get(_ctx->t.i32, elems);
             workVec.push_back(Work(sec, std::move(vec), relocs));
-            continue;
+            work = &workVec.back();
+        } else {
+            cda = llvm::ConstantDataArray::get(*_ctx->ctx, vec);
+            aty = cda->getType();
         }
 
         // create the ShadowImage
-        llvm::Constant* cda = llvm::ConstantDataArray::get(*_ctx->ctx, vec);
         gv = new llvm::GlobalVariable(
-            *_ctx->module, cda->getType(), !CONSTANT,
+            *_ctx->module, aty, !CONSTANT,
             llvm::GlobalValue::ExternalLinkage, cda,
             gvname(sec->name()));
         gv->setAlignment(align);
+        if (work)
+            work->gv = gv;
         _sections[sec->name()] = toI32(gv);
     }
 
@@ -101,9 +114,9 @@ void ShadowImage::build()
         // relocate
         SBTRelocation reloc(_ctx,
             work.relocs.begin(), work.relocs.end(), work.sec);
-        auto* gv = reloc.relocateSection(work.vec, this);
-        gv->setName(gvname(work.sec->name()));
-        _sections[work.sec->name()] = toI32(gv);
+        llvm::GlobalVariable* gv = work.gv;
+        llvm::Constant* c = reloc.relocateSection(work.vec, this);
+        gv->setInitializer(c);
     }
 }
 

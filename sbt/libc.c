@@ -1,5 +1,6 @@
 #include "Runtime.h"
 
+#include <assert.h>
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
@@ -7,6 +8,8 @@
 #include <string.h>
 #include <strings.h>
 #include <time.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 // function
@@ -22,9 +25,11 @@ F(atexit)
 F(atoi)
 F(atof)
 F(bcopy)
+F(calloc)
 F(clock)
 F(close)
 F(cos)
+F(difftime)
 F(exit)
 F(exp)
 F(fclose)
@@ -34,16 +39,21 @@ F(fflush)
 F(fgetc)
 F(fgetpos)
 F(fgets)
+F(floor)
 F(fopen)
 F(free)
 F(fprintf)
 F(fputc)
 F(fread)
+F(frexp)
 F(fscanf)
 F(fseek)
 F(ftell)
 F(fwrite)
 F(getc)
+F(ldexp)
+F(log)
+F(log10)
 F(malloc)
 F(memchr)
 F(memcpy)
@@ -58,15 +68,20 @@ F(read)
 F(realloc)
 F(sin)
 F(sleep)
+F(sprintf)
 F(sqrt)
 F(sqrtf)
 F(srand)
 F(sscanf)
+F(strcmp)
 F(strchr)
 F(strlen)
+F(strncat)
 F(strncmp)
+F(strncpy)
 F(strtod)
 F(strtol)
+F(time)
 F(tolower)
 F(toupper)
 F(usleep)
@@ -74,8 +89,10 @@ F(write)
 
 F(_IO_getc)
 F(_IO_putc)
+F(__assert_fail)
 F(__ctype_tolower_loc)
 F(__ctype_toupper_loc)
+F(__xstat)
 
 // GNU extensions (used by gcc -O3)
 void sincos(double x, double* sin, double* cos);

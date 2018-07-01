@@ -13,7 +13,7 @@
 #include <queue>
 
 namespace llvm {
-class GlobalVariable;
+class Constant;
 }
 
 
@@ -75,7 +75,7 @@ public:
      *
      * @return global variable whose content is the relocated section.
      */
-    llvm::GlobalVariable* relocateSection(
+    llvm::Constant* relocateSection(
         const std::vector<uint8_t>& bytes,
         const ShadowImage* shadowImage);
 

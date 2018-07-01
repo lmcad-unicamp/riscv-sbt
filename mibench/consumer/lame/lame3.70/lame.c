@@ -48,7 +48,7 @@
 
 
 /* Global variable definitions for lame.c */
-static Bit_stream_struc   bs;
+static Bit_stream_struc   lame_bs;
 static III_side_info_t l3_side;
 #define MFSIZE (1152+1152+ENCDELAY-MDCTDELAY)
 static short int mfbuf[2][MFSIZE];
@@ -68,7 +68,7 @@ void lame_init_params(lame_global_flags *gfp)
   FLOAT compression_ratio;
 
 
-  memset(&bs, 0, sizeof(Bit_stream_struc));
+  memset(&lame_bs, 0, sizeof(Bit_stream_struc));
   memset(&l3_side,0x00,sizeof(III_side_info_t));
 
 
@@ -392,7 +392,7 @@ void lame_init_params(lame_global_flags *gfp)
     gfp->bWriteVbrTag=0;  /* disable Xing VBR tag */
   }
 
-  init_bit_stream_w(&bs);
+  init_bit_stream_w(&lame_bs);
 
 
 
@@ -480,7 +480,7 @@ void lame_init_params(lame_global_flags *gfp)
   if (gfp->bWriteVbrTag)
     {
       /* Write initial VBR Header to bitstream */
-      InitVbrTag(&bs,1-gfp->version,gfp->mode,gfp->samplerate_index);
+      InitVbrTag(&lame_bs,1-gfp->version,gfp->mode,gfp->samplerate_index);
     }
 
 #ifdef HAVEGTK
@@ -838,10 +838,10 @@ int mf_size,char *mp3buf, int mp3buf_size)
   /*  write the frame to the bitstream  */
   getframebits(gfp,&bitsPerFrame,&mean_bits);
   III_format_bitstream( gfp,bitsPerFrame, l3_enc, &l3_side,
-			scalefac, &bs);
+			scalefac, &lame_bs);
 
 
-  frameBits = bs.totbit - sentBits;
+  frameBits = lame_bs.totbit - sentBits;
 
 
   if ( frameBits % bitsPerSlot )   /* a program failure */
@@ -851,7 +851,7 @@ int mf_size,char *mp3buf, int mp3buf_size)
   sentBits += frameBits;
 
   /* copy mp3 bit buffer into array */
-  mp3count = copy_buffer(mp3buf,mp3buf_size,&bs);
+  mp3count = copy_buffer(mp3buf,mp3buf_size,&lame_bs);
 
   if (gfp->bWriteVbrTag) AddVbrFrame((int)(sentBits/8));
 
@@ -1356,7 +1356,7 @@ int lame_encode_finish(lame_global_flags *gfp,char *mp3buffer, int mp3buffer_siz
 
     if (imp3 == -1) {
       /* fatel error: mp3buffer too small */
-      desalloc_buffer(&bs);    /* Deallocate all buffers */
+      desalloc_buffer(&lame_bs);    /* Deallocate all buffers */
       return -1;
     }
     mp3buffer += imp3;
@@ -1386,15 +1386,15 @@ int lame_encode_finish(lame_global_flags *gfp,char *mp3buffer, int mp3buffer_siz
   /* if user specifed buffer size = 0, dont check size */
   if (mp3buffer_size == 0) mp3buffer_size_remaining=0;  
 
-  imp3= copy_buffer(mp3buffer,mp3buffer_size_remaining,&bs);
+  imp3= copy_buffer(mp3buffer,mp3buffer_size_remaining,&lame_bs);
   if (imp3 == -1) {
     /* fatel error: mp3buffer too small */
-    desalloc_buffer(&bs);    /* Deallocate all buffers */
+    desalloc_buffer(&lame_bs);    /* Deallocate all buffers */
     return -1;
   }
 
   mp3count += imp3;
-  desalloc_buffer(&bs);    /* Deallocate all buffers */
+  desalloc_buffer(&lame_bs);    /* Deallocate all buffers */
   return mp3count;
 }
 

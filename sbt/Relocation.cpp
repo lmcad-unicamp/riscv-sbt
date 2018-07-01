@@ -366,7 +366,7 @@ llvm::Constant* SBTRelocation::lastSymVal() const
 }
 
 
-llvm::GlobalVariable* SBTRelocation::relocateSection(
+llvm::Constant* SBTRelocation::relocateSection(
     const std::vector<uint8_t>& bytes,
     const ShadowImage* shadowImage)
 {
@@ -446,8 +446,7 @@ llvm::GlobalVariable* SBTRelocation::relocateSection(
 
     llvm::ArrayType* aty = llvm::ArrayType::get(_ctx->t.i32, cvec.size());
     llvm::Constant* ca = llvm::ConstantArray::get(aty, cvec);
-    return new llvm::GlobalVariable(*_ctx->module, ca->getType(),
-        !CONSTANT, llvm::GlobalValue::ExternalLinkage, ca);
+    return ca;
 }
 
 }
