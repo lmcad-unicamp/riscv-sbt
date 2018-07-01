@@ -112,7 +112,7 @@ class Bench:
         # measures
         measures = []
         for run in self.runs:
-            self.gm.measure(run)
+            self.gm.measure(run, dep_bin=False)
             m = self.name
             if run.id:
                 m = m + "-" + run.id

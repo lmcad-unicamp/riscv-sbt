@@ -399,7 +399,7 @@ class GenMake:
             self.alias(self.name + tsuf, tests)
 
 
-    def measure(self, robj):
+    def measure(self, robj, dep_bin=True):
         args_str = robj.str(None)
         suffix = robj.id
 
@@ -416,11 +416,12 @@ class GenMake:
             "args":     " " + args_str if args_str else "",
             "stdin":    " --stdin=" + robj.stdin if robj.stdin else "",
             "mflags":   " " + " ".join(mflags) if mflags else "",
+            "dep":      " " + self.name if dep_bin else "",
         }
 
         self.append("""\
 .PHONY: {name}{suffix}-measure
-{name}{suffix}-measure: {name}
+{name}{suffix}-measure:{dep}
 \t{measure} {dstdir} {name}{args}{stdin}{mflags}
 
 """.format(**fmtdata))

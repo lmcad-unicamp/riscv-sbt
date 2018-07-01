@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from auto.config import *
+from auto.config import ARM, SBT, X86
 from auto.utils import path
 
 import argparse
@@ -11,6 +11,8 @@ import re
 import subprocess
 import sys
 import time
+
+PERF = "perf_4.9"
 
 class Options:
     def __init__(self, stdin, verbose, exp_rc):
@@ -72,7 +74,7 @@ class Program:
     def perf_libc(self, verbose=False, freq=None):
         save_out = self.opts.save_out
 
-        args = ["perf", "record", "-q"]
+        args = [PERF, "record", "-q"]
         if freq:
             args.extend(["-F", str(freq)])
         elif self.opts.freq:
@@ -101,7 +103,7 @@ class Program:
             if save_out and fout:
                 fout.close()
 
-        cp = subprocess.run(["perf", "report", "--sort=dso", "--stdio"],
+        cp = subprocess.run([PERF, "report", "--sort=dso", "--stdio"],
             stdout=subprocess.PIPE, universal_newlines=True)
         cp.check_returncode()
 
@@ -144,7 +146,7 @@ class Program:
             perf_out = self._perf_out(i)
             perf = self.opts.perf
             if perf:
-                args = ["perf", "stat", "-o", perf_out]
+                args = [PERF, "stat", "-o", perf_out]
             else:
                 args = []
             args.extend(self.args)
@@ -182,16 +184,20 @@ class Measure:
             self.id = opts.id
         else:
             self.id = prog
+        if X86.is_native():
+            self.narch = X86
+        elif ARM.is_native():
+            self.narch = ARM
+        else:
+            raise Exception("Unsupported native target")
 
 
     def measure(self):
-        for target in ['x86']:
-            self._measure_target(target)
+        self._measure_target(self.narch.name)
 
 
     def perf(self):
-        for target in ['x86']:
-            self._perf_target(target)
+        self._perf_target(self.narch.name)
 
 
     def _build_programs(self, target):
