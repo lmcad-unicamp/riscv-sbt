@@ -929,7 +929,7 @@ llvm::Error Instruction::translateBranch(BranchType bt)
             findFunction(_ctx->reloc->lastSymVal()) : nullptr;
         DBGF("reloc->isCall()={0}, func={1}",
             _ctx->reloc->isCall(_ctx->addr), !!func);
-        DBG(_ctx->reloc->lastSymVal()->dump());
+        // DBG(_ctx->reloc->lastSymVal()->dump());
 
         // target is known
         // NOTE querying the relocator is needed to disambiguate between

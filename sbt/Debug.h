@@ -8,6 +8,10 @@
 #ifndef SBT_DEBUG_H
 #define SBT_DEBUG_H
 
+#include <llvm/Support/FileSystem.h>
+#include <llvm/Support/raw_ostream.h>
+
+#include <memory>
 #include <string>
 
 // define xassert: like assert, but enabled by SBT_DEBUG instead of NDEBUG,
@@ -52,7 +56,55 @@ static inline std::string methodName(const std::string& prettyFunc)
 
 #define __METHOD_NAME__ methodName(__PRETTY_FUNCTION__)
 
+namespace sbt {
+
+// log stream
+class Logger
+{
+public:
+    llvm::raw_ostream& logs()
+    {
+        return *_logs;
+    }
+
+    static Logger& get(const std::string& file = "")
+    {
+        static Logger instance(file);
+
+        return instance;
+    }
+
+private:
+    std::unique_ptr<llvm::raw_fd_ostream> _os;
+    llvm::raw_ostream* _logs;
+
+    Logger(const std::string& file);
+};
+
+inline Logger::Logger(const std::string& file)
+{
+    if (file.empty()) {
+        _logs = &llvm::outs();
+        return;
+    }
+
+    std::error_code ec;
+    _os.reset(new llvm::raw_fd_ostream(file, ec, llvm::sys::fs::F_None));
+    if (ec) {
+        llvm::errs() << "Failed to open log file \"" << file << "\": "
+            << ec.message() << '\n';
+        std::exit(1);
+    }
+
+    _logs = _os.get();
+}
+
+} // sbt
+
+#define LOGS sbt::Logger::get().logs()
+
 #endif
+
 
 // "dynamic" part
 
@@ -62,7 +114,7 @@ static inline std::string methodName(const std::string& prettyFunc)
 #undef DBG
 #if ENABLE_DBGS
 #   include <llvm/Support/FormatVariadic.h>
-#   define DBGS (g_debug? llvm::outs() : llvm::nulls())
+#   define DBGS (g_debug? LOGS : llvm::nulls())
 #   define DBGF(...) \
         do { \
             if (g_debug) { \

@@ -119,7 +119,6 @@ add_executable(riscv-sbt
     Syscall.cpp
     Translator.cpp
     Types.cpp
-    Utils.cpp
     XRegister.cpp
     sbt.cpp)
 target_compile_options(riscv-sbt PRIVATE ${SBT_COMPILE_OPTIONS})

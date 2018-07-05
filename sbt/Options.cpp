@@ -33,6 +33,7 @@ void Options::dump() const
     DBGS << "enableFCSR=" << enableFCSR() << nl;
     DBGS << "enableFCVTValidation=" << enableFCVTValidation() << nl;
     DBGS << "hardFloatABI=" << hardFloatABI() << nl;
+    DBGS << "logFile=" << logFile() << nl;
 }
 
 }

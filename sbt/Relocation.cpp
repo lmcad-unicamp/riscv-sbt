@@ -346,7 +346,7 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
 
     _lastSymVal = lastSymC? lastSymC : c;
     c = relfn(c);
-    DBG(c->dump());
+    // DBG(c->dump());
     _last = reloc;
     return c;
 }

@@ -115,19 +115,19 @@ static bool handleError(llvm::Error&& err)
     // handle SBTErrors
     llvm::Error err2 = llvm::handleErrors(std::move(err),
         [&gotErrors](const InvalidBitcode& serr) mutable {
-            serr.log(llvm::errs());
+            serr.log(LOGS);
             gotErrors = true;
             // do not exit, let the invalid bitcode be written to make
             // debugging it easier
         },
         [](const SBTError& serr) {
-            serr.log(llvm::errs());
+            serr.log(LOGS);
             std::exit(EXIT_FAILURE);
         });
 
     // handle remaining errors
     if (err2) {
-        logAllUnhandledErrors(std::move(err2), llvm::errs(),
+        logAllUnhandledErrors(std::move(err2), LOGS,
             Constants::global().BIN_NAME + ": error: ");
         std::exit(EXIT_FAILURE);
     }
@@ -153,7 +153,7 @@ static void test()
     if (!expObj)
         handleError(expObj.takeError());
     else
-        expObj.get().dump();
+        expObj.get().dump(llvm::outs());
     std::exit(EXIT_FAILURE);
 #endif
 }
@@ -220,6 +220,8 @@ int main(int argc, char* argv[])
     cl::opt<bool> softFloatABIOpt("soft-float-abi",
         cl::desc("Use soft-float ABI"));
 
+    cl::opt<std::string> logFileOpt("log", cl::desc("Log file path"));
+
     // enable debug code
     cl::opt<bool> debugOpt("debug", cl::desc("Enable debug code"));
 
@@ -284,7 +286,10 @@ int main(int argc, char* argv[])
         .setSymBoundsCheck(!noSymBoundsCheckOpt)
         .setEnableFCSR(enableFCSROpt)
         .setEnableFCVTValidation(enableFCVTValidationOpt)
-        .setHardFloatABI(!softFloatABIOpt);
+        .setHardFloatABI(!softFloatABIOpt)
+        .setLogFile(logFileOpt);
+
+    sbt::Logger::get(opts.logFile());
     auto exp = sbt::create<sbt::SBT>(inputFiles, outputFile, opts);
     if (!exp)
         sbt::handleError(exp.takeError());

@@ -39,7 +39,7 @@ class Translator:
         mkdir_if_needed(logdir)
         log = path(logdir, chsuf(out, ".log"))
 
-        cmd = "riscv-sbt {} {} -o {} >{} 2>&1".format(
+        cmd = "riscv-sbt {} {} -o {} -log {}".format(
             flags, ipath, opath, log)
         shell(cmd)
 

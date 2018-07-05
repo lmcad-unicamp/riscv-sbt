@@ -183,7 +183,7 @@ static inline llvm::Error verror(const std::string& meth, const std::string& msg
 [[noreturn]] static inline void xabort(
     const std::string& meth, const std::string& msg)
 {
-    llvm::errs() << meth + "(): " + msg << nl;
+    LOGS << meth + "(): " + msg << nl;
     std::exit(1);
 }
 

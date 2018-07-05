@@ -679,8 +679,8 @@ public:
         return _obj->getFileFormatName();
     }
 
-    // dump object contents to stdout
-    void dump() const;
+    // dump object contents
+    void dump(llvm::raw_ostream& os) const;
 
     const llvm::object::ObjectFile* obj() const
     {

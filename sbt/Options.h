@@ -134,6 +134,17 @@ public:
         return *this;
     }
 
+    const std::string& logFile() const
+    {
+        return _logFile;
+    }
+
+    Options& setLogFile(const std::string& path)
+    {
+        _logFile = path;
+        return *this;
+    }
+
     void dump() const;
 
 private:
@@ -148,6 +159,7 @@ private:
     bool _enableFCSR = false;
     bool _enableFCVTValidation = false;
     bool _hf = true;
+    std::string _logFile;
 };
 
 }

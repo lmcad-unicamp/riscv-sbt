@@ -129,11 +129,13 @@ llvm::Value* Caller::castArg(llvm::Value* v, llvm::Type* ty)
             return v;
     }
 
+    /*
     DBGF("cast from:");
     DBG(v->getType()->dump());
     DBGF("cast to:");
     DBG(ty->dump());
     DBGS.flush();
+    */
 
     if (ty->isDoubleTy())
         return i32x2ToFP64(v, nextArg());

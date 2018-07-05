@@ -4,12 +4,10 @@
 #include "Constants.h"
 
 #include <llvm/Support/Error.h>
-#include <llvm/Support/raw_ostream.h>
 
 #include <functional>
 #include <type_traits>
 #include <vector>
-
 
 // macros
 
@@ -20,10 +18,6 @@
 
 
 namespace sbt {
-
-// log stream
-// error: true -> errs() : false -> outs()
-// llvm::raw_ostream& logs(bool error = false);
 
 // object creation functions
 

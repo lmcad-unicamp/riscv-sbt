@@ -514,10 +514,8 @@ llvm::Error Object::readSymbols()
 }
 
 
-void Object::dump() const
+void Object::dump(llvm::raw_ostream& os) const
 {
-    llvm::raw_ostream &os = llvm::outs();
-
     // basic info
     os << "fileName: " << fileName() << "\n";
     os << "fileFormat: " << fileFormatName() << "\n";
