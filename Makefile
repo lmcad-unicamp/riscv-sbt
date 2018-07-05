@@ -53,6 +53,13 @@ clean:
 lc:
 	cat $(TOPDIR)/sbt/*.h $(TOPDIR)/sbt/*.cpp $(TOPDIR)/sbt/*.s | wc -l
 
+lc-py:
+	cat $(TOPDIR)/scripts/auto/*.py \
+		$(TOPDIR)/test/sbt/genmake.py \
+		$(TOPDIR)/mibench/genmake.py \
+		$(TOPDIR)/docker/build.py \
+		| wc -l
+
 almost-alltests:
 	cd $(TOPDIR)/test/sbt && ./genmake.py && make clean almost-alltests
 
