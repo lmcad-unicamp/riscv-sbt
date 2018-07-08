@@ -69,7 +69,7 @@ char *strsearch(const char *string)
 
 #include <stdio.h>
 
-main()
+int main()
 {
       char *here;
       char *find_strings[] = { "Kur",

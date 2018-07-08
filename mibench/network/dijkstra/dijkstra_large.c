@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 #define NUM_NODES                          100
 #define NONE                               9999
@@ -140,6 +141,7 @@ int dijkstra(int chStart, int chEnd)
       //            print_path(rgnNodes, chEnd);
       printf("\n");
     }
+    return 0;
 }
 
 int main(int argc, char *argv[]) {

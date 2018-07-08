@@ -119,7 +119,7 @@ int encfile(FILE *fin, FILE *fout, aes *ctx, char* fn)
         for(i = 0; i < 16; ++i)         /* xor in previous cipher text  */
             inbuf[i] ^= outbuf[i]; 
 
-        encrypt(inbuf, outbuf, ctx);    /* and do the encryption        */
+        encrypt((const byte*)inbuf, (byte*)outbuf, ctx);    /* and do the encryption        */
 
         if(fwrite(outbuf, 1, 16, fout) != 16)
         {
@@ -147,7 +147,7 @@ int encfile(FILE *fin, FILE *fout, aes *ctx, char* fn)
         for(i = 0; i < 16; ++i)         /* xor in previous cipher text  */
             inbuf[i] ^= outbuf[i]; 
 
-        encrypt(inbuf, outbuf, ctx);    /* encrypt and output it        */
+        encrypt((const byte*)inbuf, (byte*)outbuf, ctx);    /* encrypt and output it        */
 
         if(fwrite(outbuf, 1, 16, fout) != 16)
         {
@@ -177,7 +177,7 @@ int decfile(FILE *fin, FILE *fout, aes *ctx, char* ifn, char* ofn)
         return -10;
     }
 
-    decrypt(inbuf2, outbuf, ctx);   /* decrypt it                       */
+    decrypt((const byte*)inbuf2, (byte*)outbuf, ctx);   /* decrypt it                       */
 
     for(i = 0; i < 16; ++i)         /* xor with previous input          */
         outbuf[i] ^= inbuf1[i];
@@ -203,7 +203,7 @@ int decfile(FILE *fin, FILE *fout, aes *ctx, char* ifn, char* ofn)
             return -11;
         }
 
-        decrypt(bp1, outbuf, ctx);  /* decrypt the new input block and  */
+        decrypt((const byte*)bp1, (byte*)outbuf, ctx);  /* decrypt the new input block and  */
 
         for(i = 0; i < 16; ++i)     /* xor it with previous input block */
             outbuf[i] ^= bp2[i];
@@ -293,13 +293,13 @@ int main(int argc, char *argv[])
 
     if(*argv[3] == 'e')
     {                           /* encryption in Cipher Block Chaining mode */
-        set_key(key, key_len, enc, ctx);
+        set_key((const byte*)key, key_len, enc, ctx);
 
         err = encfile(fin, fout, ctx, argv[1]);
     }
     else
     {                           /* decryption in Cipher Block Chaining mode */
-        set_key(key, key_len, dec, ctx);
+        set_key((const byte*)key, key_len, dec, ctx);
     
         err = decfile(fin, fout, ctx, argv[1], argv[2]);
     }

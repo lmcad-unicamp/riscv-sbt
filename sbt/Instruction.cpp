@@ -898,10 +898,7 @@ llvm::Error Instruction::translateBranch(BranchType bt)
             jregn == XRegister::RA &&
             jimm->isZeroValue())
     {
-        if (_ctx->inMain)
-            v = _bld->ret(_bld->load(XRegister::A0));
-        else
-            _ctx->func->freturn();
+        _ctx->func->freturn();
         return llvm::Error::success();
     }
 
@@ -1068,10 +1065,8 @@ llvm::Error Instruction::handleCall(uint64_t target, unsigned linkReg)
     // read regs
     if (sync)
         _ctx->func->loadRegisters();
-    if (isTailCall) {
-        xassert(!_ctx->inMain);
+    if (isTailCall)
         _ctx->func->freturn();
-    }
 
     return llvm::Error::success();
 }

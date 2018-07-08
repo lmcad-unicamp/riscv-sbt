@@ -498,7 +498,10 @@ void Function::storeRegisters()
 void Function::freturn()
 {
     storeRegisters();
-    _ctx->bld->retVoid();
+    if (_ctx->inMain)
+        _ctx->bld->ret(_ctx->bld->load(XRegister::A0));
+    else
+        _ctx->bld->retVoid();
 }
 
 

@@ -22,6 +22,8 @@ class GlobalOpts:
         else:
             self.static = False
 
+        self.printf_break = False
+
     def gcc(self):
         return self.cc == "gcc"
 

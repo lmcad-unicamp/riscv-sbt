@@ -190,7 +190,7 @@ class LLVMBuilder:
         self._c2lbc(srcdir, dstdir, ins, bc)
 
         if not self.opts.opt:
-            self.opt(dstdir, bc, bc, printf_break=True)
+            self.opt(dstdir, bc, bc, printf_break=GOPTS.printf_break)
             self.dis(dstdir, bc)
             self.bc2s(dstdir, bc, out)
 
@@ -199,7 +199,7 @@ class LLVMBuilder:
             opt2 = chsuf(bc, ".opt2.bc")
 
             # opt; dis; opt; dis; .bc -> .s
-            self.opt(dstdir, bc, opt1, printf_break=True)
+            self.opt(dstdir, bc, opt1, printf_break=GOPTS.printf_break)
             self.dis(dstdir, opt1)
             self.opt(dstdir, opt1, opt2, printf_break=False)
             self.dis(dstdir, opt2)

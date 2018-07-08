@@ -176,7 +176,7 @@ main(int argc, char *argv[])
 {
       DWORD crc;
       long charcnt;
-      register errors = 0;
+      register int errors = 0;
 
       while(--argc > 0)
       {

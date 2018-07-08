@@ -183,7 +183,7 @@ class MiBench:
         self.dstdir = path(DIR.build, "mibench")
         self.stack_large = ["-stack-size=131072"]    # 128K
         self.stack_huge = ["-stack-size=1048576"]    # 1M
-        self.bflags = cat("--cc=" + GOPTS.cc, "--sbtobjs=runtime")
+        self.bflags = "--sbtobjs=runtime"
         self.txt = ''
         self.benchs = None
 
@@ -430,24 +430,29 @@ arm-dstdir:
         csv_header = self._gen_csv_header()
 
         self.append("""\
+.PHONY: lame-dirs
+{0}:
+\tmkdir -p {0}
+
 .PHONY: benchs
-benchs: {}
+benchs: {0} {1}
 
 .PHONY: benchs-test
-benchs-test: {}
+benchs-test: {2}
 
 .PHONY: csv-header
 csv-header:
-\techo "{}" > mibench.csv
-\techo "{}" >> mibench.csv
+\techo "{3}" > mibench.csv
+\techo "{4}" >> mibench.csv
 
 .PHONY: benchs-measure
-benchs-measure: csv-header {}
+benchs-measure: csv-header {5}
 
 .PHONY: benchs-arm-copy
-benchs-arm-copy: benchs arm-dstdir {}
+benchs-arm-copy: benchs arm-dstdir {6}
 
 """.format(
+            path(self.dstdir, "consumer/lame/lame3.70/mpglib"),
             " ".join(names),
             " ".join([name + "-test" for name in names]),
             ",".join(csv_header[0]),
