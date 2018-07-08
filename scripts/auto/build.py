@@ -262,6 +262,7 @@ class GCCBuilder:
 class Builder:
     def __init__(self, opts):
         self.opts = opts
+        arch = opts.arch
         if opts.cc == "clang":
             self.bldr = LLVMBuilder(opts)
         else:
@@ -305,10 +306,10 @@ class Builder:
                 "-assemble", "-filetype=obj",
                 ipath, "-o", opath)
             shell(cmd)
-            if GOPTS.hard_float() and arch == RV32_LINUX:
+            if arch.is_rv32() and GOPTS.rv_hard_float():
                 self.set_abi_hf(opath, opath)
 
-        if opts.cc == "gcc" and arch == RV32_LINUX:
+        if arch.is_rv32() and opts.cc == "gcc":
             self.bldr.merge_text(dstdir, out)
 
 

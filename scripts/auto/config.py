@@ -8,12 +8,13 @@ import os
 
 class GlobalOpts:
     def __init__(self):
-        self.cc = "gcc"
-        #self.cc = "clang"
-        if self.cc == "gcc":
-            self.abi = "ilp32d"
+        self.cc = "clang"
+        self.rvcc = "gcc"
+        if self.rvcc == "gcc":
+            self.rvabi = "ilp32d"
         else:
-            self.abi = "ilp32"
+            self.rvabi = "ilp32"
+
         self.arm_copy = "ssh"
         #self.arm_copy = "adb"
         if self.arm_copy == "adb":
@@ -21,11 +22,17 @@ class GlobalOpts:
         else:
             self.static = False
 
-    def soft_float(self):
-        return self.abi == "ilp32"
+    def gcc(self):
+        return self.cc == "gcc"
 
-    def hard_float(self):
-        return self.abi == "ilp32d"
+    def rv_gcc(self):
+        return self.rvcc == "gcc"
+
+    def rv_soft_float(self):
+        return self.rvabi == "ilp32"
+
+    def rv_hard_float(self):
+        return self.rvabi == "ilp32d"
 
     def adb_copy(self):
         return self.arm_copy == "adb"
@@ -88,7 +95,7 @@ class Sbt:
             if is_rv32:
                 return ""
             name = "asm-runtime"
-        if is_rv32 and is_runtime and GOPTS.hard_float():
+        if is_rv32 and is_runtime and GOPTS.rv_hard_float():
             suffix = "-hf"
         else:
             suffix = ""
@@ -237,7 +244,7 @@ RV32 = Arch(
 
 
 RV32_LINUX_SYSROOT  = DIR.toolchain_release + "/opt/riscv/sysroot"
-RV32_LINUX_ABI          = GOPTS.abi
+RV32_LINUX_ABI          = GOPTS.rvabi
 RV32_LINUX_GCC_FLAGS    = "-march=rv32g -mabi=" + RV32_LINUX_ABI
 RV32_LINUX_AS_FLAGS     = "-march=rv32g -mabi=" + RV32_LINUX_ABI
 RV32_LINUX_LD_FLAGS     = "-m elf32lriscv"
@@ -299,7 +306,7 @@ ARM = Arch(
         gcc="{}-gcc-6".format(ARM_TRIPLE),
         gccflags=cat("-march=" + ARM_MATTR, "-mfpu=vfpv3-d16"),
         clang_flags=cat(CLANG_CFLAGS,
-            "--target=" + ARM_TRIPLE),
+            "--target=" + ARM_TRIPLE, "-fPIC"),
         sysroot=ARM_SYSROOT,
         isysroot=ARM_SYSROOT + "/include",
         llcflags=cat(LLC_PIC,

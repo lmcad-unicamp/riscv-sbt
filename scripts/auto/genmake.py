@@ -167,6 +167,12 @@ class GenMake:
         self.txt = self.txt + txt
 
 
+    def append_cc(self, arch, flags):
+        return cat(flags,
+            "--cc=" + GOPTS.rvcc if arch.is_rv32()
+            else "--cc=" + GOPTS.cc)
+
+
     def bld(self, arch, ins, out):
         out_is_obj = out.endswith(".o")
 
@@ -185,6 +191,8 @@ class GenMake:
 
         ains = [path(self.srcdir, i) for i in ins]
 
+        bflags = self.append_cc(arch, self.bflags)
+
         fmtdata = {
             "arch":     arch.name,
             "aobjs":    " ".join(aobjs),
@@ -193,7 +201,7 @@ class GenMake:
             "ins":      " ".join(ins),
             "ains":     " ".join(ains),
             "out":      out,
-            "bflags":   " " + self.bflags if self.bflags else "",
+            "bflags":   " " + bflags if bflags else "",
             "build":    TOOLS.build,
         }
 
@@ -305,7 +313,7 @@ class GenMake:
         flags = '--sbtflags " -regs={}"'.format(am.mode)
         for flag in self.sbtflags:
             flags = flags + ' " {}"'.format(flag)
-        xflags = self.xflags
+        xflags = self.append_cc(am.narch, self.xflags)
 
         fmtdata = {
             "arch":     am.narch.name,

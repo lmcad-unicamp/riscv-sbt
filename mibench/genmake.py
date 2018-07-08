@@ -214,7 +214,7 @@ arm-dstdir:
             **kwargs):
         dstdir = dstdir if dstdir else path(self.dstdir, dir)
         bflags = cat(self.bflags, bflags)
-        if GOPTS.soft_float():
+        if GOPTS.rv_soft_float():
             sbtflags = sbtflags + ["-soft-float-abi"]
 
         return ctor(

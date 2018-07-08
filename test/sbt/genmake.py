@@ -83,7 +83,6 @@ class Tests():
         self.srcdir = path(DIR.top, "test/sbt")
         self.dstdir = path(DIR.build, "test/sbt")
         self.sbtdir = path(DIR.top, "sbt")
-        self.bflags = "--cc=" + GOPTS.cc
         self.txt = ''
 
 
@@ -163,7 +162,6 @@ x86-fp128-run:
         if not srcdir and not dstdir:
             srcdir = self.srcdir
             dstdir = self.dstdir
-        bflags = cat(self.bflags, bflags)
         if skip_arm:
             narchs = [arch for arch in narchs if arch != ARM]
             xarchs = [(farch, narch) for (farch, narch) in xarchs
@@ -191,7 +189,7 @@ x86-fp128-run:
     def gen_basic(self):
         # tests
         rflags = "--tee"
-        sbtflags = ["-soft-float-abi"] if GOPTS.soft_float() else []
+        sbtflags = ["-soft-float-abi"] if GOPTS.rv_soft_float() else []
         bflags = "--sbtobjs=runtime"
         mods = [
             self._module("hello", "{}-hello.s", bflags="-C", rflags=rflags,
@@ -210,7 +208,7 @@ x86-fp128-run:
 
         names = []
         for mod in mods:
-            if GOPTS.cc == "gcc" and mod.name == "printf":
+            if mod.name == "printf" and (GOPTS.gcc() or GOPTS.rv_gcc()):
                 continue
             self.append(mod.gen())
             names.append(mod.name)
@@ -279,7 +277,7 @@ tests-arm-run: {tests-arm-run}
 
         names = []
         for utest in utests:
-            if utest == "f" and GOPTS.soft_float():
+            if utest == "f" and GOPTS.rv_soft_float():
                 continue
             skip_arm = True if utest == "system" else False
             name = utest
