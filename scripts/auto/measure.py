@@ -237,7 +237,13 @@ class Measure:
                          self._to_str(self.sd, align) ]
 
 
-        def __init__(self, mode, times, lcperfs):
+        def __init__(self, mode, times, lcperfs, noinit=False):
+            self.mode = mode
+            self.tp = [8, 5]
+            self.xp = [5, 2]
+            if noinit:
+                return
+
             # functions' aliases
             mean = Measure.mean
             sd = Measure.sd
@@ -262,12 +268,22 @@ class Measure:
             fsd = fm * sqrt(sqr(tsd/tm) + sqr(psd/pm))
 
             # save results in self
-            self.mode = mode
             Field = self.Field
-            self.t = Field(tm, tsd, [8, 5])
+            self.t = Field(tm, tsd, self.tp)
             self.p = Field(pm, psd, [5, 2])
             self.f = Field(fm, fsd, [8, 5])
-            self.x = Field(0, 0, [5, 2])
+            self.x = Field(0, 0, self.xp)
+
+
+        @staticmethod
+        def build(mode, parts):
+            res = Measure.Result(mode, None, None, noinit=True)
+            Field = Measure.Result.Field
+            res.t = Field(float(parts[0]), float(parts[1]), res.tp)
+            res.p = None
+            res.f = None
+            res.x = Field(float(parts[2]), float(parts[3]), res.xp)
+            return res
 
 
         @staticmethod
@@ -292,13 +308,14 @@ class Measure:
 
         def to_str_list(self, align=True):
             p100 = self.p
-            p100.m = p100.m * 100
-            p100.sd = p100.sd * 100
+            if p100:
+                p100.m = p100.m * 100
+                p100.sd = p100.sd * 100
 
             l = (
                 self.t.to_str_list(align) +
-                p100.to_str_list(align) +
-                self.f.to_str_list(align) +
+                (p100.to_str_list(align) if p100 else []) +
+                (self.f.to_str_list(align) if self.f else []) +
                 self.x.to_str_list(align))
 
             if align:
@@ -311,6 +328,41 @@ class Measure:
 
         def print(self):
             print(" ".join(self.to_str_list()))
+
+
+    class Results:
+        F1_ALIGN = "28"
+
+        def __init__(self, name, set, results):
+            self.name = name
+            self.set = set
+            self.results = results
+
+
+        @staticmethod
+        def parse(ln):
+            parts = ln.split(',')
+            idx = 0
+            name = parts[idx]
+            idx = idx + 1
+            set = parts[idx]
+            idx = idx + 1
+
+            results = []
+            for mode in ['native'] + SBT.modes:
+                res = Measure.Result.build(mode, parts[idx:idx+4])
+                idx = idx + 4
+                results.append(res)
+            return Measure.Results(name, set, results)
+
+
+        def print(self):
+            name_set = self.name + "/" + self.set
+            print(("{0:<" + self.F1_ALIGN + "}").format(name_set), end='')
+            for res in self.results:
+                sl = res.to_str_list()
+                print(" ".join(sl[1:]), end=' ')
+            print()
 
 
     def _measure_target(self, target):
@@ -386,6 +438,45 @@ class Measure:
             f.write(",".join(row) + "\n")
 
 
+    def _print_header(self, header, ln):
+        parts = ln.split(',')
+        if header == 1:
+            name_set = parts[0] + "/" + parts[1]
+            s = name_set
+        else:
+            s = parts[0]
+        print(("{0:<" + self.Results.F1_ALIGN + "}").format(s), end='')
+        idx = 2
+        for idx in range(2,12,4):
+            f = parts[idx:idx+4]
+            if header == 0:
+                f[0] = f[0].replace("Native x86", "Native")
+            elif header == 1:
+                f[2] = f[2].replace("Slowdown", "x")
+                f[3] = f[3].replace("Slowdown SD", "xsd")
+            print("{0:<9}{1:<9}{2:<6}{3:<6}".format(*f), end='')
+        print()
+
+
+    def format(self, csv):
+        headers = 0
+        i = 0
+        n = 30
+        with open(csv, "r") as f:
+            for ln in f:
+                ln = ln.strip()
+                if headers < 2:
+                    self._print_header(headers, ln)
+                    headers = headers + 1
+                    continue
+
+                res = self.Results.parse(ln)
+                res.print()
+                i = i + 1
+                if i == n:
+                    break
+
+
     def _perf_target(self, target):
         progs = self._build_programs(target)
 
@@ -429,8 +520,7 @@ class Measure:
 # dir test arg
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Measure translation overhead')
-    parser.add_argument('dir', type=str)
-    parser.add_argument('test', type=str)
+    parser.add_argument('pargs', type=str, nargs="*", metavar="parg")
     parser.add_argument("--args", nargs="*", metavar="arg", default=[])
     parser.add_argument("--stdin", help="stdin redirection")
     parser.add_argument("-v", action="store_true", help="verbose")
@@ -447,6 +537,8 @@ if __name__ == "__main__":
     parser.add_argument("--id", type=str)
     parser.add_argument("-n", type=int, default=10,
         help="number of runs")
+    parser.add_argument("--format", "-f", action="store_true",
+        help="show .csv file contents as formatted entries")
 
     args = parser.parse_args()
     sargs = [arg.strip() for arg in args.args]
@@ -461,10 +553,20 @@ if __name__ == "__main__":
     opts.csv = not args.no_csv
     opts.id = args.id
     opts.n = args.n
-    measure = Measure(args.dir, args.test, sargs, opts)
 
-    if args.perf:
-        measure.perf()
+    pargs = args.pargs
+
+    if args.format:
+        if len(pargs) != 1:
+            raise Exception("Wrong number of arguments")
+        measure = Measure(None, None, sargs, opts)
+        measure.format(pargs[0])
     else:
-        measure.measure()
+        if len(pargs) != 2:
+            raise Exception("Wrong number of arguments")
+        measure = Measure(pargs[0], pargs[1], sargs, opts)
+        if args.perf:
+            measure.perf()
+        else:
+            measure.measure()
 
