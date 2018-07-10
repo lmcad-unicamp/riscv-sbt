@@ -1,0 +1,231 @@
+Index: include/llvm/MC/MCAsmBackend.h
+===================================================================
+--- include/llvm/MC/MCAsmBackend.h
++++ include/llvm/MC/MCAsmBackend.h
+@@ -192,6 +192,8 @@
+   ///
+   /// \returns true iff any relaxation occurred.
+   bool relaxFragment(MCPaddingFragment *PF, MCAsmLayout &Layout);
++
++  virtual void setSTI(const MCSubtargetInfo &STI) {};
+ };
+ 
+ } // end namespace llvm
+Index: lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp
+===================================================================
+--- lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp
++++ lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp
+@@ -13,6 +13,8 @@
+ #include "MCTargetDesc/RISCVTargetStreamer.h"
+ #include "llvm/ADT/STLExtras.h"
+ #include "llvm/ADT/StringSwitch.h"
++#include "llvm/MC/MCAssembler.h"
++#include "llvm/MC/MCAsmBackend.h"
+ #include "llvm/MC/MCContext.h"
+ #include "llvm/MC/MCExpr.h"
+ #include "llvm/MC/MCInst.h"
+@@ -1060,9 +1062,41 @@
+     return false;
+   }
+ 
++  if (Option == "relax") {
++    getTargetStreamer().emitDirectiveOptionRelax();
++
++    Parser.Lex();
++    if (Parser.getTok().isNot(AsmToken::EndOfStatement))
++      return Error(Parser.getTok().getLoc(),
++                   "unexpected token, expected end of statement");
++
++    setFeatureBits(RISCV::FeatureRelax, "relax");
++
++    // Update AsmBackend with new STI
++    getTargetStreamer().getStreamer().getAssemblerPtr()->getBackend()
++        .setSTI(getSTI());
++    return false;
++  }
++
++  if (Option == "norelax") {
++    getTargetStreamer().emitDirectiveOptionNoRelax();
++
++    Parser.Lex();
++    if (Parser.getTok().isNot(AsmToken::EndOfStatement))
++      return Error(Parser.getTok().getLoc(),
++                   "unexpected token, expected end of statement");
++
++    clearFeatureBits(RISCV::FeatureRelax, "relax");
++
++    // Update AsmBackend with new STI
++    getTargetStreamer().getStreamer().getAssemblerPtr()->getBackend()
++        .setSTI(getSTI());
++    return false;
++  }
++
+   // Unknown option.
+   Warning(Parser.getTok().getLoc(),
+-          "unknown option, expected 'rvc' or 'norvc'");
++          "unknown option, expected 'rvc', 'norvc', 'relax' or 'norelax'");
+   Parser.eatToEndOfStatement();
+   return false;
+ }
+Index: lib/Target/RISCV/MCTargetDesc/RISCVAsmBackend.cpp
+===================================================================
+--- lib/Target/RISCV/MCTargetDesc/RISCVAsmBackend.cpp
++++ lib/Target/RISCV/MCTargetDesc/RISCVAsmBackend.cpp
+@@ -27,25 +27,27 @@
+ 
+ namespace {
+ class RISCVAsmBackend : public MCAsmBackend {
+-  const MCSubtargetInfo &STI;
++  const MCSubtargetInfo *STI;
+   uint8_t OSABI;
+   bool Is64Bit;
+ 
+ public:
+   RISCVAsmBackend(const MCSubtargetInfo &STI, uint8_t OSABI, bool Is64Bit)
+-      : MCAsmBackend(support::little), STI(STI), OSABI(OSABI),
++      : MCAsmBackend(support::little), STI(&STI), OSABI(OSABI),
+         Is64Bit(Is64Bit) {}
+   ~RISCVAsmBackend() override {}
+ 
+   // Generate diff expression relocations if the relax feature is enabled,
+   // otherwise it is safe for the assembler to calculate these internally.
+   bool requiresDiffExpressionRelocations() const override {
+-    return STI.getFeatureBits()[RISCV::FeatureRelax];
++    return STI->getFeatureBits()[RISCV::FeatureRelax];
+   }
+   void applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
+                   const MCValue &Target, MutableArrayRef<char> Data,
+                   uint64_t Value, bool IsResolved) const override;
+ 
++  void setSTI(const MCSubtargetInfo &_STI) override {STI = &_STI;}
++
+   std::unique_ptr<MCObjectTargetWriter>
+   createObjectTargetWriter() const override;
+ 
+@@ -54,7 +56,7 @@
+   // during relaxation.
+   bool shouldForceRelocation(const MCAssembler &Asm, const MCFixup &Fixup,
+                              const MCValue &Target) override {
+-    return STI.getFeatureBits()[RISCV::FeatureRelax];
++    return STI->getFeatureBits()[RISCV::FeatureRelax];
+   }
+ 
+   bool fixupNeedsRelaxation(const MCFixup &Fixup, uint64_t Value,
+@@ -197,7 +199,7 @@
+ }
+ 
+ bool RISCVAsmBackend::writeNopData(raw_ostream &OS, uint64_t Count) const {
+-  bool HasStdExtC = STI.getFeatureBits()[RISCV::FeatureStdExtC];
++  bool HasStdExtC = STI->getFeatureBits()[RISCV::FeatureStdExtC];
+   unsigned MinNopLen = HasStdExtC ? 2 : 4;
+ 
+   if ((Count % MinNopLen) != 0)
+Index: lib/Target/RISCV/MCTargetDesc/RISCVELFStreamer.h
+===================================================================
+--- lib/Target/RISCV/MCTargetDesc/RISCVELFStreamer.h
++++ lib/Target/RISCV/MCTargetDesc/RISCVELFStreamer.h
+@@ -22,6 +22,8 @@
+ 
+   virtual void emitDirectiveOptionRVC();
+   virtual void emitDirectiveOptionNoRVC();
++  virtual void emitDirectiveOptionRelax();
++  virtual void emitDirectiveOptionNoRelax();
+ };
+ }
+ #endif
+Index: lib/Target/RISCV/MCTargetDesc/RISCVELFStreamer.cpp
+===================================================================
+--- lib/Target/RISCV/MCTargetDesc/RISCVELFStreamer.cpp
++++ lib/Target/RISCV/MCTargetDesc/RISCVELFStreamer.cpp
+@@ -40,3 +40,5 @@
+ 
+ void RISCVTargetELFStreamer::emitDirectiveOptionRVC() {}
+ void RISCVTargetELFStreamer::emitDirectiveOptionNoRVC() {}
++void RISCVTargetELFStreamer::emitDirectiveOptionRelax() {}
++void RISCVTargetELFStreamer::emitDirectiveOptionNoRelax() {}
+Index: lib/Target/RISCV/MCTargetDesc/RISCVTargetStreamer.h
+===================================================================
+--- lib/Target/RISCV/MCTargetDesc/RISCVTargetStreamer.h
++++ lib/Target/RISCV/MCTargetDesc/RISCVTargetStreamer.h
+@@ -20,6 +20,8 @@
+ 
+   virtual void emitDirectiveOptionRVC() = 0;
+   virtual void emitDirectiveOptionNoRVC() = 0;
++  virtual void emitDirectiveOptionRelax() = 0;
++  virtual void emitDirectiveOptionNoRelax() = 0;
+ };
+ 
+ // This part is for ascii assembly output
+@@ -31,6 +33,8 @@
+ 
+   void emitDirectiveOptionRVC() override;
+   void emitDirectiveOptionNoRVC() override;
++  void emitDirectiveOptionRelax() override;
++  void emitDirectiveOptionNoRelax() override;
+ };
+ 
+ }
+Index: lib/Target/RISCV/MCTargetDesc/RISCVTargetStreamer.cpp
+===================================================================
+--- lib/Target/RISCV/MCTargetDesc/RISCVTargetStreamer.cpp
++++ lib/Target/RISCV/MCTargetDesc/RISCVTargetStreamer.cpp
+@@ -30,3 +30,11 @@
+ void RISCVTargetAsmStreamer::emitDirectiveOptionNoRVC() {
+   OS << "\t.option\tnorvc\n";
+ }
++
++void RISCVTargetAsmStreamer::emitDirectiveOptionRelax() {
++  OS << "\t.option\trelax\n";
++}
++
++void RISCVTargetAsmStreamer::emitDirectiveOptionNoRelax() {
++  OS << "\t.option\tnorelax\n";
++}
+Index: test/MC/RISCV/option-invalid.s
+===================================================================
+--- test/MC/RISCV/option-invalid.s
++++ test/MC/RISCV/option-invalid.s
+@@ -13,5 +13,5 @@
+ # CHECK: error: unexpected token, expected end of statement
+ .option rvc foo
+ 
+-# CHECK: warning: unknown option, expected 'rvc' or 'norvc'
++# CHECK: warning: unknown option, expected 'rvc', 'norvc', 'relax' or 'norelax'
+ .option bar
+Index: test/MC/RISCV/option-relax.s
+===================================================================
+--- /dev/null
++++ test/MC/RISCV/option-relax.s
+@@ -0,0 +1,32 @@
++# RUN: llvm-mc -triple riscv32 < %s \
++# RUN:     | FileCheck -check-prefix=CHECK-INST %s
++# RUN: llvm-mc -filetype=obj -triple riscv32 < %s \
++# RUN:     | llvm-readobj -r | FileCheck -check-prefix=CHECK-RELOC %s
++
++# RUN: llvm-mc -triple riscv64 < %s \
++# RUN:     | FileCheck -check-prefix=CHECK-INST %s
++# RUN: llvm-mc -filetype=obj -triple riscv64 < %s \
++# RUN:     | llvm-readobj -r | FileCheck -check-prefix=CHECK-RELOC %s
++
++.L1:
++# CHECK-INST: call foo
++# CHECK-RELOC: R_RISCV_CALL foo 0x0
++call foo
++.quad .L2-.L1
++
++.option relax
++# CHECK-INST: .option relax
++# CHECK-INST: call bar
++# CHECK-RELOC-NEXT: R_RISCV_CALL bar 0x0
++# CHECK-RELOC-NEXT: R_RISCV_RELAX bar 0x0
++call bar
++.quad .L2-.L1
++
++.L2:
++.option norelax
++# CHECK-INST: .option norelax
++# CHECK-INST: call baz
++# CHECK-RELOC: R_RISCV_CALL baz 0x0
++# CHECK-RELOC-NOT: R_RISCV_RELAX baz 0x0
++.quad .L2-.L1
++call baz

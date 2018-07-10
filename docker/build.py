@@ -459,7 +459,7 @@ if __name__ == "__main__":
         run("sbt-dev")
     # --xdev
     elif args.xdev:
-        exec("sbt-dev")
+        exec("dev")
     # error
     else:
         sys.exit("ERROR: no command specified")
