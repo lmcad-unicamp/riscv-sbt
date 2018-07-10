@@ -292,8 +292,14 @@ class Builder:
 
             # preserve rv32/x86 source code for debug, by not mixing in
             # assembly source together
-            if opts.dbg and out.startswith('rv32-x86-'):
+            if (opts.dbg and
+                (out.startswith('rv32-x86-') or
+                out.startswith('rv32-arm-'))):
                 flags = "-g"
+                # workaround for different llvm-mc behavior of newer versions
+                # for some reason it gets confused by the .file directive now
+                # which makes it skip generation of debug info
+                shell('sed -i "/\t.file/d" ' + ipath)
             else:
                 flags = ""
 

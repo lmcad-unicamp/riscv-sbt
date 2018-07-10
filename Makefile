@@ -68,10 +68,13 @@ alltests:
 
 ### dbg ###
 
+.PHONY: test-prep
+test-prep:
+	cd $(TOPDIR)/mibench && ./genmake.py
+	make -C $(TOPDIR)/mibench dijkstra-clean
+	make -C $(TOPDIR)/mibench rv32-dijkstra x86-dijkstra rv32-x86-dijkstra-globals rv32-x86-dijkstra-locals
+
 .PHONY: test
 test:
-	valgrind --leak-check=yes riscv-sbt -debug -regs=globals -commented-asm \
-		-a2s /mnt/ssd/riscv-sbt/build/test/sbt/rv32-mm.a2s \
-		/mnt/ssd/riscv-sbt/build/test/sbt/rv32-mm.o \
-		-o /mnt/ssd/riscv-sbt/build/test/sbt/rv32-x86-mm-globals.bc \
-		>/mnt/ssd/riscv-sbt/junk/rv32-x86-mm-globals.log 2>&1
+	#/mnt/ssd/riscv-sbt/scripts/auto/measure.py /mnt/ssd/riscv-sbt/build/mibench/network/dijkstra dijkstra -n 1 --args /mnt/ssd/riscv-sbt/mibench/network/dijkstra/input.dat
+	gdb --args /mnt/ssd/riscv-sbt/build/mibench/network/dijkstra/rv32-x86-dijkstra-globals /mnt/ssd/riscv-sbt/mibench/network/dijkstra/input.dat

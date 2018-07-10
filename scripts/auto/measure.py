@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 from auto.config import ARM, SBT, X86
-from auto.utils import path
+from auto.utils import path, shell
 
 import argparse
 import math
@@ -106,6 +106,7 @@ class Program:
         cp = subprocess.run([PERF, "report", "--sort=dso", "--stdio"],
             stdout=subprocess.PIPE, universal_newlines=True)
         cp.check_returncode()
+        shell("cp perf.data perf-" + self.name + ".data")
 
         patt = re.compile("([0-9]+\.[0-9]+)% +(.*)")
         p = None

@@ -16,7 +16,8 @@ from auto.utils import cat, mpath, path, xassert
 class Bench:
     def __init__(self, name, dir, ins, runs=None, dbg=None,
             bflags=None, xflags=None, sbtflags=[], mflags=None,
-            srcdir=None, dstdir=None, narchs=None, xarchs=None):
+            srcdir=None, dstdir=None, narchs=None, xarchs=None,
+            cc=None, rvcc=None):
         self.name = name
         self.dir = dir
         self.ins = ins
@@ -32,12 +33,16 @@ class Bench:
         if dbg == "opt":
             bflags = cat(bflags, "--dbg --opt")
             xflags = cat(xflags, "--dbg --opt")
+        if dbg == "xopt":
+            bflags = cat(bflags, "--dbg --opt")
+            xflags = cat(xflags, "--dbg --opt --xopt")
         self.narchs = narchs
         self.xarchs = xarchs
 
         self.gm = GenMake(narchs, xarchs,
                 srcdir, dstdir, self.name,
-                xflags, bflags, mflags, self.sbtflags)
+                xflags, bflags, mflags, self.sbtflags,
+                cc=cc, rvcc=rvcc)
 
 
     def out_filter(self, of):
@@ -211,6 +216,7 @@ arm-dstdir:
     def _bench(self, name, dir, ins, runs,
             dstdir=None, ctor=Bench,
             bflags=None, xflags=None, sbtflags=[],
+            cc=None, rvcc=None,
             **kwargs):
         dstdir = dstdir if dstdir else path(self.dstdir, dir)
         bflags = cat(self.bflags, bflags)
@@ -224,6 +230,7 @@ arm-dstdir:
             bflags=bflags, xflags=xflags, sbtflags=sbtflags,
             narchs=self.narchs,
             xarchs=self.xarchs,
+            cc=cc, rvcc=rvcc,
             **kwargs)
 
 
@@ -339,11 +346,13 @@ arm-dstdir:
             self._bench("dijkstra", "network/dijkstra",
                 ["dijkstra_large.c"],
                 self._single_run(
-                    [path(self.srcdir, "network/dijkstra/input.dat")])),
+                    [path(self.srcdir, "network/dijkstra/input.dat")]),
+                rvcc="clang", dbg="xopt"),
             self._bench("crc32", "telecomm/CRC32",
                 ["crc_32.c"],
                 self._single_run(
-                    [path(self.srcdir, "telecomm/adpcm/data/large.pcm")])),
+                    [path(self.srcdir, "telecomm/adpcm/data/large.pcm")]),
+                rvcc="clang"),
             self._rijndael(),
             self._bench("sha", "security/sha",
                 ["sha_driver.c", "sha.c"],

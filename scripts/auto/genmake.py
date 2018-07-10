@@ -147,7 +147,8 @@ class Runs:
 class GenMake:
     def __init__(self, narchs, xarchs,
             srcdir, dstdir, name,
-            xflags, bflags, mflags, sbtflags=[]):
+            xflags, bflags, mflags, sbtflags=[],
+            cc=None, rvcc=None):
         self.narchs = narchs
         self.xarchs = xarchs
         self.srcdir = srcdir
@@ -157,6 +158,8 @@ class GenMake:
         self.bflags = bflags
         self.mflags = mflags
         self.sbtflags = sbtflags
+        self.cc = cc
+        self.rvcc = rvcc
         #
         self.out_filter = None
         #
@@ -168,9 +171,12 @@ class GenMake:
 
 
     def append_cc(self, arch, flags):
-        return cat(flags,
-            "--cc=" + GOPTS.rvcc if arch.is_rv32()
-            else "--cc=" + GOPTS.cc)
+        s = "--cc="
+        if arch.is_rv32():
+            s = s + (self.rvcc if self.rvcc else GOPTS.rvcc)
+        else:
+            s = s + (self.cc if self.cc else GOPTS.cc)
+        return cat(flags, s)
 
 
     def bld(self, arch, ins, out):
