@@ -1,0 +1,29 @@
+01-relax-call.patch
+D44886 - upstreamed
+[RISCV] Support linker relax function call from auipc and jalr to jal
+
+02-relax-align.patch
+D46630 - Diff 2 - abandoned - replaced by D47755 (not upstreamed yet)
+[RISCV] Insert NOPs and R_RISCV_ALIGN relocation type for .align directive
+when linker relaxation enabled
+
+03-relax-reloc.patch -> 02-relax-all-d46677.patch
+D46677 - not upstreamed yet
+[RISCV] Add R_RISCV_RELAX relocation to all possible relax candidates.
+
+04-relax-was-forced.patch
+D46350 - upstreamed
+[RISCV] Add WasForced parameter to MCAsmBackend::fixupNeedsRelaxationAdvanced
+
+---
+03-relax-dont-fold-d45773.patch
+D45773 - not merged
+[RISCV] Don't fold symbol diff
+
+---
+01-clang-baremetal
+02-clang-relax-default
+---
+01-relax-align-d47755
+02-relax-all-d46677
+
