@@ -224,7 +224,7 @@ LLC_PIC         = "-relocation-model=pic"
 PK32 = DIR.toolchain_release + "/" + RV32_TRIPLE + "/bin/pk"
 RV32_SYSROOT    = DIR.toolchain_release + "/opt/riscv/" + RV32_TRIPLE
 RV32_MARCH      = "riscv32"
-RV32_MATTR      = "-a,-c,+m,+f,+d"
+RV32_MATTR      = "-a,-c,+m,+f,+d,+relax"
 RV32_LLC_FLAGS  = cat(LLC_STATIC,
         "-march=" + RV32_MARCH, "-mattr=" + RV32_MATTR)
 

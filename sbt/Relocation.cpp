@@ -222,10 +222,15 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             addProxyReloc(reloc, Relocation::PROXY_CALL);
             return handleRelocation(addr, os);
 
-        // these can be ignored
         case llvm::ELF::R_RISCV_BRANCH:
         case llvm::ELF::R_RISCV_JAL:
-            return nullptr;
+            // TODO check if this also works with GCC
+            relfn = [this, addr](llvm::Constant* symaddr) {
+                llvm::Constant* c = llvm::ConstantExpr::getSub(
+                    symaddr, _ctx->c.u32(addr));
+                return c;
+            };
+            break;
 
         default:
             xunreachable("unknown relocation");
