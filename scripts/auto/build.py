@@ -53,6 +53,7 @@ class BuildOpts:
             "-dont-use-libc" if not opts.clink else "")
         opts.dbg = args.dbg
         opts.opt = True if args.opt or not args.dbg else False
+        opts.relax = not args.no_relax
 
         return opts
 
@@ -88,6 +89,8 @@ class BuildOpts:
             help="build for debug")
         parser.add_argument("--opt", action='store_true',
             help="optmize code, even if debug is enabled")
+        parser.add_argument("--no-relax", action='store_true',
+            help="disable relax")
 
 
 class LLVMBuilder:
@@ -307,7 +310,7 @@ class Builder:
                 flags,
                 opts.sflags,
                 "-arch=" + arch.march,
-                "-mattr=" + arch.mattr)
+                "-mattr=" + arch.mattr(opts.relax))
             cmd = cat(mc, flags,
                 "-assemble", "-filetype=obj",
                 ipath, "-o", opath)

@@ -25,7 +25,7 @@ clean:
 
 $(DSTDIR)/rv32-linux-asm-hello: $(SRCDIR)/rv32-hello.s
 	$(BUILD_PY) --arch rv32-linux --srcdir $(SRCDIR) --dstdir $(DSTDIR) \
-		rv32-hello.s -o rv32-linux-asm-hello -C
+		rv32-hello.s -o rv32-linux-asm-hello -C --no-relax
 
 .PHONY: rv32-linux-asm-hello
 rv32-linux-asm-hello: $(DSTDIR)/rv32-linux-asm-hello

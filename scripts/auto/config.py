@@ -126,6 +126,9 @@ TOOLS = Tools()
 
 UNAME_M = shell("uname -m", save_out=True, quiet=True)
 
+RV32_MATTR_NORELAX = "-a,-c,+m,+f,+d"
+RV32_MATTR      = RV32_MATTR_NORELAX + ",+relax"
+
 class Arch:
     def __init__(self, name, prefix, triple, run, march, gccflags,
             clang_flags, sysroot, isysroot, llcflags, as_flags,
@@ -160,7 +163,7 @@ class Arch:
         self.ld = triple + "-ld"
         self.ld_flags = ld_flags
         #
-        self.mattr = mattr
+        self.mattr_var = mattr
         # remote
         self.rem_host = rem_host
         self.rem_topdir = rem_topdir
@@ -218,13 +221,18 @@ class Arch:
         return rpath
 
 
+    def mattr(self, relax=True):
+        if self.is_rv32():
+            return RV32_MATTR if relax else RV32_MATTR_NORELAX
+        return self.mattr_var
+
+
 LLC_STATIC      = "-relocation-model=static"
 LLC_PIC         = "-relocation-model=pic"
 
 PK32 = DIR.toolchain_release + "/" + RV32_TRIPLE + "/bin/pk"
 RV32_SYSROOT    = DIR.toolchain_release + "/opt/riscv/" + RV32_TRIPLE
 RV32_MARCH      = "riscv32"
-RV32_MATTR      = "-a,-c,+m,+f,+d,+relax"
 RV32_LLC_FLAGS  = cat(LLC_STATIC,
         "-march=" + RV32_MARCH, "-mattr=" + RV32_MATTR)
 

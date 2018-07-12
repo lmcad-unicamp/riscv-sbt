@@ -304,9 +304,13 @@ SBTRelocation::handleRelocation(uint64_t addr, llvm::raw_ostream* os)
             else {
                 llvm::Value* sym = Caller::getFunctionSymbol(_ctx, f->name());
                 xassert(sym && "Internal function symbol not found!");
-                c = llvm::ConstantExpr::getPointerCast(
-                    llvm::cast<llvm::Constant>(sym), _ctx->t.i32);
-                lastSymC = _ctx->c.i32(saddr);
+                if (reloc->type() == llvm::ELF::R_RISCV_JAL)
+                    c = _ctx->c.i32(saddr);
+                else {
+                    c = llvm::ConstantExpr::getPointerCast(
+                        llvm::cast<llvm::Constant>(sym), _ctx->t.i32);
+                    lastSymC = _ctx->c.i32(saddr);
+                }
             }
 
         } else {
