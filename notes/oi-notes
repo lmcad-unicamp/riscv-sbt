@@ -2,7 +2,15 @@
 OiCombinePass
 ===
 - combine load large immediates - ABSENT in RISC-V STB
+(ADD (SHL (LSHR X 16) 16) (AND Y 0xFFFF))
+((x >> 16) << 16) + (y & 0xFFFF)) -> constant
+
+RVSBT>2 MAYBE multiple access to register may be combined into one, especially
+        for 'globals' mode
+
 - combine GEP+ShadowMemory - ABSENT
+
+RVSBT: probably not needed as riscv-sbt uses constant expressions for this.
 
 
 ===
@@ -10,29 +18,39 @@ OiInstTranslate
 ===
 - FinishFunction
     - IREmitter: CleanRegs, FixEntryBB, FixBBTerminators
-    - ABSENT
+    - CleanRegs: OK
+    RVSBT: DONE
+
 - FinishModule
     - IREmitter::ProcessIndirectJumps
-    - ABSENT
+    RVSBT: deals with indirect jumps in another way
+
 - HandleAluSrcOperand
     - Reg: load from local, mark as read
-    - Imm: resolve relocation. Handle function address
-    SBT:
-    - MAYBE need to mark as read as well?
-    - TODO better handling of function address
+    - Imm: resolve relocation. Handle function address, using
+           relocation info to find out if Imm is a function address
+    RVSBT: DONE
+
+- HandleXXXOperand
+    - mark register as read or written
+    RVSBT: DONE
+
 - HandleMemOperand
     - resolve relocation and map to shadow memory
-    - DONE
-- HandleAluDstOperand
-    - get reg and mark as written
-    - MAYBE
+    RVSBT: DONE
+
+- It seems OISBT tries to optimize accesses to spilled regs
+    RVSBT>5 MAYBE
+
 - HandleCallTarget
     - IREmitter::HandleLocalCall
     - OR handle libc call
-    - DONE
+    RVSBT: DONE
+
 - HandleBranchTarget
     - set target address and create BB
-    - DONE
+    RVSBT: DONE
+
 - printInstruction - main method
     - handle operands
     - add first instruction to map
@@ -41,7 +59,8 @@ OiInstTranslate
     - JAL: HandleCallTarget (IREmmiter::HandleLocalCall)
     - JALR: IREmmiter: HandleFunctionExitPoint/AddIndirectCall/HandleFunctionEntryPoint
     - IJMP: IREmmiter: AddIndirectJump to a dummy instruction
-    - DONE
+    - JR: returns are identified by register number
+    RVSBT: DONE
 
 
 ===
@@ -53,10 +72,6 @@ OneRegion - whole program in one function
 OptimizeStack
 AggrOptimizeStack
 NoShadow - avoid adding shadow image offset to every memory access
-
-- CleanRegs - seems to remove unused loads/stores to registers that are not
-used, but that the compiler can't optimize out.
-- MAYBE check if needed
 
 - ProcessIndirectJumps
     - for each relocation in .text:
@@ -75,31 +90,49 @@ used, but that the compiler can't optimize out.
               (IndDests)
 
     - for each indirect call: call through pointer
-- TODO need to implement this on SBT
+    RVSBT>4 DONE indirect call through pointer
+           MAYBE riscv-sbt is able to perform indirect jumps with
+             indirectBr. Would it be faster to use switches and
+             jump tables instead?
+
+- BuildShadowImage
+    RVSBT>3 TODO check if we can leave some sections out, or if grouping
+                everything together helps
 
 - StartFunction
     - build local reg file
-    - TODO need to implement local reg file
+    RVSBT: DONE
+
 - StartMainFunction
     - InsertStartupCode
-    - DONE in parts
+    RVSBT: DONE
+
 - HandleFunctionEntryPoint - sync local reg file with global one
-    - TODO need to implement this
+    RVSBT: DONE
+
 - HandleFunctionExitPoint - sync global reg file with local one
-    - TODO need to implement this
+    RVSBT: DONE
+
 - FixEntryBB - fix function entry point, to the one with no predecessors
-    - MAYBE is this needed on SBT?
+    RVSBT: DONE
+
 - FixBBTerminators
     - CreateUnreachable on BBs with no terminators
     - erase empty BBs
-    - MAYBE is this needed on SBT?
+    RVSBT: DONE
+
+- CleanRegs - seems to remove unused loads/stores to registers that are not
+              used, but that the compiler can't optimize out.
+    RVSBT>1 TODO check if all global regs not read/write are being removed
+
 - BuildReturns
     - on function returns, create an indirect br, with call sites as
       possible destinations
-    - MAYBE is this needed? SBT uses LLVM return on most cases
+    RVSBT: this will be needed if OneRegion mode is implemented
+
 - HandleBackEdge
     - get back BB, possibly splitting an existing one
-    - DONE
+    RVSBT: DONE
 
 
 ===
@@ -121,20 +154,18 @@ Resolves relocations
                     - (CommonSectionAddress = ShadowSize)
             - other symbols: add section address to original symbol's address
     - .text relocations are performed by ProcessIndirectJumps
+    RVSBT: DONE
 
-    - DONE seems to be done on SBT
 
 ===
 SBTUtils
 ===
 
 Convert register numbers from LLVM to OpenISA and vice-versa
-- DONE
 
 - GetELFOffset(section): get offset of section inside the ELF image
-    - DONE
 - GetCommonSymbolsList: get all .bss and common symbols from ELF object
-    - DONE in another way
+RVSBT: DONE
 
 
 ===
@@ -142,7 +173,7 @@ StringRefMemoryObject
 ===
 
 Convenience class to extract bytes from a StringRef
-- probably unneeded
+RVSBT: not needed
 
 
 ===
@@ -150,7 +181,7 @@ SyscallsIface
 ===
 
 Generate code to call libc functions.
-- DONE in another way
+RVSBT: DONE in another way
 
 
 ===
@@ -167,7 +198,7 @@ StackSize - default = 300B
     - createGVNPass
     - createCFGSimplificationPass
     - WriteBitcodeToFile
-    - MAYBE need to optimize in SBT
+    RVSBT: probably not need, everything can be done with opt later
 
 - DisassembleObject
     - get target, its disassembler, reg info, asm info, etc...
@@ -181,22 +212,20 @@ StackSize - default = 300B
                 - disassemble it
                 - translate it (using OiInstTranlate)
     - OptimizeAndWriteBitcode
-    - TODO translate multiple objects
+    RVSBT: DONE
 
 - DumpObject
     - prints some stuff and calls DisassembleObject
-
 - DumpArchive
     - iterate through each contained object calling DumpObject on each
-
 - DumpInput
     - read file and call DumpArchive or DumpObject
-
 - main
     - init LLVM targets
     - parse command line
     - for each input file:
         - call DumpInput
+RVSBT: DONE
 
 
 ===
@@ -269,54 +298,3 @@ sbtpass2 dijkstra_large-oi-x86
 
 
 # repeat with: static-bt -nolocals / "" (globals) / -abi-locals
-
-
-RISC-V
-------
-
-# .c -> x86
-
-clang --target=x86_64-unknown-linux-gnu -m32 -emit-llvm -c -O3 -mllvm -disable-llvm-optzns dijkstra_large.c -o x86-dijkstra_large.bc
-
-llvm-dis x86-dijkstra_large.bc -o x86-dijkstra_large.ll
-opt -O3 x86-dijkstra_large.bc -o x86-dijkstra_large.opt.bc
-llvm-dis x86-dijkstra_large.opt.bc -o x86-dijkstra_large.opt.ll
-opt -O3 x86-dijkstra_large.opt.bc -o x86-dijkstra_large.opt2.bc
-llvm-dis x86-dijkstra_large.opt2.bc -o x86-dijkstra_large.opt2.ll
-
-llc -relocation-model=static -O3 -march=x86 -mattr=avx2 x86-dijkstra_large.opt2.bc -o x86-dijkstra_large.s
-
-# assembling and linking with GNU as/ld, because these are also used with
-# RISC-V, as LLVM can't assemble and link RISC-V code yet.
-
-x86_64-linux-gnu-as --32 -o x86-dijkstra_large.o -c x86-dijkstra_large.s
-
-x86_64-linux-gnu-ld -m elf_i386 -o x86-dijkstra_large /usr/lib32/crt1.o /usr/lib32/crti.o x86-dijkstra_large.o /usr/lib32/libc.a /usr/lib/gcc/x86_64-linux-gnu/4.9.2/32/libgcc.a /usr/lib/gcc/x86_64-linux-gnu/4.9.2/32/libgcc_eh.a /usr/lib32/libc.a /usr/lib32/crtn.o
-
-
-# .c -> rv32.o
-
-clang --target=riscv -mriscv=RV32IMAFD -emit-llvm -c -O3 -mllvm -disable-llvm-optzns dijkstra_large.c -o rv32-dijkstra_large.bc
-
-llvm-dis rv32-dijkstra_large.bc -o rv32-dijkstra_large.ll
-opt -O3 rv32-dijkstra_large.bc -o rv32-dijkstra_large.opt.bc
-llvm-dis rv32-dijkstra_large.opt.bc -o rv32-dijkstra_large.opt.ll
-
-llc -relocation-model=static -O3 -march=riscv -mcpu=RV32IMAFD rv32-dijkstra_large.opt.bc -o rv32-dijkstra_large.s
-
-# RISC-V needs to use GNU as/ld, as LLVM for RISC-V doesn't support assembling
-# and linking yet
-
-riscv32-unknown-elf-as -o rv32-dijkstra_large.o -c rv32-dijkstra_large.s
-
-riscv-sbt -o rv32-x86-dijkstra_large.bc rv32-dijkstra_large.o
-
-llvm-dis rv32-x86-dijkstra_large.bc -o rv32-x86-dijkstra_large.ll
-opt -O3 rv32-x86-dijkstra_large.bc -o rv32-x86-dijkstra_large.opt.bc
-llvm-dis rv32-x86-dijkstra_large.opt.bc -o rv32-x86-dijkstra_large.opt.ll
-
-llc -relocation-model=static -O3 -march=x86 -mattr=avx2 rv32-x86-dijkstra_large.opt.bc -o rv32-x86-dijkstra_large.s
-
-x86_64-linux-gnu-as --32 -o rv32-x86-dijkstra_large.o -c rv32-x86-dijkstra_large.s
-
-x86_64-linux-gnu-ld -m elf_i386 -o rv32-x86-dijkstra_large /usr/lib32/crt1.o /usr/lib32/crti.o rv32-x86-dijkstra_large.o /mnt/ssd/riscv-sbt/toolchain/debug/share/riscv-sbt/x86-syscall.o /usr/lib32/libc.a /usr/lib/gcc/x86_64-linux-gnu/4.9.2/32/libgcc.a /usr/lib/gcc/x86_64-linux-gnu/4.9.2/32/libgcc_eh.a /usr/lib32/libc.a /usr/lib32/crtn.o

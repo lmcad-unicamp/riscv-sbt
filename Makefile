@@ -76,5 +76,4 @@ test-prep:
 
 .PHONY: test
 test:
-	#/mnt/ssd/riscv-sbt/scripts/auto/measure.py /mnt/ssd/riscv-sbt/build/mibench/network/dijkstra dijkstra -n 1 --args /mnt/ssd/riscv-sbt/mibench/network/dijkstra/input.dat
-	gdb --args /mnt/ssd/riscv-sbt/build/mibench/network/dijkstra/rv32-x86-dijkstra-globals /mnt/ssd/riscv-sbt/mibench/network/dijkstra/input.dat
+	/mnt/ssd/riscv-sbt/scripts/auto/measure.py /mnt/ssd/riscv-sbt/build/mibench/network/dijkstra dijkstra -n 1 --args /mnt/ssd/riscv-sbt/mibench/network/dijkstra/input.dat
