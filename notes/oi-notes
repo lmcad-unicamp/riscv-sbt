@@ -123,7 +123,7 @@ NoShadow - avoid adding shadow image offset to every memory access
 
 - CleanRegs - seems to remove unused loads/stores to registers that are not
               used, but that the compiler can't optimize out.
-    RVSBT>1 TODO check if all global regs not read/write are being removed
+    RVSBT: DONE
 
 - BuildReturns
     - on function returns, create an indirect br, with call sites as

@@ -20,7 +20,7 @@ class Translator:
         opath = path(dir, out)
         flags = cat(SBT.flags, opts.sbtflags)
 
-        if opts.dbg:
+        if opts.xdbg:
             # strip arch prefix
             prefix = arch.add_prefix("")
             prefix = RV32_LINUX.add_prefix(prefix)
@@ -86,10 +86,13 @@ if __name__ == "__main__":
     BuildOpts.add_to_parser(parser)
     parser.add_argument("--xopt", action="store_true",
         help="optimize translated code")
+    parser.add_argument("--xdbg", action="store_true",
+        help="insert debug info on translated code")
     args = parser.parse_args()
 
     # set xlator opts
     opts = BuildOpts.parse(args)
+    opts.xdbg = args.xdbg
     if args.xopt or (opts.opt and not opts.dbg):
         opts.xopt = True
     else:
