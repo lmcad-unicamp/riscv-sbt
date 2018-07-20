@@ -1,6 +1,3 @@
-[submodule "lowrisc-llvm"]
-	path = submodules/lowrisc-llvm
-	url = https://github.com/lowRISC/riscv-llvm
 [submodule "riscv-fesvr"]
 	path = submodules/riscv-fesvr
 	url = https://github.com/riscv/riscv-fesvr
