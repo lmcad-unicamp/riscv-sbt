@@ -132,8 +132,8 @@ class Docker:
             ).format(**fmtdata))
 
 
-    def run(self, cmd=None, interactive=False):
-        self.cmd("run", cmd, interactive, vols=Docker.volstr())
+    def run(self, cmd=None, interactive=False, bind=False):
+        self.cmd("run", cmd, interactive, vols=Docker.volstr(bind))
 
 
     def exec(self, cmd, interactive=True):
@@ -141,11 +141,16 @@ class Docker:
 
 
     @staticmethod
-    def volstr():
+    def volstr(bind):
         src = Helper.cygpath(TOPDIR)
         dst = "/riscv-sbt"
-        vstr = "--mount type=bind,source={},destination={}".format(src, dst)
-        vstr = cat(vstr, VOLS.volstr())
+        bmount = "--mount type=bind,source={},destination={}"
+        vstr = bmount.format(src, dst)
+        if bind:
+            vstr = cat(vstr,
+                bmount.format(path(src, "toolchain"), path(dst, "toolchain")))
+        else:
+            vstr = cat(vstr, VOLS.volstr())
         return vstr
 
 #
@@ -349,6 +354,8 @@ class Image:
                 'make almost-alltests"')
         elif name == "dev":
             pass
+        elif name == "gcc7":
+            pass
         else:
             raise Exception("Invalid: build " + name)
 
@@ -361,7 +368,8 @@ class Images:
             Image("emu"),
             Image("llvm"),
             Image("sbt", img="sbt"),
-            Image("dev")
+            Image("dev"),
+            Image("gcc7")
         ]
         self._iter = None
 
@@ -407,21 +415,28 @@ if __name__ == "__main__":
     parser.add_argument("--build", metavar="img", type=str,
         choices=names + ["all"],
         help="build img. imgs=[{}]".format(", ".join(names + ["all"])))
+    parser.add_argument("-f", "--force", action="store_true",
+        help="force build")
     parser.add_argument("--run", type=str, help="run a docker image")
     parser.add_argument("--exec", type=str,
         help="exec bash on an existing container")
+    parser.add_argument("--bind", action="store_true",
+        help="use bind mount for all volumes when running a container")
     parser.add_argument("--rdev", action="store_true",
         help="run dev container")
     parser.add_argument("--xdev", action="store_true",
         help="exec bash on an existing dev container")
-    parser.add_argument("-f", "--force", action="store_true")
+    parser.add_argument("--rgcc7", action="store_true",
+        help="run gcc7 container")
+    parser.add_argument("--xgcc7", action="store_true",
+        help="exec bash on an existing gcc7 container")
     args = parser.parse_args()
 
 
     def run(img):
         name = img.replace("sbt-", "")
         docker = Docker(name, img)
-        docker.run(interactive=True)
+        docker.run(interactive=True, bind=args.bind)
 
     def exec(img):
         name = img.replace("sbt-", "")
@@ -460,6 +475,12 @@ if __name__ == "__main__":
     # --xdev
     elif args.xdev:
         exec("dev")
+    # --rgcc7
+    elif args.rgcc7:
+        run("sbt-gcc7")
+    # --xgcc7
+    elif args.xgcc7:
+        exec("gcc7")
     # error
     else:
         sys.exit("ERROR: no command specified")

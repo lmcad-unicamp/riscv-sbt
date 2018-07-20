@@ -346,13 +346,13 @@ arm-dstdir:
             self._bench("dijkstra", "network/dijkstra",
                 ["dijkstra_large.c"],
                 self._single_run(
-                    [path(self.srcdir, "network/dijkstra/input.dat")]),
-                rvcc="clang", dbg="xopt"),
+                    [path(self.srcdir, "network/dijkstra/input.dat")])),
+                #rvcc="clang", dbg="xopt"),
             self._bench("crc32", "telecomm/CRC32",
                 ["crc_32.c"],
                 self._single_run(
-                    [path(self.srcdir, "telecomm/adpcm/data/large.pcm")]),
-                rvcc="clang"),
+                    [path(self.srcdir, "telecomm/adpcm/data/large.pcm")])),
+                #rvcc="clang"),
             self._rijndael(),
             self._bench("sha", "security/sha",
                 ["sha_driver.c", "sha.c"],

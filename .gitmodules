@@ -1,14 +1,3 @@
-[submodule "riscv-gnu-toolchain"]
-	path = submodules/riscv-gnu-toolchain
-	url = https://github.com/riscv/riscv-gnu-toolchain
-[submodule "llvm"]
-	path = submodules/llvm
-	url = https://github.com/OpenISA/llvm
-	branch = lowrisc
-[submodule "clang"]
-	path = submodules/clang
-	url = https://github.com/OpenISA/clang
-	branch = lowrisc
 [submodule "lowrisc-llvm"]
 	path = submodules/lowrisc-llvm
 	url = https://github.com/lowRISC/riscv-llvm
@@ -24,3 +13,13 @@
 [submodule "riscv-qemu-tests"]
 	path = submodules/riscv-qemu-tests
 	url = https://github.com/arsv/riscv-qemu-tests
+[submodule "submodules/riscv-gnu-toolchain"]
+	path = submodules/riscv-gnu-toolchain
+	url = https://github.com/OpenISA/riscv-gnu-toolchain
+	branch = gcc-7.3.0
+[submodule "submodules/llvm"]
+	path = submodules/llvm
+	url = https://github.com/OpenISA/llvm
+[submodule "submodules/clang"]
+	path = submodules/clang
+	url = https://github.com/OpenISA/clang
