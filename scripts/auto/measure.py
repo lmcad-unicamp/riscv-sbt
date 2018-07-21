@@ -106,7 +106,7 @@ class Program:
         cp = subprocess.run([PERF, "report", "--sort=dso", "--stdio"],
             stdout=subprocess.PIPE, universal_newlines=True)
         cp.check_returncode()
-        shell("cp perf.data perf-" + self.name + ".data")
+        shell("cp perf.data perf-" + self.name + ".data", quiet=True)
 
         patt = re.compile("([0-9]+\.[0-9]+)% +(.*)")
         p = None
@@ -379,8 +379,11 @@ class Measure:
             if self.opts.perf_libc:
                 for i in range(N):
                     prog.perf_libc()
+                    print('c', end='')
             for i in range(N):
                 prog.run(i)
+                print('*', end='')
+            print()
             times[prog.mode] = prog.times
             lcperfs[prog.mode] = prog.lcperfs
 

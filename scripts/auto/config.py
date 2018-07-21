@@ -3,6 +3,7 @@
 from auto.utils import cat, chsuf, path, shell
 
 import os
+import subprocess
 
 ### config ###
 
@@ -125,6 +126,8 @@ class Tools:
 TOOLS = Tools()
 
 UNAME_M = shell("uname -m", save_out=True, quiet=True)
+GCC7 = subprocess.run("gcc --version | head -n1 | grep 7.3 >/dev/null",
+            shell=True, check=False).returncode == 0
 
 RV32_MATTR_NORELAX = "-a,-c,+m,+f,+d"
 RV32_MATTR      = RV32_MATTR_NORELAX + ",+relax"
@@ -275,18 +278,22 @@ RV32_LINUX = Arch(
         mattr=RV32_MATTR)
 
 
+X86_TRIPLE      = "i686-linux-gnu" if GCC7 else "x86_64-linux-gnu"
 X86_MARCH       = "x86"
 X86_MATTR       = "avx"
-X86_SYSROOT     = "/"
-X86_ISYSROOT    = "/usr/include"
+X86_SYSROOT     = "/usr/i686-linux-gnu" if GCC7 else "/"
+X86_ISYSROOT    = "/usr/i686-linux-gnu/include" if GCC7 else "/usr/include"
+X86_GCC         = X86_TRIPLE + ("-gcc-7" if GCC7 else "-gcc")
+X86_GCC_FLAGS   = "" if GCC7 else "-m32"
 
 X86 = Arch(
         name="x86",
         prefix="x86",
-        triple="x86_64-linux-gnu",
+        triple=X86_TRIPLE,
         run="",
         march=X86_MARCH,
-        gccflags="-m32",
+        gcc=X86_GCC,
+        gccflags=X86_GCC_FLAGS,
         gccoflags="-mfpmath=sse -m" + X86_MATTR,
         clang_flags=cat(CLANG_CFLAGS,
             "--target=x86_64-unknown-linux-gnu -m32"),
@@ -306,6 +313,7 @@ ARM_MATTR   = "armv7-a"
 ARM_HOST    = os.getenv("ARM") if GOPTS.ssh_copy() else os.getenv("ADB")
 ARM_TOPDIR  = (os.getenv("ARM_TOPDIR") if GOPTS.ssh_copy()
                 else os.getenv("ADB_TOPDIR"))
+ARM_GCC     = ARM_TRIPLE + ("-gcc-7" if GCC7 else "-gcc-6")
 
 ARM = Arch(
         name=ARM_PREFIX,
@@ -313,7 +321,7 @@ ARM = Arch(
         triple=ARM_TRIPLE,
         run="",
         march=ARM_MARCH,
-        gcc="{}-gcc-6".format(ARM_TRIPLE),
+        gcc=ARM_GCC,
         gccflags=cat("-march=" + ARM_MATTR, "-mfpu=vfpv3-d16"),
         clang_flags=cat(CLANG_CFLAGS,
             "--target=" + ARM_TRIPLE, "-fPIC"),
