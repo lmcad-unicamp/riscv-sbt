@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from auto.config import ARM, SBT, X86
+from auto.config import ARM, GCC7, SBT, X86
 from auto.utils import path, shell
 
 import argparse
@@ -12,7 +12,7 @@ import subprocess
 import sys
 import time
 
-PERF = "perf_4.9"
+PERF = "perf_4.16" if GCC7 else "perf_4.9"
 
 class Options:
     def __init__(self, stdin, verbose, exp_rc):
@@ -373,12 +373,13 @@ class Measure:
         N = self.opts.n
         times = {}
         lcperfs = {}
+        verbose = self.opts.verbose
         for prog in progs:
-            if self.opts.verbose:
+            if verbose:
                 print("measuring", prog.name)
             if self.opts.perf_libc:
                 for i in range(N):
-                    prog.perf_libc()
+                    prog.perf_libc(verbose=verbose)
                     print('c', end='')
             for i in range(N):
                 prog.run(i)

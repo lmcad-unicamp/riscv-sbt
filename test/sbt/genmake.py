@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from auto.config import ARM, DIR, GOPTS, RV32_LINUX, SBT, TOOLS, X86
+from auto.config import ARM, DIR, GCC7, GOPTS, RV32_LINUX, SBT, TOOLS, X86
 from auto.genmake import ArchAndMode, GenMake, Run, Runs
 from auto.utils import cat, path
 
@@ -103,7 +103,7 @@ arm-dstdir:
 
 ### elf ###
 
-CXX      = x86_64-linux-gnu-g++
+CXX      = {g++}
 CXXFLAGS = -m32 -Wall -Werror -g -std=c++11 -pedantic
 LDFLAGS  = -m32
 
@@ -147,7 +147,8 @@ x86-fp128-run:
         "srcdir":   self.srcdir,
         "dstdir":   self.dstdir,
         "sbtdir":   self.sbtdir,
-        "mk-arm-dstdir":    GenMake.mk_arm_dstdir_static(self.dstdir)
+        "mk-arm-dstdir":    GenMake.mk_arm_dstdir_static(self.dstdir),
+        "g++":      "i686-linux-gnu-g++-7" if GCC7 else "x86_64-linux-gnu-g++",
         }))
 
 

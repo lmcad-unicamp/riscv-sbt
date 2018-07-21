@@ -16,6 +16,7 @@ RUN apt-get update \
     gawk \
     gcc-7-i686-linux-gnu \
     gcc-7-arm-linux-gnueabihf \
+    g++-7-i686-linux-gnu \
     git \
     gperf \
     libexpat-dev \
@@ -32,6 +33,13 @@ RUN apt-get update \
     texinfo \
     vim \
     zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN dpkg --add-architecture i386 \
+    && apt-get update \
+    && apt-get install -y \
+    libunwind8:i386 \
+    linux-perf-4.16:i386 \
     && rm -rf /var/lib/apt/lists/*
 
 ENV TOPDIR=/riscv-sbt
