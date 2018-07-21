@@ -447,7 +447,7 @@ llvm::Constant* SBTRelocation::relocateSection(
         // or just copy the raw bytes
         } else {
             xassert(n - addr >= 4);
-            uint32_t val = *(uint32_t*)&bytes[addr];
+            uint32_t val = *(const uint32_t*)&bytes[addr];
             DBGF("copying raw bytes @{0:X-8}: {1:X-8}", addr, val);
             cvec.push_back(_ctx->c.u32(val));
         }

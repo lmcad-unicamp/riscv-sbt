@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 
-from auto.config import *
+from auto.config import DIR
+from auto.utils import cat, path, shell
+
 import auto.pkg
 
-GNU_TOOLCHAIN_PREFIX = None
+import os
 
 class GnuToolchain(auto.pkg.Package):
+
+    PREFIX = None
+    PREFIX_GCC7 = None
+
     def __init__(self, name, prefix, build_dir,
             makefile="Makefile", configure=None, toolchain=None,
             target=None):
@@ -29,43 +35,70 @@ class GnuToolchain(auto.pkg.Package):
 
 
 def _pkgs():
+    pkgs = []
+
     # riscv-gnu-toolchain
     name = "riscv-gnu-toolchain-newlib"
     prefix = path(DIR.toolchain_release, "opt/riscv")
-    global GNU_TOOLCHAIN_PREFIX
-    GNU_TOOLCHAIN_PREFIX = prefix
+    GnuToolchain.PREFIX = prefix
     build_dir = path(DIR.build, name)
 
-    configure = cat(
-        "./configure",
-        "--prefix=" + prefix,
-        "--with-arch=rv32gc",
-        "--with-abi=ilp32d")
+    def configure1(prefix):
+        return cat(
+            "./configure",
+            "--prefix=" + prefix,
+            "--with-arch=rv32gc",
+            "--with-abi=ilp32d")
 
-    toolchain = "bin/riscv32-unknown-elf-gcc"
+    toolchain1 = "bin/riscv32-unknown-elf-gcc"
 
-    pkg1 = GnuToolchain(name, prefix, build_dir,
-            configure=configure,
-            toolchain=toolchain)
-
+    pkgs.append(
+        GnuToolchain(name, prefix, build_dir,
+            configure=configure1(prefix),
+            toolchain=toolchain1))
 
     # riscv-gnu-toolchain-linux
     name = "riscv-gnu-toolchain-linux"
     build_dir = path(DIR.build, name)
 
-    configure = cat(
-       "./configure",
-       "--prefix=" + prefix,
-       "--enable-multilib"
-    )
+    def configure2(prefix):
+        return cat(
+           "./configure",
+           "--prefix=" + prefix,
+           "--enable-multilib")
 
-    toolchain = "bin/riscv64-unknown-linux-gnu-gcc"
+    toolchain2 = "bin/riscv64-unknown-linux-gnu-gcc"
 
-    pkg2 = GnuToolchain(name, prefix, build_dir,
-            configure=configure,
-            toolchain=toolchain,
-            target="linux")
+    pkgs.append(
+        GnuToolchain(name, prefix, build_dir,
+            configure=configure2(prefix),
+            toolchain=toolchain2,
+            target="linux"))
 
-    return [pkg1, pkg2]
+
+    ### gcc7 ###
+
+    # riscv-gnu-toolchain
+    name = "riscv-gnu-toolchain-newlib-gcc7"
+    prefix = path(DIR.toolchain_release, "gcc7/opt/riscv")
+    GnuToolchain.PREFIX_GCC7 = prefix
+    build_dir = path(DIR.build, name)
+
+    pkgs.append(
+        GnuToolchain(name, prefix, build_dir,
+            configure=configure1(prefix),
+            toolchain=toolchain1))
+
+    # riscv-gnu-toolchain-linux
+    name = "riscv-gnu-toolchain-linux-gcc7"
+    build_dir = path(DIR.build, name)
+
+    pkgs.append(
+        GnuToolchain(name, prefix, build_dir,
+            configure=configure2(prefix),
+            toolchain=toolchain2,
+            target="linux"))
+
+    return pkgs
 
 auto.pkg.Package.pkgs.extend(_pkgs())

@@ -8,8 +8,14 @@ riscv-gnu-toolchain-newlib:
 	@$(BUILDPKG_PY) $@ $(MAKE_OPTS)
 riscv-gnu-toolchain-linux:
 	@$(BUILDPKG_PY) $@ $(MAKE_OPTS)
+riscv-gnu-toolchain-newlib-gcc7:
+	@$(BUILDPKG_PY) $@ $(MAKE_OPTS)
+riscv-gnu-toolchain-linux-gcc7:
+	@$(BUILDPKG_PY) $@ $(MAKE_OPTS)
 
 llvm:
+	@$(BUILDPKG_PY) $@ $(MAKE_OPTS)
+llvm-gcc7:
 	@$(BUILDPKG_PY) $@ $(MAKE_OPTS)
 
 spike:
@@ -21,10 +27,14 @@ qemu:
 
 .PHONY: sbt
 sbt:
-	@$(BUILDPKG_PY) $(MAKE_OPTS) sbt
+	@$(BUILDPKG_PY) $(MAKE_OPTS) $@
+sbt-gcc7:
+	@$(BUILDPKG_PY) $(MAKE_OPTS) $@
 
 sbt-force:
 	@$(BUILDPKG_PY) $(MAKE_OPTS) -f sbt
+sbt-clean:
+	@$(BUILDPKG_PY) $(MAKE_OPTS) --clean sbt
 
 ### docker image
 
@@ -43,6 +53,16 @@ docker-xdev:
 	cd docker && \
 		export TOPDIR=$(TOPDIR) PYTHONPATH=$(TOPDIR)/scripts && \
 		./build.py --xdev
+
+docker-rgcc7:
+	cd docker && \
+		export TOPDIR=$(TOPDIR) PYTHONPATH=$(TOPDIR)/scripts && \
+		./build.py --bind --rgcc7
+
+docker-xgcc7:
+	cd docker && \
+		export TOPDIR=$(TOPDIR) PYTHONPATH=$(TOPDIR)/scripts && \
+		./build.py --bind --xgcc7
 
 ###
 

@@ -96,6 +96,8 @@ VOLS = Volumes()
 #
 
 class Docker:
+    BIND = False
+
     def __init__(self, name, img):
         self.name = name
         self.img = img
@@ -132,8 +134,8 @@ class Docker:
             ).format(**fmtdata))
 
 
-    def run(self, cmd=None, interactive=False, bind=False):
-        self.cmd("run", cmd, interactive, vols=Docker.volstr(bind))
+    def run(self, cmd=None, interactive=False):
+        self.cmd("run", cmd, interactive, vols=Docker.volstr(Docker.BIND))
 
 
     def exec(self, cmd, interactive=True):
@@ -355,7 +357,13 @@ class Image:
         elif name == "dev":
             pass
         elif name == "gcc7":
-            pass
+            if not Docker.BIND:
+                VOLS["build"].create()
+                VOLS["toolchain"].create()
+            docker.run("make riscv-gnu-toolchain-newlib-gcc7")
+            docker.run("make riscv-gnu-toolchain-linux-gcc7")
+            docker.run("make llvm-gcc7")
+            docker.run("make sbt-gcc7")
         else:
             raise Exception("Invalid: build " + name)
 
@@ -433,10 +441,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
 
+    Docker.BIND = args.bind
+
     def run(img):
         name = img.replace("sbt-", "")
         docker = Docker(name, img)
-        docker.run(interactive=True, bind=args.bind)
+        docker.run(interactive=True)
 
     def exec(img):
         name = img.replace("sbt-", "")

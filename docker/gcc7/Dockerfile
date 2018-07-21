@@ -2,17 +2,36 @@ FROM debian:buster
 
 RUN apt-get update \
     && apt-get install -y \
+    autoconf \
+    automake \
+    autotools-dev \
+    bc \
+    bison \
     build-essential \
     cmake \
     clang-6.0 \
+    curl \
     device-tree-compiler \
+    flex \
+    gawk \
     gcc-7-i686-linux-gnu \
     gcc-7-arm-linux-gnueabihf \
     git \
+    gperf \
+    libexpat-dev \
+    libgmp-dev \
+    libmpc-dev \
+    libmpfr-dev \
+    libncursesw5-dev \
+    libtool \
     linux-perf \
+    ninja-build \
+    patchutils \
     python3 \
     python3-numpy \
+    texinfo \
     vim \
+    zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
 ENV TOPDIR=/riscv-sbt
@@ -23,6 +42,8 @@ ENV MAKE_OPTS=-j2
 ENV PATH=$TOPDIR/toolchain/release/opt/riscv/bin:$PATH
 ENV PATH=$TOPDIR/toolchain/release/bin:$PATH
 ENV PATH=$TOPDIR/toolchain/debug/bin:$PATH
+ENV PATH=$TOPDIR/toolchain/release/gcc7/opt/riscv/bin:$PATH
+ENV PATH=$TOPDIR/toolchain/debug/gcc7/bin:$PATH
 
 COPY vimrc /root/.vimrc
 

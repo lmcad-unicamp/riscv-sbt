@@ -157,6 +157,7 @@ add_custom_target(rv32-runtime DEPENDS rv32-runtime.o rv32-runtime-hf.o)
 # x86-runtime
 add_custom_command(OUTPUT x86-runtime.o COMMAND
     clang --target=x86_64-unknown-linux-gnu -m32 -c -O3
+        -isysroot /usr/i686-linux-gnu -isystem /usr/i686-linux-gnu/include
         -isysroot / -isystem /usr/include
         ${RUNTIME_C} -o x86-runtime.o
         MAIN_DEPENDENCY ${RUNTIME_C})
