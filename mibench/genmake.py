@@ -2,6 +2,7 @@
 
 from auto.config import ARM, DIR, GOPTS, RV32_LINUX, SBT, TOOLS, X86
 from auto.genmake import ArchAndMode, GenMake, Run, Runs
+from auto.measure import Measure
 from auto.utils import cat, mpath, path, xassert
 
 # Mibench source
@@ -412,27 +413,7 @@ arm-dstdir:
         self._write()
 
     def _gen_csv_header(self):
-        header = []
-
-        ispace = ["", "", ""]
-        l = ["Mibench Benchmarks", ""]
-        l.extend(["Native x86"] + ispace)
-        l.extend(["Globals"] + ispace)
-        l.extend(["Locals"] + ispace)
-        header.append(l)
-
-        tm = "Time"
-        tsd = "Time SD"
-        x = "Slowdown"
-        xsd = "Slowdown SD"
-        item = [tm, tsd, x, xsd]
-
-        l = ["Name", "Set"]
-        l.extend(item * 3)
-        header.append(l)
-
-        return header
-
+        return Measure.MiBench.header()
 
     def _gen_epilogue(self):
         names = [b.name for b in self.benchs]

@@ -211,8 +211,7 @@ class Measure:
 
 
     class Result:
-        # mode len
-        ml = 8
+        MODE_LEN = 8
 
         # m: mean
         # sd: standard deviation
@@ -238,10 +237,36 @@ class Measure:
                          self._to_str(self.sd, align) ]
 
 
+            def mul(self, f):
+                self.m = self.m * f.m
+                self.sd = self.sd * f.sd
+
+
+            def xrt(self, n):
+                self.m = self.m**(1.0/n)
+                self.sd = self.sd**(1.0/n)
+
+
+        @staticmethod
+        def precisions():
+            return [
+                [7, 4],
+                [5, 2],
+                [7, 4],
+                [5, 2]]
+
+
+        def _set_precisions(self):
+            p = self.precisions()
+            self.tp = p[0]
+            self.pp = p[1]
+            self.fp = p[2]
+            self.xp = p[3]
+
+
         def __init__(self, mode, times, lcperfs, noinit=False):
             self.mode = mode
-            self.tp = [8, 5]
-            self.xp = [5, 2]
+            self._set_precisions()
             if noinit:
                 return
 
@@ -271,9 +296,23 @@ class Measure:
             # save results in self
             Field = self.Field
             self.t = Field(tm, tsd, self.tp)
-            self.p = Field(pm, psd, [5, 2])
-            self.f = Field(fm, fsd, [8, 5])
+            self.p = Field(pm, psd, self.pp)
+            self.f = Field(fm, fsd, self.fp)
             self.x = Field(0, 0, self.xp)
+
+
+        def mul(self, res):
+            self.t.mul(res.t)
+            self.p.mul(res.p)
+            self.f.mul(res.f)
+            self.x.mul(res.x)
+
+
+        def xrt(self, n):
+            self.t.xrt(n)
+            self.p.xrt(n)
+            self.f.xrt(n)
+            self.x.xrt(n)
 
 
         @staticmethod
@@ -281,9 +320,20 @@ class Measure:
             res = Measure.Result(mode, None, None, noinit=True)
             Field = Measure.Result.Field
             res.t = Field(float(parts[0]), float(parts[1]), res.tp)
-            res.p = None
-            res.f = None
-            res.x = Field(float(parts[2]), float(parts[3]), res.xp)
+            res.p = Field(float(parts[2])/100, float(parts[3])/100, res.pp)
+            res.f = Field(float(parts[4]), float(parts[5]), res.fp)
+            res.x = Field(float(parts[6]), float(parts[7]), res.xp)
+            return res
+
+
+        @staticmethod
+        def get_neutral(mode="neutral"):
+            res = Measure.Result(mode, None, None, noinit=True)
+            Field = Measure.Result.Field
+            res.t = Field(1.00, 1.00, res.tp)
+            res.p = Field(1.00, 1.00, res.pp)
+            res.f = Field(1.00, 1.00, res.fp)
+            res.x = Field(1.00, 1.00, res.xp)
             return res
 
 
@@ -307,11 +357,14 @@ class Measure:
             self.x.sd = sd
 
 
-        def to_str_list(self, align=True):
-            p100 = self.p
-            if p100:
+        def to_str_list(self, align=True, mode=True, adjust_p=True):
+            if adjust_p:
+                p = self.p
+                p100 = self.Field(p.m, p.sd, p.p)
                 p100.m = p100.m * 100
                 p100.sd = p100.sd * 100
+            else:
+                p100 = self.p
 
             l = (
                 self.t.to_str_list(align) +
@@ -319,8 +372,11 @@ class Measure:
                 (self.f.to_str_list(align) if self.f else []) +
                 self.x.to_str_list(align))
 
+            if not mode:
+                return l
+
             if align:
-                mode_str = ("{:<" + str(self.ml) + "}").format(self.mode)
+                mode_str = ("{:<" + str(self.MODE_LEN) + "}").format(self.mode)
             else:
                 mode_str = self.mode
 
@@ -332,9 +388,9 @@ class Measure:
 
 
     class Results:
-        F1_ALIGN = "28"
+        F1_ALIGN = "14"
 
-        def __init__(self, name, set, results):
+        def __init__(self, name, results):
             self.name = name
             self.set = set
             self.results = results
@@ -345,25 +401,111 @@ class Measure:
             parts = ln.split(',')
             idx = 0
             name = parts[idx]
-            idx = idx + 1
-            set = parts[idx]
+            name = name.replace("encode", "enc")
+            name = name.replace("decode", "dec")
+            name = name.replace("smoothing", "smooth")
             idx = idx + 1
 
             results = []
             for mode in ['native'] + SBT.modes:
-                res = Measure.Result.build(mode, parts[idx:idx+4])
-                idx = idx + 4
+                res = Measure.Result.build(mode, parts[idx:idx+8])
+                idx = idx + 8
                 results.append(res)
-            return Measure.Results(name, set, results)
+            return Measure.Results(name, results)
 
 
         def print(self):
-            name_set = self.name + "/" + self.set
-            print(("{0:<" + self.F1_ALIGN + "}").format(name_set), end='')
+            print(("{0:<" + self.F1_ALIGN + "}").format(self.name), end='')
             for res in self.results:
-                sl = res.to_str_list()
-                print(" ".join(sl[1:]), end=' ')
+                sl = res.to_str_list(mode=False)
+                print(" ".join(sl), end=' ')
             print()
+
+
+        def mul(self, results):
+            for i in range(len(self.results)):
+                r0 = self.results[i]
+                r1 = results.results[i]
+                r0.mul(r1)
+
+
+        def xrt(self, n):
+            for res in self.results:
+                res.xrt(n)
+
+
+        @staticmethod
+        def geomean(results):
+            Result = Measure.Result
+            Results = Measure.Results
+
+            acc = Results("geomean", [Result.get_neutral(mode)
+                    for mode in ['native'] + SBT.modes])
+
+            for res in results:
+                acc.mul(res)
+            acc.xrt(len(results))
+            return acc
+
+
+    class MiBench:
+        @staticmethod
+        def header():
+            hdr = []
+
+            ispace = ["" for i in range(7)]
+            l = ["benchmarks"]
+            l.extend(["native"] + ispace)
+            l.extend(["globals"] + ispace)
+            l.extend(["locals"] + ispace)
+            hdr.append(l)
+
+            tm = "tmean"
+            tsd = "tsd"
+            pm = "%mean"
+            psd = "%sd"
+            fm = "mean"
+            fsd = "sd"
+            x = "x"
+            xsd = "xsd"
+            item = [tm, tsd, pm, psd, fm, fsd, x, xsd]
+
+            l = ["name"]
+            l.extend(item * 3)
+            hdr.append(l)
+
+            return hdr
+
+
+        @staticmethod
+        def item_format_str():
+            # precisions
+            p = [p[0] for p in Measure.Result.precisions()
+                      for j in range(2)]
+            # format strings
+            fmt = ("{{:<{}}} " * 7 + "{{:<{}}}").format(*p)
+            return fmt
+
+
+        @staticmethod
+        def item_format(*args):
+            self = Measure.MiBench
+            return self.item_format_str().format(*args)
+
+
+        @staticmethod
+        def line_format_str():
+            self = Measure.MiBench
+            ifmt = self.item_format_str()
+            fhdr = ("{{:<{}}}".format(Measure.Results.F1_ALIGN) +
+                    (ifmt + " ") * 2 + ifmt)
+            return fhdr
+
+
+        @staticmethod
+        def line_format(*args):
+            self = Measure.MiBench
+            return self.line_format_str().format(*args)
 
 
     def _measure_target(self, target):
@@ -391,24 +533,13 @@ class Measure:
         # get means
         nat = None
         Result = Measure.Result
+        MiBench = Measure.MiBench
 
-        # precisions
-        r = Result("", [1, 2], [])
-        l0 = [
-            r.t.p[0],
-            r.p.p[0],
-            r.f.p[0],
-            r.x.p[0]]
-        l = [i  for i in l0
-                for j in range(2)]
+        print(
+            "{{:<{}}} ".format(Measure.Result.MODE_LEN).format("mode"),
+            MiBench.item_format(*MiBench.header()[1][1:9]),
+            " ({})".format(self.id), sep='')
 
-        # format strings
-        header = ("{{:<{}}} " + "{{:<{}}} " * 8 + " ({{}})").format(
-                Result.ml, *l)
-
-        print(header.format("mode",
-            "tmean", "tsd", "%mean", "%sd", "mean", "sd",
-            "x", "xsd", self.id))
         results = []
         for mode in ['native'] + SBT.modes:
             res = Result(mode, times[mode], lcperfs[mode])
@@ -424,19 +555,10 @@ class Measure:
 
 
     def _csv_append(self, results):
-        dir = os.path.split(self.dir)[0]
-        if self.prog.startswith("adpcm"):
-            dir = os.path.split(dir)[0]
-            dir = os.path.split(dir)[1]
-        else:
-            dir = os.path.split(dir)[1]
-
-
         align = False
-        row = [self.id, dir]
+        row = [self.id]
         for res in results:
-            l = (res.f.to_str_list(align) +
-                 res.x.to_str_list(align))
+            l = res.to_str_list(align, mode=False)
             row.extend(l)
 
         with open("mibench.csv", "a") as f:
@@ -444,29 +566,16 @@ class Measure:
 
 
     def _print_header(self, header, ln):
+        MiBench = Measure.MiBench
         parts = ln.split(',')
-        if header == 1:
-            name_set = parts[0] + "/" + parts[1]
-            s = name_set
-        else:
-            s = parts[0]
-        print(("{0:<" + self.Results.F1_ALIGN + "}").format(s), end='')
-        idx = 2
-        for idx in range(2,12,4):
-            f = parts[idx:idx+4]
-            if header == 0:
-                f[0] = f[0].replace("Native x86", "Native")
-            elif header == 1:
-                f[2] = f[2].replace("Slowdown", "x")
-                f[3] = f[3].replace("Slowdown SD", "xsd")
-            print("{0:<9}{1:<9}{2:<6}{3:<6}".format(*f), end='')
-        print()
+        print(MiBench.line_format(*parts))
 
 
     def format(self, csv):
         headers = 0
         i = 0
         n = 30
+        results = []
         with open(csv, "r") as f:
             for ln in f:
                 ln = ln.strip()
@@ -477,9 +586,11 @@ class Measure:
 
                 res = self.Results.parse(ln)
                 res.print()
+                results.append(res)
                 i = i + 1
                 if i == n:
                     break
+        Measure.Results.geomean(results).print()
 
 
     def _perf_target(self, target):

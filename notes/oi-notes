@@ -5,7 +5,7 @@ OiCombinePass
 (ADD (SHL (LSHR X 16) 16) (AND Y 0xFFFF))
 ((x >> 16) << 16) + (y & 0xFFFF)) -> constant
 
-RVSBT>2 MAYBE multiple access to register may be combined into one, especially
+RVSBT>4 MAYBE multiple access to register may be combined into one, especially
         for 'globals' mode
 
 - combine GEP+ShadowMemory - ABSENT
@@ -40,7 +40,7 @@ OiInstTranslate
     RVSBT: DONE
 
 - It seems OISBT tries to optimize accesses to spilled regs
-    RVSBT>5 MAYBE
+    RVSBT>1 MAYBE
 
 - HandleCallTarget
     - IREmitter::HandleLocalCall
@@ -90,13 +90,13 @@ NoShadow - avoid adding shadow image offset to every memory access
               (IndDests)
 
     - for each indirect call: call through pointer
-    RVSBT>4 DONE indirect call through pointer
+    RVSBT>3 DONE indirect call through pointer
            MAYBE riscv-sbt is able to perform indirect jumps with
              indirectBr. Would it be faster to use switches and
              jump tables instead?
 
 - BuildShadowImage
-    RVSBT>3 TODO check if we can leave some sections out, or if grouping
+    RVSBT>2 TODO check if we can leave some sections out, or if grouping
                 everything together helps
 
 - StartFunction
