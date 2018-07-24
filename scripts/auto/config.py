@@ -9,7 +9,7 @@ import subprocess
 
 class GlobalOpts:
     def __init__(self):
-        self.cc = "gcc"
+        self.cc = "clang"
         self.rvcc = "gcc"
         if self.rvcc == "gcc":
             self.rvabi = "ilp32d"

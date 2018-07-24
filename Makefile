@@ -88,12 +88,14 @@ alltests:
 
 ### dbg ###
 
-.PHONY: test-prep
-test-prep:
-	cd $(TOPDIR)/mibench && ./genmake.py
-	make -C $(TOPDIR)/mibench dijkstra-clean
-	make -C $(TOPDIR)/mibench rv32-dijkstra x86-dijkstra rv32-x86-dijkstra-globals rv32-x86-dijkstra-locals
+TEST := crc32
+TEST_DIR := telecomm/CRC32
+TEST_FILE := telecomm/adpcm/data/large.pcm
 
 .PHONY: test
 test:
-	/mnt/ssd/riscv-sbt/scripts/auto/measure.py /mnt/ssd/riscv-sbt/build/mibench/network/dijkstra dijkstra -n 1 --args /mnt/ssd/riscv-sbt/mibench/network/dijkstra/input.dat
+	cd $(TOPDIR)/mibench && ./genmake.py
+	make -C $(TOPDIR)/mibench $(TEST)-clean
+	make -C $(TOPDIR)/mibench rv32-$(TEST) x86-$(TEST) rv32-x86-$(TEST)-globals rv32-x86-$(TEST)-locals
+	$(TOPDIR)/scripts/auto/measure.py $(TOPDIR)/build/mibench/$(TEST_DIR) $(TEST) -n 1 \
+		--args $(TOPDIR)/mibench/$(TEST_FILE)

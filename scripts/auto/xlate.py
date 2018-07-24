@@ -92,11 +92,8 @@ if __name__ == "__main__":
 
     # set xlator opts
     opts = BuildOpts.parse(args)
+    opts.xopt = args.xopt
     opts.xdbg = args.xdbg
-    if args.xopt or (opts.opt and not opts.dbg):
-        opts.xopt = True
-    else:
-        opts.xopt = False
     xltr = Translator(opts)
     # translate
     xltr.translate()

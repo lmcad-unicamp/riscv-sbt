@@ -52,7 +52,7 @@ class BuildOpts:
         opts.sbtflags = cat(" ".join(args.sbtflags).strip(),
             "-dont-use-libc" if not opts.clink else "")
         opts.dbg = args.dbg
-        opts.opt = True if args.opt or not args.dbg else False
+        opts.opt = args.opt
         opts.relax = not args.no_relax
 
         return opts
@@ -198,14 +198,18 @@ class LLVMBuilder:
             self.bc2s(dstdir, bc, out)
 
         else:
+            optx2 = False
             opt1 = chsuf(bc, ".opt.bc")
-            opt2 = chsuf(bc, ".opt2.bc")
 
             # opt; dis; opt; dis; .bc -> .s
             self.opt(dstdir, bc, opt1, printf_break=GOPTS.printf_break)
             self.dis(dstdir, opt1)
-            self.opt(dstdir, opt1, opt2, printf_break=False)
-            self.dis(dstdir, opt2)
+            if optx2:
+                opt2 = chsuf(bc, ".opt2.bc")
+                self.opt(dstdir, opt1, opt2, printf_break=False)
+                self.dis(dstdir, opt2)
+            else:
+                opt2 = opt1
             self.bc2s(dstdir, opt2, out)
 
 

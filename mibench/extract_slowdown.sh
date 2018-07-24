@@ -6,4 +6,4 @@ else
     file=mibench.csv
 fi
 
-cat $file | sed 1,2d | cut -d, -f9,10,13,14
+cat $file | sed 1,2d | cut -d, -f15,16,23,24

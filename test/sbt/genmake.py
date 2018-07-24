@@ -17,8 +17,14 @@ class Module:
         self.narchs = narchs
         self.srcdir = srcdir
         self.dstdir = dstdir
-        self.bflags = cat(bflags, "--dbg" if dbg else '')
-        self.xflags = cat(self.bflags, xflags)
+        if dbg:
+            bflags = cat(bflags, "--dbg")
+            xflags = cat(xflags, "--xdbg")
+        else:
+            bflags = cat(bflags, "--opt")
+            xflags = cat(xflags, "--xopt")
+        self.bflags = bflags
+        self.xflags = cat(bflags, xflags)
         self.rflags = rflags
         self.gm = GenMake(
             self.narchs, self.xarchs,
@@ -365,7 +371,6 @@ rv32tests_status:
 
 """.format(**{"status":status}))
 
-        dbg = False
         xarchs = [(RV32_LINUX, X86)]
         narchs = [RV32_LINUX]
         qtests = path(DIR.top, "riscv-qemu-tests")

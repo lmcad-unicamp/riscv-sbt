@@ -30,13 +30,16 @@ class Bench:
         xflags = cat(bflags, xflags)
         if dbg == "dbg":
             bflags = cat(bflags, "--dbg")
-            xflags = cat(xflags, "--dbg")
-        if dbg == "opt":
+            xflags = cat(xflags, "--dbg --xdbg")
+        elif dbg == "opt":
             bflags = cat(bflags, "--dbg --opt")
-            xflags = cat(xflags, "--dbg --opt")
-        if dbg == "xopt":
+            xflags = cat(xflags, "--dbg --opt --xdbg")
+        elif dbg == "xopt":
             bflags = cat(bflags, "--dbg --opt")
             xflags = cat(xflags, "--dbg --opt --xopt")
+        else:
+            bflags = cat(bflags, "--opt")
+            xflags = cat(xflags, "--opt --xopt")
         self.narchs = narchs
         self.xarchs = xarchs
 
@@ -348,12 +351,10 @@ arm-dstdir:
                 ["dijkstra_large.c"],
                 self._single_run(
                     [path(self.srcdir, "network/dijkstra/input.dat")])),
-                #rvcc="clang", dbg="xopt"),
             self._bench("crc32", "telecomm/CRC32",
                 ["crc_32.c"],
                 self._single_run(
                     [path(self.srcdir, "telecomm/adpcm/data/large.pcm")])),
-                #rvcc="clang"),
             self._rijndael(),
             self._bench("sha", "security/sha",
                 ["sha_driver.c", "sha.c"],
