@@ -30,6 +30,7 @@ class Options:
 
 class Program:
     def __init__(self, dir, basename, arch, mode, args, opts):
+        self.basename = basename
         self.name = arch + '-' + basename
         if mode:
             self.name = self.name + '-' + mode
@@ -43,6 +44,32 @@ class Program:
 
         if self.opts.verbose:
             print(" ".join(self.args))
+        self._copy_files()
+        if self.opts.verbose:
+            print(" ".join(self.args))
+
+
+    def _copy_files(self):
+        if self.basename == "rijndael":
+            # encode
+            ins = [1]
+            outs = [2]
+            # TODO decode
+        else:
+            ins = []
+            outs = []
+
+        def to_tmp(i, copy):
+            arg = self.args[i]
+            out = path("/tmp", os.path.basename(arg))
+            if copy:
+                shell("cp {} {}".format(arg, out))
+            self.args[i] = out
+
+        for i in ins:
+            to_tmp(i, copy=True)
+        for o in outs:
+            to_tmp(o, copy=False)
 
 
     def _out(self, i):
