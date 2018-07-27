@@ -363,7 +363,8 @@ arm-dstdir:
                 ["sha_driver.c", "sha.c"],
                 self._single_run(
                     [path(self.srcdir, "security/sha/input_large.asc")]),
-                sbtflags=["-stack-size=16384"]),
+                sbtflags=["-stack-size=16384"], dbg="xopt",
+                bflags=self.bflags_mmx),
             self._bench("adpcm-encode", "telecomm/adpcm/src",
                 ["rawcaudio.c", "adpcm.c"],
                 self._single_run([],

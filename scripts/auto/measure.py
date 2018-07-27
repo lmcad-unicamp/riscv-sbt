@@ -43,6 +43,15 @@ class Program:
         self.times = []
         self.lcperfs = []
 
+        self.ins = []
+        self.outs = []
+        if self.basename in ["dijkstra", "crc32", "sha"]:
+            self.ins = [1]
+        elif self.basename == "rijndael":
+            # encode/decode
+            self.ins = [1]
+            self.outs = [2]
+
         if self.opts.verbose:
             print(" ".join(self.args))
         self._copy_ins()
@@ -59,28 +68,14 @@ class Program:
 
 
     def _copy_ins(self):
-        if self.basename == "rijndael":
-            # encode/decode
-            ins = [1]
-            outs = [2]
-        else:
-            ins = []
-            outs = []
-
-        for i in ins:
+        for i in self.ins:
             self._to_tmp(i, copy=True)
-        for o in outs:
+        for o in self.outs:
             self._to_tmp(o, copy=False)
 
 
     def copy_outs(self):
-        if self.basename == "rijndael":
-            # encode/decode
-            outs = [2]
-        else:
-            outs = []
-
-        for o in outs:
+        for o in self.outs:
             arg = self.args[o]
             oarg = self.oargs[o]
             shell("cp {} {}".format(arg, oarg))
