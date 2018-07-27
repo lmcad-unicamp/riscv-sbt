@@ -193,6 +193,8 @@ class MiBench:
         self.stack_large = ["-stack-size=131072"]    # 128K
         self.stack_huge = ["-stack-size=1048576"]    # 1M
         self.bflags = "--sbtobjs=runtime"
+        self.bflags_mmx = ('--llcflags-x86="-march=x86 -mcpu=pentium-mmx' +
+            ' -mattr=mmx" --gccflags-x86="-march=pentium-mmx"')
         self.txt = ''
         self.benchs = None
 
@@ -251,7 +253,8 @@ arm-dstdir:
         runs.dec = dec
 
         return self._bench("rijndael", dir,
-            ["aes.c", "aesxam.c"], runs, ctor=EncDecBench)
+            ["aes.c", "aesxam.c"], runs, bflags=self.bflags_mmx,
+            ctor=EncDecBench, dbg="xopt")
 
 
     def _bf(self):
@@ -376,9 +379,7 @@ arm-dstdir:
             self._bench("stringsearch", "office/stringsearch",
                 ["bmhasrch.c", "bmhisrch.c", "bmhsrch.c", "pbmsrch_large.c"],
                 self._single_run([]),
-                bflags='--llcflags-x86="-march=x86 -mcpu=pentium-mmx' +
-                    ' -mattr=mmx" --gccflags-x86="-march=pentium-mmx"',
-                sbtflags=self.stack_large),
+                bflags=self.bflags_mmx, sbtflags=self.stack_large),
             self._bf(),
             self._bench("basicmath", "automotive/basicmath",
                 ["basicmath_large.c", "rad2deg.c", "cubic.c", "isqrt.c"],

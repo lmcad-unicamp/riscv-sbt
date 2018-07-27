@@ -38,38 +38,52 @@ class Program:
             mode = 'native'
         self.mode = mode
         self.args = [path(dir, self.name)] + args
+        self.oargs = list(self.args)
         self.opts = opts
         self.times = []
         self.lcperfs = []
 
         if self.opts.verbose:
             print(" ".join(self.args))
-        self._copy_files()
+        self._copy_ins()
         if self.opts.verbose:
             print(" ".join(self.args))
 
 
-    def _copy_files(self):
+    def _to_tmp(self, i, copy):
+        arg = self.args[i]
+        out = path("/tmp", os.path.basename(arg))
+        if copy:
+            shell("cp {} {}".format(arg, out))
+        self.args[i] = out
+
+
+    def _copy_ins(self):
         if self.basename == "rijndael":
-            # encode
+            # encode/decode
             ins = [1]
             outs = [2]
-            # TODO decode
         else:
             ins = []
             outs = []
 
-        def to_tmp(i, copy):
-            arg = self.args[i]
-            out = path("/tmp", os.path.basename(arg))
-            if copy:
-                shell("cp {} {}".format(arg, out))
-            self.args[i] = out
-
         for i in ins:
-            to_tmp(i, copy=True)
+            self._to_tmp(i, copy=True)
         for o in outs:
-            to_tmp(o, copy=False)
+            self._to_tmp(o, copy=False)
+
+
+    def copy_outs(self):
+        if self.basename == "rijndael":
+            # encode/decode
+            outs = [2]
+        else:
+            outs = []
+
+        for o in outs:
+            arg = self.args[o]
+            oarg = self.oargs[o]
+            shell("cp {} {}".format(arg, oarg))
 
 
     def _out(self, i):
@@ -554,6 +568,7 @@ class Measure:
                 prog.run(i)
                 print('*', end='')
             print()
+            prog.copy_outs()
             times[prog.mode] = prog.times
             lcperfs[prog.mode] = prog.lcperfs
 

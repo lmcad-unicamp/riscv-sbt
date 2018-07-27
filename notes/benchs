@@ -17,5 +17,5 @@ gcc:
 0.3081  0.0543  67.13 2.02  0.2068  0.0370  1.57  0.45
 
 main overhead:
-reg sync overhead OR missed vectorization
-in call to encrypt(), inside encfile()
+- probably due to reg sync
+- disabling vectorization didn't improve performance
