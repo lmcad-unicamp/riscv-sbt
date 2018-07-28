@@ -12,7 +12,8 @@ class Options
 public:
     enum class Regs {
         GLOBALS,
-        LOCALS
+        LOCALS,
+        ABI
     };
 
     Options(

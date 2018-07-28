@@ -178,7 +178,7 @@ int main(int argc, char* argv[])
 
     cl::opt<std::string> regsOpt(
         "regs",
-        cl::desc("Register translation mode: globals|locals (default=globals)"),
+        cl::desc("Register translation mode: globals|locals|abi (default=globals)"),
         cl::init("globals"));
 
     cl::opt<bool> dontUseLibCOpt(
@@ -259,6 +259,8 @@ int main(int argc, char* argv[])
         regs = sbt::Options::Regs::GLOBALS;
     else if (regsOpt == "locals")
         regs = sbt::Options::Regs::LOCALS;
+    else if (regsOpt == "abi")
+        regs = sbt::Options::Regs::ABI;
     else {
         llvm::errs() << c.BIN_NAME << ": invalid -regs value\n";
         return EXIT_FAILURE;

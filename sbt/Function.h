@@ -53,7 +53,7 @@ public:
         _sec(sec),
         _addr(addr),
         _end(end),
-        _localRegs(_ctx->opts->regs() == Options::Regs::LOCALS)
+        _regsMode(_ctx->opts->regs())
     {}
 
     /**
@@ -233,7 +233,7 @@ public:
      */
     Register& getReg(size_t i)
     {
-        if (_localRegs) {
+        if (locals() || abi()) {
             xassert(_regs);
             return _regs->getReg(i);
         } else
@@ -245,11 +245,23 @@ public:
      */
     Register& getFReg(size_t i)
     {
-        if (_localRegs) {
+        if (locals() || abi()) {
             xassert(_fregs);
             return _fregs->getReg(i);
         } else
             return _ctx->f->getReg(i);
+    }
+
+    bool globals() const {
+        return _regsMode == Options::Regs::GLOBALS;
+    }
+
+    bool locals() const {
+        return _regsMode == Options::Regs::LOCALS;
+    }
+
+    bool abi() const {
+        return _regsMode == Options::Regs::ABI;
     }
 
     /**
@@ -282,7 +294,7 @@ private:
     SBTSection* _sec;
     uint64_t _addr;
     uint64_t _end;
-    bool _localRegs;
+    Options::Regs _regsMode;
 
     llvm::Function* _f = nullptr;
     // address of next basic block

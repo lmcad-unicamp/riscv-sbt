@@ -63,7 +63,7 @@ def _pkgs():
         path(srcdir, "configure"),
         "--prefix=" + prefix,
         "--host=" + RV32.triple,
-        "--enable-32bit")
+        "--with-arch=rv32g")
 
     class RISCVPK(Package):
         def _prepare(self):

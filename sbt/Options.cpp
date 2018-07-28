@@ -15,6 +15,8 @@ static std::string regs2str(Options::Regs regs)
             return "globals";
         case Options::Regs::LOCALS:
             return "locals";
+        case Options::Regs::ABI:
+            return "abi";
     }
     xunreachable("invalid regs");
 }

@@ -89,7 +89,7 @@ llvm::Error Function::startMain()
     bld->setInsertBlock(newBB(_addr));
 
     // create local register file
-    if (_localRegs) {
+    if (locals() || abi()) {
         _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
         _fregs.reset(new FRegisters(_ctx, FRegisters::LOCAL));
     }
@@ -116,7 +116,7 @@ llvm::Error Function::start()
     _ctx->bld->setInsertBlock(ptr);
 
     // create local register file
-    if (_localRegs) {
+    if (locals() || abi()) {
         _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
         _fregs.reset(new FRegisters(_ctx, FRegisters::LOCAL));
     }
@@ -168,7 +168,7 @@ llvm::Error Function::finish()
 
 void Function::cleanRegs()
 {
-    if (!_localRegs)
+    if (!(locals() || abi()))
         return;
 
     auto cleanReg = [](Register& r) {
@@ -425,13 +425,22 @@ void Function::transferBBs(uint64_t from, Function* to)
 
 void Function::loadRegisters(bool retRegsOnly)
 {
-    if (!_localRegs)
+    if (!(locals() || abi()))
         return;
 
     Builder* bld = _ctx->bld;
     xassert(bld);
 
     auto loadXReg = [&](size_t i) {
+        if (retRegsOnly || abi())
+            switch (i) {
+                case XRegister::A0:
+                case XRegister::A1:
+                    break;
+                default:
+                    return;
+            }
+
         Register& local = getReg(i);
         Register& global = _ctx->x->getReg(i);
         // NOTE don't count this write
@@ -440,6 +449,18 @@ void Function::loadRegisters(bool retRegsOnly)
     };
 
     auto loadFReg = [&](size_t i) {
+        if (!_ctx->opts->syncFRegs())
+            return;
+
+        if (retRegsOnly || abi())
+            switch (i) {
+                case FRegister::FA0:
+                case FRegister::FA1:
+                    break;
+                default:
+                    return;
+            }
+
         Register& local = getFReg(i);
         Register& global = _ctx->f->getReg(i);
         // NOTE don't count this write
@@ -447,51 +468,76 @@ void Function::loadRegisters(bool retRegsOnly)
         bld->store(v, local.get());
     };
 
-    if (retRegsOnly)
-        for (size_t i = XRegister::A0; i <= XRegister::A1; i++)
-            loadXReg(i);
-    else
-        for (size_t i = 1; i < XRegisters::NUM; i++)
-            loadXReg(i);
-
-    if (!_ctx->opts->syncFRegs())
-        return;
-
-    if (retRegsOnly)
-        for (size_t i = FRegister::FA0; i <= FRegister::FA1; i++)
-            loadFReg(i);
-    else
-        for (size_t i = 0; i < FRegisters::NUM; i++)
-            loadFReg(i);
+    for (size_t i = 1; i < XRegisters::NUM; i++)
+        loadXReg(i);
+    for (size_t i = 0; i < FRegisters::NUM; i++)
+        loadFReg(i);
 }
 
 
 void Function::storeRegisters()
 {
-    if (!_localRegs)
+    if (!(locals() || abi()))
         return;
 
     Builder* bld = _ctx->bld;
     xassert(bld);
 
-    for (size_t i = 1; i < XRegisters::NUM; i++) {
+    auto storeXReg = [&](size_t i) {
+        if (abi())
+            switch (i) {
+                case XRegister::RA:
+                case XRegister::SP:
+                case XRegister::A0:
+                case XRegister::A1:
+                case XRegister::A2:
+                case XRegister::A3:
+                case XRegister::A4:
+                case XRegister::A5:
+                case XRegister::A6:
+                case XRegister::A7:
+                    break;
+                default:
+                    return;
+            }
+
         Register& local = getReg(i);
         Register& global = _ctx->x->getReg(i);
         // NOTE don't count this read
         llvm::Value* v = bld->load(local.get());
         bld->store(v, global.getForWrite());
-    }
+    };
 
-    if (!_ctx->opts->syncFRegs())
-        return;
+    auto storeFReg = [&](size_t i) {
+        if (!_ctx->opts->syncFRegs())
+            return;
 
-    for (size_t i = 0; i < FRegisters::NUM; i++) {
+        if (abi())
+            switch (i) {
+                case FRegister::FA0:
+                case FRegister::FA1:
+                case FRegister::FA2:
+                case FRegister::FA3:
+                case FRegister::FA4:
+                case FRegister::FA5:
+                case FRegister::FA6:
+                case FRegister::FA7:
+                    break;
+                default:
+                    return;
+            }
+
         Register& local = getFReg(i);
         Register& global = _ctx->f->getReg(i);
         // NOTE don't count this read
         llvm::Value* v = bld->load(local.get());
         bld->store(v, global.getForWrite());
-    }
+    };
+
+    for (size_t i = 1; i < XRegisters::NUM; i++)
+        storeXReg(i);
+    for (size_t i = 0; i < FRegisters::NUM; i++)
+        storeFReg(i);
 }
 
 
