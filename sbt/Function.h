@@ -269,9 +269,20 @@ public:
      */
     void cleanRegs();
 
+    enum SyncFlags {
+        S_CALL          = 0x01,
+        S_CALL_RETURNED = 0x02,
+        S_FUNC_START    = 0x04,
+        S_FUNC_RETURN   = 0x08,
+        S_LOAD          = 0x10,
+        S_ABI           = 0x20,
+        S_RET_REGS_ONLY = 0x40,
+        S_XREG          = 0x80
+    };
+
     // sync local register file
-    void loadRegisters(bool retRegsOnly = false);
-    void storeRegisters();
+    void loadRegisters(int syncFlags = 0);
+    void storeRegisters(int syncFlags = 0);
     void freturn();
 
     // setup argc/argv

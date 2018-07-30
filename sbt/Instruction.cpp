@@ -1055,7 +1055,7 @@ llvm::Error Instruction::handleCall(uint64_t target, unsigned linkReg)
     link(linkReg);
     // write regs
     if (sync)
-        _ctx->func->storeRegisters();
+        _ctx->func->storeRegisters(Function::S_CALL);
     // call
     if (isExt) {
         Caller caller(_ctx, _bld, f, _ctx->func);
@@ -1064,7 +1064,7 @@ llvm::Error Instruction::handleCall(uint64_t target, unsigned linkReg)
         _bld->call(f->func());
     // read regs
     if (sync)
-        _ctx->func->loadRegisters();
+        _ctx->func->loadRegisters(Function::S_CALL_RETURNED);
     if (isTailCall)
         _ctx->func->freturn();
 
@@ -1078,7 +1078,7 @@ llvm::Value* Instruction::leaveFunction(llvm::Value* target)
     llvm::Value* ext = nullptr;
 
     if (_ctx->opts->syncOnExternalCalls())
-        f->storeRegisters();
+        f->storeRegisters(Function::S_CALL);
     else {
         const Function& ie = _ctx->translator->isExternal();
         llvm::Function* llie = ie.func();
@@ -1095,7 +1095,7 @@ llvm::Value* Instruction::leaveFunction(llvm::Value* target)
 
         // save regs
         _bld->setInsertBlock(bbSaveRegs);
-        f->storeRegisters();
+        f->storeRegisters(Function::S_CALL);
         _bld->br(bbICall);
         _bld->setInsertBlock(bbICall);
     }
@@ -1110,7 +1110,7 @@ void Instruction::enterFunction(llvm::Value* ext)
 
     // restore regs
     if (_ctx->opts->syncOnExternalCalls())
-        f->loadRegisters();
+        f->loadRegisters(Function::S_CALL_RETURNED);
     else {
         // ext? restore_ret_regs : restore_regs
         BasicBlock *bbRestoreRegs = f->newUBB(_addr, "restore_regs");
@@ -1119,11 +1119,11 @@ void Instruction::enterFunction(llvm::Value* ext)
         _bld->condBr(ext, bbRestoreRetRegs, bbRestoreRegs);
 
         _bld->setInsertBlock(bbRestoreRegs);
-        f->loadRegisters();
+        f->loadRegisters(Function::S_CALL_RETURNED);
         _bld->br(bbRestoreEnd);
 
         _bld->setInsertBlock(bbRestoreRetRegs);
-        f->loadRegisters(RET_REGS_ONLY);
+        f->loadRegisters(Function::S_CALL_RETURNED | Function::S_RET_REGS_ONLY);
         _bld->br(bbRestoreEnd);
 
         _bld->setInsertBlock(bbRestoreEnd);

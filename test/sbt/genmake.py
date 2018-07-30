@@ -10,7 +10,7 @@ class Module:
             xarchs, narchs,
             srcdir, dstdir,
             xflags=None, bflags=None, rflags=None, sbtflags=[],
-            dbg=True):
+            dbg=True, modes=None):
         self.name = name
         self.src = src
         self.xarchs = xarchs
@@ -26,10 +26,13 @@ class Module:
         self.bflags = bflags
         self.xflags = cat(bflags, xflags)
         self.rflags = rflags
+        self.modes = modes
+
         self.gm = GenMake(
             self.narchs, self.xarchs,
             self.srcdir, self.dstdir, name,
-            self.xflags, self.bflags, mflags=None, sbtflags=sbtflags)
+            self.xflags, self.bflags, mflags=None, sbtflags=sbtflags,
+            modes=modes)
 
         self.robj = Run(args=[], rflags=self.rflags)
         self.runs = Runs([self.robj], name)
@@ -67,7 +70,7 @@ class Module:
 
         # translations
         for (farch, narch) in self.xarchs:
-            for mode in SBT.modes:
+            for mode in self.modes:
                 am = ArchAndMode(farch, narch, mode)
                 self._xlatenrun(am)
                 self.gm.copy(am, name)
@@ -89,6 +92,7 @@ class Tests():
         self.srcdir = path(DIR.top, "test/sbt")
         self.dstdir = path(DIR.build, "test/sbt")
         self.sbtdir = path(DIR.top, "sbt")
+        self.modes = SBT.modes
         self.txt = ''
 
 
@@ -162,7 +166,7 @@ x86-fp128-run:
             xarchs=None, narchs=None,
             srcdir=None, dstdir=None,
             xflags=None, bflags=None, rflags=None, sbtflags=[],
-            dbg=True, skip_arm=False):
+            dbg=True, skip_arm=False, modes=None):
         if not xarchs and not narchs:
             xarchs = self.xarchs
             narchs = self.narchs
@@ -173,9 +177,12 @@ x86-fp128-run:
             narchs = [arch for arch in narchs if arch != ARM]
             xarchs = [(farch, narch) for (farch, narch) in xarchs
                     if narch != ARM]
+        if not modes:
+            modes = self.modes
         return Module(name, src,
                 xarchs, narchs, srcdir, dstdir,
-                xflags, bflags, rflags, sbtflags, dbg)
+                xflags, bflags, rflags, sbtflags, dbg,
+                modes)
 
 
     def _arm_bins(self, names, skip_native=False):
@@ -386,13 +393,20 @@ rv32tests_status:
                 return ["-soft-float-abi"]
             return []
 
+        def modes(test):
+            if test in ["jal", "jalr"]:
+                return ["globals", "locals"]
+            else:
+                return None
+
         for test in tests:
             name = test
             src = name + ".s"
             mod = self._module(name, src,
                     xarchs=xarchs, narchs=narchs,
                     srcdir=srcdir, dstdir=dstdir,
-                    bflags=bflags, sbtflags=sbtflags(name))
+                    bflags=bflags, sbtflags=sbtflags(name),
+                    modes=modes(test))
             self.append(mod.gen())
 
         fmtdata = {

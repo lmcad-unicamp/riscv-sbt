@@ -86,7 +86,7 @@ class Sbt:
         #        "-enable-fcsr",
         #        "-enable-fcvt-validation")
         self.share_dir = DIR.toolchain + "/share/riscv-sbt"
-        self.modes = ["globals", "locals"]
+        self.modes = ["globals", "locals", "abi"]
 
     def nat_obj(self, arch, name, clink):
         is_rv32 = arch == RV32 or arch == RV32_LINUX

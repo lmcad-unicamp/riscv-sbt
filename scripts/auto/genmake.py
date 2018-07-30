@@ -148,7 +148,7 @@ class GenMake:
     def __init__(self, narchs, xarchs,
             srcdir, dstdir, name,
             xflags, bflags, mflags, sbtflags=[],
-            cc=None, rvcc=None):
+            cc=None, rvcc=None, modes=None):
         self.narchs = narchs
         self.xarchs = xarchs
         self.srcdir = srcdir
@@ -160,6 +160,7 @@ class GenMake:
         self.sbtflags = sbtflags
         self.cc = cc
         self.rvcc = rvcc
+        self.modes = modes if modes else SBT.modes
         #
         self.out_filter = None
         #
@@ -460,7 +461,7 @@ class GenMake:
         nmods = [arch.add_prefix(mod) for arch in self.narchs]
         xmods = [farch.add_prefix(narch.add_prefix(mod)) + "-" + mode
                 for (farch, narch) in self.xarchs
-                for mode in SBT.modes]
+                for mode in self.modes]
 
         fmtdata = {
             "mod":      mod,
@@ -484,7 +485,7 @@ class GenMake:
     def _xams(self):
         return [ArchAndMode(farch, narch, mode)
                 for (farch, narch) in self.xarchs
-                for mode in SBT.modes]
+                for mode in self.modes]
 
     def _ufams(self):
         farchs = unique([am.farch for am in self._xams() if am.farch])

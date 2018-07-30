@@ -5,6 +5,8 @@ from auto.genmake import ArchAndMode, GenMake, Run, Runs
 from auto.measure import Measure
 from auto.utils import cat, mpath, path, xassert
 
+import argparse
+
 # Mibench source
 # http://vhosts.eecs.umich.edu/mibench//automotive.tar.gz
 # http://vhosts.eecs.umich.edu/mibench//network.tar.gz
@@ -185,9 +187,14 @@ class EncDecBench(Bench):
 
 
 class MiBench:
-    def __init__(self):
-        self.narchs = [RV32_LINUX, X86, ARM]
-        self.xarchs = [(RV32_LINUX, X86), (RV32_LINUX, ARM)]
+    def __init__(self, args):
+        no_arm = args.no_arm
+        if no_arm:
+            self.narchs = [RV32_LINUX, X86]
+            self.xarchs = [(RV32_LINUX, X86)]
+        else:
+            self.narchs = [RV32_LINUX, X86, ARM]
+            self.xarchs = [(RV32_LINUX, X86), (RV32_LINUX, ARM)]
         self.srcdir = path(DIR.top, "mibench")
         self.dstdir = path(DIR.build, "mibench")
         self.stack_large = ["-stack-size=131072"]    # 128K
@@ -462,5 +469,9 @@ benchs-arm-copy: benchs arm-dstdir {6}
 
 
 if __name__ == "__main__":
-    mb = MiBench()
+    parser = argparse.ArgumentParser(description="Generate Makefile")
+    parser.add_argument("--no-arm", action="store_true")
+    args = parser.parse_args()
+
+    mb = MiBench(args)
     mb.gen()

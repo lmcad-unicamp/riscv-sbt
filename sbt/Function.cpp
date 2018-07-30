@@ -120,7 +120,7 @@ llvm::Error Function::start()
         _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
         _fregs.reset(new FRegisters(_ctx, FRegisters::LOCAL));
     }
-    loadRegisters();
+    loadRegisters(S_FUNC_START);
 
     return llvm::Error::success();
 }
@@ -423,23 +423,110 @@ void Function::transferBBs(uint64_t from, Function* to)
 }
 
 
-void Function::loadRegisters(bool retRegsOnly)
+static bool syncXRegCall(size_t i)
+{
+    switch (i) {
+        case XRegister::RA:
+        case XRegister::SP:
+        case XRegister::A0:
+        case XRegister::A1:
+        case XRegister::A2:
+        case XRegister::A3:
+        case XRegister::A4:
+        case XRegister::A5:
+        case XRegister::A6:
+        case XRegister::A7:
+            return true;
+        default:
+            return false;
+    }
+}
+
+
+static bool syncFRegCall(size_t i)
+{
+    switch (i) {
+        case FRegister::FA0:
+        case FRegister::FA1:
+        case FRegister::FA2:
+        case FRegister::FA3:
+        case FRegister::FA4:
+        case FRegister::FA5:
+        case FRegister::FA6:
+        case FRegister::FA7:
+            return true;
+        default:
+            return false;
+    }
+}
+
+
+static bool syncXRegRet(size_t i)
+{
+    switch (i) {
+        case XRegister::A0:
+        case XRegister::A1:
+            return true;
+        default:
+            return false;
+    }
+}
+
+
+static bool syncFRegRet(size_t i)
+{
+    switch (i) {
+        case FRegister::FA0:
+        case FRegister::FA1:
+            return true;
+        default:
+            return false;
+    }
+}
+
+
+static bool syncReg(size_t i, int syncFlags)
+{
+    using F = Function;
+
+    bool (*syncCall)(size_t) = syncFlags & F::S_XREG?
+        syncXRegCall : syncFRegCall;
+    bool (*syncRet)(size_t) = syncFlags & F::S_XREG?
+        syncXRegRet : syncFRegRet;
+
+    // handle !ABI and RET_REGS_ONLY flags here
+    if (!(syncFlags & F::S_ABI)) {
+        if (syncFlags & F::S_RET_REGS_ONLY)
+            return syncRet(i);
+        else
+            return true;
+    }
+
+    bool sCall = (syncFlags & F::S_CALL) || (syncFlags & F::S_FUNC_START);
+    bool sRet = (syncFlags & F::S_CALL_RETURNED) ||
+        (syncFlags & F::S_FUNC_RETURN);
+    xassert(sCall ^ sRet);
+
+    if (sCall)
+        return syncCall(i);
+    else
+        return syncRet(i);
+}
+
+
+void Function::loadRegisters(int syncFlags)
 {
     if (!(locals() || abi()))
         return;
 
     Builder* bld = _ctx->bld;
     xassert(bld);
+    syncFlags |= S_LOAD;
+    syncFlags |= abi()? S_ABI : 0;
 
     auto loadXReg = [&](size_t i) {
-        if (retRegsOnly || abi())
-            switch (i) {
-                case XRegister::A0:
-                case XRegister::A1:
-                    break;
-                default:
-                    return;
-            }
+        if (!syncReg(i, syncFlags | S_XREG))
+            return;
 
         Register& local = getReg(i);
         Register& global = _ctx->x->getReg(i);
@@ -452,14 +539,8 @@ void Function::loadRegisters(bool retRegsOnly)
         if (!_ctx->opts->syncFRegs())
             return;
 
-        if (retRegsOnly || abi())
-            switch (i) {
-                case FRegister::FA0:
-                case FRegister::FA1:
-                    break;
-                default:
-                    return;
-            }
+        if (!syncReg(i, syncFlags))
+            return;
 
         Register& local = getFReg(i);
         Register& global = _ctx->f->getReg(i);
@@ -475,31 +556,18 @@ void Function::loadRegisters(bool retRegsOnly)
 }
 
 
-void Function::storeRegisters()
+void Function::storeRegisters(int syncFlags)
 {
     if (!(locals() || abi()))
         return;
 
     Builder* bld = _ctx->bld;
     xassert(bld);
+    syncFlags |= abi()? S_ABI : 0;
 
     auto storeXReg = [&](size_t i) {
-        if (abi())
-            switch (i) {
-                case XRegister::RA:
-                case XRegister::SP:
-                case XRegister::A0:
-                case XRegister::A1:
-                case XRegister::A2:
-                case XRegister::A3:
-                case XRegister::A4:
-                case XRegister::A5:
-                case XRegister::A6:
-                case XRegister::A7:
-                    break;
-                default:
-                    return;
-            }
+        if (!syncReg(i, syncFlags | S_XREG))
+            return;
 
         Register& local = getReg(i);
         Register& global = _ctx->x->getReg(i);
@@ -512,20 +580,8 @@ void Function::storeRegisters()
         if (!_ctx->opts->syncFRegs())
             return;
 
-        if (abi())
-            switch (i) {
-                case FRegister::FA0:
-                case FRegister::FA1:
-                case FRegister::FA2:
-                case FRegister::FA3:
-                case FRegister::FA4:
-                case FRegister::FA5:
-                case FRegister::FA6:
-                case FRegister::FA7:
-                    break;
-                default:
-                    return;
-            }
+        if (!syncReg(i, syncFlags))
+            return;
 
         Register& local = getFReg(i);
         Register& global = _ctx->f->getReg(i);
@@ -543,7 +599,7 @@ void Function::storeRegisters()
 
 void Function::freturn()
 {
-    storeRegisters();
+    storeRegisters(S_FUNC_RETURN);
     if (_ctx->inMain)
         _ctx->bld->ret(_ctx->bld->load(XRegister::A0));
     else
