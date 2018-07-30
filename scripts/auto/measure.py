@@ -13,6 +13,7 @@ import sys
 import time
 
 PERF = "perf_4.16" if GCC7 else "perf_4.9"
+ALL_MODES = SBT.modes
 
 class Options:
     def __init__(self, stdin, verbose, exp_rc):
@@ -26,6 +27,7 @@ class Options:
         self.id = None
         self.save_out = False
         self.n = None
+        self.modes = None
 
 
 class Program:
@@ -242,7 +244,7 @@ class Measure:
         xarch = 'rv32-' + target
         xprogs = [
             Program(self.dir, self.prog, xarch, mode, self.args, self.opts)
-                for mode in SBT.modes]
+                for mode in self.opts.modes]
         return [nprog] + xprogs
 
 
@@ -443,7 +445,7 @@ class Measure:
             idx = idx + 1
 
             results = []
-            for mode in ['native'] + SBT.modes:
+            for mode in ['native'] + ALL_MODES:
                 res = Measure.Result.build(mode, parts[idx:idx+8])
                 idx = idx + 8
                 results.append(res)
@@ -453,6 +455,8 @@ class Measure:
         def print(self):
             print(("{0:<" + self.F1_ALIGN + "}").format(self.name), end='')
             for res in self.results:
+                if not res.mode in ["native"] + MODES:
+                    continue
                 sl = res.to_str_list(mode=False)
                 print(" ".join(sl), end=' ')
             print()
@@ -476,7 +480,7 @@ class Measure:
             Results = Measure.Results
 
             acc = Results("geomean", [Result.get_neutral(mode)
-                    for mode in ['native'] + SBT.modes])
+                    for mode in ['native'] + ALL_MODES])
 
             for res in results:
                 acc.mul(res)
@@ -492,8 +496,8 @@ class Measure:
             ispace = ["" for i in range(7)]
             l = ["benchmarks"]
             l.extend(["native"] + ispace)
-            l.extend(["globals"] + ispace)
-            l.extend(["locals"] + ispace)
+            for mode in MODES:
+                l.extend([mode] + ispace)
             hdr.append(l)
 
             tm = "tmean"
@@ -507,10 +511,15 @@ class Measure:
             item = [tm, tsd, pm, psd, fm, fsd, x, xsd]
 
             l = ["name"]
-            l.extend(item * 3)
+            l.extend(item * (len(MODES)+1))
             hdr.append(l)
 
             return hdr
+
+
+        @staticmethod
+        def item_len():
+            return 8
 
 
         @staticmethod
@@ -531,10 +540,11 @@ class Measure:
 
         @staticmethod
         def line_format_str():
+            items = len(MODES) + 1
             self = Measure.MiBench
             ifmt = self.item_format_str()
             fhdr = ("{{:<{}}}".format(Measure.Results.F1_ALIGN) +
-                    (ifmt + " ") * 2 + ifmt)
+                    (ifmt + " ") * (items-1) + ifmt)
             return fhdr
 
 
@@ -578,7 +588,7 @@ class Measure:
             " ({})".format(self.id), sep='')
 
         results = []
-        for mode in ['native'] + SBT.modes:
+        for mode in ['native'] + self.opts.modes:
             res = Result(mode, times[mode], lcperfs[mode])
             if mode == 'native':
                 nat = res
@@ -605,6 +615,17 @@ class Measure:
     def _print_header(self, header, ln):
         MiBench = Measure.MiBench
         parts = ln.split(',')
+
+        if header == 0:
+            idx = 1
+            for mode in ALL_MODES:
+                mode = parts[idx]
+                if mode in ["native"] + MODES:
+                    pass
+                else:
+                    del parts[idx:idx + MiBench.item_len()]
+                idx = idx + MiBench.item_len()
+
         print(MiBench.line_format(*parts))
 
 
@@ -692,6 +713,8 @@ if __name__ == "__main__":
         help="number of runs")
     parser.add_argument("--format", "-f", action="store_true",
         help="show .csv file contents as formatted entries")
+    parser.add_argument("--modes", "-m", type=str, nargs='+',
+            choices=SBT.modes, default=SBT.modes)
 
     args = parser.parse_args()
     sargs = [arg.strip() for arg in args.args]
@@ -706,6 +729,9 @@ if __name__ == "__main__":
     opts.csv = not args.no_csv
     opts.id = args.id
     opts.n = args.n
+    opts.modes = args.modes
+    global MODES
+    MODES = opts.modes
 
     pargs = args.pargs
 
