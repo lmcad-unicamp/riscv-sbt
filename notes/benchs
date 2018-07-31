@@ -1,21 +1,23 @@
-1) dijkstra     native  x
-clang:          0.584   0.99
-gcc:            0.661   0.86
+MiBench
+=======
 
-2) crc32
-clang:          0.167   1.17
-gcc:            0.173   0.95
+cc=clang
+rvcc=gcc
+                globals locals  abi
+1) dijkstra     1.94    0.99    0.96
+2) crc32        1.88    1.21    0.84
+    ~15%, high %sd
 
-3) rijndael-enc
-tmean   tsd     %mean %sd   mean    sd      x     xsd
+rijndael: MMX:
+3) rijndael-enc 4.77    1.48    1.13
+4) rijndael-dec 4.96    1.50    1.16
+AVX:
+3) rijndael-enc 5.21    1.63    1.25
+4) rijndael-dec 5.26    1.61    1.25
+main overheads:
+1) reg sync
+2) missed LLVM vectorization (TODO investigate further, explaining
+                              if/why it should be possible for LLVM
+                              to vectorize translated code)
 
-clang:
-0.1913  0.0169  55.49 2.22  0.1061  0.0103
-0.2900  0.0874  67.77 1.23  0.1966  0.0593  1.85  0.59
-gcc:
-0.2296  0.0508  57.41 1.86  0.1318  0.0295
-0.3081  0.0543  67.13 2.02  0.2068  0.0370  1.57  0.45
-
-main overhead:
-- probably due to reg sync
-- disabling vectorization didn't improve performance
+5) sha          2.63    1.52    1.21

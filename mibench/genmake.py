@@ -370,8 +370,7 @@ arm-dstdir:
                 ["sha_driver.c", "sha.c"],
                 self._single_run(
                     [path(self.srcdir, "security/sha/input_large.asc")]),
-                sbtflags=["-stack-size=16384"], dbg="xopt",
-                bflags=self.bflags_mmx),
+                sbtflags=["-stack-size=16384"]),
             self._bench("adpcm-encode", "telecomm/adpcm/src",
                 ["rawcaudio.c", "adpcm.c"],
                 self._single_run([],
@@ -423,7 +422,6 @@ arm-dstdir:
         self._write()
 
     def _gen_csv_header(self):
-        Measure.MiBench.init()
         return Measure.MiBench.header()
 
     def _gen_epilogue(self):
