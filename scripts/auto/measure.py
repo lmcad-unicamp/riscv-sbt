@@ -14,6 +14,7 @@ import time
 
 PERF = "perf_4.16" if GCC7 else "perf_4.9"
 ALL_MODES = SBT.modes
+MODES = None
 
 class Options:
     def __init__(self, stdin, verbose, exp_rc):
@@ -490,6 +491,12 @@ class Measure:
 
     class MiBench:
         @staticmethod
+        def init():
+            global MODES
+            if not MODES:
+                MODES = ALL_MODES
+
+        @staticmethod
         def header():
             hdr = []
 
@@ -730,7 +737,6 @@ if __name__ == "__main__":
     opts.id = args.id
     opts.n = args.n
     opts.modes = args.modes
-    global MODES
     MODES = opts.modes
 
     pargs = args.pargs

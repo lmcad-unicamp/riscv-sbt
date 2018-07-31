@@ -423,6 +423,7 @@ arm-dstdir:
         self._write()
 
     def _gen_csv_header(self):
+        Measure.MiBench.init()
         return Measure.MiBench.header()
 
     def _gen_epilogue(self):

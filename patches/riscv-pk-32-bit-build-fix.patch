@@ -1,13 +1,30 @@
-diff --git a/Makefile.in b/Makefile.in
-index aeabdc2..93b371c 100644
---- a/Makefile.in
-+++ b/Makefile.in
-@@ -61,7 +61,7 @@ else
-   march := -march=@WITH_ARCH@
- endif
- is_32bit := $(findstring 32,$(march))
--mabi := -mabi=$(if $(is_32bit),ilp32,lp64)
-+mabi := -mabi=$(if $(is_32bit),ilp32d,lp64)
- 
- # Installation directories
- 
+diff --git a/configure b/configure
+index 5af7cee..029329a 100755
+--- a/configure
++++ b/configure
+@@ -4084,8 +4084,8 @@ fi
+ case "${BUILD_32BIT}" in
+   yes|default)
+ 	echo "Building 32-bit pk"
+-	CFLAGS="$default_CFLAGS -m32"
+-	LDFLAGS="-m32"
++	CFLAGS="$default_CFLAGS"
++	LDFLAGS=
+ 	install_subdir="`echo $host_alias | sed -e 's/64/32/g'`"
+ 	;;
+   *)
+diff --git a/configure.ac b/configure.ac
+index da0d737..eb77dbd 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -88,8 +88,8 @@ AC_ARG_ENABLE([32bit],
+ case "${BUILD_32BIT}" in
+   yes|default)
+ 	echo "Building 32-bit pk"
+-	CFLAGS="$default_CFLAGS -m32"
+-	LDFLAGS="-m32"
++	CFLAGS="$default_CFLAGS"
++	LDFLAGS=
+ 	install_subdir="`echo $host_alias | sed -e 's/64/32/g'`"
+ 	;;
+   *)
