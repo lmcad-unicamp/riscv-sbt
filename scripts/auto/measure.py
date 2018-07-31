@@ -48,12 +48,15 @@ class Program:
 
         self.ins = []
         self.outs = []
-        if self.basename in ["dijkstra", "crc32", "sha"]:
+        if self.basename in ["dijkstra", "crc32", "sha", "patricia"]:
             self.ins = [1]
-        elif self.basename == "rijndael":
-            # encode/decode
+        elif self.basename in ["rijndael", "susan", "lame"]:
             self.ins = [1]
             self.outs = [2]
+        elif self.basename == "blowfish":
+            self.ins = [2]
+            self.outs = [3]
+        self.stdin = opts.stdin
 
         if self.opts.verbose:
             print(" ".join(self.args))
@@ -75,6 +78,12 @@ class Program:
             self._to_tmp(i, copy=True)
         for o in self.outs:
             self._to_tmp(o, copy=False)
+
+        if self.stdin:
+            arg = self.stdin
+            out = path("/tmp", os.path.basename(arg))
+            shell("cp {} {}".format(arg, out))
+            self.stdin = out
 
 
     def copy_outs(self):
@@ -125,7 +134,7 @@ class Program:
         fin = None
         fout = None
         try:
-            stdin = self.opts.stdin
+            stdin = self.stdin
             if stdin:
                 fin = open(stdin, 'rb')
             if save_out:
@@ -175,7 +184,7 @@ class Program:
         fout = None
 
         try:
-            stdin = self.opts.stdin
+            stdin = self.stdin
             if stdin:
                 fin = open(stdin, 'rb')
             if save_out:
