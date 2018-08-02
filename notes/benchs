@@ -6,7 +6,7 @@ rvcc=gcc
                 globals locals  abi
 1) dijkstra     1.94    0.99    0.96
 2) crc32        1.88    1.21    0.84
-    ~15%, high %sd
+    low %mean (~15%), high %sd
 
 rijndael: MMX:
 3) rijndael-enc 4.77    1.48    1.13
@@ -16,8 +16,42 @@ AVX:
 4) rijndael-dec 5.26    1.61    1.25
 main overheads:
 1) reg sync
-2) missed LLVM vectorization (TODO investigate further, explaining
-                              if/why it should be possible for LLVM
-                              to vectorize translated code)
+2) missed LLVM vectorization
+   16 bytes -> load -> xor -> store
+   RV: unrolled loop that performs multiple loads, xors and stores
+   x86: vload, vxor, vstore
+   opt/llc: unable to infer that the multiple loads, xors and stores
+        could be done with vector instructions
+  mention that RISCV vectorization extension should help with this
 
-5) sha          2.63    1.52    1.21
+5) sha          2.95    1.69    1.29
+MMX:            2.59    1.51    1.17
+* missed vectorization
+
+6) adpcm-enc    1.24    0.81    0.80
+7) adpcm-dec    2.27    1.04    0.93
+8) stringsearch 6.15    1.11    1.18 (MMX)
+9) bf-enc       1.92    1.26    1.14
+A) bf-dec       1.85    1.26    1.06
+
+B) basicmath    1.11    1.13    1.03
+* very low %mean (~3%), that also causes big xsd (~0.25)
+
+C) bitcount     1.31    1.78    0.83
+* huge reg sync impact
+
+D) fft-std      1.96    1.24    1.19
+* low %mean (~5%)
+E) fft-inv      1.88    1.22    1.20
+* low %mean (~8%)
+
+F) patricia     1.23    0.98    0.89
+* low %mean (~4%), high xsd (~0.3)
+
+G) susan-smooth 3.04    1.23    1.12
+
+H) susan-edges  2.42    1.41    1.37
+
+I) susan-corner 2.10    1.26    1.24
+
+J) lame

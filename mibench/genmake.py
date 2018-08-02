@@ -2,9 +2,9 @@
 
 from auto.config import ARM, DIR, GOPTS, RV32_LINUX, SBT, TOOLS, X86
 from auto.genmake import ArchAndMode, GenMake, Run, Runs
-from auto.measure import Measure
 from auto.utils import cat, mpath, path, xassert
 
+import auto.measure
 import argparse
 
 # Mibench source
@@ -261,7 +261,7 @@ arm-dstdir:
 
         return self._bench("rijndael", dir,
             ["aes.c", "aesxam.c"], runs, bflags=self.bflags_mmx,
-            ctor=EncDecBench, dbg="xopt")
+            ctor=EncDecBench)
 
 
     def _bf(self):
@@ -298,8 +298,8 @@ arm-dstdir:
             Run([_in, out + "corners.pgm", "-c"], "corners", outidx=1)])
 
         return self._bench("susan", dir,
-                ["susan.c"], runs,
-                sbtflags=self.stack_huge)
+                ["susan.c"], runs, sbtflags=self.stack_huge,
+                dbg="xopt")
 
 
     def _lame(self):
@@ -370,7 +370,7 @@ arm-dstdir:
                 ["sha_driver.c", "sha.c"],
                 self._single_run(
                     [path(self.srcdir, "security/sha/input_large.asc")]),
-                sbtflags=["-stack-size=16384"]),
+                sbtflags=["-stack-size=16384"], bflags=self.bflags_mmx),
             self._bench("adpcm-encode", "telecomm/adpcm/src",
                 ["rawcaudio.c", "adpcm.c"],
                 self._single_run([],
@@ -422,7 +422,7 @@ arm-dstdir:
         self._write()
 
     def _gen_csv_header(self):
-        return Measure.MiBench.header()
+        return auto.measure.MiBench().header()
 
     def _gen_epilogue(self):
         names = [b.name for b in self.benchs]

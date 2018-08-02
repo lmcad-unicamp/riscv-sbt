@@ -73,6 +73,13 @@ private:
         XOR
     };
 
+    enum ALUOpAlias {
+        A_NONE,
+        A_MV,
+        A_NEG,
+        A_NOT
+    };
+
     enum ALUOpFlags {
         AF_NONE = 0,
         AF_IMM = 1,
@@ -224,6 +231,8 @@ private:
     void dbgprint();
 
     Function* findFunction(llvm::Constant* c) const;
+
+    static const char* estr(ALUOpAlias e);
 
 
     // float

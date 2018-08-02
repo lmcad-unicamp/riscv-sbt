@@ -224,13 +224,13 @@ class Program:
 
 
 class MiBench:
-    def __init__(self, modes, columns):
-        self.modes = modes
-        self.columns = columns
+    def __init__(self, modes=None, columns=None):
+        self.modes = modes if modes else ALL_MODES
+        self.columns = columns if columns else ALL_COLUMNS
         # precisions
         p = [p[0] for p in Result.precisions()
                   for j in range(2)]
-        self.p = [p[i] for i in columns]
+        self.p = [p[i] for i in self.columns]
 
 
     def header(self):
@@ -695,7 +695,7 @@ class Measure:
         xarch = 'rv32-' + target
         xprogs = [
             Program(self.dir, self.prog, xarch, mode, self.args, self.opts)
-                for mode in self.opts.modes]
+                for mode in self.opts.modes if mode != "native"]
         return [nprog] + xprogs
 
 
@@ -725,13 +725,14 @@ class Measure:
         # get means
         nat = None
 
+        mibench = MiBench(ALL_MODES, ALL_COLUMNS)
         print(
             "{{:<{}}} ".format(Result.MODE_LEN).format("mode"),
-            MiBench.item_format(*MiBench.header()[1][1:9]),
+            mibench.item_format(*mibench.header()[1][1:9]),
             " ({})".format(self.id), sep='')
 
         results = []
-        for mode in ['native'] + self.opts.modes:
+        for mode in self.opts.modes:
             res = Result(mode, times[mode], lcperfs[mode])
             if mode == 'native':
                 nat = res

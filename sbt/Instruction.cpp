@@ -356,6 +356,17 @@ llvm::Expected<llvm::Constant*> Instruction::getImm(int op, bool out)
 }
 
 
+const char* Instruction::estr(ALUOpAlias e)
+{
+    switch (e) {
+        case A_NONE:    return "A_NONE";
+        case A_MV:      return "A_MV";
+        case A_NEG:     return "A_NEG";
+        case A_NOT:     return "A_NOT";
+    }
+}
+
+
 llvm::Error Instruction::translateALUOp(ALUOp op, uint32_t flags)
 {
     bool hasImm = flags & AF_IMM;
@@ -379,6 +390,7 @@ llvm::Error Instruction::translateALUOp(ALUOp op, uint32_t flags)
     *_os << '\t';
 
     unsigned o = getRD();
+    unsigned o1n = getRegNum(1, false);
     llvm::Value* o1 = getReg(1);
     llvm::Value* o2;
     if (hasImm) {
@@ -389,53 +401,101 @@ llvm::Error Instruction::translateALUOp(ALUOp op, uint32_t flags)
     } else
         o2 = getReg(2);
 
-    llvm::Value* v;
-
+    // optimize aliases
+    ALUOpAlias opa = A_NONE;
     switch (op) {
         case ADD:
-            v = _bld->add(o1, o2);
-            break;
-
-        case AND:
-            v = _bld->_and(o1, o2);
-            break;
-
-        case OR:
-            v = _bld->_or(o1, o2);
-            break;
-
-        case SLL:
-            // Note: only the bottom 5 bits are valid on shifts
-            v = _bld->_and(o2, _c->i32(0x1F));
-            v = _bld->sll(o1, v);
-            break;
-
-        case SLT:
-            if (isUnsigned)
-                v = _bld->ult(o1, o2);
-            else
-                v = _bld->slt(o1, o2);
-            v = _bld->zext(v);
-            break;
-
-        case SRA:
-            v = _bld->_and(o2, _c->i32(0x1F));
-            v = _bld->sra(o1, v);
-            break;
-
-        case SRL:
-            v = _bld->_and(o2, _c->i32(0x1F));
-            v = _bld->srl(o1, v);
+            if (hasImm) {
+                llvm::ConstantInt* ci = llvm::dyn_cast<llvm::ConstantInt>(o2);
+                if (ci && ci->getZExtValue() == 0)
+                    opa = A_MV;
+            }
             break;
 
         case SUB:
-            v = _bld->sub(o1, o2);
+            if (o1n == XRegister::ZERO)
+                opa = A_NEG;
             break;
 
         case XOR:
-            v = _bld->_xor(o1, o2);
+            if (hasImm) {
+                llvm::ConstantInt* ci = llvm::dyn_cast<llvm::ConstantInt>(o2);
+                if (ci && ci->getSExtValue() == -1)
+                    opa = A_NOT;
+            }
+            break;
+
+        default:
             break;
     }
+
+    llvm::Value* v;
+
+    switch (opa) {
+        case A_NONE:
+            break;
+
+        case A_MV:
+            v = o1;
+            break;
+
+        case A_NEG:
+            v = _bld->neg(o2);
+            break;
+
+        case A_NOT:
+            v = _bld->_not(o1);
+            break;
+    }
+
+    if (opa == A_NONE)
+        switch (op) {
+            case ADD:
+                v = _bld->add(o1, o2);
+                break;
+
+            case AND:
+                v = _bld->_and(o1, o2);
+                break;
+
+            case OR:
+                v = _bld->_or(o1, o2);
+                break;
+
+            case SLL:
+                // Note: only the bottom 5 bits are valid on shifts
+                v = _bld->_and(o2, _c->i32(0x1F));
+                v = _bld->sll(o1, v);
+                break;
+
+            case SLT:
+                if (isUnsigned)
+                    v = _bld->ult(o1, o2);
+                else
+                    v = _bld->slt(o1, o2);
+                v = _bld->zext(v);
+                break;
+
+            case SRA:
+                v = _bld->_and(o2, _c->i32(0x1F));
+                v = _bld->sra(o1, v);
+                break;
+
+            case SRL:
+                v = _bld->_and(o2, _c->i32(0x1F));
+                v = _bld->srl(o1, v);
+                break;
+
+            case SUB:
+                v = _bld->sub(o1, o2);
+                break;
+
+            case XOR:
+                v = _bld->_xor(o1, o2);
+                break;
+        }
+    else
+        DBGF("ALIAS: {0}", estr(opa));
 
     _bld->store(v, o);
 

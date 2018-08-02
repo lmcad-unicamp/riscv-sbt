@@ -251,7 +251,16 @@ public:
     }
 
     llvm::Value* _not(llvm::Value* a) {
-        return _xor(a, _ctx->c.i32(~0));
+        // return _xor(a, _ctx->c.i32(~0));
+        llvm::Value* v = _builder->CreateNot(a);
+        updateFirst(v);
+        return v;
+    }
+
+    llvm::Value* neg(llvm::Value* a) {
+        llvm::Value* v = _builder->CreateNeg(a);
+        updateFirst(v);
+        return v;
     }
 
     // comparisons
