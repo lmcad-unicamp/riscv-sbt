@@ -6,6 +6,7 @@
 #include "Caller.h"
 #include "Context.h"
 #include "Disassembler.h"
+#include "Register.h"
 #include "Relocation.h"
 #include "SBTError.h"
 #include "Section.h"
@@ -588,6 +589,12 @@ llvm::Error Instruction::translateUI(UIOp op)
 }
 
 
+static bool optStack(Context* ctx)
+{
+    return ctx->opts->optStack();
+}
+
+
 llvm::Error Instruction::translateLoad(IntType it)
 {
     switch (it) {
@@ -614,15 +621,20 @@ llvm::Error Instruction::translateLoad(IntType it)
     *_os << '\t';
 
     unsigned o = getRD();
+    unsigned rs1n = getRegNum(1, false);
     llvm::Value* rs1 = getReg(1);
     auto expImm = getImm(2);
     if (!expImm)
         return expImm.takeError();
     llvm::Constant* imm = expImm.get();
-
-    llvm::Value* v = _bld->add(rs1, imm);
-
     llvm::Value* ptr;
+    llvm::Value* v = nullptr;
+
+    if (optStack(_ctx) && rs1n == XRegister::SP)
+        v = _bld->getSpilledAddress(imm, Register::T_INT);
+    if (!v)
+        v = _bld->add(rs1, imm);
+
     switch (it) {
         case S8:
         case U8:
@@ -638,7 +650,6 @@ llvm::Error Instruction::translateLoad(IntType it)
             ptr = _bld->i32ToI32Ptr(v);
             break;
     }
-
     v = _bld->load(ptr);
 
     // to int32
@@ -684,13 +695,18 @@ llvm::Error Instruction::translateStore(IntType it)
 
 
     llvm::Value* rs2 = getReg(0);
+    unsigned rs1n = getRegNum(1, false);
     llvm::Value* rs1 = getReg(1);
     auto expImm = getImm(2);
     if (!expImm)
         return expImm.takeError();
     llvm::Constant* imm = expImm.get();
+    llvm::Value* v = nullptr;
 
-    llvm::Value* v = _bld->add(rs1, imm);
+    if (optStack(_ctx) && rs1n == XRegister::SP)
+        v = _bld->getSpilledAddress(imm, Register::T_INT);
+    if (!v)
+        v = _bld->add(rs1, imm);
 
     llvm::Value* ptr;
     switch (it) {
@@ -1726,15 +1742,21 @@ llvm::Error Instruction::translateFPLoad(FType ft)
     *_os << '\t';
 
     unsigned fr = getFRD();
+    unsigned rs1n = getRegNum(1, false);
     llvm::Value* rs1 = getReg(1);
     auto expImm = getImm(2);
     if (!expImm)
         return expImm.takeError();
     llvm::Constant* imm = expImm.get();
 
-    llvm::Value* addr = _bld->add(rs1, imm);
+    llvm::Value* addr = nullptr;
     llvm::Value* ptr = nullptr;
     llvm::Value* v = nullptr;
+
+    if (optStack(_ctx) && rs1n == XRegister::SP)
+        addr = _bld->getSpilledAddress(imm, Register::T_FLOAT);
+    if (!addr)
+        addr = _bld->add(rs1, imm);
 
     switch (ft) {
         case F_SINGLE:
@@ -1766,14 +1788,20 @@ llvm::Error Instruction::translateFPStore(FType ft)
     *_os << '\t';
 
     llvm::Value* fr = getFReg(0, ft);
+    unsigned rs1n = getRegNum(1, false);
     llvm::Value* rs1 = getReg(1);
     auto expImm = getImm(2);
     if (!expImm)
         return expImm.takeError();
     llvm::Constant* imm = expImm.get();
 
-    llvm::Value* addr = _bld->add(rs1, imm);
+    llvm::Value* addr = nullptr;
     llvm::Value* ptr = nullptr;
+
+    if (optStack(_ctx) && rs1n == XRegister::SP)
+        addr = _bld->getSpilledAddress(imm, Register::T_FLOAT);
+    if (!addr)
+        addr = _bld->add(rs1, imm);
 
     switch (ft) {
         case F_SINGLE:

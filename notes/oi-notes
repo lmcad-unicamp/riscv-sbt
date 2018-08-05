@@ -40,7 +40,7 @@ OiInstTranslate
     RVSBT: DONE
 
 - It seems OISBT tries to optimize accesses to spilled regs
-    RVSBT>1 MAYBE
+    RVSBT>1 TODO this may help a lot in Susan benchmarks
 
 - HandleCallTarget
     - IREmitter::HandleLocalCall

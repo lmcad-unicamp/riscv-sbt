@@ -220,6 +220,8 @@ int main(int argc, char* argv[])
     cl::opt<bool> softFloatABIOpt("soft-float-abi",
         cl::desc("Use soft-float ABI"));
 
+    cl::opt<bool> optStackOpt("opt-stack", cl::desc("Optimize stack accesses"));
+
     cl::opt<std::string> logFileOpt("log", cl::desc("Log file path"));
 
     // enable debug code
@@ -289,6 +291,7 @@ int main(int argc, char* argv[])
         .setEnableFCSR(enableFCSROpt)
         .setEnableFCVTValidation(enableFCVTValidationOpt)
         .setHardFloatABI(!softFloatABIOpt)
+        .setOptStack(optStackOpt)
         .setLogFile(logFileOpt);
 
     sbt::Logger::get(opts.logFile());

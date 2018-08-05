@@ -89,7 +89,7 @@ llvm::Error Function::startMain()
     bld->setInsertBlock(newBB(_addr));
 
     // create local register file
-    if (locals() || abi()) {
+    if (localRegs()) {
         _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
         _fregs.reset(new FRegisters(_ctx, FRegisters::LOCAL));
     }
@@ -97,7 +97,8 @@ llvm::Error Function::startMain()
     copyArgv();
 
     // set stack pointer
-    bld->store(_ctx->stack->end(), XRegister::SP);
+    bld->store(_ctx->stack->end(), XRegister::SP, false/*cfaSet*/);
+    spillInit();
 
     _ctx->inMain = true;
     return llvm::Error::success();
@@ -116,9 +117,10 @@ llvm::Error Function::start()
     _ctx->bld->setInsertBlock(ptr);
 
     // create local register file
-    if (locals() || abi()) {
+    if (localRegs()) {
         _regs.reset(new XRegisters(_ctx, XRegisters::LOCAL));
         _fregs.reset(new FRegisters(_ctx, FRegisters::LOCAL));
+        spillInit();
     }
     loadRegisters(S_FUNC_START);
 
@@ -168,7 +170,7 @@ llvm::Error Function::finish()
 
 void Function::cleanRegs()
 {
-    if (!(locals() || abi()))
+    if (!localRegs())
         return;
 
     auto cleanReg = [](Register& r) {
@@ -516,7 +518,7 @@ static bool syncReg(size_t i, int syncFlags)
 
 void Function::loadRegisters(int syncFlags)
 {
-    if (!(locals() || abi()))
+    if (!localRegs())
         return;
 
     Builder* bld = _ctx->bld;
@@ -558,7 +560,7 @@ void Function::loadRegisters(int syncFlags)
 
 void Function::storeRegisters(int syncFlags)
 {
-    if (!(locals() || abi()))
+    if (!localRegs())
         return;
 
     Builder* bld = _ctx->bld;
@@ -616,6 +618,196 @@ void Function::copyArgv()
     Builder* bld = _ctx->bld;
     bld->store(&argc, XRegister::A0);
     bld->store(&argv, XRegister::A1);
+}
+
+///             ///
+/// SPILL CODE  ///
+///             ///
+
+static bool optStack(Context* ctx)
+{
+    auto regs = ctx->opts->regs();
+    bool locals = regs == Options::Regs::LOCALS;
+    bool abi = regs == Options::Regs::ABI;
+
+    return (locals || abi) && ctx->opts->optStack();
+}
+
+
+void Function::spillInit()
+{
+    if (optStack(_ctx))
+        return;
+
+    _cfaOffs = INVALID_CFA;
+    _spillMap.clear();
+}
+
+
+static int64_t getConstInt(llvm::Constant* imm)
+{
+    llvm::ConstantInt* ci = llvm::dyn_cast<llvm::ConstantInt>(imm);
+    xassert(ci);
+    return ci->getSExtValue();
+}
+
+
+static llvm::Constant* getOpVal(llvm::Value* op);
+
+static llvm::Constant* getLIVal(llvm::Value* li)
+{
+    // li -> addi (lui r, hi), rhs
+    DBG(llvm::errs() << "li: "; li->dump());
+    auto* inst = llvm::dyn_cast<llvm::Instruction>(li);
+    xassert(inst && inst->getOpcode() == llvm::Instruction::Add);
+    // lhs = lui
+    auto* lhs = llvm::dyn_cast<llvm::LoadInst>(inst->getOperand(0));
+    // rhs = lo
+    auto* rhs = llvm::dyn_cast<llvm::Constant>(inst->getOperand(1));
+    xassert(lhs && rhs);
+    DBG(llvm::errs() << "lhs: "; lhs->dump());
+    DBG(llvm::errs() << "rhs: "; rhs->dump());
+    auto* hi = getOpVal(lhs);
+    DBG(llvm::errs() << "hi: "; hi->dump());
+    // imm = hi + lo
+    int64_t imm = getConstInt(hi) + getConstInt(rhs);
+    llvm::Type* ty = rhs->getType();
+    return llvm::ConstantInt::get(ty, imm, true);
+}
+
+
+static llvm::Constant* getOpVal(llvm::Value* op)
+{
+    // not a constant, must be an instruction
+    auto* inst = llvm::dyn_cast<llvm::Instruction>(op);
+    DBG(llvm::errs() << "inst: "; inst->dump());
+    // only Load is supported for now: val = ld ptr
+    xassert(inst && inst->getOpcode() == llvm::Instruction::Load);
+    op = inst->getOperand(0);
+    xassert(op);
+    DBG(llvm::errs() << "op: "; op->dump());
+    // get the Store inst right before the Load: st val, ptr
+    xassert(op->hasNUsesOrMore(2));
+    llvm::User* uld = nullptr, *ust = nullptr;
+    for (auto user : op->users()) {
+        DBG(llvm::errs() << "user: "; user->dump());
+        if (user == inst)
+            uld = user;
+        else if (uld) {
+            ust = user;
+            break;
+        }
+    }
+    xassert(uld && ust);
+    DBG(llvm::errs() << "uld: "; uld->dump());
+    DBG(llvm::errs() << "ust: "; ust->dump());
+    auto* st = llvm::dyn_cast<llvm::StoreInst>(ust);
+    xassert(st);
+    op = st->getOperand(0);
+    xassert(op);
+    auto* imm = llvm::dyn_cast<llvm::Constant>(op);
+    if (!imm)
+        imm = getLIVal(op);
+    xassert(imm);
+    DBG(imm->dump());
+    return imm;
+}
+
+
+void Function::setCFAOffs(llvm::Value* v)
+{
+    if (!optStack(_ctx))
+        return;
+
+    // DBG(llvm::errs() << "v: "; v->dump());
+    llvm::Instruction* inst = llvm::dyn_cast<llvm::Instruction>(v);
+    xassert(inst && inst->getOpcode() == llvm::Instruction::Add);
+    inst->dump();
+    llvm::Value* op = inst->getOperand(1);
+    xassert(op);
+    llvm::Constant* imm = llvm::dyn_cast<llvm::Constant>(op);
+    if (!imm)
+        imm = getOpVal(op);
+    int64_t addr = getConstInt(imm);
+    xassert(_cfaOffs != INVALID_CFA || addr < 0);
+
+    if (_cfaOffs == INVALID_CFA)
+        _cfaOffs = addr;
+    else
+        _cfaOffs += addr;
+    DBGF("addr={0}, CFA={1}", addr, _cfaOffs);
+    xassert(_cfaOffs % 16 == 0 && "SP must always be 16-byte aligned");
+}
+
+
+llvm::Value* Function::getSpilledAddress(llvm::Constant* imm, Register::Type t)
+{
+    if (!optStack(_ctx))
+        return nullptr;
+
+    xassert(_cfaOffs != INVALID_CFA);
+    int64_t offs = getConstInt(imm);
+    // get closest multiple of 4
+    if (offs % 4 != 0) {
+        DBGF("offs({0}) % 4 != 0", offs);
+        offs &= ~3;
+    }
+    int64_t idx = -_cfaOffs - offs;
+    if (idx < 4) {
+        DBGF("offs={0}, idx({1}) < 4", offs, idx);
+        return nullptr;
+    }
+
+    llvm::Value* v;
+    Builder* bld = _ctx->bld;
+    xassert(bld);
+    llvm::Type* ty = t == Register::T_INT? _ctx->t.i32 : _ctx->t.fp64;
+
+    auto it = _spillMap.find(idx);
+    if (it == _spillMap.end()) {
+        bld->saveInsertBlock();
+        bld->setInsertBlock(findBB(_addr), true/*begin*/);
+        v = bld->_alloca(ty, nullptr, "sp" + std::to_string(idx));
+        v = bld->bitOrPointerCast(v, _ctx->t.i32);
+        bld->restoreInsertBlock();
+        _spillMap.insert({idx,v});
+        DBGF("SPILL: new: offs={0}, idx={1}", offs, idx);
+    } else {
+        DBGF("SPILL: offs={0}, idx={1}", offs, idx);
+        v = it->second;
+    }
+    return v;
+
+    /*
+    CFA - 4 = ra
+    CFA - 8 = s0
+    CFA -12 = s1
+    CFA -16 = s2
+    CFA -20 = s3
+    CFA -24 = s4
+    CFA -28 = s5
+    CFA -32 = s6
+    CFA -36 = s7
+    CFA -40 = s8
+    CFA -44 = s9
+    CFA -48 = s10
+    CFA -52 = s11
+    CFA -56 = 16-byte pad
+    CFA -60 = 16-byte pad
+    CFA -64 = 16-byte pad
+    CFA -72 = fs0
+    CFA -80 = fs1
+    CFA -88 = fs2
+    CFA -96 = fs3
+    CFA-104 = fs4
+    CFA-112 = fs5
+    CFA-120 = fs6
+    CFA-128 = fs7
+    CFA-136 = fs8
+    CFA-144 = fs9
+    CFA-152 = fs10
+    CFA-160 = fs11
+    */
 }
 
 }

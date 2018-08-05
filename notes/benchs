@@ -51,6 +51,7 @@ F) patricia     1.23    0.98    0.89
 G) susan-smooth 3.04    1.23    1.12
 
 H) susan-edges  2.42    1.41    1.37
+* suffers from rv32 spills
 
 I) susan-corner 2.10    1.26    1.24
 

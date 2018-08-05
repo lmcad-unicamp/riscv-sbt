@@ -91,18 +91,27 @@ public:
     }
 
     // store value in register
-    llvm::StoreInst* store(llvm::Value* v, unsigned reg)
+    llvm::StoreInst* store(llvm::Value* v, unsigned reg, bool cfaSet=true)
     {
         if (reg == XRegister::ZERO)
             return nullptr;
 
         xassert(_ctx->func);
 
+        if (cfaSet && reg == XRegister::SP)
+            _ctx->func->setCFAOffs(v);
+
         Register& x = _ctx->func->getReg(reg);
         llvm::StoreInst* i = _builder->CreateStore(v,
                 x.getForWrite(), !VOLATILE);
         updateFirst(i);
         return i;
+    }
+
+    llvm::Value* getSpilledAddress(llvm::Constant* imm, Register::Type t)
+    {
+        xassert(_ctx->func);
+        return _ctx->func->getSpilledAddress(imm, t);
     }
 
     // nop
@@ -497,11 +506,15 @@ public:
     }
 
     // set insert basic block
-    void setInsertBlock(BasicBlock* bb)
+    void setInsertBlock(BasicBlock* bb, bool begin=false)
     {
         DBGF("{0}", bb->name());
         _bb = bb;
-        _builder->SetInsertPoint(_bb->bb());
+        llvm::BasicBlock* llbb = _bb->bb();
+        if (begin)
+            _builder->SetInsertPoint(llbb, llbb->begin());
+        else
+            _builder->SetInsertPoint(llbb);
     }
 
     void saveInsertBlock()

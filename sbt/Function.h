@@ -12,6 +12,7 @@
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/Error.h>
 
+#include <map>
 #include <memory>
 
 
@@ -264,6 +265,10 @@ public:
         return _regsMode == Options::Regs::ABI;
     }
 
+    bool localRegs() const {
+        return locals() || abi();
+    }
+
     /**
      * Erase unused local registers.
      */
@@ -284,6 +289,9 @@ public:
     void loadRegisters(int syncFlags = 0);
     void storeRegisters(int syncFlags = 0);
     void freturn();
+
+    void setCFAOffs(llvm::Value* v);
+    llvm::Value* getSpilledAddress(llvm::Constant* imm, Register::Type t);
 
     // setup argc/argv
     void copyArgv();
@@ -321,11 +329,18 @@ private:
     std::unique_ptr<XRegisters> _regs;
     std::unique_ptr<FRegisters> _fregs;
 
+    // spill data
+    static const int64_t INVALID_CFA = ~0ll;
+    int64_t _cfaOffs = INVALID_CFA;
+    std::map<int64_t, llvm::Value*> _spillMap;
+
     // methods
 
     llvm::Error startMain();
     llvm::Error start();
     llvm::Error finish();
+
+    void spillInit();
 };
 
 using FunctionPtr = Pointer<Function>;

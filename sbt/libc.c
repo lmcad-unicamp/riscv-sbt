@@ -10,6 +10,7 @@
 #include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 // function
@@ -51,6 +52,7 @@ F(fseek)
 F(ftell)
 F(fwrite)
 F(getc)
+F(gettimeofday)
 F(ldexp)
 F(log)
 F(log10)

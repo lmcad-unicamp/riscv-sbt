@@ -135,6 +135,17 @@ public:
         return *this;
     }
 
+    bool optStack() const
+    {
+        return _optStack;
+    }
+
+    Options& setOptStack(bool b)
+    {
+        _optStack = b;
+        return *this;
+    }
+
     const std::string& logFile() const
     {
         return _logFile;
@@ -160,6 +171,7 @@ private:
     bool _enableFCSR = false;
     bool _enableFCVTValidation = false;
     bool _hf = true;
+    bool _optStack = false;
     std::string _logFile;
 };
 
