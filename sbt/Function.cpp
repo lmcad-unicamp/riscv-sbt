@@ -627,10 +627,10 @@ void Function::copyArgv()
 static bool optStack(Context* ctx)
 {
     auto regs = ctx->opts->regs();
-    bool locals = regs == Options::Regs::LOCALS;
+    // bool locals = regs == Options::Regs::LOCALS;
     bool abi = regs == Options::Regs::ABI;
 
-    return (locals || abi) && ctx->opts->optStack();
+    return abi && ctx->opts->optStack();
 }
 
 
@@ -733,10 +733,46 @@ void Function::setCFAOffs(llvm::Value* v)
 
     if (_cfaOffs == INVALID_CFA)
         _cfaOffs = addr;
-    else
+    else {
+        // skip restores
+        if (_cfaOffs + addr == 0) {
+            DBGF("SPILL: restore skipped: addr={0}, CFA={1}", addr, _cfaOffs);
+            return;
+        }
         _cfaOffs += addr;
-    DBGF("addr={0}, CFA={1}", addr, _cfaOffs);
+    }
+    DBGF("SPILL: addr={0}, CFA={1}", addr, _cfaOffs);
     xassert(_cfaOffs % 16 == 0 && "SP must always be 16-byte aligned");
+}
+
+
+Function::Spill::Spill(
+    Context* ctx,
+    BasicBlock* bb,
+    int64_t idx,
+    Register::Type t)
+    :
+    _rty(t)
+{
+    Builder* bld = ctx->bld;
+    xassert(bld);
+    xassert(bb);
+    llvm::Type* ty = t == Register::T_INT? ctx->t.i32 : ctx->t.fp64;
+
+    bld->saveInsertBlock();
+    bld->setInsertBlock(bb, true/*begin*/);
+    _var = bld->_alloca(ty, nullptr, "sp" + std::to_string(idx));
+    _i32 = bld->bitOrPointerCast(_var, ctx->t.i32);
+    bld->restoreInsertBlock();
+}
+
+
+static const char* estr(Register::Type t)
+{
+    switch (t) {
+        case Register::Type::T_INT:     return "INT";
+        case Register::Type::T_FLOAT:   return "FLOAT";
+    }
 }
 
 
@@ -749,34 +785,31 @@ llvm::Value* Function::getSpilledAddress(llvm::Constant* imm, Register::Type t)
     int64_t offs = getConstInt(imm);
     // get closest multiple of 4
     if (offs % 4 != 0) {
-        DBGF("offs({0}) % 4 != 0", offs);
+        DBGF("WARNING: SPILL: offs({0}) % 4 != 0", offs);
         offs &= ~3;
     }
     int64_t idx = -_cfaOffs - offs;
     if (idx < 4) {
-        DBGF("offs={0}, idx({1}) < 4", offs, idx);
+        DBGF("WARNING: SPILL: offs={0}, idx({1}) < 4", offs, idx);
         return nullptr;
     }
 
-    llvm::Value* v;
-    Builder* bld = _ctx->bld;
-    xassert(bld);
-    llvm::Type* ty = t == Register::T_INT? _ctx->t.i32 : _ctx->t.fp64;
-
+    const Spill* spill;
     auto it = _spillMap.find(idx);
     if (it == _spillMap.end()) {
-        bld->saveInsertBlock();
-        bld->setInsertBlock(findBB(_addr), true/*begin*/);
-        v = bld->_alloca(ty, nullptr, "sp" + std::to_string(idx));
-        v = bld->bitOrPointerCast(v, _ctx->t.i32);
-        bld->restoreInsertBlock();
-        _spillMap.insert({idx,v});
         DBGF("SPILL: new: offs={0}, idx={1}", offs, idx);
+        auto p = _spillMap.insert({idx, Spill(_ctx, findBB(_addr), idx, t)});
+        spill = &p.first->second;
     } else {
         DBGF("SPILL: offs={0}, idx={1}", offs, idx);
-        v = it->second;
+        spill = &it->second;
+        if (t != spill->regType()) {
+            DBGF("WARNING: SPILL: accessing spill data with different type: "
+                 "spill={0}, access={1}",
+                 estr(spill->regType()), estr(t));
+        }
     }
-    return v;
+    return spill->val();
 
     /*
     CFA - 4 = ra

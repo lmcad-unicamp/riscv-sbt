@@ -332,7 +332,27 @@ private:
     // spill data
     static const int64_t INVALID_CFA = ~0ll;
     int64_t _cfaOffs = INVALID_CFA;
-    std::map<int64_t, llvm::Value*> _spillMap;
+
+
+    class Spill {
+    public:
+        Spill(Context* ctx, BasicBlock* bb, int64_t idx, Register::Type t);
+
+        Register::Type regType() const {
+            return _rty;
+        }
+
+        llvm::Value* val() const {
+            return _i32;
+        }
+
+    private:
+        llvm::Value* _var;
+        llvm::Value* _i32;
+        Register::Type _rty;
+    };
+
+    std::map<int64_t, Spill> _spillMap;
 
     // methods
 

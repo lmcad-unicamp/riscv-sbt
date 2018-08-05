@@ -368,6 +368,12 @@ const char* Instruction::estr(ALUOpAlias e)
 }
 
 
+static bool optStack(Context* ctx)
+{
+    return ctx->opts->optStack();
+}
+
+
 llvm::Error Instruction::translateALUOp(ALUOp op, uint32_t flags)
 {
     bool hasImm = flags & AF_IMM;
@@ -394,6 +400,7 @@ llvm::Error Instruction::translateALUOp(ALUOp op, uint32_t flags)
     unsigned o1n = getRegNum(1, false);
     llvm::Value* o1 = getReg(1);
     llvm::Value* o2;
+    llvm::Value* v = nullptr;
     if (hasImm) {
         auto expImm = getImm(2);
         if (!expImm)
@@ -401,6 +408,17 @@ llvm::Error Instruction::translateALUOp(ALUOp op, uint32_t flags)
         o2 = expImm.get();
     } else
         o2 = getReg(2);
+
+    // possible stack reference to spill area
+    /*
+    if (optStack(_ctx) && op == ADD && hasImm &&
+            o1n == XRegister::SP && o != XRegister::SP) {
+        auto* imm = llvm::dyn_cast<llvm::Constant>(o2);
+        if (imm) {
+            v = _bld->getSpilledAddress(imm, Register::T_INT);
+        }
+    }
+    */
 
     // optimize aliases
     ALUOpAlias opa = A_NONE;
@@ -430,14 +448,13 @@ llvm::Error Instruction::translateALUOp(ALUOp op, uint32_t flags)
             break;
     }
 
-    llvm::Value* v;
-
     switch (opa) {
         case A_NONE:
             break;
 
         case A_MV:
-            v = o1;
+            if (!v)
+                v = o1;
             break;
 
         case A_NEG:
@@ -452,7 +469,8 @@ llvm::Error Instruction::translateALUOp(ALUOp op, uint32_t flags)
     if (opa == A_NONE)
         switch (op) {
             case ADD:
-                v = _bld->add(o1, o2);
+                if (!v)
+                    v = _bld->add(o1, o2);
                 break;
 
             case AND:
@@ -586,12 +604,6 @@ llvm::Error Instruction::translateUI(UIOp op)
     _bld->store(c, o);
 
     return llvm::Error::success();
-}
-
-
-static bool optStack(Context* ctx)
-{
-    return ctx->opts->optStack();
 }
 
 
