@@ -624,6 +624,13 @@ void Function::copyArgv()
 /// SPILL CODE  ///
 ///             ///
 
+#define DEBUG_SPILL 0
+#if DEBUG_SPILL
+#define SDBG DBG
+#else
+#define SDBG(a) do { ; } while (0)
+#endif
+
 static bool optStack(Context* ctx)
 {
     auto regs = ctx->opts->regs();
@@ -657,7 +664,7 @@ static llvm::Constant* getOpVal(llvm::Value* op);
 static llvm::Constant* getLIVal(llvm::Value* li)
 {
     // li -> addi (lui r, hi), rhs
-    DBG(llvm::errs() << "li: "; li->dump());
+    SDBG(llvm::errs() << "li: "; li->dump());
     auto* inst = llvm::dyn_cast<llvm::Instruction>(li);
     xassert(inst && inst->getOpcode() == llvm::Instruction::Add);
     // lhs = lui
@@ -665,10 +672,10 @@ static llvm::Constant* getLIVal(llvm::Value* li)
     // rhs = lo
     auto* rhs = llvm::dyn_cast<llvm::Constant>(inst->getOperand(1));
     xassert(lhs && rhs);
-    DBG(llvm::errs() << "lhs: "; lhs->dump());
-    DBG(llvm::errs() << "rhs: "; rhs->dump());
+    SDBG(llvm::errs() << "lhs: "; lhs->dump());
+    SDBG(llvm::errs() << "rhs: "; rhs->dump());
     auto* hi = getOpVal(lhs);
-    DBG(llvm::errs() << "hi: "; hi->dump());
+    SDBG(llvm::errs() << "hi: "; hi->dump());
     // imm = hi + lo
     int64_t imm = getConstInt(hi) + getConstInt(rhs);
     llvm::Type* ty = rhs->getType();
@@ -680,17 +687,17 @@ static llvm::Constant* getOpVal(llvm::Value* op)
 {
     // not a constant, must be an instruction
     auto* inst = llvm::dyn_cast<llvm::Instruction>(op);
-    DBG(llvm::errs() << "inst: "; inst->dump());
+    SDBG(llvm::errs() << "inst: "; inst->dump());
     // only Load is supported for now: val = ld ptr
     xassert(inst && inst->getOpcode() == llvm::Instruction::Load);
     op = inst->getOperand(0);
     xassert(op);
-    DBG(llvm::errs() << "op: "; op->dump());
+    SDBG(llvm::errs() << "op: "; op->dump());
     // get the Store inst right before the Load: st val, ptr
     xassert(op->hasNUsesOrMore(2));
     llvm::User* uld = nullptr, *ust = nullptr;
     for (auto user : op->users()) {
-        DBG(llvm::errs() << "user: "; user->dump());
+        SDBG(llvm::errs() << "user: "; user->dump());
         if (user == inst)
             uld = user;
         else if (uld) {
@@ -699,8 +706,8 @@ static llvm::Constant* getOpVal(llvm::Value* op)
         }
     }
     xassert(uld && ust);
-    DBG(llvm::errs() << "uld: "; uld->dump());
-    DBG(llvm::errs() << "ust: "; ust->dump());
+    SDBG(llvm::errs() << "uld: "; uld->dump());
+    SDBG(llvm::errs() << "ust: "; ust->dump());
     auto* st = llvm::dyn_cast<llvm::StoreInst>(ust);
     xassert(st);
     op = st->getOperand(0);
@@ -709,7 +716,7 @@ static llvm::Constant* getOpVal(llvm::Value* op)
     if (!imm)
         imm = getLIVal(op);
     xassert(imm);
-    DBG(imm->dump());
+    SDBG(imm->dump());
     return imm;
 }
 
@@ -719,10 +726,10 @@ void Function::setCFAOffs(llvm::Value* v)
     if (!optStack(_ctx))
         return;
 
-    // DBG(llvm::errs() << "v: "; v->dump());
+    // SDBG(llvm::errs() << "v: "; v->dump());
     llvm::Instruction* inst = llvm::dyn_cast<llvm::Instruction>(v);
     xassert(inst && inst->getOpcode() == llvm::Instruction::Add);
-    inst->dump();
+    SDBG(llvm::errs() << "inst: "; inst->dump());
     llvm::Value* op = inst->getOperand(1);
     xassert(op);
     llvm::Constant* imm = llvm::dyn_cast<llvm::Constant>(op);

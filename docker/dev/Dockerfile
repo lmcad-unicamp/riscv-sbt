@@ -17,7 +17,8 @@ ENV ADB_DOCKER_WIN="adb -H docker.for.win.localhost"
 RUN echo "alias ls='ls --color'" >> /root/.bashrc \
     && echo "echo 0 > /proc/sys/kernel/kptr_restrict" >> /root/.bashrc \
     && echo "source scripts/env.sh" >> /root/.bashrc \
-    && echo "export ADB=\"$ADB_DOCKER_WIN\"" >> /root/.bashrc
+    && echo "export ADB=\"$ADB_DOCKER_WIN\"" >> /root/.bashrc \
+    && echo "tmpfs /tmp tmpfs defaults 0 0" >> /etc/fstab
 
 COPY vimrc /root/.vimrc
 
