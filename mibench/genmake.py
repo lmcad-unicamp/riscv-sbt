@@ -297,10 +297,9 @@ arm-dstdir:
             Run([_in, out + "edges.pgm", "-e"], "edges", outidx=1),
             Run([_in, out + "corners.pgm", "-c"], "corners", outidx=1)])
 
-        sbtflags = self.stack_huge + ["-opt-stack"]
+        sbtflags = self.stack_huge #+ ["-opt-stack"]
         return self._bench("susan", dir,
-                ["susan.c"], runs, sbtflags=sbtflags,
-                dbg="xopt")
+                ["susan.c"], runs, sbtflags=sbtflags)
 
 
     def _lame(self):
