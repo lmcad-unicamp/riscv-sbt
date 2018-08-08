@@ -200,8 +200,11 @@ class MiBench:
         self.stack_large = ["-stack-size=131072"]    # 128K
         self.stack_huge = ["-stack-size=1048576"]    # 1M
         self.bflags = "--sbtobjs=runtime"
-        self.bflags_mmx = ('--llcflags-x86="-march=x86 -mcpu=pentium-mmx' +
-            ' -mattr=mmx" --gccflags-x86="-march=pentium-mmx"')
+        if GOPTS.mmx:
+            self.bflags_mmx = ('--llcflags-x86="-march=x86 -mcpu=pentium-mmx' +
+                ' -mattr=mmx" --gccflags-x86="-march=pentium-mmx"')
+        else:
+            self.bflags_mmx = ""
         self.txt = ''
         self.benchs = None
 

@@ -12,6 +12,7 @@ class GlobalOpts:
         #self.cc = "clang"
         self.cc = "gcc"
         self.rvcc = "gcc"
+        self.mmx = True
         if self.rvcc == "gcc":
             self.rvabi = "ilp32d"
         else:
