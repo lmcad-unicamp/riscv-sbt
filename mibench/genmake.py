@@ -453,6 +453,12 @@ benchs-measure: csv-header {5}
 .PHONY: benchs-arm-copy
 benchs-arm-copy: benchs arm-dstdir {6}
 
+plot: mibench.csv
+\t{7} -x mibench.csv -m globals locals abi -c 6 7 > mibench_slowdown.csv
+\tsed 1,2d mibench_slowdown.csv | grep -v geomean | tr , ' ' | \
+\t\tawk 'BEGIN{{i=1}} {{print i++ " " $$0}}' > mibench_slowdown.dat
+\t./mibench.gnuplot
+
 """.format(
             path(self.dstdir, "consumer/lame/lame3.70/mpglib"),
             " ".join(names),
@@ -461,6 +467,7 @@ benchs-arm-copy: benchs arm-dstdir {6}
             ",".join(csv_header[1]),
             " ".join([name + "-measure" for name in names]),
             " ".join([name + "-copy" for name in names]),
+            TOOLS.measure,
         ))
 
 
