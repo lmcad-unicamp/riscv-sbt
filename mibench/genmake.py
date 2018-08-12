@@ -302,7 +302,7 @@ arm-dstdir:
 
         sbtflags = self.stack_huge #+ ["-opt-stack"]
         return self._bench("susan", dir,
-                ["susan.c"], runs, sbtflags=sbtflags)
+                ["susan.c"], runs, sbtflags=sbtflags, bflags=self.bflags_mmx)
 
 
     def _lame(self):

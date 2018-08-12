@@ -3,17 +3,17 @@ MiBench
 
 cc=clang
 rvcc=gcc
-                globals locals  abi
-1) dijkstra     1.94    0.99    0.96
-2) crc32        1.88    1.21    0.84
+                locals  abi
+1) dijkstra     0.87    0.85
+2) crc32        0.95    0.71
     low %mean (~15%), high %sd
 
 rijndael: MMX:
-3) rijndael-enc 4.77    1.48    1.13
-4) rijndael-dec 4.96    1.50    1.16
+3) rijndael-enc 1.27    1.00
+4) rijndael-dec 1.25    0.99
 AVX:
-3) rijndael-enc 5.21    1.63    1.25
-4) rijndael-dec 5.26    1.61    1.25
+3) rijndael-enc 1.57    1.20
+4) rijndael-dec 1.43    1.14
 main overheads:
 1) reg sync
 2) missed LLVM vectorization
@@ -24,35 +24,47 @@ main overheads:
         could be done with vector instructions
   mention that RISCV vectorization extension should help with this
 
-5) sha          2.95    1.69    1.29
-MMX:            2.59    1.51    1.17
+5) sha          1.73    1.32
+MMX:            1.61    1.24
+1- missed vectorization
+2- translated code uses more instructions at sha_transform()
+   - x86 seems to move pointer val to register and make memory
+     accesses through that, taking full advantage of x86 more
+     complex addressing modes, while rv32 code breaks these accesses
+     in more parts, by performing calculations that could be done
+     directly in mov. Also, rv32 presents more spills of some important
+     registers.
+
+6) adpcm-enc    0.72    0.70
+7) adpcm-dec    1.25    1.11
+
+8) stringsearch 2.67    2.85
+MMX:            0.94    0.95
 * missed vectorization
 
-6) adpcm-enc    1.24    0.81    0.80
-7) adpcm-dec    2.27    1.04    0.93
-8) stringsearch 6.15    1.11    1.18 (MMX)
-9) bf-enc       1.92    1.26    1.14
-A) bf-dec       1.85    1.26    1.06
+9) bf-enc       1.15    1.03
+A) bf-dec       1.14    0.95
 
-B) basicmath    1.11    1.13    1.03
+B) basicmath    0.99    0.99
 * very low %mean (~3%), that also causes big xsd (~0.25)
 
-C) bitcount     1.31    1.78    0.83
+C) bitcount     1.75    0.81
 * huge reg sync impact
 
-D) fft-std      1.96    1.24    1.19
+D) fft-std      1.17    1.13
 * low %mean (~5%)
-E) fft-inv      1.88    1.22    1.20
+E) fft-inv      1.16    1.12
 * low %mean (~8%)
 
-F) patricia     1.23    0.98    0.89
+F) patricia     0.90    0.99
 * low %mean (~4%), high xsd (~0.3)
 
-G) susan-smooth 3.04    1.23    1.12
+G) susan-smooth 1.13    1.03
+MMX:            0.76    0.69
+H) susan-edges  1.26    1.23
+MMX:            1.13    1.09
+I) susan-corner 1.34    1.27
+MMX:            0.94    0.95
+* missed vectorization
 
-H) susan-edges  2.42    1.41    1.37
-* suffers from rv32 spills
-
-I) susan-corner 2.10    1.26    1.24
-
-J) lame
+J) lame         1.44    1.12

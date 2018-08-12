@@ -837,7 +837,8 @@ if __name__ == "__main__":
     opts.perf = not args.no_perf
     opts.csv = not args.no_csv
     opts.id = args.id
-    opts.n = args.n
+    n = os.getenv("N")
+    opts.n = int(n) if n else args.n
     opts.modes = args.modes
     opts.columns = args.columns
 
