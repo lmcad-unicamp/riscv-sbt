@@ -18,7 +18,7 @@ class Helper:
     @staticmethod
     def is_cygwin():
         try:
-            shell("uname | grep -i cygwin")
+            shell("uname | grep -i cygwin >/dev/null", quiet=True)
             return True
         except:
             return False
@@ -58,7 +58,8 @@ class Volume:
     def create(self):
         # create volume if needed
         try:
-            shell("docker volume ls | grep " + self.vol_name)
+            shell("docker volume ls | grep " + self.vol_name + " >/dev/null",
+                    quiet=True)
         except:
             shell("docker volume create " + self.vol_name)
 
@@ -438,6 +439,12 @@ if __name__ == "__main__":
         help="run gcc7 container")
     parser.add_argument("--xgcc7", action="store_true",
         help="exec bash on an existing gcc7 container")
+    parser.add_argument("--mibuild", action="store_true",
+        help="build MiBench benchmarks")
+    parser.add_argument("--mitest", action="store_true",
+        help="test MiBench benchmarks")
+    parser.add_argument("--mirun", action="store_true",
+        help="run MiBench benchmarks, measuring times")
     args = parser.parse_args()
 
 
@@ -491,6 +498,24 @@ if __name__ == "__main__":
     # --xgcc7
     elif args.xgcc7:
         exec("gcc7")
+    # --mibuild
+    elif args.mibuild:
+        docker = Docker("sbt", "sbt")
+        docker.run('bash -c "' +
+            '. scripts/env.sh && ' +
+            'cd mibench && ' +
+            './genmake.py --no-arm && ' +
+            'make clean benchs"')
+    # --mitest
+    elif args.mitest:
+        Docker("sbt", "sbt").run("make -C mibench benchs-test")
+    # --mirun
+    elif args.mirun:
+        Docker("sbt", "sbt").run('bash -c "' +
+            '. scripts/env.sh && ' +
+            'mount -t tmpfs tmpfs /tmp && ' +
+            'echo 0 > /proc/sys/kernel/kptr_restrict && ' +
+            'make -C mibench benchs-measure"')
     # error
     else:
         sys.exit("ERROR: no command specified")
