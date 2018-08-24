@@ -324,14 +324,15 @@ ARM = Arch(
         run="",
         march=ARM_MARCH,
         gcc=ARM_GCC,
-        gccflags=cat("-march=" + ARM_MATTR, "-mfpu=vfpv3-d16"),
+        gccflags=cat("-mcpu=generic-armv7-a", "-mfpu=vfpv3-d16"),
         clang_flags=cat(CLANG_CFLAGS,
             "--target=" + ARM_TRIPLE, "-fPIC"),
         sysroot=ARM_SYSROOT,
         isysroot=ARM_SYSROOT + "/include",
         llcflags=cat(LLC_PIC,
-            "-march=" + ARM_MARCH,
-            "-mattr=" + ARM_MATTR + ",vfp3,d16",
+            "-mtriple=arm",
+            "-mcpu=generic",
+            "-mattr=armv7-a,vfp3,d16,thumb-mode,-neon",
             "-float-abi=hard"),
         as_flags="",
         ld_flags="",
@@ -340,29 +341,12 @@ ARM = Arch(
         rem_topdir=ARM_TOPDIR)
 
 
-RV32_FOR_X86 = Arch(
-        name="rv32-for-x86",
-        prefix="rv32-for-x86",
-        triple=RV32_LINUX.triple,
-        run="",
-        march=RV32_MARCH,
-        gccflags=RV32_LINUX_GCC_FLAGS,
-        clang_flags=cat(CLANG_CFLAGS, "--target=riscv32"),
-        sysroot=X86_SYSROOT,
-        isysroot=X86_ISYSROOT,
-        llcflags=RV32_LLC_FLAGS,
-        as_flags=RV32_LINUX_AS_FLAGS,
-        ld_flags=RV32_LINUX_LD_FLAGS,
-        mattr=RV32_MATTR)
-
-
 # arch map
 ARCH = {
     "arm"           : ARM,
     "rv32"          : RV32,
     "rv32-linux"    : RV32_LINUX,
     "x86"           : X86,
-    "rv32-for-x86"  : RV32_FOR_X86,
 }
 
 ###

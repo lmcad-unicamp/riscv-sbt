@@ -5,8 +5,14 @@ cc=clang
 rvcc=gcc
                 locals  abi
 1) dijkstra     0.87    0.85
+ARM:            0.77    0.80
+
 2) crc32        0.95    0.71
     low %mean (~15%), high %sd
+ARM:            1.23    1.46
+* reg mode somehow leads to different ordering during opt phase,
+  and codegen is able to generate less code in the main loop for
+  locals mode.
 
 rijndael: MMX:
 3) rijndael-enc 1.27    1.00
