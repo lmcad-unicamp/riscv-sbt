@@ -264,7 +264,7 @@ arm-dstdir:
 
         return self._bench("rijndael", dir,
             ["aes.c", "aesxam.c"], runs, bflags=self.bflags_mmx,
-            ctor=EncDecBench)
+            ctor=EncDecBench, dbg="xopt")
 
 
     def _bf(self):
@@ -373,7 +373,8 @@ arm-dstdir:
                 ["sha_driver.c", "sha.c"],
                 self._single_run(
                     [path(self.srcdir, "security/sha/input_large.asc")]),
-                sbtflags=["-stack-size=16384"], bflags=self.bflags_mmx),
+                sbtflags=["-stack-size=16384"], bflags=self.bflags_mmx,
+                dbg="xopt"),
             self._bench("adpcm-encode", "telecomm/adpcm/src",
                 ["rawcaudio.c", "adpcm.c"],
                 self._single_run([],

@@ -138,8 +138,9 @@ class LLVMBuilder:
         opts = self.opts
         ipath = path(dir, _in)
         opath = path(dir, out)
+        arch = opts.arch
 
-        flags = cat(TOOLS.opt_flags(opts.opt), opts.oflags)
+        flags = cat(TOOLS.opt_flags(opts.opt), arch.optflags, opts.oflags)
         if printf_break:
             flags = cat(flags,
                 "-load", "libPrintfBreak.so", "-printf-break")
@@ -276,6 +277,11 @@ class Builder:
             self.bldr = GCCBuilder(opts)
 
 
+    def _is_xlate(self, out):
+        return (out.startswith('rv32-x86-') or
+                out.startswith('rv32-arm-'))
+
+
     def _s2o(self, srcdir, dstdir, _in, out):
         """ .s -> .o """
 
@@ -285,6 +291,9 @@ class Builder:
         opath = path(dstdir, out)
 
         if opts._as == "as":
+            if opts.dbg and self._is_xlate(out):
+                shell('sed -i "/\t.file/d" ' + ipath)
+
             flags = cat(arch.as_flags, opts.sflags,
                 "-g" if opts.dbg else '')
             cmd = cat(arch._as, flags, "-c", ipath, "-o", opath)
@@ -299,9 +308,7 @@ class Builder:
 
             # preserve rv32/x86 source code for debug, by not mixing in
             # assembly source together
-            if (opts.dbg and
-                (out.startswith('rv32-x86-') or
-                out.startswith('rv32-arm-'))):
+            if (opts.dbg and self._is_xlate(out)):
                 flags = "-g"
                 # workaround for different llvm-mc behavior of newer versions
                 # for some reason it gets confused by the .file directive now

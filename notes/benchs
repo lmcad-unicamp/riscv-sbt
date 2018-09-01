@@ -9,18 +9,20 @@ ARM:            0.77    0.80
 
 2) crc32        0.95    0.71
     low %mean (~15%), high %sd
-ARM:            1.23    1.46
+ARM:            1.25    1.48
 * reg mode somehow leads to different ordering during opt phase,
   and codegen is able to generate less code in the main loop for
   locals mode.
 
 rijndael: MMX:
 3) rijndael-enc 1.27    1.00
+AVX:            1.57    1.20
+ARM:            1.85    1.40
 4) rijndael-dec 1.25    0.99
-AVX:
-3) rijndael-enc 1.57    1.20
-4) rijndael-dec 1.43    1.14
-main overheads:
+AVX:            1.43    1.14
+ARM:            1.63    1.26
+
+main overheads on x86:
 1) reg sync
 2) missed LLVM vectorization
    16 bytes -> load -> xor -> store
@@ -30,8 +32,22 @@ main overheads:
         could be done with vector instructions
   mention that RISCV vectorization extension should help with this
 
+main overheads on ARM:
+- reg sync is also responsible for a big overhead on ARM
+- the other main source of overhead for rijndael translated to ARM
+  is at encfile()/decfile(). The loop to xor 16 positions of inbuf
+  with outbuf is unrolled, using a large amount of registers. When
+  translating from RV to ARM, the resulting code ends up doing a lot
+  of spills, because it still keeps lots of emulated regs on local vars,
+  instead of promoting almost all to host registers.
+
+--> ARM <--
+
 5) sha          1.73    1.32
 MMX:            1.61    1.24
+ARM:            1.64    1.48
+
+x86:
 1- missed vectorization
 2- translated code uses more instructions at sha_transform()
    - x86 seems to move pointer val to register and make memory
@@ -40,6 +56,23 @@ MMX:            1.61    1.24
      in more parts, by performing calculations that could be done
      directly in mov. Also, rv32 presents more spills of some important
      registers.
+
+ARM:
+- SHA's main source of overhead is similar to that of Rijndael: too many
+  spills when a large number of registers is used.
+  In SHA's case, it happens at sha_final(), at the 2 calls to byte_reverse().
+  On RV and ARM, byte_reverse() codegen produces a series of loads followed
+  by stores, from/to registers directly to an offset on the stack.
+  *
+  On RV32-ARM, at byte_reverse(), there is a huge number of spills first,
+  followed by loads and stores with a considerable number of spills/reloads
+  between them.
+  The large number of spills corresponds mainly to pointers to guest stack.
+  Since ARM
+  On the translated code, we have 2 stacks: guest and native.
+  ***
+  TODO: load offs(reg)/store offs(reg) is not being translated efficiently,
+        to only one host instruction.
 
 6) adpcm-enc    0.72    0.70
 7) adpcm-dec    1.25    1.11

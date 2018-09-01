@@ -13,6 +13,7 @@ class GlobalOpts:
         self.cc = "gcc"
         self.rvcc = "gcc"
         self.mmx = True
+        self.thumb = True
         if self.rvcc == "gcc":
             self.rvabi = "ilp32d"
         else:
@@ -138,7 +139,8 @@ class Arch:
     def __init__(self, name, prefix, triple, run, march, gccflags,
             clang_flags, sysroot, isysroot, llcflags, as_flags,
             ld_flags, mattr, gccoflags=None, gcc=None,
-            rem_host=None, rem_topdir=None):
+            rem_host=None, rem_topdir=None,
+            optflags=None):
 
         self.name = name
         self.prefix = prefix
@@ -157,6 +159,8 @@ class Arch:
         self.isysroot = isysroot
         self.sysroot_flag = "-isysroot {} -isystem {}".format(
             sysroot, isysroot)
+        # opt
+        self.optflags = optflags
         # llc
         self.llc = "llc"
         self.llcflags = llcflags
@@ -307,15 +311,28 @@ X86 = Arch(
         mattr=X86_MATTR)
 
 
-ARM_TRIPLE  = "arm-linux-gnueabihf"
-ARM_PREFIX  = "arm"
-ARM_SYSROOT = "/usr/arm-linux-gnueabihf"
-ARM_MARCH   = "arm"
-ARM_MATTR   = "armv7-a"
-ARM_HOST    = os.getenv("ARM") if GOPTS.ssh_copy() else os.getenv("ADB")
-ARM_TOPDIR  = (os.getenv("ARM_TOPDIR") if GOPTS.ssh_copy()
-                else os.getenv("ADB_TOPDIR"))
-ARM_GCC     = ARM_TRIPLE + ("-gcc-7" if GCC7 else "-gcc-6")
+ARM_TRIPLE      = "arm-linux-gnueabihf"
+ARM_PREFIX      = "arm"
+ARM_SYSROOT     = "/usr/arm-linux-gnueabihf"
+ARM_MARCH       = "arm"
+ARM_MATTR       = "armv7-a"
+ARM_HOST        = os.getenv("ARM") if GOPTS.ssh_copy() else os.getenv("ADB")
+ARM_TOPDIR      = (os.getenv("ARM_TOPDIR") if GOPTS.ssh_copy()
+                    else os.getenv("ADB_TOPDIR"))
+ARM_GCC         = ARM_TRIPLE + ("-gcc-7" if GCC7 else "-gcc-6")
+
+ARM_GCC_FLAGS   = cat("-mcpu=generic-armv7-a", "-mfpu=vfpv3-d16",
+                    ("-mthumb" if GOPTS.thumb else "-marm"))
+
+ARM_LLVM_TRIPLE = "-mtriple=" + ARM_TRIPLE
+ARM_LLVM_ARCH   = "-march=" + ARM_MARCH
+ARM_LLVM_CPU    = "-mcpu=generic"
+ARM_LLVM_ATTR   = ("-mattr=armv7-a,vfp3,d16," +
+                    ("thumb-mode," if GOPTS.thumb else "") +
+                    "-neon")
+
+ARM_LLC_FLAGS   = cat(LLC_PIC, ARM_LLVM_TRIPLE, ARM_LLVM_ARCH,
+                    ARM_LLVM_CPU, ARM_LLVM_ATTR, "-float-abi=hard")
 
 ARM = Arch(
         name=ARM_PREFIX,
@@ -324,16 +341,13 @@ ARM = Arch(
         run="",
         march=ARM_MARCH,
         gcc=ARM_GCC,
-        gccflags=cat("-mcpu=generic-armv7-a", "-mfpu=vfpv3-d16"),
+        gccflags=ARM_GCC_FLAGS,
         clang_flags=cat(CLANG_CFLAGS,
             "--target=" + ARM_TRIPLE, "-fPIC"),
         sysroot=ARM_SYSROOT,
         isysroot=ARM_SYSROOT + "/include",
-        llcflags=cat(LLC_PIC,
-            "-mtriple=arm",
-            "-mcpu=generic",
-            "-mattr=armv7-a,vfp3,d16,thumb-mode,-neon",
-            "-float-abi=hard"),
+        llcflags=ARM_LLC_FLAGS,
+        optflags=ARM_LLC_FLAGS,
         as_flags="",
         ld_flags="",
         mattr=ARM_MATTR,
