@@ -41,7 +41,6 @@ main overheads on ARM:
   of spills, because it still keeps lots of emulated regs on local vars,
   instead of promoting almost all to host registers.
 
---> ARM <--
 
 5) sha          1.73    1.32
 MMX:            1.61    1.24
@@ -57,22 +56,19 @@ x86:
      directly in mov. Also, rv32 presents more spills of some important
      registers.
 
-ARM:
-- SHA's main source of overhead is similar to that of Rijndael: too many
-  spills when a large number of registers is used.
+x86 && ARM:
+- SHA's main source of overhead is somewhat similar to that of Rijndael:
+  too many spills when a large number of registers is used.
   In SHA's case, it happens at sha_final(), at the 2 calls to byte_reverse().
-  On RV and ARM, byte_reverse() codegen produces a series of loads followed
-  by stores, from/to registers directly to an offset on the stack.
-  *
-  On RV32-ARM, at byte_reverse(), there is a huge number of spills first,
-  followed by loads and stores with a considerable number of spills/reloads
-  between them.
-  The large number of spills corresponds mainly to pointers to guest stack.
-  Since ARM
-  On the translated code, we have 2 stacks: guest and native.
-  ***
-  TODO: load offs(reg)/store offs(reg) is not being translated efficiently,
-        to only one host instruction.
+  On RV32, byte_reverse() codegen produces a series of loads followed
+  by stores, from/to registers directly to an offset at SHA_INFO's data array,
+  using all of the 32 RV32 registers as it is possible.
+  When the code is translated to x86 or ARM, however, that have a much smaller
+  register set, there is a huge number of spills and reloads.
+  Native x86/ARM code performs better because codegen limits more the loop
+  unrolling, using the number of host registers to limit it.
+
+--> ARM <--
 
 6) adpcm-enc    0.72    0.70
 7) adpcm-dec    1.25    1.11

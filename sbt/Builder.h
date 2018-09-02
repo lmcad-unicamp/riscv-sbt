@@ -177,7 +177,7 @@ public:
         llvm::Value* b64 = sext64(b);
         llvm::Value* v = mul(a64, b64);
         v = sra(v, _c->i64(32));
-        v = truncOrBitCastI32(v);
+        v = truncOrBitCast(v, _t->i32);
         return v;
     }
 
@@ -186,7 +186,7 @@ public:
         llvm::Value* b64 = zext64(b);
         llvm::Value* v = mul(a64, b64);
         v = srl(v, _c->i64(32));
-        v = truncOrBitCastI32(v);
+        v = truncOrBitCast(v, _t->i32);
         return v;
     }
 
@@ -195,7 +195,7 @@ public:
         llvm::Value* b64 = zext64(b);
         llvm::Value* v = mul(a64, b64);
         v = sra(v, _c->i64(32));
-        v = truncOrBitCastI32(v);
+        v = truncOrBitCast(v, _t->i32);
         return v;
     }
 
@@ -328,72 +328,11 @@ public:
         return v;
     }
 
-    // i32 to i8*
-    llvm::Value* i32ToI8Ptr(llvm::Value* i32)
+    llvm::Value* truncOrBitCast(llvm::Value* v, llvm::Type* ty)
     {
-        llvm::Value* v = _builder->CreateCast(
-            llvm::Instruction::CastOps::IntToPtr, i32, _t->i8ptr);
-        updateFirst(v);
-        return v;
-    }
-
-    // i32 to i16*
-    llvm::Value* i32ToI16Ptr(llvm::Value* i32)
-    {
-        llvm::Value* v = _builder->CreateCast(
-            llvm::Instruction::CastOps::IntToPtr, i32, _t->i16ptr);
-        updateFirst(v);
-        return v;
-    }
-
-    // i32 to i32*
-    llvm::Value* i32ToI32Ptr(llvm::Value* i32)
-    {
-        llvm::Value* v = _builder->CreateCast(
-            llvm::Instruction::CastOps::IntToPtr, i32, _t->i32ptr);
-        updateFirst(v);
-        return v;
-    }
-
-    // int to ptr
-    llvm::Value* intToPtr(llvm::Value* i, llvm::Type* t)
-    {
-        llvm::Value* v = _builder->CreateIntToPtr(i, t);
-        updateFirst(v);
-        return v;
-    }
-
-    // ptr to int
-    llvm::Value* ptrToInt(llvm::Value* p, llvm::Type* t)
-    {
-        llvm::Value* v = _builder->CreatePtrToInt(p, t);
-        updateFirst(v);
-        return v;
-    }
-
-
-    // trunc or cast to i8
-    llvm::Value* truncOrBitCastI8(llvm::Value* i32)
-    {
-        llvm::Value* v = _builder->CreateTruncOrBitCast(i32, _t->i8);
-        updateFirst(v);
-        return v;
-    }
-
-    // trunc or cast to i16
-    llvm::Value* truncOrBitCastI16(llvm::Value* i32)
-    {
-        llvm::Value* v = _builder->CreateTruncOrBitCast(i32, _t->i16);
-        updateFirst(v);
-        return v;
-    }
-
-    // trunc or cast to i32
-    llvm::Value* truncOrBitCastI32(llvm::Value* i64)
-    {
-        llvm::Value* v = _builder->CreateTruncOrBitCast(i64, _t->i32);
-        updateFirst(v);
-        return v;
+        llvm::Value* v2 = _builder->CreateTruncOrBitCast(v, ty);
+        updateFirst(v2);
+        return v2;
     }
 
     // bit or pointer cast
@@ -408,6 +347,16 @@ public:
     llvm::Value* gep(llvm::Value* ptr, std::vector<llvm::Value*> idx)
     {
         llvm::Value* v = _builder->CreateGEP(ptr, idx);
+        updateFirst(v);
+        return v;
+    }
+
+    llvm::Value* gep(
+        llvm::Type* ty,
+        llvm::Value* ptr,
+        std::vector<llvm::Value*> idx)
+    {
+        llvm::Value* v = _builder->CreateGEP(ty, ptr, idx);
         updateFirst(v);
         return v;
     }

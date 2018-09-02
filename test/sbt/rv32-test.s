@@ -3,12 +3,13 @@
 .text
 .global main
 main:
-    lsym a0, str
-    mv s0, ra
-    call puts
-    mv ra, s0
-    li a0, 0
+    lui     t0, %hi(var)
+    addi    t0, t0, %lo(var)
+    lbu     a0, 3(t0)
     ret
 
 .data
-str: .asciz "test"
+var:    .byte 12
+        .byte 34
+        .byte 56
+        .byte 0

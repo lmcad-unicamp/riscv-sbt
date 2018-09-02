@@ -250,9 +250,9 @@ std::pair<llvm::Value*, llvm::Value*>
 Caller::fp64ToI32x2(llvm::Value* f)
 {
     llvm::Value* v = _bld->bitOrPointerCast(f, _ctx->t.i64);
-    llvm::Value* vlo = _bld->truncOrBitCastI32(v);
+    llvm::Value* vlo = _bld->truncOrBitCast(v, _ctx->t.i32);
     llvm::Value* vhi = _bld->srl(v, _ctx->c.i64(32));
-    vhi = _bld->truncOrBitCastI32(vhi);
+    vhi = _bld->truncOrBitCast(vhi, _ctx->t.i32);
     return std::make_pair(vlo, vhi);
 }
 

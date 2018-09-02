@@ -216,8 +216,6 @@ x86-fp128-run:
                 bflags=bflags, sbtflags=sbtflags),
             self._module("printf", "printf.c", rflags=rflags,
                 bflags=bflags, sbtflags=sbtflags),
-            self._module("test", "rv32-test.s",
-                xarchs=[], narchs=[RV32_LINUX], rflags=rflags),
         ]
 
         names = []
@@ -270,7 +268,8 @@ tests-arm-run: {tests-arm-run}
             "fence",
             "system",
             "m",
-            "f"
+            "f",
+            "test"
         ]
 
         narchs = [RV32_LINUX]
@@ -296,9 +295,10 @@ tests-arm-run: {tests-arm-run}
             skip_arm = True if utest == "system" else False
             name = utest
             src = "rv32-" + name + ".s"
+            dbg = utest != "test"
             mod = self._module(name, src, xarchs=xarchs, narchs=narchs,
                     xflags=xflags(name), rflags=rflags,
-                    sbtflags=sbtflags(name), skip_arm=skip_arm)
+                    sbtflags=sbtflags(name), skip_arm=skip_arm, dbg=dbg)
             self.append(mod.gen())
             names.append(utest)
 

@@ -607,6 +607,21 @@ llvm::Error Instruction::translateUI(UIOp op)
 }
 
 
+llvm::Type* Instruction::getLLVMTy(IntType ity) const
+{
+    switch (ity) {
+        case S8:
+        case U8:
+            return _t->i8;
+        case S16:
+        case U16:
+            return _t->i16;
+        case U32:
+            return _t->i32;
+    }
+}
+
+
 llvm::Error Instruction::translateLoad(IntType it)
 {
     switch (it) {
@@ -633,36 +648,26 @@ llvm::Error Instruction::translateLoad(IntType it)
     *_os << '\t';
 
     unsigned o = getRD();
-    unsigned rs1n = getRegNum(1, false);
     llvm::Value* rs1 = getReg(1);
     auto expImm = getImm(2);
     if (!expImm)
         return expImm.takeError();
     llvm::Constant* imm = expImm.get();
-    llvm::Value* ptr;
-    llvm::Value* v = nullptr;
 
+#if 0
+    llvm::Value* v = nullptr;
+    unsigned rs1n = getRegNum(1, false);
     if (optStack(_ctx) && rs1n == XRegister::SP)
         v = _bld->getSpilledAddress(imm, Register::T_INT);
     if (!v)
         v = _bld->add(rs1, imm);
+#endif
 
-    switch (it) {
-        case S8:
-        case U8:
-            ptr = _bld->i32ToI8Ptr(v);
-            break;
-
-        case S16:
-        case U16:
-            ptr = _bld->i32ToI16Ptr(v);
-            break;
-
-        case U32:
-            ptr = _bld->i32ToI32Ptr(v);
-            break;
-    }
-    v = _bld->load(ptr);
+    llvm::Type* ty = getLLVMTy(it);
+    llvm::Value* ptr = _bld->bitOrPointerCast(rs1, _t->i8ptr);
+    ptr = _bld->gep(ptr, { imm });
+    ptr = _bld->bitOrPointerCast(ptr, ty->getPointerTo());
+    llvm::Value* v = _bld->load(ptr);
 
     // to int32
     switch (it) {
@@ -707,41 +712,27 @@ llvm::Error Instruction::translateStore(IntType it)
 
 
     llvm::Value* rs2 = getReg(0);
-    unsigned rs1n = getRegNum(1, false);
     llvm::Value* rs1 = getReg(1);
     auto expImm = getImm(2);
     if (!expImm)
         return expImm.takeError();
     llvm::Constant* imm = expImm.get();
-    llvm::Value* v = nullptr;
 
+#if 0
+    unsigned rs1n = getRegNum(1, false);
+    llvm::Value* v = nullptr;
     if (optStack(_ctx) && rs1n == XRegister::SP)
         v = _bld->getSpilledAddress(imm, Register::T_INT);
     if (!v)
         v = _bld->add(rs1, imm);
+#endif
 
-    llvm::Value* ptr;
-    switch (it) {
-        case U8:
-            ptr = _bld->i32ToI8Ptr(v);
-            v = _bld->truncOrBitCastI8(rs2);
-            break;
-
-        case U16:
-            ptr = _bld->i32ToI16Ptr(v);
-            v = _bld->truncOrBitCastI16(rs2);
-            break;
-
-        case U32:
-            ptr = _bld->i32ToI32Ptr(v);
-            v = rs2;
-            break;
-
-        default:
-            xassert(false && "unknown store type!");
-    }
-
-    _bld->store(v, ptr);
+    llvm::Type* ty = getLLVMTy(it);
+    llvm::Value* ptr = _bld->bitOrPointerCast(rs1, _t->i8ptr);
+    ptr = _bld->gep(ptr, { imm });
+    ptr = _bld->bitOrPointerCast(ptr, ty->getPointerTo());
+    rs2 = _bld->truncOrBitCast(rs2, ty);
+    _bld->store(rs2, ptr);
 
     return llvm::Error::success();
 }

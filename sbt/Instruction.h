@@ -231,6 +231,7 @@ private:
     void dbgprint();
 
     Function* findFunction(llvm::Constant* c) const;
+    llvm::Type* getLLVMTy(IntType ity) const;
 
     static const char* estr(ALUOpAlias e);
 

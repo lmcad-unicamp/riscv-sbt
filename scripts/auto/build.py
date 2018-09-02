@@ -141,6 +141,9 @@ class LLVMBuilder:
         arch = opts.arch
 
         flags = cat(TOOLS.opt_flags(opts.opt), arch.optflags, opts.oflags)
+        # FIXME workaround for LLVM issue with ARM thumb: branch out of range
+        if out.startswith('rv32-arm-'):
+            flags = flags.replace('thumb-mode,', '')
         if printf_break:
             flags = cat(flags,
                 "-load", "libPrintfBreak.so", "-printf-break")
@@ -177,6 +180,9 @@ class LLVMBuilder:
             flags = cat(flags, opts.llcflags[arch.prefix])
         else:
             flags = cat(flags, arch.llcflags)
+        # FIXME workaround for LLVM issue with ARM thumb: branch out of range
+        if out.startswith('rv32-arm-'):
+            flags = flags.replace('thumb-mode,', '')
 
         cmd = cat(arch.llc, flags, ipath, "-o", opath)
         shell(cmd)

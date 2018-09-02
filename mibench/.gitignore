@@ -1,4 +1,5 @@
 Makefile
+mibench.csv
 mibench.pdf
 mibench_slowdown.csv
 mibench_slowdown.dat
