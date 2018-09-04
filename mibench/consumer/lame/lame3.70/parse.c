@@ -636,8 +636,7 @@ void lame_parse_args(lame_global_flags *gfp,int argc, char **argv)
 #ifdef HAVEGTK
 	  gfp->gtkflag = TRUE;
 #else
-	    fprintf(stderr,"LAME not compiled with GTK support, -g not supported.\n",
-		    programName, arg);
+	    fprintf(stderr,"LAME not compiled with GTK support, -g not supported.\n");
 #endif
 	  break;
 

@@ -205,6 +205,8 @@ class MiBench:
                 ' -mattr=mmx" --gccflags-x86="-march=pentium-mmx"')
         else:
             self.bflags_mmx = ""
+        self.bflags_no_fp_contract = \
+            "--gccflags=-ffp-contract=off --oflags=-fp-contract=off"
         self.txt = ''
         self.benchs = None
 
@@ -346,10 +348,11 @@ arm-dstdir:
         _in = mpath(self.srcdir, dir, "large.wav")
         out = mpath(self.dstdir, dir, "{prefix}output_large{mode}.mp3")
         runs = Runs([Run([_in, out], outidx=1)])
-        bflags = '--cflags="-DLAMEPARSE -DLAMESNDFILE"'
+        bflags = cat('--cflags="-DLAMEPARSE -DLAMESNDFILE"',
+                        self.bflags_no_fp_contract)
         sbtflags = self.stack_huge
         return self._bench("lame", dir, srcs, runs,
-                bflags=bflags, sbtflags=sbtflags)
+                bflags=bflags, sbtflags=sbtflags, dbg="xopt")
 
 
     def _single_run(self, args, stdin=None, rflags=None):
@@ -408,7 +411,7 @@ arm-dstdir:
                     Run(["8", "32768"], "std"),
                     Run(["8", "32768", "-i"], "inv") ]),
                 sbtflags=self.stack_large,
-                bflags="--gccflags=-ffp-contract=off --oflags=-fp-contract=off"),
+                bflags=self.bflags_no_fp_contract),
             self._bench("patricia", "network/patricia",
                 ["patricia.c", "patricia_test.c"],
                 self._single_run(

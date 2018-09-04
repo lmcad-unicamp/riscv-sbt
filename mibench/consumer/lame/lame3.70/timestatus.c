@@ -128,19 +128,20 @@ void timestatus(int samp_rate,long frameNum,long totalframes,int framesize)
     (int)((long)((time+.5) / 60) % 60), \
     (int)((long)(time+.5) % 60)
 
-  fprintf(stderr,
-    "\r%6ld/%6ld(%3d%%)|%2d:%02d:%02d/%2d:%02d:%02d|%2d:%02d:%02d/%2d:%02d:%02d|%10.4f|%2d:%02d:%02d ",
-    frameNum,
-    totalframes - 1,
-    percent,
-    TS_TIME_DECOMPOSE(process_time.so_far),
-    TS_TIME_DECOMPOSE(process_time.estimated),
-    TS_TIME_DECOMPOSE(real_time.so_far),
-	TS_TIME_DECOMPOSE(real_time.estimated),
-    process_time.speed,
-    TS_TIME_DECOMPOSE(real_time.eta)
-  );
-
+  fprintf(stderr, "\r%6ld/%6ld(%3d%%)|",
+    frameNum, totalframes - 1, percent);
+  fprintf(stderr, "%2d:%02d:%02d/",
+    TS_TIME_DECOMPOSE(process_time.so_far));
+  fprintf(stderr, "%2d:%02d:%02d|",
+    TS_TIME_DECOMPOSE(process_time.estimated));
+  fprintf(stderr, "%2d:%02d:%02d/",
+    TS_TIME_DECOMPOSE(real_time.so_far));
+  fprintf(stderr, "%2d:%02d:%02d|",
+    TS_TIME_DECOMPOSE(real_time.estimated));
+  fprintf(stderr, "%10.4f|",
+    process_time.speed);
+  fprintf(stderr, "%2d:%02d:%02d ",
+    TS_TIME_DECOMPOSE(real_time.eta));
   fflush(stderr);
 }
 

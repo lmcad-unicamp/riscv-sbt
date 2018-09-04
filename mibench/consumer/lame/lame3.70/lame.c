@@ -544,14 +544,18 @@ void lame_print_config(lame_global_flags *gfp)
     fprintf(stderr, "Encoding %s to %s\n",
 	    (strcmp(gfp->inPath, "-")? gfp->inPath : "stdin"),
 	    (strcmp(gfp->outPath, "-")? gfp->outPath : "stdout"));
-    if (gfp->VBR)
-      fprintf(stderr, "Encoding as %.1fkHz VBR(q=%i) %s MPEG%i LayerIII  qval=%i\n",
-	      gfp->out_samplerate/1000.0,
-	      gfp->VBR_q,mode_names[gfp->mode],2-gfp->version,gfp->quality);
-    else
-      fprintf(stderr, "Encoding as %.1f kHz %d kbps %s MPEG%i LayerIII (%4.1fx)  qval=%i\n",
-	      gfp->out_samplerate/1000.0,gfp->brate,
-	      mode_names[gfp->mode],2-gfp->version,compression,gfp->quality);
+    if (gfp->VBR) {
+      fprintf(stderr, "Encoding as %.1fkHz VBR(q=%i) ",
+	      gfp->out_samplerate/1000.0, gfp->VBR_q);
+     fprintf(stderr, "%s MPEG%i LayerIII  qval=%i\n",
+	      mode_names[gfp->mode], 2 - gfp->version, gfp->quality);
+    } else {
+      fprintf(stderr, "Encoding as %.1f kHz %d kbps %s",
+	      gfp->out_samplerate/1000.0, gfp->brate, mode_names[gfp->mode]);
+      fprintf(stderr, "MPEG%i LayerIII%c(%4.1fx)",
+	        2-gfp->version, ' ', compression);
+      fprintf(stderr, "  qval=%i\n", gfp->quality);
+    }
   }
   fflush(stderr);
 }

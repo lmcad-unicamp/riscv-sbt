@@ -319,7 +319,17 @@ ARM_MATTR       = "armv7-a"
 ARM_HOST        = os.getenv("ARM") if GOPTS.ssh_copy() else os.getenv("ADB")
 ARM_TOPDIR      = (os.getenv("ARM_TOPDIR") if GOPTS.ssh_copy()
                     else os.getenv("ADB_TOPDIR"))
-ARM_GCC         = ARM_TRIPLE + ("-gcc-7" if GCC7 else "-gcc-6")
+
+def arm_gcc6_exists():
+    try:
+        subprocess.run([ARM_TRIPLE + "-gcc-6","--version"],
+                stdout=subprocess.DEVNULL)
+    except FileNotFoundError:
+        return False
+    return True
+
+ARM_GCC         = ARM_TRIPLE + ("-gcc-7" if GCC7 else
+                    ("-gcc-6" if arm_gcc6_exists() else "-gcc"))
 
 ARM_GCC_FLAGS   = cat("-mcpu=generic-armv7-a", "-mfpu=vfpv3-d16",
                     ("-mthumb" if GOPTS.thumb else "-marm"))
