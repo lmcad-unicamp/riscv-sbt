@@ -94,7 +94,7 @@ std::string Section::str() const
         << " name=\"" << name() << "\"\n";
     // dump symbols
     for (ConstSymbolPtr sym : symbols())
-        ss << sym->str();
+        ss << sym->str() << nl;
     // dump relocations
     for (ConstRelocationPtr rel : relocs())
         ss << rel->str() << nl;
@@ -195,7 +195,7 @@ std::string Symbol::str() const
         << ", type=" << getTypeStr(type())
         << ", name=\"" << name()
         << "\", flags=[" << g_flags->str(flags())
-        << "]\n";
+        << "]";
     return s;
 }
 

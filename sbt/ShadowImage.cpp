@@ -1,5 +1,8 @@
 #include "ShadowImage.h"
 
+#include "BasicBlock.h"
+#include "Builder.h"
+#include "Function.h"
 #include "Object.h"
 #include "Relocation.h"
 #include "SBTError.h"
@@ -119,5 +122,70 @@ void ShadowImage::build()
         gv->setInitializer(c);
     }
 }
+
+void ShadowImage::addPending(PendingReloc&& prel)
+{
+    uint64_t key = prel.sym.addr;
+    auto it = _pendingRelocs.find(key);
+    if (it == _pendingRelocs.end()) {
+        _pendingRelocs.insert({key, std::move(prel)});
+        return;
+    }
+
+    PendingReloc::Section sec = prel.secs.back();
+    xassert(it->second.sym.name == prel.sym.name);
+    xassert(it->second.sym.addr == prel.sym.addr);
+    it->second.secs.emplace_back(std::move(sec));
+}
+
+
+BasicBlock* ShadowImage::processPending(
+    uint64_t addr,
+    BasicBlock* bb)
+{
+    PendingRelocsIter pit = _pendingRelocs.find(addr);
+    if (pit == _pendingRelocs.end())
+        return bb;
+    PendingReloc prel = pit->second;
+
+    BasicBlock* nbb;
+    if (bb->addr() != addr) {
+        DBGF("spliting BB@{0:X+8}", addr);
+        nbb = _ctx->func->addBB(addr, bb->split(addr));
+        _ctx->bld->setInsertBlock(nbb);
+    } else {
+        DBGF("split not needed: BB@{0:X+8}", addr);
+        nbb = bb;
+    }
+    llvm::BlockAddress* ba = llvm::BlockAddress::get(nbb->bb());
+    llvm::Constant* bai = llvm::ConstantExpr::getPointerCast(ba, _ctx->t.i32);
+
+    for (const auto& sec : prel.secs) {
+        llvm::Constant* c = getSection(sec.name);
+        xassert(c->getNumOperands() == 1);
+        llvm::Value* v = c->getOperand(0);
+        auto* gv = llvm::cast<llvm::GlobalVariable>(v);
+        llvm::Constant* init = gv->getInitializer();
+        xassert(init);
+        auto* ca = llvm::cast<llvm::ConstantArray>(init);
+        xassert(ca->getType()->getElementType() == _ctx->t.i32);
+        unsigned op = sec.offs / 4;
+        xassert(sec.offs % 4 == 0);
+        xassert(op < ca->getNumOperands());
+        DBGF("section={0}, offs={1:X+8}, op={2}, sym={3}",
+            sec.name, sec.offs, op, prel.sym.name);
+
+        std::vector<llvm::Constant*> cvec;
+        cvec.reserve(ca->llvm::User::getNumOperands());
+        for (auto& op : ca->operands())
+            cvec.push_back(llvm::cast<llvm::Constant>(&op));
+        cvec[op] = bai;
+        gv->setInitializer(llvm::ConstantArray::get(ca->getType(), cvec));
+    }
+    _pendingRelocs.erase(pit);
+
+    return nbb;
+}
+
 
 }

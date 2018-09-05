@@ -8,6 +8,7 @@
 #include "Instruction.h"
 #include "Module.h"
 #include "SBTError.h"
+#include "ShadowImage.h"
 #include "Stack.h"
 #include "Syscall.h"
 #include "Utils.h"
@@ -218,6 +219,8 @@ llvm::Error Translator::translate()
         if (auto err = mod.translate(f))
             return err;
     }
+
+    xassert(_ctx->shadowImage->noPendingRelocs());
 
     if (auto err = finish())
         return err;

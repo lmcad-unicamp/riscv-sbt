@@ -77,7 +77,7 @@ public:
      */
     llvm::Constant* relocateSection(
         const std::vector<uint8_t>& bytes,
-        const ShadowImage* shadowImage);
+        ShadowImage* shadowImage);
 
     bool isCall(uint64_t addr) const;
     llvm::Constant* lastSymVal() const;
@@ -97,6 +97,10 @@ private:
     ConstRelocationPtr nextPReloc();
     ConstRelocationPtr getReloc(uint64_t addr);
     void addProxyReloc(ConstRelocationPtr rel, Relocation::RType rtype);
+
+    llvm::Constant* processSectionReloc(
+        ConstRelocationPtr reloc,
+        ShadowImage* shadowImage);
 };
 
 }

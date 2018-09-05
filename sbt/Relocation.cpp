@@ -375,9 +375,61 @@ llvm::Constant* SBTRelocation::lastSymVal() const
 }
 
 
+llvm::Constant* SBTRelocation::processSectionReloc(
+    ConstRelocationPtr reloc,
+    ShadowImage* shadowImage)
+{
+    uint64_t addr = reloc->addend();
+    bool isFunction = false;
+    xassert(reloc->hasSec());
+
+    auto* llrel = static_cast<const LLVMRelocation*>(reloc.get());
+
+    if (reloc->hasSym()) {
+        addr += reloc->symAddr();
+
+        if (llrel->section()->isText()) {
+            if (Function::isFunction(_ctx, addr, llrel->section()))
+                isFunction = true;
+            else {
+                DBGF("adding pending .text relocation: "
+                    "symbol=\"{0}\", symaddr={1}",
+                    reloc->symName(), reloc->symAddr());
+                shadowImage->addPending(PendingReloc(
+                    reloc->symAddr(), reloc->symName(),
+                    _section->name(), reloc->offset()));
+                return _ctx->c.i32(0);
+            }
+        }
+
+        DBGF("relocating {0:X-8}: symbol=\"{1}\", symaddr={2:X+8}, "
+            "section=\"{3}\", addend={4:X+8}, addr={5:X-8}{6}",
+            reloc->offset(),
+            reloc->symName(), reloc->symAddr(),
+            reloc->secName(), reloc->addend(),
+            addr, isFunction? " (function)" : "");
+    } else {
+        DBGF("relocating {0:X-8}: section=\"{1}\", addend={2:X+8}",
+            reloc->offset(), reloc->secName(), reloc->addend());
+    }
+
+    llvm::Constant* c;
+    if (isFunction) {
+        Function::getByAddr(_ctx, addr, llrel->section());
+        llvm::Value* sym = Caller::getFunctionSymbol(_ctx, reloc->symName());
+        xassert(sym && "Function symbol not found!");
+        c = llvm::cast<llvm::Constant>(sym);
+        c = llvm::ConstantExpr::getPointerCast(c, _ctx->t.i32);
+    } else
+        c = llvm::ConstantExpr::getAdd(
+            shadowImage->getSection(reloc->secName()), _ctx->c.u32(addr));
+    return c;
+}
+
+
 llvm::Constant* SBTRelocation::relocateSection(
     const std::vector<uint8_t>& bytes,
-    const ShadowImage* shadowImage)
+    ShadowImage* shadowImage)
 {
     xassert(_section);
     DBGF("relocating section {0}", _section->name());
@@ -391,53 +443,9 @@ llvm::Constant* SBTRelocation::relocateSection(
         if (rit != _re && addr == (*rit)->offset()) {
             ConstRelocationPtr reloc = *rit;
             switch (reloc->type()) {
-                case llvm::ELF::R_RISCV_32: {
-                    uint64_t addr = reloc->addend();
-                    bool isFunction = false;
-                    xassert(reloc->hasSec());
-
-                    auto* llrel =
-                        static_cast<const LLVMRelocation*>(reloc.get());
-
-                    if (reloc->hasSym()) {
-                        addr += reloc->symAddr();
-
-                        if (llrel->section()->isText() &&
-                            Function::isFunction(_ctx, addr, llrel->section()))
-                                isFunction = true;
-
-                        DBGF(
-                            "relocating {0:X-8}: "
-                            "symbol=\"{1}\", symaddr={2:X+8}, "
-                            "section=\"{3}\", addend={4:X+8}, "
-                            "addr={5:X-8}{6}",
-                            reloc->offset(),
-                            reloc->symName(), reloc->symAddr(),
-                            reloc->secName(), reloc->addend(),
-                            addr, isFunction? " (function)" : "");
-                    } else {
-                        DBGF(
-                            "relocating {0:X-8}: "
-                            "section=\"{1}\", addend={2:X+8}",
-                            reloc->offset(),
-                            reloc->secName(), reloc->addend());
-                    }
-
-                    llvm::Constant* c;
-                    if (isFunction) {
-                        Function::getByAddr(_ctx, addr, llrel->section());
-                        llvm::Value* sym =
-                            Caller::getFunctionSymbol(_ctx, reloc->symName());
-                        xassert(sym && "Function symbol not found!");
-                        c = llvm::cast<llvm::Constant>(sym);
-                        c = llvm::ConstantExpr::getPointerCast(c, _ctx->t.i32);
-                    } else
-                        c = llvm::ConstantExpr::getAdd(
-                            shadowImage->getSection(reloc->secName()),
-                                _ctx->c.u32(addr));
-                    cvec.push_back(c);
+                case llvm::ELF::R_RISCV_32:
+                    cvec.push_back(processSectionReloc(reloc, shadowImage));
                     break;
-                }
 
                 default:
                     DBGF("unknown relocation type: {0}", reloc->type());

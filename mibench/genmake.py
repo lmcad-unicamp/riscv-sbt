@@ -352,7 +352,7 @@ arm-dstdir:
                         self.bflags_no_fp_contract)
         sbtflags = self.stack_huge
         return self._bench("lame", dir, srcs, runs,
-                bflags=bflags, sbtflags=sbtflags, dbg="xopt")
+                bflags=bflags, sbtflags=sbtflags, dbg="opt")
 
 
     def _single_run(self, args, stdin=None, rflags=None):

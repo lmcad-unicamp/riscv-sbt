@@ -6,6 +6,7 @@
 #include "Module.h"
 #include "SBTError.h"
 #include "Section.h"
+#include "ShadowImage.h"
 #include "Stack.h"
 
 #include <llvm/IR/Function.h>
@@ -283,6 +284,7 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
             xassert(bb->bb() == fbb);
         }
 
+        bb = _ctx->shadowImage->processPending(addr, bb);
         bb->addInstr(addr, std::move(first));
 
         // If last instruction terminated this basicblock
