@@ -138,8 +138,18 @@ bool Function::terminated() const
 }
 
 
+void Function::processIndirectBranches()
+{
+    for (auto* ibr : _indBrs)
+        for (auto* ibb : _indBBs)
+            ibr->addDestination(ibb->bb());
+}
+
+
 llvm::Error Function::finish()
 {
+    processIndirectBranches();
+
     auto bld = _ctx->bld;
     // add a return if there is no terminator in current block
     if (!bld->getInsertBlock()->terminated()) {

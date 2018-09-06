@@ -421,10 +421,10 @@ public:
         return v;
     }
 
-    llvm::Value* indBr(llvm::Value* addr)
+    llvm::IndirectBrInst* indBr(llvm::Value* addr)
     {
         addr = bitOrPointerCast(addr, _t->i32ptr);
-        llvm::Value* v = _builder->CreateIndirectBr(addr);
+        llvm::IndirectBrInst* v = _builder->CreateIndirectBr(addr);
         updateFirst(v);
         return v;
     }

@@ -14,6 +14,7 @@
 
 #include <map>
 #include <memory>
+#include <vector>
 
 
 namespace llvm {
@@ -307,6 +308,16 @@ public:
         uint64_t addr,
         ConstSectionPtr sec = nullptr);
 
+    void addIndBr(llvm::IndirectBrInst* ibr) {
+        _indBrs.push_back(ibr);
+    }
+
+    void addIndBB(BasicBlock* ibb) {
+        _indBBs.push_back(ibb);
+    }
+
+    void processIndirectBranches();
+
 private:
     Context* _ctx;
     std::string _name;
@@ -328,6 +339,10 @@ private:
 
     std::unique_ptr<XRegisters> _regs;
     std::unique_ptr<FRegisters> _fregs;
+
+    // indirect branches
+    std::vector<llvm::IndirectBrInst*> _indBrs;
+    std::vector<BasicBlock*> _indBBs;
 
     // spill data
     static const int64_t INVALID_CFA = ~0ll;

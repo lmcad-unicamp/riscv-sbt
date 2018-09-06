@@ -184,6 +184,7 @@ BasicBlock* ShadowImage::processPending(
     }
     _pendingRelocs.erase(pit);
 
+    _ctx->func->addIndBB(nbb);
     return nbb;
 }
 

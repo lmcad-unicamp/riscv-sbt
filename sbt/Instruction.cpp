@@ -1387,7 +1387,7 @@ llvm::Error Instruction::handleIJump(llvm::Value* target)
 {
     DBGF("NOTE: indirect branch");
 
-    _bld->indBr(target);
+    _ctx->func->addIndBr(_bld->indBr(target));
     return llvm::Error::success();
 }
 
