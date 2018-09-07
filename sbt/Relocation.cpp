@@ -398,7 +398,7 @@ llvm::Constant* SBTRelocation::processSectionReloc(
                 shadowImage->addPending(PendingReloc(
                     reloc->symAddr(), reloc->symName(),
                     _section->name(), reloc->offset()));
-                return _ctx->c.i32(0);
+                return _ctx->c.i32(1234);
             }
         }
 

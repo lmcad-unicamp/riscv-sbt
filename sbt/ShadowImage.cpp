@@ -167,20 +167,26 @@ BasicBlock* ShadowImage::processPending(
         auto* gv = llvm::cast<llvm::GlobalVariable>(v);
         llvm::Constant* init = gv->getInitializer();
         xassert(init);
-        auto* ca = llvm::cast<llvm::ConstantArray>(init);
-        xassert(ca->getType()->getElementType() == _ctx->t.i32);
+        auto* aty = llvm::cast<llvm::ArrayType>(init->getType());
+        xassert(aty->getElementType() == _ctx->t.i32);
         unsigned op = sec.offs / 4;
         xassert(sec.offs % 4 == 0);
-        xassert(op < ca->getNumOperands());
+        xassert(op < aty->getNumElements());
         DBGF("section={0}, offs={1:X+8}, op={2}, sym={3}",
             sec.name, sec.offs, op, prel.sym.name);
 
         std::vector<llvm::Constant*> cvec;
-        cvec.reserve(ca->llvm::User::getNumOperands());
-        for (auto& op : ca->operands())
-            cvec.push_back(llvm::cast<llvm::Constant>(&op));
+        cvec.reserve(aty->getNumElements());
+        if (auto* ca = llvm::dyn_cast<llvm::ConstantArray>(init))
+            for (auto& op : ca->operands())
+                cvec.push_back(llvm::cast<llvm::Constant>(&op));
+        else if (auto* cda = llvm::dyn_cast<llvm::ConstantDataArray>(init))
+            for (unsigned i = 0; i < cda->getNumElements(); i++)
+                cvec.push_back(cda->getElementAsConstant(i));
+        else
+            xunreachable("Unknown constant array type!");
         cvec[op] = bai;
-        gv->setInitializer(llvm::ConstantArray::get(ca->getType(), cvec));
+        gv->setInitializer(llvm::ConstantArray::get(aty, cvec));
     }
     _pendingRelocs.erase(pit);
 

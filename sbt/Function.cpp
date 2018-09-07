@@ -294,8 +294,8 @@ llvm::Error Function::translateInstrs(uint64_t st, uint64_t end)
             xassert(bb->bb() == fbb);
         }
 
-        bb = _ctx->shadowImage->processPending(addr, bb);
         bb->addInstr(addr, std::move(first));
+        bb = _ctx->shadowImage->processPending(addr, bb);
 
         // If last instruction terminated this basicblock
         // switch to a new one. This is needed in case the
