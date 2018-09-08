@@ -36,6 +36,7 @@ void Options::dump() const
     DBGS << "enableFCVTValidation=" << enableFCVTValidation() << nl;
     DBGS << "hardFloatABI=" << hardFloatABI() << nl;
     DBGS << "optStack=" << optStack() << nl;
+    DBGS << "icallIntOnly=" << icallIntOnly() << nl;
     DBGS << "logFile=" << logFile() << nl;
 }
 

@@ -146,6 +146,17 @@ public:
         return *this;
     }
 
+    bool icallIntOnly() const
+    {
+        return _icallIntOnly;
+    }
+
+    Options& setICallIntOnly(bool b)
+    {
+        _icallIntOnly = b;
+        return *this;
+    }
+
     const std::string& logFile() const
     {
         return _logFile;
@@ -172,6 +183,7 @@ private:
     bool _enableFCVTValidation = false;
     bool _hf = true;
     bool _optStack = false;
+    bool _icallIntOnly = false;
     std::string _logFile;
 };
 

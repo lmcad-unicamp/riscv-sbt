@@ -224,13 +224,15 @@ int main(int argc, char* argv[])
 
     cl::opt<std::string> logFileOpt("log", cl::desc("Log file path"));
 
+    cl::opt<bool> icallIntOnlyOpt("icall-int-only",
+        cl::desc("Assume that all icalls are to internal functions"));
+
     // enable debug code
     cl::opt<bool> debugOpt("debug", cl::desc("Enable debug code"));
 
     cl::opt<bool> testOpt("test", cl::desc("For testing purposes only"));
 
-    cl::opt<bool> helpOpt("help",
-        cl::desc("Print this help message"));
+    cl::opt<bool> helpOpt("help", cl::desc("Print this help message"));
 
     // parse args
     cl::ParseCommandLineOptions(argc, argv);
@@ -292,6 +294,7 @@ int main(int argc, char* argv[])
         .setEnableFCVTValidation(enableFCVTValidationOpt)
         .setHardFloatABI(!softFloatABIOpt)
         .setOptStack(optStackOpt)
+        .setICallIntOnly(icallIntOnlyOpt)
         .setLogFile(logFileOpt);
 
     sbt::Logger::get(opts.logFile());

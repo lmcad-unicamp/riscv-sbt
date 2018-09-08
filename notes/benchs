@@ -68,38 +68,81 @@ x86 && ARM:
   Native x86/ARM code performs better because codegen limits more the loop
   unrolling, using the number of host registers to limit it.
 
---> ARM <--
-
 6) adpcm-enc    0.72    0.70
+ARM:            1.14    1.12
 7) adpcm-dec    1.25    1.11
+ARM:            1.20    1.08
 
 8) stringsearch 2.67    2.85
 MMX:            0.94    0.95
+ARM:            1.21    1.00
 * missed vectorization
 
 9) bf-enc       1.15    1.03
+ARM:            1.84    1.33
 A) bf-dec       1.14    0.95
+ARM:            1.87    1.33
+- ARM: biggest overhead is at BF_cfb64_encrypt
+  There is a couple of optimizations that the compiler performs when emitting
+  code directly to ARM that are lost when translating from RV32 to ARM:
+  - combine a lot of loads and reloads (from spilled stuff) into a single
+    ldmia instruction
+  - preserve content loaded before calling BF_encrypt(), used in n2l() calls,
+    to reuse it in the l2n() calls
+  - implement l2n() (*(a++)=(b>>c)&0xff) with 4 pairs of lsr+bfi and a single
+    32-bit store of the result.
+    RV32 has nothing similar to bfi to manipulate bits, so it ends up using
+    more instructions and more memory accesses to arrange data correctly.
 
 B) basicmath    0.99    0.99
-* very low %mean (~3%), that also causes big xsd (~0.25)
+ARM:            0.98    1.08
+x86: * very low %mean (~3%), that also causes big xsd (~0.25)
+ARM: * very low %mean (~2%), that also causes big xsd (~0.15)
 
-C) bitcount     1.75    0.81
+C) bitcount     1.75    0.81    # TODO run test again on x86
+ARM:            5.25    1.42
 * huge reg sync impact
+ARM:
+ - Even on ABI mode, the register sync is responsible for the 42% overhead on
+   ARM. On native mode, the compiler is smart enough to use very few registers
+   in the main loop and, above that, load/reload only the registers that: 1-
+   it will need inside the loop; 2- are used to pass arguments to the indirect
+   function called.
+   When translated, all registers that had any modification and may transfer
+   data to/from the called function are synchronized. ABI mode reduces this
+   number drasticaly, but still sync many more registers than native compile
+   mode, thus the big overhead.
+   However, this is not due to hard to emulate aspects of RISC-V, as this
+   overhead could be eliminated by improvements in the SBT, by making it
+   move reg syncs of unchanged registers inside the loop to the outside.
+   (LIRSM - loop invariant reg sync motion :) )
 
 D) fft-std      1.17    1.13
-* low %mean (~5%)
+ARM:            1.04    0.98
+x86: * low %mean (~5%)
+ARM: * low %mean (~7%)
 E) fft-inv      1.16    1.12
-* low %mean (~8%)
+ARM:            1.05    0.99
+x86: * low %mean (~8%)
+ARM: * low %mean (~13%)
 
 F) patricia     0.90    0.99
-* low %mean (~4%), high xsd (~0.3)
+ARM:            1.40    1.19
+x86: * low %mean (~4%), high xsd (~0.3)
+ARM: * low %mean (~3%), high xsd (~0.2)
+
+--> ARM <--
 
 G) susan-smooth 1.13    1.03
 MMX:            0.76    0.69
+ARM:
 H) susan-edges  1.26    1.23
 MMX:            1.13    1.09
+ARM:
 I) susan-corner 1.34    1.27
 MMX:            0.94    0.95
+ARM:
 * missed vectorization
 
 J) lame         1.44    1.12
+ARM:

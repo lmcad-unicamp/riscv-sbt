@@ -266,7 +266,7 @@ arm-dstdir:
 
         return self._bench("rijndael", dir,
             ["aes.c", "aesxam.c"], runs, bflags=self.bflags_mmx,
-            ctor=EncDecBench, dbg="xopt")
+            ctor=EncDecBench)
 
 
     def _bf(self):
@@ -283,12 +283,9 @@ arm-dstdir:
         runs.dec = dec
 
         return self._bench("blowfish", dir,
-                ["bf.c", "bf_skey.c",
-                "bf_ecb.c", "bf_enc.c", "bf_cbc.c",
-                "bf_cfb64.c", "bf_ofb64.c"],
-                runs,
-                ctor=EncDecBench,
-                sbtflags=self.stack_large,
+                ["bf.c", "bf_skey.c", "bf_ecb.c", "bf_enc.c",
+                    "bf_cbc.c", "bf_cfb64.c", "bf_ofb64.c"],
+                runs, ctor=EncDecBench, sbtflags=self.stack_large,
                 mflags=[rflags])
 
 
@@ -376,8 +373,7 @@ arm-dstdir:
                 ["sha_driver.c", "sha.c"],
                 self._single_run(
                     [path(self.srcdir, "security/sha/input_large.asc")]),
-                sbtflags=["-stack-size=16384"], bflags=self.bflags_mmx,
-                dbg="xopt"),
+                sbtflags=["-stack-size=16384"], bflags=self.bflags_mmx),
             self._bench("adpcm-encode", "telecomm/adpcm/src",
                 ["rawcaudio.c", "adpcm.c"],
                 self._single_run([],
@@ -403,7 +399,7 @@ arm-dstdir:
                 ["bitcnt_1.c", "bitcnt_2.c", "bitcnt_3.c", "bitcnt_4.c",
                     "bitcnts.c", "bitfiles.c", "bitstrng.c", "bstr_i.c"],
                 self._single_run(["1125000"]),
-                sbtflags=self.stack_large)
+                sbtflags=self.stack_large+["-icall-int-only"])
                 .out_filter("sed 's/Time:[^;]*; //;/^Best/d;/^Worst/d'"),
             self._bench("fft", "telecomm/FFT",
                 ["main.c", "fftmisc.c", "fourierf.c"],
