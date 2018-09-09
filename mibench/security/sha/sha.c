@@ -99,6 +99,10 @@ static void sha_transform(SHA_INFO *sha_info)
 
 /* change endianness of data */
 
+/* #pragma GCC push_options
+ * #pragma GCC optimize("no-unroll-loops,no-peel-loops,no-tree-loop-optimize")
+ */
+
 static void byte_reverse(LONG *buffer, int count)
 {
     int i;
@@ -118,6 +122,8 @@ static void byte_reverse(LONG *buffer, int count)
 	cp += sizeof(LONG);
     }
 }
+
+/* #pragma GCC pop_options */
 
 #endif /* LITTLE_ENDIAN */
 

@@ -45,6 +45,21 @@ main overheads on ARM:
 5) sha          1.73    1.32
 MMX:            1.61    1.24
 ARM:            1.64    1.48
+NO_LOOP_UNROLLING_AT_BYTE_REVERSE:
+/*
+#pragma GCC push_options
+#pragma GCC optimize("no-unroll-loops,no-peel-loops,no-tree-loop-optimize"))
+byte_reverse(...) {
+...
+}
+#pragma GCC pop_options
+*/
+MMX:            1.19    1.09
+ARM:            1.59    1.18
+
+NOTE: on ARM, performance doesn't improve much on locals mode because with
+loop unrolling disabled the compiler doesn't inline byte_reverse in sha_final
+anymore, but instead make calls to byte_reverse, which increases reg syncs.
 
 x86:
 1- missed vectorization
