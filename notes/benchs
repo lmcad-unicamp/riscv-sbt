@@ -114,7 +114,7 @@ ARM:            0.98    1.08
 x86: * very low %mean (~3%), that also causes big xsd (~0.25)
 ARM: * very low %mean (~2%), that also causes big xsd (~0.15)
 
-C) bitcount     1.75    0.81    # TODO run test again on x86
+C) bitcount     1.65    0.80
 ARM:            5.25    1.42
 * huge reg sync impact
 ARM:
@@ -146,18 +146,18 @@ ARM:            1.40    1.19
 x86: * low %mean (~4%), high xsd (~0.3)
 ARM: * low %mean (~3%), high xsd (~0.2)
 
---> ARM <--
-
 G) susan-smooth 1.13    1.03
 MMX:            0.76    0.69
-ARM:
+ARM:            1.23    1.15
 H) susan-edges  1.26    1.23
 MMX:            1.13    1.09
-ARM:
+ARM:            1.25    1.19
 I) susan-corner 1.34    1.27
 MMX:            0.94    0.95
-ARM:
+ARM:            1.15    1.17
 * missed vectorization
 
+--> ARM <--
+
 J) lame         1.44    1.12
-ARM:
+ARM:            1.95    1.46

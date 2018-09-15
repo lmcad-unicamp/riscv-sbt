@@ -345,8 +345,7 @@ arm-dstdir:
         _in = mpath(self.srcdir, dir, "large.wav")
         out = mpath(self.dstdir, dir, "{prefix}output_large{mode}.mp3")
         runs = Runs([Run([_in, out], outidx=1)])
-        bflags = cat('--cflags="-DLAMEPARSE -DLAMESNDFILE"',
-                        self.bflags_no_fp_contract)
+        bflags = '--cflags="-DLAMEPARSE -DLAMESNDFILE"'
         sbtflags = self.stack_huge
         return self._bench("lame", dir, srcs, runs,
                 bflags=bflags, sbtflags=sbtflags)
