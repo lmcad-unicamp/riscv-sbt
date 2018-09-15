@@ -122,7 +122,10 @@ instret_l2:
 
     li a0, 1
     lsym a1, ecall
+#   gcc/as
     li a2, %lo(len)
+#   clang/mc
+#   li a2, 6
     li a7, %lo(SYS_WRITE)
     ecall
 

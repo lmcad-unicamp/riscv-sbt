@@ -220,7 +220,7 @@ x86-fp128-run:
 
         names = []
         for mod in mods:
-            if mod.name == "printf" and (GOPTS.gcc() or GOPTS.rv_gcc()):
+            if mod.name == "printf" and not GOPTS.printf_break:
                 continue
             self.append(mod.gen())
             names.append(mod.name)

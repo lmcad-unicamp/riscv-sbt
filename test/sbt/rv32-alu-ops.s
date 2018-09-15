@@ -162,6 +162,13 @@ main:
     mv a0, s3
     call printf
 
+#   For some reason that I have no time to investigate auipc test does not
+#   work on clang/mc.
+#
+# gcc/as
+.if 1
+# clang/mc
+#.if 0
     # auipc
     # symbol
     lsym a0, auipc_str
@@ -171,6 +178,7 @@ main:
     auipc a1, 0x12345
     sub a1, a1, s4
     call printf
+.endif
 
     # restore ra
     add ra, zero, s1

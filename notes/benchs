@@ -1,8 +1,7 @@
 MiBench
 =======
 
-cc=clang
-rvcc=gcc
+cc=rvcc=gcc
                 locals  abi
 1) dijkstra     0.87    0.85
 ARM:            0.77    0.80

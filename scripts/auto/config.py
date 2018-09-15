@@ -11,6 +11,7 @@ class GlobalOpts:
     def __init__(self):
         #self.cc = "clang"
         self.cc = "gcc"
+        #self.rvcc = "clang"
         self.rvcc = "gcc"
         self.mmx = True
         self.thumb = True
@@ -279,6 +280,7 @@ RV32_LINUX = Arch(
         sysroot=RV32_LINUX_SYSROOT,
         isysroot=RV32_LINUX_SYSROOT + "/usr/include",
         llcflags=RV32_LLC_FLAGS,
+        optflags=RV32_LLC_FLAGS,
         as_flags=RV32_LINUX_AS_FLAGS,
         ld_flags=RV32_LINUX_LD_FLAGS,
         mattr=RV32_MATTR)
@@ -291,6 +293,7 @@ X86_SYSROOT     = "/usr/i686-linux-gnu" if GCC7 else "/"
 X86_ISYSROOT    = "/usr/i686-linux-gnu/include" if GCC7 else "/usr/include"
 X86_GCC         = X86_TRIPLE + ("-gcc-7" if GCC7 else "-gcc")
 X86_GCC_FLAGS   = "" if GCC7 else "-m32"
+X86_LLC_FLAGS   = cat(LLC_STATIC, "-march=" + X86_MARCH, "-mattr=" + X86_MATTR)
 
 X86 = Arch(
         name="x86",
@@ -305,7 +308,8 @@ X86 = Arch(
             "--target=x86_64-unknown-linux-gnu -m32"),
         sysroot=X86_SYSROOT,
         isysroot=X86_ISYSROOT,
-        llcflags=cat(LLC_STATIC, "-march=" + X86_MARCH, "-mattr=" + X86_MATTR),
+        llcflags=X86_LLC_FLAGS,
+        optflags=X86_LLC_FLAGS,
         as_flags="--32",
         ld_flags="-m elf_i386",
         mattr=X86_MATTR)

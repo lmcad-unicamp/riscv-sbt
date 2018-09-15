@@ -13,7 +13,10 @@ _start:
     addi a0, zero, 1
     lui a1, %hi(msg)
     addi a1, a1, %lo(msg)
+# gcc/as
     addi a2, zero, %lo(msg_len)
+# clang/mc
+#   addi a2, zero, 14
     addi a7, zero, %lo(SYS_WRITE)
     ecall
 
