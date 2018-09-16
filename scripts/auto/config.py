@@ -130,8 +130,16 @@ class Tools:
 TOOLS = Tools()
 
 UNAME_M = shell("uname -m", save_out=True, quiet=True)
-GCC7 = subprocess.run("gcc --version | head -n1 | grep 7.3 >/dev/null",
-            shell=True, check=False).returncode == 0
+
+def x86_gcc7_exists():
+    try:
+        subprocess.run(["i686-linux-gnu-gcc-7", "--version"],
+                stdout=subprocess.DEVNULL)
+    except FileNotFoundError:
+        return False
+    return True
+
+GCC7 = x86_gcc7_exists()
 
 RV32_MATTR_NORELAX = "-a,-c,+m,+f,+d"
 RV32_MATTR      = RV32_MATTR_NORELAX + ",+relax"

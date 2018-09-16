@@ -12,7 +12,7 @@ import subprocess
 import sys
 import time
 
-PERF = "perf_4.16" if GCC7 else "perf"
+PERF = "perf"
 ALL_MODES = ["native"] + SBT.modes
 ALL_COLUMNS = [i for i in range(8)]
 

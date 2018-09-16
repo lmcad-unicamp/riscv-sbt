@@ -39,7 +39,7 @@ RUN dpkg --add-architecture i386 \
     && apt-get update \
     && apt-get install -y \
     libunwind8:i386 \
-    linux-perf-4.16:i386 \
+    linux-perf-4.18:i386 \
     && rm -rf /var/lib/apt/lists/*
 
 ENV TOPDIR=/riscv-sbt
