@@ -12,7 +12,7 @@ import subprocess
 import sys
 import time
 
-PERF = "perf"
+PERF = os.getenv("PERF", "perf")
 ALL_MODES = ["native"] + SBT.modes
 ALL_COLUMNS = [i for i in range(8)]
 
