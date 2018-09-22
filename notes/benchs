@@ -160,3 +160,100 @@ ARM:            1.15    1.17
 
 J) lame         1.44    1.12
 ARM:            1.95    1.46
+
+ARM:
+On ARM, the biggest overhead is at window_subband.constprop.28() function.
+However, LAME is quite big, and other parts of it also present significant
+overhead. But, for timing constraints, we've analyzed only window_subband().
+
+
+First, let's consider the experimental data collected:
+
+Measurement data (RV32-ARM = rv32-arm-lame-abi):
+            time% at lame bin   time% at window_subband     slowdown
+ARM:        91.68%              13.71%
+RV32-ARM:   93.70%              15.86%                      1.46x
+
+Note that although % of time is not much higher on RV32-ARM, this % refers to
+a much bigger total execution time.
+
+Perf samples:   pre-loop    loop1   loop2   total
+ARM:            10          241     288     539
+RV32-ARM:       17          421     863     1301
+
+
+Now, let's look at how code was generated.
+
+The hot spot source code has the following format:
+for 15..0:
+    for 14..0:
+        s0 += *wp++ * *in++;
+        s1 += *wp++ * *in++;
+
+Where,
+wp = mm (uninitialized static data)
+in = func param = win (uninitialized static data)
+s0, s1 = local vars
+
+CodeGen:
+- In all cases the inner loop was completely unrolled.
+
+ARM (each iteration):
+4x vldr
+2x vmla.f64
+total = 6 instructions
+
+RV32:
+4x fld offs(a4/a5)
+2x fmadd
+total = 6 instructions
+
+RV32-ARM:
+2x
+1- movw r0, %lo(addr)
+2- movt r0, %hi(addr)
+3- add r0, ip
+4- vldr dx, [r0]
+5- add.w rx, r2, #imm
+6- vldr dx, [rx]
+7- vmla.f64
+total = 14 instructions
+
+We can see that, for both ARM and RV32, the generated code is optimal. It
+performs only the minimum required operations: 4 loads and 2 fused multiply
+adds of loaded values.
+When translating from RV32 to ARM however, the number of instructions more
+than double. We can divide the inneficiencies in two.
+
+1)
+On RV32-ARM, instructions 1 to 3 are used to load an immediate address, that
+is then used by instruction 4 to load a value from there. On RV32, these are
+a4 relative addresses. At the inner loop, a4 has a known value and that's why
+references using it are translated to immediate addresses on ARM.
+The main problem here seems to be that, when translating the
+optimized/unrolled RV32 loop, the optimizer/code generator fails to infer that
+all these addresses are relative to a common base, with an offset added only.
+Add to that the fact that, on ARM, an immediate address in Position
+Independent Code (PIC) requires 3 instructions to be loaded into a register:
+load the lower part (movw), higher part (movt) and add the position
+independent base (ip).
+On native ARM codegen, loads are performed using a base register plus an
+offset. Going even further, the compiler adds an offset to the base register,
+to make it possible to use the limited immediate offset field of vldr
+instruction (-1020..1020), saving a register and an add instruction on each
+load.
+Thus, for native ARM, the compiler is able to maintain the whole view of the
+hottest nested loop and generate the most efficient code for it. That's not
+the case when translating the already unrolled and optimized RV32 loop code.
+Performance could possibly be increase if generating ARM code that need not be
+position independent or making RV32 code be position independent, so both
+optimizer would match on this feature. Our ARM toolchain however requires PIC
+and there is no time available to change the experiments to use RV32 PIC.
+
+2)
+On RV32, a5 value inside the main basic block varies (it's assigned from a
+phi node). That's why addresses derived from it can't be converted into
+immediate values, as in case 1. When generating ARM code, a5 based loads
+results in 2 instructions: 5 (r2+offset) and 6 (vldr). In this case, the shift
+base register value to make offsets fit in vldr immediate field optimization
+was missed, as in 1.
