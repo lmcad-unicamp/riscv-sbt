@@ -93,7 +93,13 @@ plot_vs()
     local l3="$slabel1 Locals"
     local l4="$slabel2 Locals"
     local l5="$slabel1 ABI"
-    local l6="$slabel2 ABI"
+    local l6
+
+    if [ "$arch" = ARM -a "$second" = "arm-oi.csv" ]; then
+        l6="$slabel2 Whole"
+    else
+        l6="$slabel2 ABI"
+    fi
 
     if [ -f "$out" ]; then
         return

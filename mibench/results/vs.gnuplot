@@ -1,11 +1,12 @@
 #!/usr/bin/gnuplot
 reset
-set title a_title
+#set title a_title
 set ylabel "Slowdown"
 set xtics rotate by 33 offset 0,0 right
 set grid ytics
 set xrange [0:21]
 set yrange [0:3]
+set size noratio 2,1
 set key on
 
 set style data histograms
@@ -19,7 +20,7 @@ set style line 4 lt 1 linecolor rgb "#80ff80"
 set style line 5 lt 1 linecolor rgb "#0000ff"
 set style line 6 lt 1 linecolor rgb "#8080ff"
 
-set terminal postscript eps enhanced color "Arial" 8
+set terminal postscript eps enhanced color "Arial" 14
 set output f_out
 
 plot f_in using ($1-0.2):3:4:xticlabels(2) with boxerrorbars title l1 ls 1, \
