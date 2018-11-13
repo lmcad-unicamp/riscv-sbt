@@ -1,3 +1,4 @@
-*_slowdown.csv
+arm_slowdown.csv
+x86-avx-*_slowdown.csv
 *.dat
 *.pdf

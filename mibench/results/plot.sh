@@ -5,8 +5,12 @@ MEASURE_PY=$AUTO/measure.py
 
 clean()
 {
-    rm -f *_slowdown.csv *.dat *.pdf
+    rm -f x86-avx-*_slowdown.csv arm_slowdown.csv *.dat *.pdf
 }
+
+
+#f=x86-avx-gcchf.csv
+#plot_single $f ${f%.csv}.pdf x86
 
 plot_single()
 {
@@ -36,9 +40,13 @@ extract_slowdown()
     local slowdown_csv=${base}_slowdown.csv
     local slowdown_dat=${base}_slowdown.dat
 
-    $MEASURE_PY -x $in -m globals locals abi -c 6 7 > $slowdown_csv
-    sed 1,2d $slowdown_csv | tr , ' ' | \
-        awk 'BEGIN{i=1} {print i++ " " $$0}' > $slowdown_dat
+    if [ ! -f "$slowdown_csv" ]; then
+        $MEASURE_PY -x $in -m globals locals abi -c 6 7 > $slowdown_csv
+    fi
+    if [ ! -f "$slowdown_dat" ]; then
+        sed 1,2d $slowdown_csv | tr , ' ' | \
+            awk 'BEGIN{i=1} {print i++ " " $$0}' > $slowdown_dat
+    fi
     echo $slowdown_dat
 }
 
@@ -87,6 +95,10 @@ plot_vs()
     local l5="$slabel1 ABI"
     local l6="$slabel2 ABI"
 
+    if [ -f "$out" ]; then
+        return
+    fi
+
     first_dat=`extract_slowdown $first`
     second_dat=`extract_slowdown $second`
     merge $first_dat $second_dat > $dat
@@ -116,8 +128,14 @@ set -e
 set -u
 set -x
 
-f=x86-avx-gcchf.csv
-#plot_single $f ${f%.csv}.pdf x86
 plot_vs "Clang soft-float" "GCC soft-float" "x86" \
     x86-avx-clang.csv x86-avx-gccsf.csv x86-clang-vs-gcc.pdf \
     "Clang" "GCC"
+
+plot_vs "RISC-V SBT" "OpenISA SBT" "x86" \
+    x86-avx-gcchf.csv x86-oi.csv x86-rv-vs-oi.pdf \
+    "RISC-V" "OpenISA"
+
+plot_vs "RISC-V SBT" "OpenISA SBT" "ARM" \
+    arm.csv arm-oi.csv arm-rv-vs-oi.pdf \
+    "RISC-V" "OpenISA"
