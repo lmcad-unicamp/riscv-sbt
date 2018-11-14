@@ -8,31 +8,6 @@ clean()
     rm -f x86-avx-*_slowdown.csv arm_slowdown.csv *.dat *.pdf
 }
 
-
-#f=x86-avx-gcchf.csv
-#plot_single $f ${f%.csv}.pdf x86
-
-plot_single()
-{
-    local in=$1
-    local out=$2
-    local arch=$3
-
-    local base=${in%.csv}
-    local slowdown_csv=${base}_slowdown.csv
-    local slowdown_dat=${base}_slowdown.dat
-    local output="| ps2pdf -dEPSCrop -dAutoRotatePages=/None - $out"
-
-    $MEASURE_PY -x $in -m globals locals abi -c 6 7 > $slowdown_csv
-    sed 1,2d $slowdown_csv | grep -v geomean | tr , ' ' | \
-        awk 'BEGIN{i=1} {print i++ " " $$0}' > $slowdown_dat
-    gnuplot \
-        -e "f_in='$slowdown_dat'" \
-        -e "f_out='$output'" \
-        -e "a_title='MiBench RISC-V to $arch Translation'" \
-        mibench.gnuplot
-}
-
 extract_slowdown()
 {
     local in=$1
@@ -48,6 +23,36 @@ extract_slowdown()
             awk 'BEGIN{i=1} {print i++ " " $$0}' > $slowdown_dat
     fi
     echo $slowdown_dat
+}
+
+plot_single()
+{
+    local title=$1
+    local arch=$2
+    local in=$3
+
+    local dat
+    local base=${in%.csv}
+    local out=$base.pdf
+    local output="| ps2pdf -dEPSCrop -dAutoRotatePages=/None - $out"
+    local l1="Globals"
+    local l2="Locals"
+    local l3="ABI"
+
+    if [ -f "$out" ]; then
+        return
+    fi
+
+    dat=`extract_slowdown $in`
+
+    gnuplot \
+        -e "f_in='$dat'" \
+        -e "f_out='$output'" \
+        -e "a_title='MiBench RISC-V to $arch Translation'" \
+        -e "l1='$l1'" \
+        -e "l2='$l2'" \
+        -e "l3='$l3'" \
+        single.gnuplot
 }
 
 merge()
@@ -134,14 +139,41 @@ set -e
 set -u
 set -x
 
+# clang vs gcc (x86)
 plot_vs "Clang soft-float" "GCC soft-float" "x86" \
     x86-avx-clang.csv x86-avx-gccsf.csv x86-clang-vs-gcc.pdf \
     "Clang" "GCC"
 
+# gcc soft-float vs hard-float (x86)
+plot_vs "GCC soft-float" "GCC hard-float" "x86" \
+    x86-avx-gccsf.csv x86-avx-gcchf.csv x86-sf-vs-hf.pdf \
+    "soft-float" "hard-float"
+
+# GCC 6 vs 7
+# x86
+plot_vs "GCC 6.3.0" "GCC 7.3.0" "x86" \
+    x86-avx-gcchf.csv x86-avx-gcc7hf.csv x86-gcc6-vs-gcc7.pdf \
+    "GCC6" "GCC7"
+# ARM
+plot_vs "GCC 6.3.0" "GCC 7.3.0" "ARM" \
+    arm.csv arm-gcc7.csv arm-gcc6-vs-gcc7.pdf \
+    "GCC6" "GCC7"
+
+# GCC hard-float AVX
+plot_single "GCC hard-float" "x86" x86-avx-gcchf.csv
+plot_single "GCC hard-float" "ARM" arm.csv
+
+# AVX vs MMX (x86)
+plot_vs "GCC hard-float AVX" "GCC hard-float MMX" "x86" \
+    x86-avx-gcchf.csv x86-mmx-gcchf.csv x86-avx-vs-mmx.pdf \
+    "AVX" "MMX"
+
+# RISC-V vs OpenISA
+# x86
 plot_vs "RISC-V SBT" "OpenISA SBT" "x86" \
     x86-avx-gcchf.csv x86-oi.csv x86-rv-vs-oi.pdf \
     "RISC-V" "OpenISA"
-
+# ARM
 plot_vs "RISC-V SBT" "OpenISA SBT" "ARM" \
     arm.csv arm-oi.csv arm-rv-vs-oi.pdf \
     "RISC-V" "OpenISA"

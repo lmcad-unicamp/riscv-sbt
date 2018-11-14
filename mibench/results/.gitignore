@@ -1,4 +1,6 @@
 arm_slowdown.csv
+arm-gcc7_slowdown.csv
 x86-avx-*_slowdown.csv
+x86-mmx-*_slowdown.csv
 *.dat
 *.pdf
