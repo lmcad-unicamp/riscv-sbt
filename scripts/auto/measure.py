@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from auto.config import ARM, GCC7, SBT, X86
+from auto.config import ARM, GCC7, RV32_LINUX, SBT, X86
 from auto.utils import path, shell
 
 import argparse
@@ -13,7 +13,9 @@ import sys
 import time
 
 PERF = os.getenv("PERF", "perf")
-ALL_MODES = ["native"] + SBT.modes
+RV32_MODES = ["native", "QEMU"]
+SBT_MODES = ["native"] + SBT.modes
+ALL_MODES = RV32_MODES + SBT.modes
 ALL_COLUMNS = [i for i in range(8)]
 
 class Options:
@@ -29,13 +31,17 @@ class Options:
         self.save_out = False
         self.n = None
         self.modes = None
+        self.rv32 = None
 
 
 class Program:
     def __init__(self, dir, basename, arch, mode, args, opts):
         self.basename = basename
         self.name = arch + '-' + basename
-        if mode:
+        self.rv32 = arch == "rv32"
+        if mode and mode == "QEMU":
+            pass
+        elif mode:
             self.name = self.name + '-' + mode
         else:
             mode = 'native'
@@ -127,6 +133,10 @@ class Program:
             args.extend(["-F", str(freq)])
         elif self.opts.freq:
             args.extend(["-F", str(self.opts.freq)])
+
+        if self.rv32:
+            args.extend(["qemu-riscv32", "-L", RV32_LINUX.sysroot])
+
         args.extend(self.args)
         if verbose:
             print(" ".join(args))
@@ -198,6 +208,10 @@ class Program:
                 args = [PERF, "stat", "-o", perf_out]
             else:
                 args = []
+
+            if self.rv32:
+                args.extend(["qemu-riscv32", "-L", RV32_LINUX.sysroot])
+
             args.extend(self.args)
 
             if not perf:
@@ -683,19 +697,25 @@ class Measure:
 
 
     def measure(self):
-        self._measure_target(self.narch.name)
+        self._measure_target(self.narch.prefix)
 
 
     def perf(self):
-        self._perf_target(self.narch.name)
+        self._perf_target(self.narch.prefix)
 
 
     def _build_programs(self, target):
         nprog = Program(self.dir, self.prog, target, None, self.args, self.opts)
-        xarch = 'rv32-' + target
-        xprogs = [
-            Program(self.dir, self.prog, xarch, mode, self.args, self.opts)
-                for mode in self.opts.modes if mode != "native"]
+
+        if self.opts.rv32:
+            xarch = "rv32"
+            xprogs = [ Program(self.dir, self.prog, xarch, "QEMU", self.args,
+                    self.opts) ]
+        else:
+            xarch = 'rv32-' + target
+            xprogs = [
+                Program(self.dir, self.prog, xarch, mode, self.args, self.opts)
+                    for mode in self.opts.modes if mode != "native"]
         return [nprog] + xprogs
 
 
@@ -725,14 +745,20 @@ class Measure:
         # get means
         nat = None
 
-        mibench = MiBench(ALL_MODES, ALL_COLUMNS)
+        if self.opts.rv32:
+            modes = ["native", "QEMU"]
+            mibench = MiBench(modes, ALL_COLUMNS)
+        else:
+            mibench = MiBench(ALL_MODES, ALL_COLUMNS)
+            modes = self.opts.modes
+
         print(
             "{{:<{}}} ".format(Result.MODE_LEN).format("mode"),
             mibench.item_format(*mibench.header()[1][1:9]),
             " ({})".format(self.id), sep='')
 
         results = []
-        for mode in self.opts.modes:
+        for mode in modes:
             res = Result(mode, times[mode], lcperfs[mode])
             if mode == 'native':
                 nat = res
@@ -819,11 +845,13 @@ if __name__ == "__main__":
     parser.add_argument("--printf", "-p", action="store_true",
         help="print formatted .csv file contents")
     parser.add_argument("--modes", "-m", type=str, nargs='+',
-        choices=ALL_MODES, default=ALL_MODES)
+        choices=ALL_MODES, default=SBT_MODES)
     parser.add_argument("--columns", "-c", type=int, nargs='+',
         choices=ALL_COLUMNS, default=ALL_COLUMNS)
     parser.add_argument("--xform", "-x", action="store_true",
         help="apply modes/columns filters and output new .csv file")
+    parser.add_argument("--rv32", action="store_true",
+        help="measure RV32 emulator (QEMU) performance")
 
     args = parser.parse_args()
     sargs = [arg.strip() for arg in args.args]
@@ -841,6 +869,13 @@ if __name__ == "__main__":
     opts.n = int(n) if n else args.n
     opts.modes = args.modes
     opts.columns = args.columns
+
+    opts.rv32 = args.rv32
+    if opts.rv32:
+        opts.perf_libc = False
+        ALL_MODES = RV32_MODES
+    else:
+        ALL_MODES = SBT_MODES
 
     pargs = args.pargs
 

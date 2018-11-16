@@ -20,7 +20,7 @@ class Bench:
     def __init__(self, name, dir, ins, runs=None, dbg=None,
             bflags=None, xflags=None, sbtflags=[], mflags=None,
             srcdir=None, dstdir=None, narchs=None, xarchs=None,
-            cc=None, rvcc=None):
+            cc=None, rvcc=None, rv32=None):
         self.name = name
         self.dir = dir
         self.ins = ins
@@ -28,6 +28,7 @@ class Bench:
         self.runs.name = name
         self.sbtflags = sbtflags
         self.dbg = dbg
+        self.rv32 = rv32
 
         xflags = cat(bflags, xflags)
         if dbg == "dbg":
@@ -123,7 +124,7 @@ class Bench:
         # measures
         measures = []
         for run in self.runs:
-            self.gm.measure(run, dep_bin=False)
+            self.gm.measure(run, dep_bin=False, rv32=self.rv32)
             m = self.name
             if run.id:
                 m = m + "-" + run.id
@@ -188,6 +189,7 @@ class EncDecBench(Bench):
 
 class MiBench:
     def __init__(self, args):
+        self.rv32 = args.rv32
         no_arm = args.no_arm
         if no_arm:
             self.narchs = [RV32_LINUX, X86]
@@ -248,7 +250,7 @@ arm-dstdir:
             bflags=bflags, xflags=xflags, sbtflags=sbtflags,
             narchs=self.narchs,
             xarchs=self.xarchs,
-            cc=cc, rvcc=rvcc,
+            cc=cc, rvcc=rvcc, rv32=self.rv32,
             **kwargs)
 
 
@@ -478,7 +480,10 @@ plot: mibench.csv
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate Makefile")
-    parser.add_argument("--no-arm", action="store_true")
+    parser.add_argument("--no-arm", action="store_true",
+        help="exclude all ARM targets")
+    parser.add_argument("--rv32", action="store_true",
+        help="measure QEMU RV32 performance instead of that of translated bins")
     args = parser.parse_args()
 
     mb = MiBench(args)
