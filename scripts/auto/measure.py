@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from auto.config import ARM, GCC7, RV32_LINUX, SBT, X86
+from auto.config import ARM, GCC7, GOPTS, RV32_LINUX, SBT, X86
 from auto.utils import path, shell
 
 import argparse
@@ -13,9 +13,16 @@ import sys
 import time
 
 PERF = os.getenv("PERF", "perf")
-RV32_MODES = ["native", "QEMU"]
-SBT_MODES = ["native"] + SBT.modes
-ALL_MODES = RV32_MODES + SBT.modes
+
+RV32_EMU    = "QEMU" if GOPTS.rv32 == "qemu" else "RV8"
+if RV32_EMU == "QEMU":
+    RV32_RUN = ["qemu-riscv32", "-L", RV32_LINUX.sysroot]
+else:
+    RV32_RUN = ["rv-jit"]
+
+RV32_MODES  = ["native", RV32_EMU]
+SBT_MODES   = ["native"] + SBT.modes
+ALL_MODES   = RV32_MODES + SBT.modes
 ALL_COLUMNS = [i for i in range(8)]
 
 class Options:
@@ -39,7 +46,7 @@ class Program:
         self.basename = basename
         self.name = arch + '-' + basename
         self.rv32 = arch == "rv32"
-        if mode and mode == "QEMU":
+        if mode and mode == RV32_EMU:
             pass
         elif mode:
             self.name = self.name + '-' + mode
@@ -135,7 +142,7 @@ class Program:
             args.extend(["-F", str(self.opts.freq)])
 
         if self.rv32:
-            args.extend(["qemu-riscv32", "-L", RV32_LINUX.sysroot])
+            args.extend(RV32_RUN)
 
         args.extend(self.args)
         if verbose:
@@ -210,7 +217,7 @@ class Program:
                 args = []
 
             if self.rv32:
-                args.extend(["qemu-riscv32", "-L", RV32_LINUX.sysroot])
+                args.extend(RV32_RUN)
 
             args.extend(self.args)
 
@@ -709,7 +716,7 @@ class Measure:
 
         if self.opts.rv32:
             xarch = "rv32"
-            xprogs = [ Program(self.dir, self.prog, xarch, "QEMU", self.args,
+            xprogs = [ Program(self.dir, self.prog, xarch, RV32_EMU, self.args,
                     self.opts) ]
         else:
             xarch = 'rv32-' + target
@@ -746,7 +753,7 @@ class Measure:
         nat = None
 
         if self.opts.rv32:
-            modes = ["native", "QEMU"]
+            modes = RV32_MODES
             mibench = MiBench(modes, ALL_COLUMNS)
         else:
             mibench = MiBench(ALL_MODES, ALL_COLUMNS)
@@ -851,7 +858,7 @@ if __name__ == "__main__":
     parser.add_argument("--xform", "-x", action="store_true",
         help="apply modes/columns filters and output new .csv file")
     parser.add_argument("--rv32", action="store_true",
-        help="measure RV32 emulator (QEMU) performance")
+        help="measure RV32 emulator (QEMU/RV8) performance")
 
     args = parser.parse_args()
     sargs = [arg.strip() for arg in args.args]

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from auto.config import ARM, GOPTS, SBT, TOOLS, X86
+from auto.config import ARM, GOPTS, RV32, SBT, TOOLS, X86
 from auto.utils import cat, path, unique
 
 class ArchAndMode:
@@ -386,6 +386,13 @@ class GenMake:
                 nam = ArchAndMode(None, xam.narch)
                 nout = name(nam)
                 diff(nout, xout)
+
+        if GOPTS.rv32 == "rv8":
+            fam = ArchAndMode(RV32, None)
+            nam = ArchAndMode(None, X86)
+            fout = name(fam)
+            nout = name(nam)
+            diff(fout, nout)
 
         tname = Run.build_name(None, self.name, id, None)
         fmtdata = {

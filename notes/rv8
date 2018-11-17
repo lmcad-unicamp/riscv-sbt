@@ -1,0 +1,17 @@
+dijkstra - ok
+crc32 - ok
+sha - ok
+adpcm-encode - ok
+adpcm-decode - ok
+stringsearch - ok
+
+rijndael - cannot create output file issue
+blowfish - cannot create output file issue
+workaround: create output file with touch first
+
+basicmath - crash
+bitcount - wrong result
+fft - doesn't end
+patricia - doesn't build with ELF toolchain
+susan - cannot create output file issue && wrong result
+lame - cannot create output file issue && crash

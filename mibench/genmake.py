@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from auto.config import ARM, DIR, GOPTS, RV32_LINUX, SBT, TOOLS, X86
+from auto.config import ARM, DIR, GOPTS, RV32, RV32_LINUX, SBT, TOOLS, X86
 from auto.genmake import ArchAndMode, GenMake, Run, Runs
 from auto.utils import cat, mpath, path, xassert
 
@@ -191,12 +191,22 @@ class MiBench:
     def __init__(self, args):
         self.rv32 = args.rv32
         no_arm = args.no_arm
-        if no_arm:
-            self.narchs = [RV32_LINUX, X86]
-            self.xarchs = [(RV32_LINUX, X86)]
+
+        if GOPTS.rv32 == "rv8":
+            rv32 = RV32
+            no_arm = True
+            xarchs = []
         else:
-            self.narchs = [RV32_LINUX, X86, ARM]
-            self.xarchs = [(RV32_LINUX, X86), (RV32_LINUX, ARM)]
+            rv32 = RV32_LINUX
+            xarchs = [(rv32, X86)]
+
+        if no_arm:
+            self.narchs = [rv32, X86]
+            self.xarchs = xarchs
+        else:
+            self.narchs = [rv32, X86, ARM]
+            self.xarchs = [(rv32, X86), (rv32, ARM)]
+
         self.srcdir = path(DIR.top, "mibench")
         self.dstdir = path(DIR.build, "mibench")
         self.stack_large = ["-stack-size=131072"]    # 128K

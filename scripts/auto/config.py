@@ -13,16 +13,19 @@ class GlobalOpts:
         self.cc = "gcc"
         #self.rvcc = "clang"
         self.rvcc = "gcc"
-        self.mmx = True
+        self.mmx = False
         self.thumb = True
         if self.rvcc == "gcc":
             self.rvabi = "ilp32d"
         else:
             self.rvabi = "ilp32"
 
+        self.rv32 = "qemu"
+        #self.rv32 = "rv8"
+
         self.arm_copy = "ssh"
         #self.arm_copy = "adb"
-        if self.arm_copy == "adb":
+        if self.arm_copy == "adb" or self.rv32 == "rv8":
             self.static = True
         else:
             self.static = False
@@ -254,12 +257,16 @@ RV32_MARCH      = "riscv32"
 RV32_LLC_FLAGS  = cat(LLC_STATIC,
         "-march=" + RV32_MARCH, "-mattr=" + RV32_MATTR)
 
+#RV32_RUN       = "LD_LIBRARY_PATH={}/lib spike {}".format(
+#   DIR.toolchain_release, PK32)
+RV32_RUN        = \
+    "qemu-riscv32" if GOPTS.rv32 == "qemu" else "rv-jit --"
+
 RV32 = Arch(
         name="rv32",
         prefix="rv32",
         triple=RV32_TRIPLE,
-        run="LD_LIBRARY_PATH={}/lib spike {}".format(
-            DIR.toolchain_release, PK32),
+        run=RV32_RUN,
         march=RV32_MARCH,
         gccflags="",
         clang_flags=cat(CLANG_CFLAGS, "--target=riscv32"),
@@ -276,12 +283,15 @@ RV32_LINUX_ABI          = GOPTS.rvabi
 RV32_LINUX_GCC_FLAGS    = "-march=rv32g -mabi=" + RV32_LINUX_ABI
 RV32_LINUX_AS_FLAGS     = "-march=rv32g -mabi=" + RV32_LINUX_ABI
 RV32_LINUX_LD_FLAGS     = "-m elf32lriscv"
+RV32_LINUX_RUN          = \
+    "qemu-riscv32 -L " + RV32_LINUX_SYSROOT if GOPTS.rv32 == "qemu" \
+        else "rv-jit --"
 
 RV32_LINUX = Arch(
         name="rv32-linux",
         prefix="rv32",
         triple="riscv64-unknown-linux-gnu",
-        run="qemu-riscv32 -L " + RV32_LINUX_SYSROOT,
+        run=RV32_LINUX_RUN,
         march=RV32_MARCH,
         gccflags=RV32_LINUX_GCC_FLAGS,
         clang_flags=cat(CLANG_CFLAGS, "--target=riscv32 -D__riscv_xlen=32"),

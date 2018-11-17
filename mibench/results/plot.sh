@@ -15,6 +15,10 @@ extract_slowdown()
     local slowdown_csv=${base}_slowdown.csv
     local slowdown_dat=${base}_slowdown.dat
 
+
+#$MEASURE_PY --rv32 -x qemu.csv -m QEMU -c 6 7 > qemu_slowdown.csv
+#$MEASURE_PY --rv32 -x rv8.csv -m RV8 -c 6 7 > rv8_slowdown.csv
+
     if [ ! -f "$slowdown_csv" ]; then
         $MEASURE_PY -x $in -m globals locals abi -c 6 7 > $slowdown_csv
     fi

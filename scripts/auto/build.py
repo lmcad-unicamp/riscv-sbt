@@ -254,7 +254,7 @@ class GCCBuilder:
         opts = self.opts
         arch = opts.arch
 
-        if arch != RV32_LINUX:
+        if arch != RV32_LINUX and arch != RV32:
             raise Exception("unexpected arch")
 
         old = chsuf(obj, ".old.o")
@@ -434,7 +434,7 @@ class Builder:
         else:
             self._cnlink()
 
-        if opts.dbg and opts.arch == RV32_LINUX:
+        if opts.dbg and (opts.arch == RV32_LINUX or opts.arch == RV32):
             self._gen_list()
 
 
