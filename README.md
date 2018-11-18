@@ -71,6 +71,21 @@ machine and follow the same steps as above. Note that on the ARM machine
 only the riscv-sbt files are needed, as no submodules are used to run the
 benchmarks on ARM.
 
+Graph Plotting
+--------------
+
+Briefly, to update the performance and comparison graphs with the results of a new MiBench
+run, do the following:
+
+- copy the resulting mibench.csv file to results/&lt;run-name&gt;.csv
+- in results dir, run `./plot.sh`
+- use `./plot.sh clean` or remove the corresponding intermediate files to force the generation of a new graph
+
+Here, &lt;run-name&gt; should be the name of one of the already present .csv files in results dir,
+excluding the *_slowdown.csv ones. The name is related to the settings used in the run. For instance,
+x86-avx-gcchf means that the benchmarks were run on an x86 host, with AVX extensions enabled, using GCC with
+hard-float ABI to build RISC-V and native binaries. Most of the settings can be adjusted at scripts/auto/config.py
+file.
 
 Unit Tests
 ----------
