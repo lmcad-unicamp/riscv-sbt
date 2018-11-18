@@ -62,20 +62,20 @@ correctly.  Then, use `make benchs-measure` to measure the times of all
 binaries.
 
 To run MiBench on an ARM host, the fastest way (and currently the only
-        supported one) is to cross compile the ARM binaries on an x86 host and
-copy the binaries to the ARM host through SSH. By default, `./genmake.py &&
+supported one) is to cross compile the ARM binaries on an x86 host and
+copy them to the ARM host through SSH. By default, `./genmake.py &&
 make` already builds all ARM binaries. To copy them to the remote machine,
-    first adjust ARM and ARM_TOPDIR to point the desired target, then use
-    `make benchs-arm-copy` to copy them with SSH. To run then, SSH to the ARM
-    machine, and follow the same steps as above. Note that on the ARM machine
-    only the riscv-sbt files are needed, as no submodules are used to run the
-    benchmarks on ARM.
+first adjust ARM and ARM_TOPDIR environment variables to point the desired target, then use
+`make benchs-arm-copy` to copy them with SSH. To run them, SSH to the ARM
+machine and follow the same steps as above. Note that on the ARM machine
+only the riscv-sbt files are needed, as no submodules are used to run the
+benchmarks on ARM.
 
 
 Unit Tests
 ----------
 
-There are a couple of unit tests written to check if the toolchain and RISC-V
+There are a couple of unit tests written to check if the toolchain and RISC-V SBT
 are working correctly, that may be useful when changing the SBT or hunting
 bugs. To run them, use:
 
@@ -84,7 +84,7 @@ bugs. To run them, use:
 make almost-alltests
 ```
 
-There is also an 'alltests' target, but includes a test for mostly unused
+There is also an 'alltests' target, but it includes a test for mostly unused
 features of the SBT, such as (limited) ecall translation and CSR reads of
-time, cycles, and instructions retired, and it can be tricky to get it working
+time, cycles, and instructions retired. Also, it can be tricky to get it working
 properly.
