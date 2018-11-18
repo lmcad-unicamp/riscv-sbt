@@ -15,3 +15,34 @@ fft - doesn't end
 patricia - doesn't build with ELF toolchain
 susan - cannot create output file issue && wrong result
 lame - cannot create output file issue && crash
+
+---
+Measuring QEMU performance
+---
+
+- config.py: set GOPTS.rv32 to "qemu"
+- cd mibench && ./genmake.py --no-arm --rv32
+- make && make benchs-test && make benchs-measure
+- cp mibench.csv qemu.csv
+- measure.py --rv32 -x qemu.csv -m QEMU -c 6 7 > qemu_slowdown.csv
+
+---
+Measuring RV8 performance
+---
+
+- config.py: set GOPTS.rv32 to "rv8"
+- cd mibench && ./genmake.py --no-arm --rv32
+- make dijkstra crc32 sha adpcm-encode adpcm-decode stringsearch rijndael \
+  blowfish
+- make dijkstra-test crc32-test sha-test adpcm-encode-test adpcm-decode-test \
+    stringsearch-test
+- make rijndael-encode-test # fails: create output file and run again
+- make rijndael-decode-test # fails: create output file and run again
+- make blowfish-encode-test # fails: create output file and run again
+- make blowfish-decode-test # fails: create output file and run again
+- make dijkstra-measure crc32-measure rijndael-measure sha-measure \
+    adpcm-encode-measure adpcm-decode-measure stringsearch-measure \
+    blowfish-measure
+- cp mibench.csv rv8.csv
+- measure.py --rv32 -x rv8.csv -m RV8 -c 6 7 > rv8_slowdown.csv
+- # insert the missing benchmarks after blowfish, with 0.00 values

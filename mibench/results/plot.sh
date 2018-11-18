@@ -131,6 +131,37 @@ plot_vs()
         vs.gnuplot
 }
 
+plot_others()
+{
+    local first=$1
+    local second=$2
+    local third=$3
+    local out=$4
+
+    local first_dat
+    local second_dat
+    local third_dat
+    local dat=${out%.pdf}.dat
+    # output a pdf file via ps2pdf
+    local output="| ps2pdf -dEPSCrop -dAutoRotatePages=/None - $out"
+
+    if [ -f "$out" ]; then
+        return
+    fi
+
+    first_dat=`extract_slowdown $first`
+    second_dat=`extract_slowdown $second`
+    third_dat=`extract_slowdown $third`
+
+    gnuplot \
+        -e "f1='$first_dat'" \
+        -e "f2='$second_dat'" \
+        -e "f3='$third_dat'" \
+        -e "f_out='$output'" \
+        others.gnuplot
+}
+
+
 
 ### main ###
 
@@ -181,3 +212,6 @@ plot_vs "RISC-V SBT" "OpenISA SBT" "x86" \
 plot_vs "RISC-V SBT" "OpenISA SBT" "ARM" \
     arm.csv arm-oi.csv arm-rv-vs-oi.pdf \
     "RISC-V" "OpenISA"
+
+# others: RISC-V SBT vs QEMU vs RV8
+plot_others x86-avx-gcchf-wlibc.csv qemu.csv rv8.csv others.pdf

@@ -884,6 +884,7 @@ if __name__ == "__main__":
     else:
         ALL_MODES = SBT_MODES
 
+#    opts.perf_libc = False
     pargs = args.pargs
 
     if args.printf or args.xform:
