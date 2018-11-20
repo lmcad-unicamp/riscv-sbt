@@ -22,7 +22,7 @@ else:
 
 RV32_MODES  = ["native", RV32_EMU]
 SBT_MODES   = ["native"] + SBT.modes
-ALL_MODES   = RV32_MODES + SBT.modes
+ALL_MODES   = None
 ALL_COLUMNS = [i for i in range(8)]
 
 class Options:
@@ -246,6 +246,10 @@ class Program:
 
 class MiBench:
     def __init__(self, modes=None, columns=None):
+        global ALL_MODES
+        if not ALL_MODES:
+            ALL_MODES = SBT_MODES
+
         self.modes = modes if modes else ALL_MODES
         self.columns = columns if columns else ALL_COLUMNS
         # precisions
@@ -852,7 +856,7 @@ if __name__ == "__main__":
     parser.add_argument("--printf", "-p", action="store_true",
         help="print formatted .csv file contents")
     parser.add_argument("--modes", "-m", type=str, nargs='+',
-        choices=ALL_MODES, default=SBT_MODES)
+        choices=RV32_MODES + SBT.modes, default=SBT_MODES)
     parser.add_argument("--columns", "-c", type=int, nargs='+',
         choices=ALL_COLUMNS, default=ALL_COLUMNS)
     parser.add_argument("--xform", "-x", action="store_true",
@@ -884,7 +888,10 @@ if __name__ == "__main__":
     else:
         ALL_MODES = SBT_MODES
 
-#    opts.perf_libc = False
+    # uncomment the line below to enable measuring
+    # native performance with libc time included
+    #opts.perf_libc = False
+
     pargs = args.pargs
 
     if args.printf or args.xform:

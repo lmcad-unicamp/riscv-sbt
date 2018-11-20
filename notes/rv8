@@ -36,13 +36,25 @@ Measuring RV8 performance
   blowfish
 - make dijkstra-test crc32-test sha-test adpcm-encode-test adpcm-decode-test \
     stringsearch-test
-- make rijndael-encode-test # fails: create output file and run again
-- make rijndael-decode-test # fails: create output file and run again
-- make blowfish-encode-test # fails: create output file and run again
-- make blowfish-decode-test # fails: create output file and run again
+- make rijndael-test    # encode fails: create output file and run again
+- make rijndael-test    # decode fails: create output file and run again
+- make blowfish-test    # encode fails: create output file and run again
+- make blowfish-test    # decode fails: create output file and run again
+- make csv-header
 - make dijkstra-measure crc32-measure rijndael-measure sha-measure \
     adpcm-encode-measure adpcm-decode-measure stringsearch-measure \
     blowfish-measure
 - cp mibench.csv rv8.csv
 - measure.py --rv32 -x rv8.csv -m RV8 -c 6 7 > rv8_slowdown.csv
 - # insert the missing benchmarks after blowfish, with 0.00 values
+
+---
+Measuring x86 performance with libc included
+---
+
+- cd mibench && ./genmake.py --no-arm
+- measure.py: uncomment the line below
+    "# native performance with libc time included"
+- make && make benchs-test && make benchs-measure
+- cp mibench.csv results/x86-avx-gcchf-wlibc.csv
+
