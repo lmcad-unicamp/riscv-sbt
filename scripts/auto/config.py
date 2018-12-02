@@ -20,12 +20,13 @@ class GlobalOpts:
         else:
             self.rvabi = "ilp32"
 
-        self.rv32 = "qemu"
+        #self.rv32 = "qemu"
         #self.rv32 = "rv8"
+        self.rv32 = "ovp"
 
         self.arm_copy = "ssh"
         #self.arm_copy = "adb"
-        if self.arm_copy == "adb" or self.rv32 == "rv8":
+        if self.arm_copy == "adb" or self.rv32 == "rv8" or self.rv32 == "ovp":
             self.static = True
         else:
             self.static = False
@@ -257,16 +258,28 @@ RV32_MARCH      = "riscv32"
 RV32_LLC_FLAGS  = cat(LLC_STATIC,
         "-march=" + RV32_MARCH, "-mattr=" + RV32_MATTR)
 
-#RV32_RUN       = "LD_LIBRARY_PATH={}/lib spike {}".format(
-#   DIR.toolchain_release, PK32)
-RV32_RUN        = \
-    "qemu-riscv32" if GOPTS.rv32 == "qemu" else "rv-jit --"
+RV32_RUN_ARGV = None
+if GOPTS.rv32 == "qemu":
+    RV32_EMU = "QEMU"
+    RV32_RUN = ["qemu-riscv32", "-L", RV32_LINUX.sysroot]
+elif GOPTS.rv32 == "rv8":
+    RV32_EMU = "RV8"
+    RV32_RUN = ["rv-jit", "--"]
+elif GOPTS.rv32 == "ovp":
+    RV32_EMU = "OVP"
+    RV32_RUN = ["riscvOVPsim.exe", "--variant", "RV32GC", "--program"]
+    RV32_RUN_ARGV = "--argv"
+else:
+    raise Exception("Invalid GOPTS.rv32 value!")
+
+RV32_RUN_STR = " ".join(RV32_RUN)
+
 
 RV32 = Arch(
         name="rv32",
         prefix="rv32",
         triple=RV32_TRIPLE,
-        run=RV32_RUN,
+        run=RV32_RUN_STR,
         march=RV32_MARCH,
         gccflags="",
         clang_flags=cat(CLANG_CFLAGS, "--target=riscv32"),
@@ -283,9 +296,7 @@ RV32_LINUX_ABI          = GOPTS.rvabi
 RV32_LINUX_GCC_FLAGS    = "-march=rv32g -mabi=" + RV32_LINUX_ABI
 RV32_LINUX_AS_FLAGS     = "-march=rv32g -mabi=" + RV32_LINUX_ABI
 RV32_LINUX_LD_FLAGS     = "-m elf32lriscv"
-RV32_LINUX_RUN          = \
-    "qemu-riscv32 -L " + RV32_LINUX_SYSROOT if GOPTS.rv32 == "qemu" \
-        else "rv-jit --"
+RV32_LINUX_RUN          = RV32_RUN_STR
 
 RV32_LINUX = Arch(
         name="rv32-linux",

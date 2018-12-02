@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-from auto.config import *
-from auto.utils import *
+from auto.config import ARCH, GOPTS, RV32_RUN_ARGV
+from auto.utils import cat, path, shell
 
 import argparse
 import shlex
@@ -26,7 +26,15 @@ class Runner:
         opath = path(dir, out)
         save_out = len(out) > 0 and self.arch.can_run()
 
-        cmd = cat(arch.run, ppath, " ".join(args))
+        argv_sep = None
+        if arch.is_rv32():
+            argv_sep = RV32_RUN_ARGV
+
+        # XXX hack
+        if arch.is_rv32() and GOPTS.rv32 == "ovp" and prog == "rv32-blowfish":
+            exp_rc = 0
+
+        cmd = cat(arch.run, ppath, argv_sep, " ".join(args))
         if tee:
             cmd = "/bin/bash -c " + shlex.quote(cmd + " | tee " + opath +
                   "; exit ${PIPESTATUS[0]}")

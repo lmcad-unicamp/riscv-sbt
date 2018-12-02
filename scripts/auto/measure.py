@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 
-from auto.config import ARM, GCC7, GOPTS, RV32_LINUX, SBT, X86
+from auto.config import ARM, GCC7, GOPTS, \
+        RV32_EMU, RV32_LINUX, RV32_RUN, RV32_RUN_ARGV, \
+        SBT, X86
 from auto.utils import path, shell
 
 import argparse
@@ -13,12 +15,6 @@ import sys
 import time
 
 PERF = os.getenv("PERF", "perf")
-
-RV32_EMU    = "QEMU" if GOPTS.rv32 == "qemu" else "RV8"
-if RV32_EMU == "QEMU":
-    RV32_RUN = ["qemu-riscv32", "-L", RV32_LINUX.sysroot]
-else:
-    RV32_RUN = ["rv-jit"]
 
 RV32_MODES  = ["native", RV32_EMU]
 SBT_MODES   = ["native"] + SBT.modes
@@ -115,7 +111,12 @@ class Program:
 
 
     def _check_rc(self, rc, args=None):
-        exp_rc = self.opts.exp_rc
+        # XXX hack
+        if self.rv32 and GOPTS.rv32 == "ovp" and self.name == "rv32-blowfish":
+            exp_rc = 0
+        else:
+            exp_rc = self.opts.exp_rc
+
         if rc != exp_rc:
             raise Exception("Failure! rc=" + str(rc) + " exp_rc=" + str(exp_rc)
                     + ("\nCommand: " + " ".join(args) if args else ""))
@@ -219,7 +220,11 @@ class Program:
             if self.rv32:
                 args.extend(RV32_RUN)
 
-            args.extend(self.args)
+            # XXX hack
+            if self.rv32 and GOPTS.rv32 == "ovp":
+                args.extend([self.args[0], "--argv"] + self.args[1:])
+            else:
+                args.extend(self.args)
 
             if not perf:
                 t0 = time.time()
@@ -862,7 +867,7 @@ if __name__ == "__main__":
     parser.add_argument("--xform", "-x", action="store_true",
         help="apply modes/columns filters and output new .csv file")
     parser.add_argument("--rv32", action="store_true",
-        help="measure RV32 emulator (QEMU/RV8) performance")
+        help="measure RV32 emulator (QEMU/RV8/OVP) performance")
 
     args = parser.parse_args()
     sargs = [arg.strip() for arg in args.args]
@@ -887,10 +892,6 @@ if __name__ == "__main__":
         ALL_MODES = RV32_MODES
     else:
         ALL_MODES = SBT_MODES
-
-    # uncomment the line below to enable measuring
-    # native performance with libc time included
-    #opts.perf_libc = False
 
     pargs = args.pargs
 

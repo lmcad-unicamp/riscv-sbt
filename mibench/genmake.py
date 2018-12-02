@@ -192,7 +192,7 @@ class MiBench:
         self.rv32 = args.rv32
         no_arm = args.no_arm
 
-        if GOPTS.rv32 == "rv8":
+        if GOPTS.rv32 == "rv8" or GOPTS.rv32 == "ovp":
             rv32 = RV32
             no_arm = True
             xarchs = []

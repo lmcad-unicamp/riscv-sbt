@@ -49,6 +49,35 @@ Measuring RV8 performance
 - # insert the missing benchmarks after blowfish, with 0.00 values
 
 ---
+Measuring OVP performance
+---
+
+- config.py: set GOPTS.rv32 to "ovp"
+- cd mibench && ./genmake.py --no-arm --rv32
+- make dijkstra crc32 sha adpcm-encode adpcm-decode stringsearch rijndael \
+  blowfish
+- make dijkstra-test crc32-test sha-test adpcm-encode-test adpcm-decode-test \
+    stringsearch-test rijndael-test blowfish-test
+- make csv-header
+- make dijkstra-measure crc32-measure rijndael-measure sha-measure \
+    adpcm-encode-measure adpcm-decode-measure stringsearch-measure \
+    blowfish-measure
+- cp mibench.csv ovp.csv
+- measure.py --rv32 -x ovp.csv -m OVP -c 6 7 > ovp_slowdown.csv
+- # insert the missing benchmarks after blowfish, with 0.00 values
+
+---
+Measuring x86 performance with libc included
+---
+
+- cd mibench && ./genmake.py --no-arm
+- measure.py: uncomment the line below
+    "# native performance with libc time included"
+- make && make benchs-test && make benchs-measure
+- cp mibench.csv results/x86-avx-gcchf-wlibc.csv
+
+
+---
 Measuring x86 performance with libc included
 ---
 
