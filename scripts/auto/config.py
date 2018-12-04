@@ -20,9 +20,9 @@ class GlobalOpts:
         else:
             self.rvabi = "ilp32"
 
-        #self.rv32 = "qemu"
+        self.rv32 = "qemu"
         #self.rv32 = "rv8"
-        self.rv32 = "ovp"
+        #self.rv32 = "ovp"
 
         self.arm_copy = "ssh"
         #self.arm_copy = "adb"
@@ -261,7 +261,7 @@ RV32_LLC_FLAGS  = cat(LLC_STATIC,
 RV32_RUN_ARGV = None
 if GOPTS.rv32 == "qemu":
     RV32_EMU = "QEMU"
-    RV32_RUN = ["qemu-riscv32", "-L", RV32_LINUX.sysroot]
+    RV32_RUN = ["qemu-riscv32"]
 elif GOPTS.rv32 == "rv8":
     RV32_EMU = "RV8"
     RV32_RUN = ["rv-jit", "--"]
@@ -291,18 +291,19 @@ RV32 = Arch(
         mattr=RV32_MATTR)
 
 
-RV32_LINUX_SYSROOT  = DIR.toolchain_release + "/opt/riscv/sysroot"
+RV32_LINUX_SYSROOT      = DIR.toolchain_release + "/opt/riscv/sysroot"
 RV32_LINUX_ABI          = GOPTS.rvabi
 RV32_LINUX_GCC_FLAGS    = "-march=rv32g -mabi=" + RV32_LINUX_ABI
 RV32_LINUX_AS_FLAGS     = "-march=rv32g -mabi=" + RV32_LINUX_ABI
 RV32_LINUX_LD_FLAGS     = "-m elf32lriscv"
-RV32_LINUX_RUN          = RV32_RUN_STR
+RV32_LINUX_RUN          = RV32_RUN + ["-L", RV32_LINUX_SYSROOT]
+RV32_LINUX_RUN_STR      = " ".join(RV32_LINUX_RUN)
 
 RV32_LINUX = Arch(
         name="rv32-linux",
         prefix="rv32",
         triple="riscv64-unknown-linux-gnu",
-        run=RV32_LINUX_RUN,
+        run=RV32_LINUX_RUN_STR,
         march=RV32_MARCH,
         gccflags=RV32_LINUX_GCC_FLAGS,
         clang_flags=cat(CLANG_CFLAGS, "--target=riscv32 -D__riscv_xlen=32"),

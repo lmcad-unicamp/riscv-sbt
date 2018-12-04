@@ -128,7 +128,7 @@ class Program:
             for l in f:
                 m = patt.match(l)
                 if m:
-                    return float(m.group(1))
+                    return float(m.group(1).replace(',','.'))
             else:
                 raise Exception("Failed to extract perf time!")
 
