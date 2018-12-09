@@ -2,7 +2,7 @@
 reset
 #set title a_title
 set ylabel "Slowdown"
-set xtics rotate by 33 offset 0,0 right
+set xtics rotate by 45 offset 0,0 right
 set grid ytics
 set xrange [0:21]
 set yrange [0:3]
@@ -23,7 +23,7 @@ set style line 5 lt 1 linecolor rgb "#0000ff"
 set style line 6 lt 1 linecolor rgb "#8080ff"
 set style line 7 lt 1 linecolor rgb "#ffffff"
 
-set terminal postscript eps enhanced color "Arial" 14
+set terminal postscript eps enhanced color "Arial-Bold" 18
 set output f_out
 
 plot \
@@ -32,8 +32,9 @@ plot \
     '' using ($1-2*inc):7:8   with boxerrorbars title l3 ls 3, \
     '' using ($1-1*inc):9:10  with boxerrorbars title l4 ls 4, \
     '' using ($1+0*inc):11:12 with boxerrorbars title l5 ls 5, \
-    '' using ($1+1*inc):13:14 with boxerrorbars title l6 ls 6, \
-    '' using ($1-4*inc):3:3   with labels left rotate font "Arial-Bold,10" offset 0,-2 tc ls 7 notitle, \
+    '' using ($1+1*inc):13:14 with boxerrorbars title l6 ls 6
+
+#    '' using ($1-4*inc):3:3   with labels left rotate font "Arial-Bold,10" offset 0,-2 tc ls 7 notitle, \
     '' using ($1-3*inc):5:5   with labels left rotate font "Arial-Bold,10" offset 0,-2 tc ls 7 notitle, \
     '' using ($1-2*inc):7:7   with labels left rotate font "Arial-Bold,10" offset 0,-2 tc ls 7 notitle, \
     '' using ($1-1*inc):9:9   with labels left rotate font "Arial-Bold,10" offset 0,-2 tc ls 7 notitle, \

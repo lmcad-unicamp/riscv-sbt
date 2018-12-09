@@ -3,13 +3,29 @@
 .text
 .global main
 main:
-    lui     t0, %hi(var)
-    addi    t0, t0, %lo(var)
-    lbu     a0, 3(t0)
+    # save return address
+    mv      s0, ra
+
+    addi    t0, zero, 2
+    blt     a0, t0, no_args
+
+    lui     a0, %hi(str_first_arg)
+    addi    a0, a0, %lo(str_first_arg)
+    lw      a1, 4(a1)
+    call    printf
+    j       out
+
+no_args:
+    lui     a0, %hi(str_no_args)
+    addi    a0, a0, %lo(str_no_args)
+    call    puts
+
+out:
+    mv      a0, zero
+    mv      ra, s0
     ret
 
 .data
-var:    .byte 12
-        .byte 34
-        .byte 56
-        .byte 0
+.align 4
+str_first_arg:  .asciz  "First argument: %s\n"
+str_no_args:    .asciz  "No arguments"
