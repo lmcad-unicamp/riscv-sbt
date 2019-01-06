@@ -216,6 +216,7 @@ x86-fp128-run:
                 bflags=bflags, sbtflags=sbtflags),
             self._module("printf", "printf.c", rflags=rflags,
                 bflags=bflags, sbtflags=sbtflags),
+            self._module("ex", "ex.c", rflags=rflags, bflags=bflags, dbg=False)
         ]
 
         names = []
