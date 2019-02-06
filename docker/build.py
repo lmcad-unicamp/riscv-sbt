@@ -97,7 +97,7 @@ VOLS = Volumes()
 #
 
 class Docker:
-    BIND = False
+    BIND = True
 
     def __init__(self, name, img):
         self.name = name
@@ -429,8 +429,8 @@ if __name__ == "__main__":
     parser.add_argument("--run", type=str, help="run a docker image")
     parser.add_argument("--exec", type=str,
         help="exec bash on an existing container")
-    parser.add_argument("--bind", action="store_true",
-        help="use bind mount for all volumes when running a container")
+    parser.add_argument("--no-bind", action="store_true",
+        help="do not use bind mount for all volumes when running a container")
     parser.add_argument("--rdev", action="store_true",
         help="run dev container")
     parser.add_argument("--xdev", action="store_true",
@@ -448,7 +448,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
 
-    Docker.BIND = args.bind
+    if args.no_bind:
+        Docker.BIND = False
 
     def run(img):
         name = img.replace("sbt-", "")
