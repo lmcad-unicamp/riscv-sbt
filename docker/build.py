@@ -387,6 +387,8 @@ class Images:
         # build all?
         if name == "all":
             for img in self.imgs:
+                if img.name == "gcc7":
+                    continue
                 img.build(force)
             return
 
