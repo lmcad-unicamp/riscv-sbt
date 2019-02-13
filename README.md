@@ -7,6 +7,7 @@ How to Build
 To build the SBT and the RISC-V toolchain, use the following:
 
 ```bash
+git submodule update --init --recursive
 . scripts/env.sh
 make
 ```
