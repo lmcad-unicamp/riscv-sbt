@@ -44,25 +44,28 @@ docker-img:
 		./build.py --get-srcs && \
 		./build.py --build all
 
+DOCKER_SET := cd docker && export TOPDIR=$(TOPDIR) PYTHONPATH=$(TOPDIR)/scripts
+
+docker-mibuild:
+	$(DOCKER_SET) && ./build.py --mibuild
+
+docker-mitest:
+	$(DOCKER_SET) && ./build.py --mitest
+
+docker-mirun:
+	$(DOCKER_SET) && ./build.py --mirun
+
 docker-rdev:
-	cd docker && \
-		export TOPDIR=$(TOPDIR) PYTHONPATH=$(TOPDIR)/scripts && \
-		./build.py --rdev
+	$(DOCKER_SET) && ./build.py --rdev
 
 docker-xdev:
-	cd docker && \
-		export TOPDIR=$(TOPDIR) PYTHONPATH=$(TOPDIR)/scripts && \
-		./build.py --xdev
+	$(DOCKER_SET) && ./build.py --xdev
 
 docker-rgcc7:
-	cd docker && \
-		export TOPDIR=$(TOPDIR) PYTHONPATH=$(TOPDIR)/scripts && \
-		./build.py --bind --rgcc7
+	$(DOCKER_SET) && ./build.py --bind --rgcc7
 
 docker-xgcc7:
-	cd docker && \
-		export TOPDIR=$(TOPDIR) PYTHONPATH=$(TOPDIR)/scripts && \
-		./build.py --bind --xgcc7
+	$(DOCKER_SET) && ./build.py --bind --xgcc7
 
 ###
 

@@ -25,6 +25,9 @@ TCD=$TC/debug
 SCRIPTS_DIR=$TOPDIR/scripts
 export PYTHONPATH=$SCRIPTS_DIR
 
+# library path (needed to use docker built SBT)
+export LD_LIBRARY_PATH=$TC/$BUILD_TYPE_DIR/lib
+
 # set PATH
 
 addpath()

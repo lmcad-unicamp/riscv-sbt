@@ -66,11 +66,29 @@ To run MiBench on an ARM host, the fastest way (and currently the only
 supported one) is to cross compile the ARM binaries on an x86 host and
 copy them to the ARM host through SSH. By default, `./genmake.py &&
 make` already builds all ARM binaries. To copy them to the remote machine,
-first adjust ARM and ARM_TOPDIR environment variables to point the desired target, then use
-`make benchs-arm-copy` to copy them with SSH. To run them, SSH to the ARM
-machine and follow the same steps as above. Note that on the ARM machine
-only the riscv-sbt files are needed, as no submodules are used to run the
-benchmarks on ARM.
+first adjust ARM and ARM_TOPDIR environment variables to point the desired
+target, then use `make benchs-arm-copy` to copy them with SSH. To run them,
+SSH to the ARM machine and follow the same steps as above. Note that on the
+ARM machine only the riscv-sbt files are needed, as no submodules are used
+to run the benchmarks on ARM.
+
+
+MiBench on Docker
+-----------------
+
+Alternatively, Docker can be used to build and run MiBench instead, but only
+for x86. Use the following commands to build, test and run MiBench:
+
+```bash
+make docker-mibuild
+make docker-mitest
+make docker-mirun
+```
+
+The results will be available at mibench/mibench.csv. Use the measure.py
+script to print the results in a more readable format, or check how to plot a
+graph from it in the next section.
+
 
 Graph Plotting
 --------------
