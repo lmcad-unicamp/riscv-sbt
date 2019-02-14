@@ -1,8 +1,8 @@
-RISC-V Static Binary Translator (SBT)
--------------------------------------
+# RISC-V Static Binary Translator (SBT)
 
-How to Build
-------------
+## 1. How to Build
+
+### 1.1. Build on Host
 
 To build the SBT and the RISC-V toolchain, use the following:
 
@@ -18,8 +18,7 @@ Note that several tools are required to build the SBT.
 The best way to find them is to look at the Dockerfiles, in docker dir.
 
 
-Docker build
-------------
+### 1.2. Build on Docker
 
 Alternatively, a docker image can be built and used instead:
 
@@ -36,8 +35,9 @@ The host machine needs to have only these tools installed:
 - python3
 
 
-MiBench
--------
+## 2. MiBench
+
+### 2.1. Host
 
 To build MiBench benchmarks, use the following commands:
 
@@ -73,8 +73,7 @@ ARM machine only the riscv-sbt files are needed, as no submodules are used
 to run the benchmarks on ARM.
 
 
-MiBench on Docker
------------------
+### 2.2. Docker
 
 Alternatively, Docker can be used to build and run MiBench instead, but only
 for x86. Use the following commands to build, test and run MiBench:
@@ -90,8 +89,7 @@ script to print the results in a more readable format, or check how to plot a
 graph from it in the next section.
 
 
-Graph Plotting
---------------
+### 2.3. Graph Plotting
 
 Briefly, to update the performance and comparison graphs with the results of a new MiBench
 run, do the following:
@@ -106,8 +104,8 @@ x86-avx-gcchf means that the benchmarks were run on an x86 host, with AVX extens
 hard-float ABI to build RISC-V and native binaries. Most of the settings can be adjusted at scripts/auto/config.py
 file.
 
-Unit Tests
-----------
+
+## 3. Unit Tests
 
 There are a couple of unit tests written to check if the toolchain and RISC-V SBT
 are working correctly, that may be useful when changing the SBT or hunting
