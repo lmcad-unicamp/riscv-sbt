@@ -136,7 +136,7 @@ class Program:
     def perf_libc(self, verbose=False, freq=None):
         save_out = self.opts.save_out
 
-        args = [PERF, "record", "-q"]
+        args = [PERF, "record", "-e", "cycles", "-q"]
         if freq:
             args.extend(["-F", str(freq)])
         elif self.opts.freq:

@@ -2,7 +2,7 @@ TOPDIR ?= $(shell pwd)
 
 BUILDPKG_PY := $(TOPDIR)/scripts/auto/build_pkg.py
 
-all: sbt riscv-gnu-toolchain-linux spike qemu
+all: riscv-gnu-toolchain-newlib riscv-gnu-toolchain-linux sbt spike qemu
 
 riscv-gnu-toolchain-newlib:
 	@$(BUILDPKG_PY) $@ $(MAKE_OPTS)
